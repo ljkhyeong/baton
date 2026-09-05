@@ -1135,12 +1135,24 @@ paths:
       description: 세션 계정의 구독 기록을 시즌 UUID 오름차순으로 최대 20개 조회한다. 현재 팀 권한과 공유 키는 필요 없다. CAL을 호출하지 않으며 최신 상태는 개별 조회한다.
       operationId: listCalendarSubscriptions
       parameters:
-        - description: 이전 응답의 nextAfterSeasonId UUID. 첫 페이지는 생략
+        - description: 같은 검색·포함 조건에서 받은 nextAfterSeasonId UUID. 조건 변경 시 생략
           in: query
           name: afterSeasonId
           required: false
           schema:
             format: uuid
+            type: string
+        - description: 팀·시즌 이름에 포함된 문자열. 최대 100자, 앞뒤 공백 제거. 생략·빈 값은 전체. %, _도 일반 문자
+          in: query
+          name: query
+          required: false
+          schema:
+            type: string
+        - description: 기본 true. false면 해제 완료 기록을 제외하며 처리 중인 기록은 유지
+          in: query
+          name: includeRevoked
+          required: false
+          schema:
             type: string
         - description: 화면의 로그인 계정 UUID. 세션 계정과 일치해야 함
           example: 00000000-0000-0000-0000-000000002641
@@ -3109,7 +3121,7 @@ paths:
               examples:
                 getDecisionChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"d99b5566-f36f-48f7-b175-78207f88e459","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"7e100c12-b540-491d-a971-b2008df69ea9","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -4713,7 +4725,7 @@ paths:
               examples:
                 getRoleResourceChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"e4489606-1ad6-42cb-aeaa-55c5d7a395d3","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"9169ec5b-6a9c-4b18-824e-497b3271b184","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}

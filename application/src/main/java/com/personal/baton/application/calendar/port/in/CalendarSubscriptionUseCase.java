@@ -17,7 +17,7 @@ public interface CalendarSubscriptionUseCase {
     record Summary(UUID subscriptionId, UUID teamId, UUID seasonId, String teamName, String seasonName,
                    ManagementStatus managementStatus) {}
     record SubscriptionPage(List<Summary> subscriptions, UUID nextAfterSeasonId) {}
-    SubscriptionPage list(UUID accountId, UUID afterSeasonId);
+    SubscriptionPage list(UUID accountId, UUID afterSeasonId, String query, boolean includeRevoked);
     Subscription find(Scope scope);
     Credential create(Scope scope);
     Credential rotate(Scope scope);

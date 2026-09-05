@@ -34,10 +34,10 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
     }
 
     @Override
-    public SubscriptionPage list(UUID accountId, UUID afterSeasonId) {
+    public SubscriptionPage list(UUID accountId, UUID afterSeasonId, String query, boolean includeRevoked) {
         int pageSize = 20;
-        var rows = store.list(accountId, afterSeasonId, pageSize + 1);
         var now = clock.instant();
+        var rows = store.list(accountId, afterSeasonId, query.strip(), includeRevoked, now, pageSize + 1);
         var summaries = rows.stream().limit(pageSize).map(row -> {
             var stored = row.subscription();
             var state = stored.revocationPending() ? ManagementStatus.REVOCATION_PENDING

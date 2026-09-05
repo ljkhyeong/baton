@@ -2,7 +2,7 @@ import { getCsrfToken } from '@/features/auth/api'
 import { ApiClientError } from '@/shared/api/ApiError'
 import { apiRequest } from '@/shared/api/client'
 import { isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
-import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarSubscription, CalendarSubscriptionList, CalendarSubscriptionSummary } from './types'
+import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarSubscription, CalendarSubscriptionList, CalendarSubscriptionSummary, CalendarListFilters } from './types'
 
 const statuses: CalendarStatus[] = ['NOT_CREATED', 'IN_PROGRESS', 'ACTIVE', 'REISSUE_REQUIRED', 'REVOKED', 'REVOCATION_PENDING']
 const invalid = () => new ApiClientError('invalid-response', undefined)
@@ -43,9 +43,9 @@ export async function revokeCalendarSubscription(scope: CalendarScope) {
 }
 
 const managementStatuses: CalendarSubscriptionSummary['managementStatus'][] = ['CHECK_REQUIRED', 'IN_PROGRESS', 'REVOKED', 'REVOCATION_PENDING']
-export function getCalendarSubscriptions(accountId: string, afterSeasonId: string | null, signal: AbortSignal) {
-  const query = afterSeasonId ? `?${new URLSearchParams({ afterSeasonId })}` : ''
-  return apiRequest(`/api/v1/me/calendar-subscriptions${query}`, { method: 'GET', signal,
+export function getCalendarSubscriptions(accountId: string, afterSeasonId: string | null, filters: CalendarListFilters, signal: AbortSignal) {
+  return apiRequest('/api/v1/me/calendar-subscriptions', { method: 'GET', signal,
+    query: { afterSeasonId, query: filters.query || undefined, includeRevoked: filters.includeRevoked ? undefined : false },
     headers: { 'X-Baton-Account-Id': accountId }, decode: (value): CalendarSubscriptionList => {
       if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Array.isArray(value.subscriptions)
         || !(value.nextAfterSeasonId === null || isUuid(value.nextAfterSeasonId))) throw invalid()

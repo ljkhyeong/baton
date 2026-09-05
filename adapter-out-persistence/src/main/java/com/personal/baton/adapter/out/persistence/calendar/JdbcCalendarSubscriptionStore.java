@@ -43,20 +43,35 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
     }
 
     @Override
-    public List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, int limit) {
+    public List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, String query, boolean includeRevoked, Instant now, int limit) {
         var parameters = new ArrayList<Object>();
         parameters.add(accountId.toString());
-        String cursor = "";
+        var sql = new StringBuilder("""
+                SELECT BIN_TO_UUID(subscription.account_id) account_id, BIN_TO_UUID(subscription.team_id) team_id,
+                       BIN_TO_UUID(subscription.season_id) season_id, BIN_TO_UUID(subscription.subscription_id) subscription_id,
+                       subscription.revoked, subscription.revocation_pending, subscription.lease_until,
+                       team.name team_name, season.name season_name
+                FROM calendar_subscriptions subscription
+                JOIN teams team ON team.id=subscription.team_id
+                JOIN seasons season ON season.id=subscription.season_id
+                WHERE subscription.account_id=UUID_TO_BIN(?)
+                """);
         if (afterSeasonId != null) {
-            cursor = " AND season_id>UUID_TO_BIN(?)";
+            sql.append(" AND subscription.season_id>UUID_TO_BIN(?)");
             parameters.add(afterSeasonId.toString());
         }
+        if (!query.isEmpty()) {
+            sql.append(" AND (LOCATE(?,team.name)>0 OR LOCATE(?,season.name)>0)");
+            parameters.add(query);
+            parameters.add(query);
+        }
+        if (!includeRevoked) {
+            sql.append(" AND (subscription.revoked=FALSE OR subscription.revocation_pending=TRUE OR subscription.lease_until>?)");
+            parameters.add(utc(now));
+        }
+        sql.append(" ORDER BY subscription.season_id LIMIT ?");
         parameters.add(limit);
-        return jdbc.query("SELECT owned.*, team.name team_name, season.name season_name FROM ("
-                + SELECT + " WHERE account_id=UUID_TO_BIN(?)" + cursor + " ORDER BY season_id LIMIT ?) owned"
-                + " JOIN teams team ON team.id=UUID_TO_BIN(owned.team_id)"
-                + " JOIN seasons season ON season.id=UUID_TO_BIN(owned.season_id)"
-                + " ORDER BY owned.season_id",
+        return jdbc.query(sql.toString(),
                 (rs, index) -> new NamedSubscription(read(rs, index), rs.getString("team_name"), rs.getString("season_name")),
                 parameters.toArray());
     }

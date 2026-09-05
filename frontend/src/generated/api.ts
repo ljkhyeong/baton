@@ -4790,8 +4790,12 @@ export interface operations {
     listCalendarSubscriptions: {
         parameters: {
             query?: {
-                /** @description 이전 응답의 nextAfterSeasonId UUID. 첫 페이지는 생략 */
+                /** @description 같은 검색·포함 조건에서 받은 nextAfterSeasonId UUID. 조건 변경 시 생략 */
                 afterSeasonId?: string;
+                /** @description 기본 true. false면 해제 완료 기록을 제외하며 처리 중인 기록은 유지 */
+                includeRevoked?: string;
+                /** @description 팀·시즌 이름에 포함된 문자열. 최대 100자, 앞뒤 공백 제거. 생략·빈 값은 전체. %, _도 일반 문자 */
+                query?: string;
             };
             header: {
                 /**

@@ -13,3 +13,6 @@ export type CalendarSubscriptionList = Omit<operations['listCalendarSubscription
   nextAfterSeasonId: string | null
 }
 export type CalendarSubscriptionSummary = CalendarSubscriptionList['subscriptions'][number]
+
+export type CalendarListFilters = { query: string; includeRevoked: boolean }
+export type CalendarStatusCheck = CalendarSubscription & { checkedAt: number }

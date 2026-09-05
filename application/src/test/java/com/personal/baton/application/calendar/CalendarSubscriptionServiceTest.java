@@ -115,8 +115,8 @@ class CalendarSubscriptionServiceTest {
         store.release(other, false);
         jdbc.update("DELETE FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", scope.accountId().toString());
         var disabled = new CalendarSubscriptionService(access, memberships, store, client, Clock.fixed(NOW, ZoneOffset.UTC), false);
-        var first = disabled.list(scope.accountId(), null);
-        var second = disabled.list(scope.accountId(), first.nextAfterSeasonId());
+        var first = disabled.list(scope.accountId(), null, "", true);
+        var second = disabled.list(scope.accountId(), first.nextAfterSeasonId(), "", true);
         assertThat(first.subscriptions()).hasSize(20).allSatisfy(row -> {
             assertThat(row.teamName()).isEqualTo("구독 검증 팀");
             assertThat(row.seasonName()).startsWith("지난 시즌 ");
@@ -127,7 +127,18 @@ class CalendarSubscriptionServiceTest {
         var actual = Stream.concat(first.subscriptions().stream(), second.subscriptions().stream())
                 .map(row -> row.seasonId().toString()).toList();
         assertThat(actual).containsExactlyElementsOf(seasons.stream().map(UUID::toString).sorted().toList());
-        assertThat(service.list(UUID.randomUUID(), null).subscriptions()).isEmpty();
+        jdbc.update("UPDATE seasons SET name='100%_시즌' WHERE id=UUID_TO_BIN(?)", actual.getLast());
+        assertThat(service.list(scope.accountId(), null, "  %_  ", true).subscriptions())
+                .singleElement().satisfies(row -> assertThat(row.seasonId().toString()).isEqualTo(actual.getLast()));
+        assertThat(service.list(scope.accountId(), null, "검증 팀", true).subscriptions()).hasSize(20);
+        assertThat(service.list(otherAccount, null, "%_", true).subscriptions()).isEmpty();
+        jdbc.update("UPDATE calendar_subscriptions SET revoked=TRUE WHERE account_id=UUID_TO_BIN(?) AND season_id=UUID_TO_BIN(?)",
+                scope.accountId().toString(), actual.getFirst());
+        var filtered = service.list(scope.accountId(), null, "", false);
+        assertThat(filtered.subscriptions()).hasSize(20).noneMatch(row -> row.seasonId().toString().equals(actual.getFirst()));
+        assertThat(filtered.nextAfterSeasonId()).isNull();
+        assertThat(filtered.subscriptions().getLast().seasonId().toString()).isEqualTo(actual.getLast());
+        assertThat(service.list(UUID.randomUUID(), null, "", true).subscriptions()).isEmpty();
         verifyNoInteractions(client);
     }
 
@@ -135,12 +146,19 @@ class CalendarSubscriptionServiceTest {
     @DisplayName("목록은 외부 조회 없이 임대 만료와 폐기 의도를 구분하고 활성 상태를 추정하지 않는다")
     void reportsLocalManagementStateWithoutRemoteLookup() {
         var claim = store.claim(owner(), true, false, NOW);
-        assertThat(service.list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("IN_PROGRESS");
-        assertThat(service(client, NOW.plusSeconds(60)).list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("CHECK_REQUIRED");
+        assertThat(service.list(scope.accountId(), null, "", true).subscriptions().getFirst().managementStatus().name()).isEqualTo("IN_PROGRESS");
+        assertThat(service(client, NOW.plusSeconds(60)).list(scope.accountId(), null, "", true).subscriptions().getFirst().managementStatus().name()).isEqualTo("CHECK_REQUIRED");
         store.requestRevocation(owner());
-        assertThat(service.list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("REVOCATION_PENDING");
+        assertThat(service.list(scope.accountId(), null, "", true).subscriptions().getFirst().managementStatus().name()).isEqualTo("REVOCATION_PENDING");
         store.release(claim, true);
-        assertThat(service.list(scope.accountId(), null).subscriptions().getFirst().managementStatus().name()).isEqualTo("REVOKED");
+        assertThat(service.list(scope.accountId(), null, "", true).subscriptions().getFirst().managementStatus().name()).isEqualTo("REVOKED");
+        assertThat(service.list(scope.accountId(), null, "", false).subscriptions()).isEmpty();
+        var rotating = store.claim(owner(), false, false, NOW);
+        assertThat(service.list(scope.accountId(), null, "", false).subscriptions()).hasSize(1);
+        assertThat(service(client, NOW.plusSeconds(60)).list(scope.accountId(), null, "", false).subscriptions()).isEmpty();
+        store.release(rotating, true);
+        store.requestRevocation(owner());
+        assertThat(service.list(scope.accountId(), null, "", false).subscriptions()).hasSize(1);
         verifyNoInteractions(client);
     }
 

@@ -10,7 +10,7 @@ public interface CalendarSubscriptionStore {
     record Stored(Owner owner, UUID subscriptionId, boolean revoked, boolean revocationPending, Instant leaseUntil) {}
     record Claim(Stored subscription, UUID token) {}
     record NamedSubscription(Stored subscription, String teamName, String seasonName) {}
-    List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, int limit);
+    List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, String query, boolean includeRevoked, Instant now, int limit);
     Optional<Stored> find(Owner owner);
     Claim claim(Owner owner, boolean create, boolean revoking, Instant now);
     boolean release(Claim claim, boolean revoked);

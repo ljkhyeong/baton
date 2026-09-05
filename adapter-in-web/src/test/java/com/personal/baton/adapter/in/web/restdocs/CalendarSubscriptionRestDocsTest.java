@@ -105,10 +105,10 @@ class CalendarSubscriptionRestDocsTest {
     void documentsList() throws Exception {
         var row = new CalendarSubscriptionUseCase.Summary(EDITION_ID, TEAM_ID, SEASON_ID,
                 "바통 독서 팀", "가을 시즌", CalendarSubscriptionUseCase.ManagementStatus.CHECK_REQUIRED);
-        when(subscriptions.list(ACCOUNT_ID, EXECUTION_ID)).thenReturn(
+        when(subscriptions.list(ACCOUNT_ID, EXECUTION_ID, "독서", false)).thenReturn(
                 new CalendarSubscriptionUseCase.SubscriptionPage(List.of(row), SEASON_ID));
         mockMvc.perform(get(CalendarSubscriptionController.LIST_PATH)
-                        .queryParam("afterSeasonId", EXECUTION_ID.toString())
+                        .queryParam("afterSeasonId", EXECUTION_ID.toString()).queryParam("query", "독서").queryParam("includeRevoked", "false")
                         .header("X-Baton-Account-Id", ACCOUNT_ID).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
@@ -117,7 +117,9 @@ class CalendarSubscriptionRestDocsTest {
                         "세션 계정의 구독 기록을 시즌 UUID 오름차순으로 최대 20개 조회한다. 현재 팀 권한과 공유 키는 필요 없다. CAL을 호출하지 않으며 최신 상태는 개별 조회한다.",
                         "내 캘린더 구독 목록",
                         queryParameters(
-                                parameterWithName("afterSeasonId").optional().description("이전 응답의 nextAfterSeasonId UUID. 첫 페이지는 생략")),
+                                parameterWithName("afterSeasonId").optional().description("같은 검색·포함 조건에서 받은 nextAfterSeasonId UUID. 조건 변경 시 생략"),
+                                parameterWithName("query").optional().description("팀·시즌 이름에 포함된 문자열. 최대 100자, 앞뒤 공백 제거. 생략·빈 값은 전체. %, _도 일반 문자"),
+                                parameterWithName("includeRevoked").optional().description("기본 true. false면 해제 완료 기록을 제외하며 처리 중인 기록은 유지")),
                         requestHeaders(headerWithName("X-Baton-Account-Id").description("화면의 로그인 계정 UUID. 세션 계정과 일치해야 함")),
                         responseHeaders(headerWithName("Cache-Control").description("no-store")),
                         responseFields(

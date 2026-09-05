@@ -1259,11 +1259,16 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 
 목록은 현재 세션 계정의 구독 기록만 시즌 UUID 오름차순으로 최대 20개 반환한다.
 계정·시즌마다 현재 저장된 구독 한 건을 표시한다. 첫 요청은
-쿼리를 생략하고 다음 요청은 `afterSeasonId=<직전 nextAfterSeasonId>`를 보낸다. 마지막 페이지의
+`afterSeasonId`를 생략하고 다음 요청은 `afterSeasonId=<직전 nextAfterSeasonId>`를 보낸다. 마지막 페이지의
 `nextAfterSeasonId`는 null, 구독 기록이 없으면 `subscriptions`는 빈 배열이다. 목록 항목은
 `subscriptionId`, `teamId`, `seasonId`, `teamName`, `seasonName`, `managementStatus`를 포함한다.
 팀·시즌 이름은 본인 구독을 구분하기 위한 현재 이름이며 권한 회수 뒤에도 이 최소 관리 정보를
 제공한다. 일정, 구성원, 접근 키와 구독 주소는 포함하지 않는다. 폐기한 기록도 목록에 남긴다.
+선택 쿼리 `query`는 최대 100자이며 앞뒤 공백을 제거한 뒤 현재 팀·시즌 이름의 부분 일치로 검색한다.
+빈 값은 전체 검색이고 `%`와 `_`도 일반 문자로 취급한다. 100자를 넘으면 `400 INVALID_INPUT`이다.
+`includeRevoked`는 기본 true이며 false이면 아래 관리 상태가 `REVOKED`인 기록만 제외한다.
+폐기 대기와 유효 임대가 있으면 계속 표시한다. 검색·필터는 페이지 크기를 적용하기 전에 처리하며
+다음 페이지에도 같은 조건을 보낸다. 조건을 바꾸면 `afterSeasonId` 없이 첫 페이지부터 조회한다.
 목록은 CAL을 호출하지 않으며 발급 비활성·CAL 장애 때도 조회할 수 있다. `managementStatus`는
 폐기 의도 `REVOCATION_PENDING`, 유효 임대 `IN_PROGRESS`, 폐기 완료 `REVOKED`, 그 외
 `CHECK_REQUIRED` 순서로 판정한다. `CHECK_REQUIRED`를 CAL 활성 상태로 해석하면 안 되며

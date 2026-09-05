@@ -26,3 +26,13 @@
 .calendar-subscription-management { padding-bottom: 18px; }
 .calendar-subscription-management > a { display: inline-block; }
 .calendar-empty { margin: 0; color: var(--muted); }
+
+.calendar-search { display: grid; gap: 10px; }
+.calendar-search-inputs { display: flex; gap: 8px; }
+.calendar-search-inputs input { min-width: 0; flex: 1; padding: 10px; border: 1px solid var(--rule-strong); border-radius: 4px; font: inherit; }
+.calendar-filter { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.calendar-filter input { width: 18px; height: 18px; }
+.calendar-search > button { justify-self: start; }
+.calendar-subscription-status { display: flex; flex-direction: column; text-align: right; max-width: 120px; }
+.calendar-subscription-status time { display: block; font-size: 10px; }
+.calendar-polling-note { color: var(--muted); font-size: 12px; }

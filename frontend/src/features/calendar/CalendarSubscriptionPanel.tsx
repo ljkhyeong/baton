@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
@@ -8,12 +8,12 @@ import type { WorkspaceProjection } from '@/features/workspace/types'
 import { ApiError } from '@/shared/api/ApiError'
 import { isSameUuid } from '@/shared/api/responseValidation'
 import { getCalendarSubscription, issueCalendarSubscription, revokeCalendarSubscription } from './api'
-import type { CalendarCredential, CalendarScope, CalendarStatus } from './types'
+import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarStatusCheck } from './types'
 import './calendar.scss'
 
 type Props = { workspace: WorkspaceProjection; accessKey: string; changesDisabled: boolean; onManageMembership: () => void }
 const labels: Record<CalendarStatus, string> = {
-  NOT_CREATED: '아직 구독하지 않았습니다.', IN_PROGRESS: '구독 요청을 처리 중입니다. 잠시 후 상태를 다시 확인해 주세요.',
+  NOT_CREATED: '아직 구독하지 않았습니다.', IN_PROGRESS: '구독 요청을 처리 중입니다.',
   ACTIVE: '구독 중입니다.', REISSUE_REQUIRED: '새 구독 주소가 필요합니다. 주소를 재발급하고 캘린더 앱에 다시 등록해 주세요.',
   REVOKED: '구독을 해제했습니다.', REVOCATION_PENDING: '구독 해제를 처리 중입니다. 완료될 때까지 기존 주소가 작동할 수 있습니다.',
 }
@@ -26,14 +26,15 @@ export function CalendarSubscriptionPanel(props: Props) {
   </details>
 }
 export function CalendarSubscriptionCleanup({ teamId, seasonId }: { teamId: string; seasonId: string }) {
+  const [open, setOpen] = useState(false)
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''
   if (!accountId) return null
-  return <details className="calendar-panel">
+  return <details className="calendar-panel" onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary><h2>내 캘린더 구독 해제</h2></summary>
     <p>팀 접근 권한이 없어도 본인 구독의 상태를 확인하고 해제할 수 있습니다.</p>
-    <CalendarContent key={`${accountId}:${teamId}:${seasonId}`} accountId={accountId}
-      scope={{ accountId, teamId, seasonId, accessKey: '' }} canIssue={false} ended={false} />
+    {open && <CalendarContent key={`${accountId}:${teamId}:${seasonId}`} accountId={accountId}
+      scope={{ accountId, teamId, seasonId, accessKey: '' }} canIssue={false} ended={false} />}
   </details>
 }
 function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembership }: Props) {
@@ -56,8 +57,9 @@ function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembers
       ended={Boolean(workspace.season.endedAt)} />
   </>
 }
-export function CalendarContent({ accountId, scope, canIssue, ended, managementOnly = false }: {
+export function CalendarContent({ accountId, scope, canIssue, ended, managementOnly = false, onStatusChecked }: {
   accountId: string; scope: CalendarScope; canIssue: boolean; ended: boolean; managementOnly?: boolean
+  onStatusChecked?: (checked: CalendarStatusCheck) => void
 }) {
   const cache = useQueryClient()
   const queryKey = ['calendar-subscription', accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
@@ -65,8 +67,23 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
   const [copied, setCopied] = useState('')
   const [confirmation, setConfirmation] = useState<'rotate' | 'revoke' | null>(null)
   const actionLock = useRef(false)
+  const pollUntil = useRef<number | null>(null)
   const subscription = useQuery({ queryKey, queryFn: ({ signal }) => getCalendarSubscription(scope, signal),
-    retry: false, gcTime: 0, staleTime: 0, refetchOnWindowFocus: 'always' })
+    retry: false, gcTime: 0, staleTime: 0, refetchOnWindowFocus: 'always', refetchIntervalInBackground: false,
+    refetchInterval: (query) => {
+      if (!['IN_PROGRESS', 'REVOCATION_PENDING'].includes(query.state.data?.status ?? '')) {
+        pollUntil.current = null
+        return false
+      }
+      if (query.state.status === 'error' || actionLock.current) return false
+      pollUntil.current ??= Date.now() + 90_000
+      return Date.now() < pollUntil.current ? 3_000 : false
+    } })
+  useEffect(() => {
+    if (subscription.isSuccess && subscription.data) {
+      onStatusChecked?.({ ...subscription.data, checkedAt: subscription.dataUpdatedAt })
+    }
+  }, [subscription.isSuccess, subscription.data, subscription.dataUpdatedAt, onStatusChecked])
   const operation = useMutation({
     mutationFn: async (action: 'create' | 'rotate' | 'revoke') => {
       setCredential(null)
@@ -93,7 +110,8 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
   })
   const busy = operation.isPending || subscription.isFetching
   const status = subscription.data?.status
-  const error = operation.error ?? subscription.error
+  const error = operation.variables === 'revoke' && status === 'REVOKED'
+    ? subscription.error : operation.error ?? subscription.error
   const unavailable = [operation.error, subscription.error].some((value) => value instanceof ApiError && [401, 403].includes(value.status))
   const ready = !busy && !subscription.isError && !!status && !unavailable
   const request = (action: 'create' | 'rotate' | 'revoke') => {
@@ -111,13 +129,16 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     <p>BATON의 회차 일정과 마감이 있는 루틴을 읽기 전용으로 구독합니다. 일정 수정은 BATON에서 해 주세요.</p>
     {subscription.isPending && <p role="status">구독 상태를 확인하고 있습니다.</p>}
     {status && <p role="status">{labels[status]}</p>}
+    {status && ['IN_PROGRESS', 'REVOCATION_PENDING'].includes(status) && <p className="calendar-polling-note">
+      이 항목을 열어 둔 동안 최대 90초간 자동으로 확인합니다. 오래 걸리거나 조회에 실패하면 ‘상태 다시 확인’을 눌러 주세요.
+    </p>}
     {ended && <p>종료된 시즌은 새 주소를 발급할 수 없습니다. 기존 구독의 상태 확인과 해제는 가능합니다.</p>}
     {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'} 주소가 표시되지 않으면 상태를 확인한 뒤 필요한 작업을 선택해 주세요.</p>}
     <div className="calendar-actions">
       {!managementOnly && status && ['NOT_CREATED', 'REVOKED'].includes(status) && <button type="button" className="primary-button" disabled={!ready || !canIssue} onClick={() => request('create')}>구독 주소 발급</button>}
       {!managementOnly && status && ['ACTIVE', 'REISSUE_REQUIRED'].includes(status) && <button type="button" className="secondary-button" disabled={!ready || !canIssue} onClick={() => setConfirmation('rotate')}>새 주소 발급</button>}
       {status && ['ACTIVE', 'REISSUE_REQUIRED', 'REVOCATION_PENDING'].includes(status) && <button type="button" className="secondary-button" disabled={!ready} onClick={() => setConfirmation('revoke')}>구독 해제</button>}
-      <button type="button" className="secondary-button" disabled={busy} onClick={() => { setCredential(null); operation.reset(); void subscription.refetch() }}>상태 다시 확인</button>
+      <button type="button" className="secondary-button" disabled={busy} onClick={() => { pollUntil.current = null; setCredential(null); operation.reset(); void subscription.refetch() }}>상태 다시 확인</button>
     </div>
     {confirmation && <div className="calendar-confirm" role="group" aria-label={confirmation === 'rotate' ? '새 주소 발급 확인' : '구독 해제 확인'}>
       <p>{confirmation === 'rotate' ? '새 주소를 발급하면 기존 주소는 사용할 수 없습니다. 캘린더 앱에서도 이전 구독을 지우고 새 주소를 등록해 주세요.' : '구독을 해제하면 기존 주소로 일정을 가져올 수 없습니다. 캘린더 앱에 이미 저장된 일정은 앱에서 직접 제거해 주세요.'}</p>

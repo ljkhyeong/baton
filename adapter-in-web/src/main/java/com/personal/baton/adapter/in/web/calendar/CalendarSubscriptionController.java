@@ -10,6 +10,7 @@ import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.SubscriptionListResponse;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionResponses.SubscriptionSummaryResponse;
 import java.util.UUID;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,10 +37,12 @@ public class CalendarSubscriptionController {
     @GetMapping(LIST_PATH)
     public ResponseEntity<SubscriptionListResponse> list(
             @RequestParam(required = false) UUID afterSeasonId,
+            @RequestParam(defaultValue = "") @Size(max = 100) String query,
+            @RequestParam(defaultValue = "true") boolean includeRevoked,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
-        var result = subscriptions.list(principal.accountId(), afterSeasonId);
+        var result = subscriptions.list(principal.accountId(), afterSeasonId, query, includeRevoked);
         var rows = result.subscriptions().stream().map(row -> new SubscriptionSummaryResponse(row.subscriptionId(),
                 row.teamId(), row.seasonId(), row.teamName(), row.seasonName(), row.managementStatus())).toList();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
