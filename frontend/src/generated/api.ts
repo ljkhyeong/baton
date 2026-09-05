@@ -788,6 +788,30 @@ export interface paths {
         patch: operations["updateRoleResourceArchive"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 자료 확인 이력 조회
+         * @description 자료 버전과 최근 20건의 수동 확인 이력을 반환한다.
+         */
+        get: operations["getResourceVerifications"];
+        put?: never;
+        /**
+         * 자료 확인 기록
+         * @description 로그인한 활성 구성원의 수동 확인을 남긴다. 자료 버전이 달라졌거나 보관되었으면 409를 반환한다.
+         */
+        post: operations["verifyResource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/roles": {
         parameters: {
             query?: never;
@@ -1204,6 +1228,58 @@ export interface components {
         Schema_3a4a0e7a2f90e51f: {
             /** @description 가입한 이메일 */
             email: string;
+        };
+        Schema_3b8b9e297849dc60: {
+            /**
+             * Format: uuid
+             * @description 자료 식별자
+             */
+            resourceId: string;
+            /** @description 현재 자료 버전 */
+            resourceVersion: number;
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 최근 확인 20건 */
+            verifications: {
+                /** @description 현재 자료 버전에 대한 확인 여부 */
+                current: boolean;
+                /**
+                 * Format: uuid
+                 * @description 확인 기록 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 확인한 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 확인 당시 구성원 이름 */
+                memberName: string;
+                /** @description 확인 메모 */
+                note: string | null;
+                /** @description 확인 당시 자료 버전 */
+                resourceVersion: number;
+                /**
+                 * @description 확인 결과
+                 * @enum {string}
+                 */
+                status: "CONFIRMED" | "NEEDS_UPDATE";
+                /** @description 확인 당시 주소 */
+                url: string;
+                /**
+                 * Format: date-time
+                 * @description 서버 확인 시각
+                 */
+                verifiedAt: string;
+            }[];
         };
         Schema_4abb9640ae4170a2: {
             /**
@@ -1857,6 +1933,22 @@ export interface components {
              * @description 소유 역할 UUID
              */
             roleId: string;
+        };
+        Schema_a79acdcbe8205845: {
+            /**
+             * Format: uuid
+             * @description 화면에서 확인한 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 확인 메모 */
+            note?: string | null;
+            /** @description 확인한 자료 버전 */
+            resourceVersion: number;
+            /**
+             * @description 확인 결과
+             * @enum {string}
+             */
+            status: "CONFIRMED" | "NEEDS_UPDATE";
         };
         Schema_afc5d14f14716d19: {
             /**
@@ -5107,6 +5199,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_cf74b807e9b1f8e0"];
+                };
+            };
+        };
+    };
+    getResourceVerifications: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 자료 식별자 */
+                resourceId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 개인 데이터 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_3b8b9e297849dc60"];
+                };
+            };
+        };
+    };
+    verifyResource: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 자료 식별자 */
+                resourceId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_a79acdcbe8205845"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 개인 데이터 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_3b8b9e297849dc60"];
                 };
             };
         };

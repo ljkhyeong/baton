@@ -1187,3 +1187,11 @@ cd frontend && npm ci && cd ..
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
+
+## 역할 자료 수동 확인
+
+- `GET /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications`: 공유 접근 권한을 확인하고 현재 자료 버전과 최근 20건을 `verifiedAt`·`id` 내림차순으로 반환한다. 종료 시즌과 보관 자료도 조회할 수 있다.
+- 같은 경로의 `POST`: 계정 세션·CSRF·동일 출처와 공유 접근 권한, 활성 구성원 연결을 확인한다. 요청의 `expectedAccountId`는 현재 계정과 같아야 하며 `resourceVersion`은 확인한 버전, `status`는 `CONFIRMED`·`NEEDS_UPDATE`, 선택 `note`는 최대 500자다. 확인자의 계정·구성원·이름과 시각은 서버에서 정한다.
+- 두 응답은 `200 OK`, `Cache-Control: no-store`이며 `teamId`, `seasonId`, `resourceId`, `resourceVersion`, `verifications`를 반환한다. 확인 항목은 `id`, `resourceVersion`, `memberId`, `memberName`, `url`, `status`, nullable `note`, `verifiedAt`, `current`를 포함한다. `current`는 현재 자료 버전에 대한 확인 여부다.
+- 자료 변경·보관은 `409 WORKSPACE_CONTENT_CONFLICT`, 다른 계정으로 전환된 요청은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 미연결·활동 종료 구성원은 `403 WORKSPACE_ACCESS_DENIED`, 종료 시즌의 기록은 `409 SEASON_ENDED`다. 같은 시즌 잠금에서 버전 확인과 이력 저장을 마쳐 자료 수정과의 경합을 막는다.
+- 확인 기록은 정정·삭제하지 않는다. 새로운 확인을 추가한다. 파일럿의 구성원 연결 근거와 WATCH 자동 점검 결과를 수동 확인의 실제 사용자 신원 검증으로 확대 해석하지 않는다.

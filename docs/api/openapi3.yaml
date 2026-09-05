@@ -3677,6 +3677,122 @@ paths:
       summary: 역할 자료 보관 상태 변경
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications:
+    get:
+      description: 자료 버전과 최근 20건의 수동 확인 이력을 반환한다.
+      operationId: getResourceVerifications
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 식별자
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 자료 식별자
+          in: path
+          name: resourceId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 공유 접근 키
+          example: key
+          in: header
+          name: X-Baton-Access-Key
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getResourceVerifications:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","resourceId":"00000000-0000-4000-8000-000000000003","resourceVersion":2,"verifications":[{"id":"00000000-0000-4000-8000-000000000005","resourceVersion":2,"memberId":"00000000-0000-4000-8000-000000000004","memberName":"박민서","url":"https://example.com/guide","status":"CONFIRMED","note":"문서
+                    접근과 내용 확인","verifiedAt":"2026-09-05T03:00:00Z","current":true}]}
+              schema:
+                $ref: '#/components/schemas/Schema_3b8b9e297849dc60'
+          headers:
+            Cache-Control:
+              description: 개인 데이터 캐시 금지
+              schema:
+                type: string
+      summary: 자료 확인 이력 조회
+      tags:
+        - api
+    post:
+      description: 로그인한 활성 구성원의 수동 확인을 남긴다. 자료 버전이 달라졌거나 보관되었으면 409를 반환한다.
+      operationId: verifyResource
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 식별자
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 자료 식별자
+          in: path
+          name: resourceId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 공유 접근 키
+          example: key
+          in: header
+          name: X-Baton-Access-Key
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              verifyResource:
+                value: >
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","resourceVersion":2,"status":"CONFIRMED","note":"문서
+                  접근과 내용 확인"}
+            schema:
+              $ref: '#/components/schemas/Schema_a79acdcbe8205845'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                verifyResource:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","resourceId":"00000000-0000-4000-8000-000000000003","resourceVersion":2,"verifications":[{"id":"00000000-0000-4000-8000-000000000005","resourceVersion":2,"memberId":"00000000-0000-4000-8000-000000000004","memberName":"박민서","url":"https://example.com/guide","status":"CONFIRMED","note":"문서
+                    접근과 내용 확인","verifiedAt":"2026-09-05T03:00:00Z","current":true}]}
+              schema:
+                $ref: '#/components/schemas/Schema_3b8b9e297849dc60'
+          headers:
+            Cache-Control:
+              description: 개인 데이터 캐시 금지
+              schema:
+                type: string
+      summary: 자료 확인 기록
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/roles:
     post:
       description: 현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다.
@@ -6978,6 +7094,80 @@ components:
       required:
         - email
       type: object
+    Schema_3b8b9e297849dc60:
+      properties:
+        resourceId:
+          description: 자료 식별자
+          format: uuid
+          type: string
+        resourceVersion:
+          description: 현재 자료 버전
+          type: number
+        seasonId:
+          description: 시즌 식별자
+          format: uuid
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+        verifications:
+          description: 최근 확인 20건
+          items:
+            properties:
+              url:
+                description: 확인 당시 주소
+                type: string
+              current:
+                description: 현재 자료 버전에 대한 확인 여부
+                type: boolean
+              id:
+                description: 확인 기록 식별자
+                format: uuid
+                type: string
+              memberId:
+                description: 확인한 구성원 식별자
+                format: uuid
+                type: string
+              memberName:
+                description: 확인 당시 구성원 이름
+                type: string
+              note:
+                description: 확인 메모
+                nullable: true
+                type: string
+              resourceVersion:
+                description: 확인 당시 자료 버전
+                type: number
+              status:
+                description: 확인 결과
+                enum:
+                  - CONFIRMED
+                  - NEEDS_UPDATE
+                type: string
+              verifiedAt:
+                description: 서버 확인 시각
+                format: date-time
+                type: string
+            required:
+              - current
+              - id
+              - memberId
+              - memberName
+              - note
+              - resourceVersion
+              - status
+              - url
+              - verifiedAt
+            type: object
+          type: array
+      required:
+        - resourceId
+        - resourceVersion
+        - seasonId
+        - teamId
+        - verifications
+      type: object
     Schema_43f45d42746b4260:
       properties:
         copiedRoles:
@@ -7739,6 +7929,32 @@ components:
         - name
         - purpose
         - responsibilities
+      type: object
+    Schema_a79acdcbe8205845:
+      properties:
+        expectedAccountId:
+          description: 화면에서 확인한 로그인 계정
+          format: uuid
+          type: string
+        note:
+          description: 확인 메모
+          maxLength: 500
+          minLength: 0
+          nullable: true
+          type: string
+        resourceVersion:
+          description: 확인한 자료 버전
+          type: number
+        status:
+          description: 확인 결과
+          enum:
+            - CONFIRMED
+            - NEEDS_UPDATE
+          type: string
+      required:
+        - expectedAccountId
+        - resourceVersion
+        - status
       type: object
     Schema_afc5d14f14716d19:
       properties:

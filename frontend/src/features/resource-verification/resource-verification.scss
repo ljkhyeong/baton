@@ -1,0 +1,16 @@
+.resource-verification {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 8px;
+  font-size: 12px;
+  summary { cursor: pointer; padding: 6px 0; }
+  > div { padding: 8px; border: 1px solid var(--rule); }
+  ol { margin: 8px 0; padding: 0; list-style: none; }
+  ol > li { display: grid; gap: 3px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  p { overflow-wrap: anywhere; white-space: pre-wrap; }
+  form, label { display: grid; gap: 6px; }
+  form { margin-top: 10px; }
+  select, textarea { width: 100%; padding: 8px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); }
+  button { padding: 8px; }
+}
+.resource-links > li:has(.resource-verification) { flex-wrap: wrap; }

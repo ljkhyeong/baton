@@ -1,0 +1,137 @@
+package com.personal.baton.adapter.in.web.restdocs;
+
+import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
+import com.epages.restdocs.apispec.EnumFields;
+import com.epages.restdocs.apispec.ConstrainedFields;
+import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
+import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController.VerifyResourceRequest;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerificationHistoryResult;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerificationResult;
+import com.personal.baton.domain.workspace.ResourceVerificationStatus;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.http.MediaType;
+import org.springframework.restdocs.RestDocumentationContextProvider;
+import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.restdocs.payload.ResponseFieldsSnippet;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.DefaultSecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
+import org.springframework.security.web.util.matcher.AnyRequestMatcher;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.springframework.restdocs.headers.HeaderDocumentation.*;
+import static org.springframework.restdocs.payload.PayloadDocumentation.*;
+import static org.springframework.restdocs.request.RequestDocumentation.*;
+import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@Tag("restdocs")
+@ExtendWith(RestDocumentationExtension.class)
+class ResourceVerificationRestDocsTest {
+    private static final UUID TEAM = UUID.fromString("00000000-0000-4000-8000-000000000001");
+    private static final UUID SEASON = UUID.fromString("00000000-0000-4000-8000-000000000002");
+    private static final UUID RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000003");
+    private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private MockMvc mvc;
+    private ResourceVerificationUseCase useCase;
+
+    @BeforeEach
+    void setUp(RestDocumentationContextProvider documentation) {
+        useCase = mock(ResourceVerificationUseCase.class);
+        mvc = MockMvcBuilders.standaloneSetup(new ResourceVerificationController(useCase))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
+                        new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
+                .apply(documentationConfiguration(documentation)).build();
+    }
+
+    @Test
+    @DisplayName("자료 확인 이력은 자료 버전과 최근 확인자의 이름을 반환한다")
+    void documentsHistory() throws Exception {
+        when(useCase.getHistory(TEAM, SEASON, RESOURCE, "key")).thenReturn(history());
+        mvc.perform(get(ResourceVerificationController.PATH, TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", "key"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.verifications[0].current").value(true))
+                .andDo(MockMvcRestDocumentationWrapper.document("getResourceVerifications",
+                        "자료 버전과 최근 20건의 수동 확인 이력을 반환한다.", "자료 확인 이력 조회",
+                        pathParameters(parameterWithName("teamId").description("팀 식별자"),
+                                parameterWithName("seasonId").description("시즌 식별자"),
+                                parameterWithName("resourceId").description("자료 식별자")),
+                        requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
+                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+    }
+
+    @Test
+    @DisplayName("자료 확인은 로그인 계정과 확인한 버전 및 메모를 전달한다")
+    void documentsVerification() throws Exception {
+        when(useCase.verify(any(), any(), any(), any(), any(), any())).thenReturn(history());
+        AuthenticatedAccountPrincipal principal = new TestPrincipal(ACCOUNT, 0);
+        mvc.perform(post(ResourceVerificationController.PATH, TEAM, SEASON, RESOURCE)
+                        .header("X-Baton-Access-Key", "key")
+                        .with(authentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of())))
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"expectedAccountId":"%s","resourceVersion":2,"status":"CONFIRMED","note":"문서 접근과 내용 확인"}
+                                """.formatted(ACCOUNT)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andDo(MockMvcRestDocumentationWrapper.document("verifyResource",
+                        "로그인한 활성 구성원의 수동 확인을 남긴다. 자료 버전이 달라졌거나 보관되었으면 409를 반환한다.", "자료 확인 기록",
+                        pathParameters(parameterWithName("teamId").description("팀 식별자"),
+                                parameterWithName("seasonId").description("시즌 식별자"),
+                                parameterWithName("resourceId").description("자료 식별자")),
+                        requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
+                        requestFields(new ConstrainedFields(VerifyResourceRequest.class).withPath("expectedAccountId").description("화면에서 확인한 로그인 계정"),
+                                new ConstrainedFields(VerifyResourceRequest.class).withPath("resourceVersion").description("확인한 자료 버전"),
+                                new EnumFields(ResourceVerificationStatus.class).withPath("status").description("확인 결과"),
+                                new ConstrainedFields(VerifyResourceRequest.class).withPath("note").description("확인 메모").optional()),
+                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+        verify(useCase).verify(eq(TEAM), eq(SEASON), eq(RESOURCE), eq("key"), eq(ACCOUNT),
+                argThat(command -> command.resourceVersion() == 2 && command.status() == ResourceVerificationStatus.CONFIRMED));
+    }
+
+    private record TestPrincipal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
+
+    private VerificationHistoryResult history() {
+        return new VerificationHistoryResult(TEAM, SEASON, RESOURCE, 2, List.of(new VerificationResult(
+                UUID.fromString("00000000-0000-4000-8000-000000000005"), 2, ACCOUNT, "박민서",
+                "https://example.com/guide", ResourceVerificationStatus.CONFIRMED, "문서 접근과 내용 확인",
+                Instant.parse("2026-09-05T03:00:00Z"), true)));
+    }
+
+    private ResponseFieldsSnippet fields() {
+        return responseFields(fieldWithPath("teamId").type(JsonFieldType.STRING).description("팀 식별자"),
+                fieldWithPath("seasonId").type(JsonFieldType.STRING).description("시즌 식별자"),
+                fieldWithPath("resourceId").type(JsonFieldType.STRING).description("자료 식별자"),
+                fieldWithPath("resourceVersion").type(JsonFieldType.NUMBER).description("현재 자료 버전"),
+                fieldWithPath("verifications").type(JsonFieldType.ARRAY).description("최근 확인 20건"),
+                fieldWithPath("verifications[].id").description("확인 기록 식별자"),
+                fieldWithPath("verifications[].resourceVersion").description("확인 당시 자료 버전"),
+                fieldWithPath("verifications[].memberId").description("확인한 구성원 식별자"),
+                fieldWithPath("verifications[].memberName").description("확인 당시 구성원 이름"),
+                fieldWithPath("verifications[].url").description("확인 당시 주소"),
+                new EnumFields(ResourceVerificationStatus.class).withPath("verifications[].status").description("확인 결과"),
+                fieldWithPath("verifications[].note").description("확인 메모").optional(),
+                fieldWithPath("verifications[].verifiedAt").description("서버 확인 시각"),
+                fieldWithPath("verifications[].current").description("현재 자료 버전에 대한 확인 여부"));
+    }
+}

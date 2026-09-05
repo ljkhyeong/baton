@@ -172,6 +172,10 @@ public class RoleResource {
                 || (rawAuthority != null && rawAuthority.indexOf('@') >= 0);
     }
 
+    public Long getVersion() {
+        return version;
+    }
+
     public UUID getId() {
         return id;
     }

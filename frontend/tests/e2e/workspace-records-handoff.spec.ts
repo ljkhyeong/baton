@@ -1208,3 +1208,55 @@ test('@memory @records @responsive 결정 Markdown은 명시적으로 전환하�
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('hidden-link-destination')
   await expect(page.getByRole('article')).toHaveCount(0)
 })
+
+
+test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 변경 후 재확인을 표시한다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
+    url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
+  await installApi(page, projection)
+  const accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
+  await page.route('**/api/v1/auth/session', route => route.fulfill({ json: {
+    authenticated: true, accountId, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'verification-csrf',
+  } }))
+  await page.route('**/api/v1/auth/csrf', route => route.fulfill({ json: {
+    csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'verification-csrf',
+  } }))
+  await page.route('**/api/v1/account-memberships/current?*', route => route.fulfill({ json: {
+    claimed: true, accountId, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-09-05T00:00:00Z',
+  } }))
+  const resource = projection.resources.find(item => item.roleId === ROLE_ID)!
+  let version = 0
+  let verified = false
+  await page.route('**/role-resources/*/verifications', route => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON()).toEqual({ expectedAccountId: accountId, resourceVersion: 0,
+        status: 'NEEDS_UPDATE', note: '접근 권한을 요청해야 합니다' })
+      expect(route.request().headers()['x-csrf-token']).toBe('verification-csrf')
+      verified = true
+    }
+    return route.fulfill({ json: { teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: resource.id,
+      resourceVersion: version, verifications: verified ? [{ id: '00000000-0000-4000-8000-000000000105',
+        resourceVersion: 0, memberId: MEMBER_ONE_ID, memberName: '박민서', url: resource.url,
+        status: 'NEEDS_UPDATE', note: '접근 권한을 요청해야 합니다', verifiedAt: '2026-09-05T03:00:00Z', current: version === 0 }] : [],
+    } })
+  })
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  const panel = page.locator('.resource-verification').first()
+  await panel.locator('summary').click()
+  await expect(panel.getByText('아직 확인한 기록이 없습니다.')).toBeVisible()
+  await panel.getByLabel('확인 결과').selectOption('NEEDS_UPDATE')
+  await panel.getByLabel('확인 메모').fill('접근 권한을 요청해야 합니다')
+  await panel.getByRole('button', { name: '내 확인 기록 남기기' }).click()
+  await expect(panel.getByText('확인 기록을 저장했습니다.')).toBeVisible()
+  await expect(panel.getByText('자료 수정이 필요합니다.')).toBeVisible()
+  version = 1
+  await page.reload()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  await panel.locator('summary').click()
+  await expect(panel.getByText('자료가 변경되어 재확인이 필요합니다.')).toBeVisible()
+  await expect(panel.getByText('수정 필요 · 이전 자료 확인')).toBeVisible()
+})
