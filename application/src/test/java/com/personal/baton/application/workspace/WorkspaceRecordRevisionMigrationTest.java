@@ -32,7 +32,7 @@ class WorkspaceRecordRevisionMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V7은 기존 결정과 바통을 활성 상태와 버전 0으로 보존한다")
+    @DisplayName("기존 결정과 바통은 이관 뒤 활성 상태와 버전 및 일반 텍스트 형식을 보존한다")
     @Test
     void preservesExistingRecordsAndAddsRevisionColumns() {
         migrateTo("6");
@@ -45,6 +45,12 @@ class WorkspaceRecordRevisionMigrationTest {
                 .load()
                 .migrate();
 
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT text_format FROM decisions WHERE id = UUID_TO_BIN(?)", String.class, DECISION_ID
+        )).isEqualTo("PLAIN_TEXT");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT reason FROM decisions WHERE id = UUID_TO_BIN(?)", String.class, DECISION_ID
+        )).isEqualTo("**별표를 그대로** 보존합니다");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM decisions WHERE id = UUID_TO_BIN(?)",
                 Long.class,
@@ -127,7 +133,7 @@ class WorkspaceRecordRevisionMigrationTest {
                 DECISION_ID,
                 SEASON_ID,
                 "질문을 전날 마감한다",
-                "준비 시간을 확보합니다",
+                "**별표를 그대로** 보존합니다",
                 "당일에도 받는 방안을 검토했습니다",
                 "2026-07-20 03:04:05.000000",
                 MEMBER_ID

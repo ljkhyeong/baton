@@ -8,6 +8,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceAccessReposito
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Decision;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
@@ -173,6 +174,9 @@ final class WorkspaceContentIdempotency {
         digest.append(Integer.toString(decision.getRoleIds().size()));
         for (UUID roleId : decision.getRoleIds()) {
             digest.append(roleId.toString());
+        }
+        if (decision.getTextFormat() != DecisionTextFormat.PLAIN_TEXT) {
+            digest.append(decision.getTextFormat().name());
         }
         return digest.digestHex();
     }

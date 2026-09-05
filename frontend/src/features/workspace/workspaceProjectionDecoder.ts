@@ -160,6 +160,7 @@ function isDecision(value: unknown) {
     'reason',
     'title',
   ])
+    && isOneOf(value.textFormat, ['PLAIN_TEXT', 'MARKDOWN'])
     && isInstant(value.createdAt)
     && isNullableInstant(value.archivedAt)
     && hasUuidFields(value, ['authorMemberId', 'id'])

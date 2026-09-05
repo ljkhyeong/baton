@@ -62,7 +62,8 @@ public class WorkspaceRecordsController {
                         request.reason(),
                         request.alternative(),
                         request.authorMemberId(),
-                        request.roleIds()
+                        request.roleIds(),
+                        request.textFormat()
                 )
         );
         return DecisionResponse.from(result);
@@ -89,7 +90,8 @@ public class WorkspaceRecordsController {
                         request.reason(),
                         request.alternative(),
                         request.authorMemberId(),
-                        request.roleIds()
+                        request.roleIds(),
+                        request.textFormat()
                 )
         ));
     }

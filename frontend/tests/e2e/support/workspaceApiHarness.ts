@@ -384,6 +384,7 @@ export function makeProjection(): WorkspaceProjection {
         createdAt: '2026-07-03T12:00:00Z',
         authorMemberId: MEMBER_ONE_ID,
         authorName: '박민서',
+        textFormat: 'PLAIN_TEXT',
         roleIds: [ROLE_ID],
         archivedAt: null,
       },
@@ -1072,6 +1073,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         id: CREATED_DECISION_ID,
         title: input.title,
         reason: input.reason,
+        textFormat: input.textFormat ?? 'PLAIN_TEXT',
         alternative: input.alternative,
         createdAt: '2026-07-20T12:00:00Z',
         authorMemberId: input.authorMemberId,
@@ -1094,6 +1096,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       const updated: Decision = {
         ...projection.decisions[decisionIndex]!,
         ...input,
+        textFormat: input.textFormat ?? projection.decisions[decisionIndex]!.textFormat,
         authorName: author?.name ?? '알 수 없음',
       }
       projection.decisions[decisionIndex] = updated

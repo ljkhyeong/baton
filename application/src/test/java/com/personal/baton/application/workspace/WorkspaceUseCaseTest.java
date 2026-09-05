@@ -65,6 +65,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceSeasonReposito
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.Decision;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.HandoffItem;
@@ -4108,6 +4109,42 @@ class WorkspaceUseCaseTest {
                     created.teamId(), created.seasonId(), created.accessKey()
             ).decisions()).containsExactly(updated);
         }
+    }
+
+    @DisplayName("결정 본문 형식은 저장과 재조회에 남고 같은 멱등 키의 형식 변경은 거부한다")
+    @Test
+    void preservesDecisionFormatAndIdempotency() {
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                "workspace-markdown-record-format-001", CREATION_KEY,
+                new CreateWorkspaceCommand("Markdown 기록 팀", "시즌", LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 9, 30), List.of("박민서")));
+        UUID memberId = lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey())
+                .members().getFirst().id();
+        RoleResult role = peopleUseCase.createRole(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("markdown-role"), created.accessKey(),
+                new CreateRoleCommand("기록자", "결정을 남깁니다", null, null, null, null, List.of(), null));
+        String key = contentIdempotencyKey("markdown-decision");
+        CreateDecisionCommand command = new CreateDecisionCommand("주간 회고", "**이유**\n- 준비 시간", "대안",
+                memberId, List.of(role.id()), DecisionTextFormat.MARKDOWN);
+        DecisionResult decision = recordsUseCase.createDecision(created.teamId(), created.seasonId(), key,
+                created.accessKey(), command);
+        assertThat(decision.textFormat()).isEqualTo(DecisionTextFormat.MARKDOWN);
+        assertThat(lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey())
+                .decisions()).containsExactly(decision);
+        assertThat(recordsUseCase.createDecision(created.teamId(), created.seasonId(), key,
+                created.accessKey(), command)).isEqualTo(decision);
+        assertThatThrownBy(() -> recordsUseCase.createDecision(created.teamId(), created.seasonId(), key,
+                created.accessKey(), new CreateDecisionCommand(command.title(), command.reason(), command.alternative(),
+                        memberId, command.roleIds()))).isInstanceOf(IdempotencyKeyReusedException.class);
+        DecisionResult updated = recordsUseCase.updateDecision(created.teamId(), created.seasonId(), decision.id(),
+                created.accessKey(), new UpdateDecisionCommand("회고 제목 정정", command.reason(), command.alternative(),
+                        memberId, command.roleIds()));
+        assertThat(updated.textFormat()).isEqualTo(DecisionTextFormat.MARKDOWN);
+        DecisionResult plain = recordsUseCase.updateDecision(created.teamId(), created.seasonId(), decision.id(),
+                created.accessKey(), new UpdateDecisionCommand(updated.title(), updated.reason(), updated.alternative(),
+                        memberId, command.roleIds(), DecisionTextFormat.PLAIN_TEXT));
+        assertThat(plain.reason()).isEqualTo(command.reason());
+        assertThat(plain.textFormat()).isEqualTo(DecisionTextFormat.PLAIN_TEXT);
     }
 
     @DisplayName("결정과 바통은 내용을 정정하고 보관했다가 원래 상태로 복원한다")

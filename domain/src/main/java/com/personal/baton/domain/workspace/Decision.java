@@ -4,6 +4,8 @@ import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -39,6 +41,10 @@ public class Decision {
 
     @Column(nullable = false, length = 2000)
     private String alternative;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "text_format", nullable = false, length = 16)
+    private DecisionTextFormat textFormat = DecisionTextFormat.PLAIN_TEXT;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -96,6 +102,23 @@ public class Decision {
             List<UUID> roleIds
     ) {
         return new Decision(id, seasonId, title, reason, alternative, createdAt, authorMemberId, roleIds);
+    }
+
+    public static Decision create(
+            UUID id, UUID seasonId, String title, String reason, String alternative,
+            Instant createdAt, UUID authorMemberId, List<UUID> roleIds, DecisionTextFormat textFormat
+    ) {
+        Decision decision = create(id, seasonId, title, reason, alternative, createdAt, authorMemberId, roleIds);
+        decision.textFormat = Objects.requireNonNullElse(textFormat, DecisionTextFormat.PLAIN_TEXT);
+        return decision;
+    }
+
+    public void update(
+            String title, String reason, String alternative, UUID authorMemberId,
+            List<UUID> roleIds, DecisionTextFormat textFormat
+    ) {
+        update(title, reason, alternative, authorMemberId, roleIds);
+        if (textFormat != null) this.textFormat = textFormat;
     }
 
     public void update(
@@ -179,6 +202,10 @@ public class Decision {
 
     public String getAlternative() {
         return alternative;
+    }
+
+    public DecisionTextFormat getTextFormat() {
+        return textFormat;
     }
 
     public Instant getCreatedAt() {

@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 
 public final class WorkspaceRequests {
 
@@ -158,7 +159,8 @@ public final class WorkspaceRequests {
             @NotBlank @Size(max = 2000) String reason,
             @Size(max = 2000) String alternative,
             @NotNull UUID authorMemberId,
-            @NotEmpty @Size(max = 100) List<@NotNull UUID> roleIds
+            @NotEmpty @Size(max = 100) List<@NotNull UUID> roleIds,
+            DecisionTextFormat textFormat
     ) {
     }
 
@@ -167,7 +169,8 @@ public final class WorkspaceRequests {
             @NotBlank @Size(max = 2000) String reason,
             @Size(max = 2000) String alternative,
             @NotNull UUID authorMemberId,
-            @NotEmpty @Size(max = 100) List<@NotNull UUID> roleIds
+            @NotEmpty @Size(max = 100) List<@NotNull UUID> roleIds,
+            DecisionTextFormat textFormat
     ) {
     }
 

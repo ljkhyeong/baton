@@ -1,3 +1,4 @@
+import { DecisionText } from './records/DecisionText'
 import { useState } from 'react'
 import type { WorkspaceScope } from './api'
 import { useWorkspaceQuery } from './queries'
@@ -71,8 +72,8 @@ function PreviousRoleRecordContents({
         {decisions.map((decision) => <li key={decision.id}>
           <strong>{decision.title}</strong>
           {decision.archivedAt && <small>보관한 결정</small>}
-          <p className="previous-role-copy">{decision.reason}</p>
-          {decision.alternative && <p className="previous-role-copy">검토한 다른 선택: {decision.alternative}</p>}
+          <DecisionText text={decision.reason} format={decision.textFormat} />
+          {decision.alternative && <div><small>검토한 다른 선택</small><DecisionText text={decision.alternative} format={decision.textFormat} /></div>}
           <small>작성자: {decision.authorName}</small>
         </li>)}
       </ul> : <p>이 역할에 연결한 결정이 없습니다.</p>}

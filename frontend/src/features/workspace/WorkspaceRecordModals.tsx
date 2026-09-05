@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { DecisionText } from './records/DecisionText'
 import type { FormEvent } from 'react'
 import {
   CreationFormFeedback,
@@ -57,6 +58,8 @@ export function DecisionModal({
   const editing = Boolean(decision)
   const submission = useSubmissionLock(pending)
   const [title, setTitle] = useState(decision?.title ?? '')
+  const [textFormat, setTextFormat] = useState<'PLAIN_TEXT' | 'MARKDOWN'>(decision?.textFormat ?? 'PLAIN_TEXT')
+  const [preview, setPreview] = useState(false)
   const [reason, setReason] = useState(decision?.reason ?? '')
   const [alternative, setAlternative] = useState(decision?.alternative ?? '')
   const [roleIds, setRoleIds] = useState<string[]>(
@@ -77,6 +80,7 @@ export function DecisionModal({
       || submission.closeGuardRef.current) return
     submission.start(onSave({
       title: title.trim(),
+      ...(textFormat === 'MARKDOWN' || decision?.textFormat === 'MARKDOWN' ? { textFormat } : {}),
       reason: reason.trim(),
       alternative: alternative.trim() || (editing ? '' : '별도 대안을 검토하지 않음'),
       authorMemberId,
@@ -104,24 +108,32 @@ export function DecisionModal({
             placeholder="예: 세션 시작 시간을 30분 앞당긴다"
           />
         </label>
-        <label>
-          <span>왜 이 선택을 했나요?</span>
-          <textarea
-            required
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="반복된 문제나 관찰한 근거를 적어주세요"
-            rows={3}
-          />
-        </label>
-        <label>
-          <span>검토한 다른 선택</span>
-          <input
-            value={alternative}
-            onChange={(event) => setAlternative(event.target.value)}
-            placeholder="예: 세션 시간을 30분 연장하기"
-          />
-        </label>
+        <fieldset className="decision-text-editor">
+          <legend>결정의 맥락</legend>
+          <label>
+            <span>본문 형식</span>
+            <select value={textFormat} onChange={(event) => setTextFormat(event.target.value as 'PLAIN_TEXT' | 'MARKDOWN')}>
+              <option value="PLAIN_TEXT">일반 텍스트</option>
+              <option value="MARKDOWN">Markdown</option>
+            </select>
+          </label>
+          <button type="button" className="decision-preview-toggle" aria-pressed={preview}
+            onClick={() => setPreview(!preview)}>{preview ? '본문 편집' : '미리보기'}</button>
+          {preview ? <div className="decision-preview" aria-label="결정 본문 미리보기">
+            <strong>이유</strong><DecisionText text={reason || '이유를 입력해 주세요.'} format={textFormat} />
+            <strong>검토한 다른 선택</strong><DecisionText text={alternative || '아직 대안을 입력하지 않았습니다.'} format={textFormat} />
+          </div> : <>
+            <label><span>왜 이 선택을 했나요?</span>
+              <textarea required maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)}
+                placeholder="반복된 문제나 관찰한 근거를 적어주세요" rows={4} />
+            </label>
+            <label><span>검토한 다른 선택</span>
+              <textarea maxLength={2000} value={alternative} onChange={(event) => setAlternative(event.target.value)}
+                placeholder="예: 세션 시간을 30분 연장하기" rows={3} />
+            </label>
+          </>}
+          {textFormat === 'MARKDOWN' && <small>굵게, 목록, 링크와 코드 서식을 쓸 수 있어요. HTML·이미지·외부 임베드는 표시하지 않습니다.</small>}
+        </fieldset>
         <label>
           <span>작성자</span>
           <select

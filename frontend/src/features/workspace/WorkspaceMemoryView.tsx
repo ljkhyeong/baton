@@ -1,3 +1,4 @@
+import { DecisionText } from './records/DecisionText'
 import {
   ActionableEmpty,
   formatInstant,
@@ -74,7 +75,7 @@ export function MemoryView({
                     </button>
                   </div>
                 </div>
-                <div className="decision-reason"><span>이유</span><p>{decision.reason}</p></div><div className="decision-alternative"><span>검토한 다른 선택</span><p>{decision.alternative}</p></div>
+                <div className="decision-reason"><span>이유</span><DecisionText text={decision.reason} format={decision.textFormat} /></div><div className="decision-alternative"><span>검토한 다른 선택</span><DecisionText text={decision.alternative} format={decision.textFormat} /></div>
                 <div className="decision-tags">{decision.roleIds.map((roleId) => { const role = roles.find((item) => item.id === roleId); return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null })}</div>
               </div>
             </article>

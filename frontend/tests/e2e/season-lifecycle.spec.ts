@@ -144,6 +144,7 @@ function projection(
       alternative: '월말에 한 번 모으기',
       authorMemberId: MEMBER_ID,
       authorName: '박민서',
+      textFormat: 'PLAIN_TEXT',
       roleIds: [ROLE_ID],
       createdAt: '2026-07-10T03:00:00Z',
       archivedAt: null,

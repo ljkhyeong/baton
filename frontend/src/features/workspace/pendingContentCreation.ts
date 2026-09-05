@@ -152,6 +152,7 @@ function normalizePayload<Operation extends ContentCreationOperation>(
       return JSON.stringify({
         title: decision.title.trim(),
         reason: decision.reason.trim(),
+        ...(decision.textFormat === 'MARKDOWN' ? { textFormat: decision.textFormat } : {}),
         alternative: decision.alternative.trim(),
         authorMemberId: decision.authorMemberId.trim(),
         roleIds: decision.roleIds.map((roleId) => roleId.trim()),

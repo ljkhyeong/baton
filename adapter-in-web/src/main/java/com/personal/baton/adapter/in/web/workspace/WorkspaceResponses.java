@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 
 public final class WorkspaceResponses {
 
@@ -377,7 +378,8 @@ public final class WorkspaceResponses {
             UUID authorMemberId,
             String authorName,
             List<UUID> roleIds,
-            Instant archivedAt
+            Instant archivedAt,
+            DecisionTextFormat textFormat
     ) {
 
         public static DecisionResponse from(WorkspaceContract.DecisionResult result) {
@@ -390,7 +392,8 @@ public final class WorkspaceResponses {
                     result.authorMemberId(),
                     result.authorName(),
                     result.roleIds(),
-                    result.archivedAt()
+                    result.archivedAt(),
+                    result.textFormat()
             );
         }
     }

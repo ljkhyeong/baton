@@ -740,11 +740,14 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
   "reason": "풀이를 설명할 시간이 부족했다",
   "alternative": "모임 시간을 늘린다",
   "authorMemberId": "opaque-member-id",
-  "roleIds": ["opaque-role-id"]
+  "roleIds": ["opaque-role-id"],
+  "textFormat": "PLAIN_TEXT"
 }
 ```
 
 작성자는 해당 팀의 활동 중 구성원이어야 하고 관련 역할은 요청한 시즌 소속이어야 하며 한 개 이상이고 중복될 수 없다. 성공 상태는 `201 Created`다. 응답의 `id`, `createdAt`, `authorName`은 서버가 결정하고, `authorMemberId`는 요청한 작성자 식별자를 반환한다. 새 결정의 `archivedAt`은 `null`이다.
+
+`textFormat`은 이유와 대안의 공통 형식으로 `PLAIN_TEXT` 또는 `MARKDOWN`이다. 생성에서 생략하거나 `null`이면 `PLAIN_TEXT`로 저장한다. 응답과 워크스페이스·이전 시즌 기록에는 항상 형식을 반환한다. 기존 기록은 V31에서 일반 텍스트로 이관하며 원문은 바꾸지 않는다. 제목은 항상 일반 텍스트이고 본문 길이 제한은 각 2,000자다. 같은 멱등 키로 본문 형식만 바꿔도 다른 요청으로 거부한다.
 
 수정:
 
@@ -753,10 +756,12 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `title`, `reason`, `alternative`, `authorMemberId`, `roleIds` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 `createdAt`은 최초 생성 시각을 유지한다. 대상 결정은 요청 시즌 소속이어야 하고 보관되지 않은 활성 기록이어야 한다. 작성자의 팀 소속과 활동 상태, 관련 역할의 같은 시즌 소속, 최소 개수와 중복 금지를 다시 검증한다. 기존 활동 종료 작성자 ID를 그대로 유지하는 것은 허용하지만 다른 활동 종료 구성원으로 바꿀 수는 없다. 대상이 없거나 다른 시즌 소속이거나 보관 상태이면 `404 DECISION_NOT_FOUND`다. 같은 결정을 먼저 읽은 다른 수정·보관 트랜잭션과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
+요청은 생성과 같은 `title`, `reason`, `alternative`, `authorMemberId`, `roleIds`와 선택적인 `textFormat` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 `createdAt`은 최초 생성 시각을 유지한다. 대상 결정은 요청 시즌 소속이어야 하고 보관되지 않은 활성 기록이어야 한다. 작성자의 팀 소속과 활동 상태, 관련 역할의 같은 시즌 소속, 최소 개수와 중복 금지를 다시 검증한다. 기존 활동 종료 작성자 ID를 그대로 유지하는 것은 허용하지만 다른 활동 종료 구성원으로 바꿀 수는 없다. 대상이 없거나 다른 시즌 소속이거나 보관 상태이면 `404 DECISION_NOT_FOUND`다. 같은 결정을 먼저 읽은 다른 수정·보관 트랜잭션과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
 
 관련 역할을 한 개 이상 유지하면서 일부 연결을 해제하거나 `roleIds` 배열 순서를 바꿀 수 있다.
 수정 응답과 이후 워크스페이스 조회는 요청한 역할 순서를 그대로 반환한다.
+
+수정에서 `textFormat`을 생략하거나 `null`로 보내면 기존 형식을 유지한다. 일반 텍스트로 되돌리려면 `PLAIN_TEXT`를 명시하며 원문 기호는 보존한다. 브라우저 미리보기는 원시 HTML·이미지·외부 임베드를 표시하지 않고 자격 증명이 없는 HTTP(S) 링크만 연결한다. 검색 발췌문은 문법과 링크 주소를 제외한 표시 텍스트를 사용한다.
 
 보관·복원:
 

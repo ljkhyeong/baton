@@ -60,7 +60,8 @@ final class WorkspaceDecisionCoordinator {
                 command.alternative(),
                 Instant.now(clock),
                 command.authorMemberId(),
-                command.roleIds()
+                command.roleIds(),
+                command.textFormat()
         );
         ContentCreationAttempt attempt = contentIdempotency.prepare(
                 teamId,
@@ -112,7 +113,8 @@ final class WorkspaceDecisionCoordinator {
                 command.reason(),
                 command.alternative(),
                 command.authorMemberId(),
-                command.roleIds()
+                command.roleIds(),
+                command.textFormat()
         );
         validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
         return resultMapper.toDecisionResult(

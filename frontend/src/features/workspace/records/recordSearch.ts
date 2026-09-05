@@ -1,3 +1,4 @@
+import { decisionVisibleText } from './decisionVisibleText'
 import type {
   Decision,
   HandoffItem,
@@ -83,15 +84,17 @@ function buildSearchResults({
   const rolesById = new Map(roles.map((role) => [role.id, role]))
   const decisionResults: RecordSearchResult[] = decisions.map((decision) => {
     const roleNames = decision.roleIds.map((roleId) => roleName(roleId, rolesById))
+    const reason = decisionVisibleText(decision.reason, decision.textFormat)
+    const alternative = decisionVisibleText(decision.alternative, decision.textFormat)
     return {
       key: `decision:${decision.id}`,
       id: decision.id,
       kind: 'decision',
       title: decision.title,
       primaryLabel: '이유',
-      primaryText: decision.reason,
+      primaryText: reason,
       secondaryLabel: decision.alternative ? '검토한 다른 선택' : undefined,
-      secondaryText: decision.alternative || undefined,
+      secondaryText: alternative || undefined,
       createdAt: decision.createdAt,
       archivedAt: decision.archivedAt,
       roleId: decision.roleIds[0] ?? '',
@@ -100,8 +103,8 @@ function buildSearchResults({
       authorName: decision.authorName,
       searchableText: normalizeSearchText([
         decision.title,
-        decision.reason,
-        decision.alternative,
+        reason,
+        alternative,
         decision.authorName,
         ...roleNames,
       ].join(' ')),

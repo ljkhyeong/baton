@@ -202,7 +202,8 @@ final class WorkspaceResultMapper {
                 decision.getAuthorMemberId(),
                 author.getName(),
                 List.copyOf(decision.getRoleIds()),
-                decision.getArchivedAt()
+                decision.getArchivedAt(),
+                decision.getTextFormat()
         );
     }
 

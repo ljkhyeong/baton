@@ -65,6 +65,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceOperationsComma
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
@@ -105,10 +106,12 @@ import org.springframework.restdocs.snippet.Snippet;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
@@ -2635,6 +2638,7 @@ class WorkspaceRestDocsTest {
                         .content("""
                                 {
                                   "title": "질문은 모임 전날 마감한다",
+                                  "textFormat": "MARKDOWN",
                                   "reason": "진행자가 준비할 시간을 확보합니다",
                                   "alternative": "모임 당일에도 받는 방안을 검토했습니다",
                                   "authorMemberId": "33333333-3333-3333-3333-333333333333",
@@ -2644,6 +2648,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.authorName").value("박민서"))
+                .andExpect(jsonPath("$.textFormat").value("PLAIN_TEXT"))
                 .andDo(document(
                         "createDecision",
                         CREATE_DECISION,
@@ -2656,12 +2661,16 @@ class WorkspaceRestDocsTest {
                                         "reason", "결정 이유"),
                                 optionalRequestField(WorkspaceRequests.CreateDecisionRequest.class,
                                         "alternative", "검토한 대안"),
+                                enumField(DecisionTextFormat.class, "textFormat",
+                                        "이유와 대안 형식. 생성 시 누락하면 일반 텍스트, 수정 시 누락하면 기존 형식 유지").optional(),
                                 requestField(WorkspaceRequests.CreateDecisionRequest.class,
                                         "authorMemberId", "작성자 구성원 UUID"),
                                 requestStringArrayField(WorkspaceRequests.CreateDecisionRequest.class,
                                         "roleIds", "roleIds[]", "중복 없는 관련 역할 UUID 목록")
                         ),
                         responseFields(decisionResponseFields())));
+        verify(recordsUseCase).createDecision(eq(TEAM_ID), eq(SEASON_ID), eq(CONTENT_IDEMPOTENCY_KEY),
+                eq(ACCESS_KEY), argThat(command -> command.textFormat() == DecisionTextFormat.MARKDOWN));
     }
 
     @DisplayName("결정 수정 API는 생성 시각을 유지하며 정정한 전체 표현을 반환한다")
@@ -2699,6 +2708,8 @@ class WorkspaceRestDocsTest {
                                         "reason", "결정 이유"),
                                 optionalRequestField(WorkspaceRequests.UpdateDecisionRequest.class,
                                         "alternative", "검토한 대안"),
+                                enumField(DecisionTextFormat.class, "textFormat",
+                                        "이유와 대안 형식. 생성 시 누락하면 일반 텍스트, 수정 시 누락하면 기존 형식 유지").optional(),
                                 requestField(WorkspaceRequests.UpdateDecisionRequest.class,
                                         "authorMemberId", "작성자 구성원 UUID"),
                                 requestStringArrayField(WorkspaceRequests.UpdateDecisionRequest.class,
@@ -4889,6 +4900,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("decisions[].title").description("결정 제목"),
                 fieldWithPath("decisions[].reason").description("결정 이유"),
                 fieldWithPath("decisions[].alternative").description("검토한 대안"),
+                enumField(DecisionTextFormat.class, "decisions[].textFormat", "이유와 대안 형식"),
                 fieldWithPath("decisions[].createdAt").description("서버가 기록한 UTC 시각"),
                 fieldWithPath("decisions[].authorMemberId").description("작성자 구성원 UUID"),
                 fieldWithPath("decisions[].authorName").description("작성자 이름"),
@@ -5326,6 +5338,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("title").description("결정 제목"),
                 fieldWithPath("reason").description("결정 이유"),
                 fieldWithPath("alternative").description("검토한 대안"),
+                enumField(DecisionTextFormat.class, "textFormat", "이유와 대안 형식"),
                 fieldWithPath("createdAt").description("서버가 기록한 UTC 시각"),
                 fieldWithPath("authorMemberId").description("작성자 구성원 UUID"),
                 fieldWithPath("authorName").description("작성자 이름"),

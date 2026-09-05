@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 
 public final class WorkspaceContract {
 
@@ -190,8 +191,14 @@ public final class WorkspaceContract {
             UUID authorMemberId,
             String authorName,
             List<UUID> roleIds,
-            Instant archivedAt
+            Instant archivedAt,
+            DecisionTextFormat textFormat
     ) {
+        public DecisionResult(UUID id, String title, String reason, String alternative, Instant createdAt,
+                              UUID authorMemberId, String authorName, List<UUID> roleIds, Instant archivedAt) {
+            this(id, title, reason, alternative, createdAt, authorMemberId, authorName, roleIds,
+                    archivedAt, DecisionTextFormat.PLAIN_TEXT);
+        }
     }
 
     public record HandoffItemResult(

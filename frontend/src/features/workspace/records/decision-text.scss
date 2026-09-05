@@ -1,0 +1,24 @@
+.decision-plain-text { white-space: pre-wrap; }
+.decision-markdown {
+  overflow-wrap: anywhere;
+  font-size: inherit;
+  line-height: 1.65;
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+  h1, h2, h3, h4, h5, h6 { font-size: 1.1em; margin: 16px 0 8px; }
+  ul, ol { padding-left: 22px; }
+  li { display: list-item; }
+  a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--baton); text-underline-offset: 3px; }
+  pre { max-width: 100%; overflow-x: auto; padding: 12px; background: var(--paper); border: 1px solid var(--rule); }
+  code { font-family: ui-monospace, monospace; font-size: .95em; }
+  blockquote { margin-inline: 0; padding-left: 12px; border-left: 3px solid var(--rule); }
+}
+.decision-text-editor {
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  legend { font-size: 12px; font-weight: 650; }
+  select { margin-block: 8px; }
+  .decision-preview-toggle { padding: 8px 12px; min-height: 36px; border: 1px solid var(--rule); border-radius: 5px; background: transparent; color: var(--ink); }
+  .decision-preview { margin-top: 12px; min-height: 60px; }
+}

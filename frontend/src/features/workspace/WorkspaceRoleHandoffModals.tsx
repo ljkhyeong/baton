@@ -1,3 +1,4 @@
+import { DecisionText } from './records/DecisionText'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -361,7 +362,7 @@ export function HandoffPreview({
             ? relatedDecisions.map((decision) => (
                 <blockquote key={decision.id}>
                   “{decision.title}”
-                  <small>{decision.reason}</small>
+                  <DecisionText text={decision.reason} format={decision.textFormat} />
                 </blockquote>
               ))
             : <p>연결된 결정이 아직 없습니다.</p>}
