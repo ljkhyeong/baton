@@ -728,6 +728,46 @@ export interface paths {
         patch: operations["correctSeasonName"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 알림함 조회
+         * @description 현재 내 역할의 마감 임박·지연 업무와 수락할 바통을 반환한다.
+         */
+        get: operations["getWorkspaceNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 알림 읽음 처리
+         * @description 현재 내 알림을 읽음으로 표시한다. 같은 요청은 최초 읽음 시각을 유지한다.
+         */
+        post: operations["readWorkspaceNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources": {
         parameters: {
             query?: never;
@@ -1897,6 +1937,60 @@ export interface components {
             /** @description BRIEF 로컬 수신 순서 cursor */
             sourceCursor: number;
         };
+        Schema_050667d05bff2f6d: {
+            /**
+             * Format: uuid
+             * @description 현재 계정 식별자
+             */
+            accountId: string;
+            /** @description 현재 내 알림 */
+            notifications: {
+                /**
+                 * Format: uuid
+                 * @description 알림 식별자
+                 */
+                id: string;
+                /**
+                 * @description 알림 종류
+                 * @enum {string}
+                 */
+                kind: "DEADLINE_SOON" | "OVERDUE" | "HANDOFF_REQUEST";
+                /**
+                 * Format: date-time
+                 * @description 마감 또는 바통 전달 시각
+                 */
+                occurredAt: string;
+                /** @description 현재 계정의 읽음 여부 */
+                read: boolean;
+                /**
+                 * Format: uuid
+                 * @description 관련 역할 식별자
+                 */
+                roleId: string;
+                /**
+                 * Format: uuid
+                 * @description 관련 회차 식별자, 바통은 null
+                 */
+                roundId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 루틴 실행 또는 역할 바통 식별자
+                 */
+                sourceId: string;
+                /** @description 업무 또는 역할 이름 */
+                title: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+        };
         Schema_8722349937f63e53: {
             /** @description 새 비밀번호 */
             password: string;
@@ -2715,6 +2809,13 @@ export interface components {
             timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
             /** @description 회차 생성 시점의 루틴 제목 */
             title: string;
+        };
+        Schema_c22d40e7f42d4109: {
+            /**
+             * Format: uuid
+             * @description 화면에서 확인한 로그인 계정
+             */
+            expectedAccountId: string;
         };
         Schema_c2944e6f33f5d617: {
             /** @description 현재·이전 공개 RSA 검증 키 */
@@ -5046,6 +5147,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getWorkspaceNotifications: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 개인 데이터 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_050667d05bff2f6d"];
+                };
+            };
+        };
+    };
+    readWorkspaceNotification: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 알림 식별자 */
+                notificationId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_c22d40e7f42d4109"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 개인 데이터 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_050667d05bff2f6d"];
                 };
             };
         };

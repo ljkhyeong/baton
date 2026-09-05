@@ -1195,3 +1195,11 @@ cd frontend && npm ci && cd ..
 - 두 응답은 `200 OK`, `Cache-Control: no-store`이며 `teamId`, `seasonId`, `resourceId`, `resourceVersion`, `verifications`를 반환한다. 확인 항목은 `id`, `resourceVersion`, `memberId`, `memberName`, `url`, `status`, nullable `note`, `verifiedAt`, `current`를 포함한다. `current`는 현재 자료 버전에 대한 확인 여부다.
 - 자료 변경·보관은 `409 WORKSPACE_CONTENT_CONFLICT`, 다른 계정으로 전환된 요청은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 미연결·활동 종료 구성원은 `403 WORKSPACE_ACCESS_DENIED`, 종료 시즌의 기록은 `409 SEASON_ENDED`다. 같은 시즌 잠금에서 버전 확인과 이력 저장을 마쳐 자료 수정과의 경합을 막는다.
 - 확인 기록은 정정·삭제하지 않는다. 새로운 확인을 추가한다. 파일럿의 구성원 연결 근거와 WATCH 자동 점검 결과를 수동 확인의 실제 사용자 신원 검증으로 확대 해석하지 않는다.
+
+## 내 알림함
+
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 24시간 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 바통은 `HANDOFF_REQUEST`다. 종료 시즌은 빈 목록이다.
+
+항목의 `id`는 계정·팀·시즌·종류·원본·마감 또는 전달 시각에서 결정한다. `sourceId`는 실행 또는 역할 바통 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차다. `title`, `occurredAt`(마감 또는 전달 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
+
+`POST /api/v1/teams/{teamId}/seasons/{seasonId}/notifications/{notificationId}/read`는 동일 출처·CSRF와 본문 `expectedAccountId` 일치를 추가 확인한다. 현재 계정의 현재 알림만 읽음으로 기록하고 전체 알림함을 `200 OK`로 반환한다. 반복 요청은 최초 읽음 시각을 보존한다. 원본이 해소되었거나 다른 계정의 알림이면 `404 NOTIFICATION_NOT_FOUND`, 미연결·활동 종료는 `403 WORKSPACE_ACCESS_DENIED`다. 읽음 표시는 업무를 완료하거나 바통을 수락하지 않는다.

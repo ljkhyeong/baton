@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { NotificationInbox } from '@/features/notifications/NotificationInbox'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
 import { isActiveMember } from './workspacePresentation'
@@ -55,6 +56,9 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
       content = <>
         <p>{member.name}님의 현재 담당 역할 기준입니다. 미완료 {unfinished.length}건 · 수락 대기 {awaiting.length}건</p>
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
+        <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}`}
+          scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
+          workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} />
         <div className="personal-work-columns">
           <div>
             <h3>미완료 루틴</h3>

@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.security;
 
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
@@ -68,9 +69,12 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             AccountSecurityController.SESSION_REVOCATIONS_PATH
     );
+    private static final RequestMatcher NOTIFICATION_READ = pathPattern(HttpMethod.POST, WorkspaceNotificationController.READ_PATH);
+    private static final RequestMatcher NOTIFICATION_INBOX = pathPattern(HttpMethod.GET, WorkspaceNotificationController.PATH);
     private static final RequestMatcher RESOURCE_VERIFICATION = pathPattern(HttpMethod.POST, ResourceVerificationController.PATH);
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
+            NOTIFICATION_READ,
             RESOURCE_VERIFICATION,
             ROUND_MEMBERSHIP_CLAIM,
             ROUND_ROOM_MAPPING_CREATE,
@@ -79,6 +83,8 @@ public final class AccountSessionRequestMatchers {
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             ACCOUNT_SECURITY_READ,
+            NOTIFICATION_READ,
+            NOTIFICATION_INBOX,
             RESOURCE_VERIFICATION,
             ACCOUNT_PASSWORD_CHANGE,
             ACCOUNT_SESSION_REVOCATION,

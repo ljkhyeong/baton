@@ -506,3 +506,39 @@ test('claim 응답의 구성원 범위가 다르면 연결 cache를 갱신하지
   await expect(dialog.getByText(/서버 응답을 확인할 수 없습니다/)).toBeVisible()
   await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toHaveCount(0)
 })
+
+
+test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유지되고 업무 원본으로 이동한다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  await installApi(page, projection)
+  await installMembershipApi(page, { currentMembershipResponse: {
+    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
+  } })
+  const round = projection.rounds[0]!
+  const execution = round.routineExecutions[0]!
+  const notificationId = '00000000-0000-4000-8000-000000000205'
+  let read = false
+  await page.route('**/api/v1/teams/*/seasons/*/notifications**', route => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON()).toEqual({ expectedAccountId: ACCOUNT_ID })
+      expect(route.request().headers()['x-csrf-token']).toBe(CSRF_TOKEN)
+      read = true
+    }
+    return route.fulfill({ json: { accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
+      notifications: [{ id: notificationId, kind: 'OVERDUE', sourceId: execution.id, roleId: execution.ownerRoleId,
+        roundId: round.id, title: execution.title, occurredAt: '2026-09-05T03:00:00Z', read }],
+    } })
+  })
+  await openSharedWorkspace(page)
+  const inbox = page.locator('.notification-inbox')
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
+  await inbox.locator('summary').click()
+  await inbox.getByRole('button', { name: `${execution.title} 알림 읽음 처리` }).click()
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+  await page.reload()
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+  await inbox.locator('summary').click()
+  await inbox.locator('.notification-source').click()
+  await expect(page.locator(`[data-execution-id="${execution.id}"]`)).toBeVisible()
+  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '운영' })).toHaveAttribute('aria-current', 'page')
+})

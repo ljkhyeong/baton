@@ -5,6 +5,8 @@ import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerificationHistoryResult;
 import java.util.List;
 import java.util.UUID;
@@ -28,12 +30,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 
-@WebMvcTest(ResourceVerificationController.class)
+@WebMvcTest({ResourceVerificationController.class, WorkspaceNotificationController.class})
 @Import({SecurityConfig.class, WebFilterConfig.class, ResourceVerificationSecurityTest.PasswordConfig.class})
 class ResourceVerificationSecurityTest {
     private static final UUID ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
     @Autowired MockMvc mvc;
     @MockitoBean ResourceVerificationUseCase useCase;
+    @MockitoBean WorkspaceNotificationUseCase notifications;
     @MockitoBean ValidateAccountSessionUseCase sessions;
 
     @Test
@@ -51,6 +54,18 @@ class ResourceVerificationSecurityTest {
         mvc.perform(request().with(authentication(auth)).with(csrf()))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"));
         verify(useCase).verify(eq(ID), eq(ID), eq(ID), eq("key"), eq(ID), any());
+    }
+
+    @Test
+    @DisplayName("내 알림은 계정 세션을 요구하고 읽음 변경에도 CSRF를 적용한다")
+    void protectsPersonalNotifications() throws Exception {
+        when(sessions.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
+        mvc.perform(get(WorkspaceNotificationController.PATH, ID, ID)).andExpect(status().isUnauthorized());
+        var auth = UsernamePasswordAuthenticationToken.authenticated(new Principal(ID, 0), null, List.of());
+        mvc.perform(post(WorkspaceNotificationController.READ_PATH, ID, ID, ID).with(authentication(auth))
+                        .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(notifications);
     }
 
     private MockHttpServletRequestBuilder request() {
