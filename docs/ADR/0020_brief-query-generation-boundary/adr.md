@@ -16,6 +16,8 @@ BRIEF는 BATON 연속성 이벤트에서 관심 항목과 불변 에디션을 �
 - BATON은 BRIEF 불변 에디션과 `ETag`를 변형하지 않고 중계한다. 식별자 단건과 비교는
   양쪽 에디션의 팀·시즌을 확인한 뒤 제공한다.
 - 현재 업무명·이동 대상과 생성 준비 상태는 별도 BATON 조회로 제공하고 불변 본문에 합치지 않는다.
+- 저장 이후 추가 전달 여부도 같은 에디션에 성공 확인한 BATON 전달 경계와 outbox에서
+  조회한다. BRIEF 수신 순번과 비교하거나 불변 에디션 내용을 최신 여부 판정으로 덮어쓰지 않는다.
 - BATON이 시즌 시간대의 현재 월요일과 완료된 BRIEF outbox `deliveryWatermark`를 정한다.
 - 생성 의도는 `(team, season, weekStart, zoneId, deliveryWatermark)`의 V27 실행 기록으로
   보존하고 1분 lease와 fencing token으로 최소 한 번 호출을 제어한다.

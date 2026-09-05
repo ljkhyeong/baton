@@ -1068,13 +1068,18 @@ CSRF 없이 조회한다.
 | `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
 | `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
+| `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
 | `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
 | `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
 
-단건·비교에서 요청 범위 밖인 에디션은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
+단건·비교·추가 전달 확인에서 요청 범위 밖인 에디션은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
 `title`, `roleId`, nullable `routineId`, `archived`를 포함하며 불변 에디션 ETag에 포함하지 않는다.
 준비 상태는 `READY`, `DELIVERY_PENDING`, `DELIVERY_FAILED`, `GENERATING`,
 `GENERATION_FAILED`, `SEASON_ENDED`, `DISABLED`이며 실제 생성에서는 기존 판정을 반복한다.
+추가 전달 상태는 `ADDITIONAL_DELIVERIES`, `NO_ADDITIONAL_DELIVERIES`, `UNKNOWN`이다.
+같은 에디션의 성공 생성·재사용 기록 중 최대 deliveryWatermark 뒤에 같은 팀·시즌의
+DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면 UNKNOWN이며 원본 전체
+반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
