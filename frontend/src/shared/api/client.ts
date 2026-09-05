@@ -123,10 +123,15 @@ export async function apiRequest<T>(
   }
 
   if (!response.ok) {
+    const retryAfter = response.headers.get('Retry-After')
+    const retryAfterSeconds = retryAfter !== null && /^\d+$/.test(retryAfter)
+      && Number.isSafeInteger(Number(retryAfter)) && Number(retryAfter) > 0
+      ? Math.min(Number(retryAfter), 3_600) : undefined
     throw new ApiError(
       response.status,
       await parseError(response, timeoutSignal, externalSignal),
       response.headers.get('X-Request-ID'),
+      retryAfterSeconds,
     )
   }
   const hasNoContent = response.status === 204

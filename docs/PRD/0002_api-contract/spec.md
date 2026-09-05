@@ -47,6 +47,8 @@ nullable `lastCheckedAt`, boolean `checkRequestAllowed`다. 원격 장애는 HTT
 409 `WATCH_CHECK_INACTIVE`, WATCH의 간격 제한은 429 `WATCH_CHECK_RATE_LIMITED`와
 `Retry-After`, 통신·계약 오류 또는 동시성 한도는 503 `WATCH_CHECK_UNAVAILABLE`다.
 이 세 오류 응답에도 `Cache-Control: no-store`를 적용한다.
+프런트 공용 오류 모델은 `Retry-After`의 양의 정수 초를 보존하며 최대 3600초로 제한한다.
+WATCH 재점검 버튼은 이 대기 시간을 표시하고, 헤더가 잘못되거나 없으면 30초를 적용한다.
 [WATCH 연동 계약](../0004_watch-integration-contract/spec.md)과 `ResourceHealthRestDocsTest`가
 최신성·미점검·오류·재점검의 세부 계약을 유지한다.
 

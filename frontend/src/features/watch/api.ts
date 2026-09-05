@@ -3,6 +3,7 @@ import type { WorkspaceScope } from '@/features/workspace/api'
 import { apiRequest } from '@/shared/api/client'
 import { isJsonObject, isSameUuid, isNullableInstant } from '@/shared/api/responseValidation'
 import type { operations } from '@/generated/api'
+import { scheduleHealthRead } from './healthReadQueue'
 
 export type ResourceHealth = operations['inspectResourceHealth']['responses'][200]['content']['application/json']
 export type ResourceCheck = operations['requestResourceCheck']['responses'][202]['content']['application/json']
@@ -20,7 +21,7 @@ export function decodeResourceHealth(value: unknown, resourceId: string): Resour
   if (!isJsonObject(value) || !isSameUuid(value.resourceId, resourceId)
     || !healthValues.some((health) => health === value.health)
     || !availabilityValues.some((availability) => availability === value.availability)
-    || !isNullableInstant(value.lastCheckedAt ?? null)
+    || !isNullableInstant(value.lastCheckedAt)
     || typeof value.checkRequestAllowed !== 'boolean') {
     throw new TypeError('자료 연결 상태 응답이 올바르지 않습니다.')
   }
@@ -28,11 +29,11 @@ export function decodeResourceHealth(value: unknown, resourceId: string): Resour
 }
 
 export function getResourceHealth(scope: ResourceHealthScope, signal?: AbortSignal) {
-  return apiRequest(`${resourcePath(scope)}/health`, {
-    method: 'GET', signal,
+  return scheduleHealthRead((requestSignal) => apiRequest(`${resourcePath(scope)}/health`, {
+    method: 'GET', signal: requestSignal,
     headers: { 'X-Baton-Access-Key': scope.accessKey },
     decode: (value) => decodeResourceHealth(value, scope.resourceId),
-  })
+  }), signal)
 }
 
 export async function requestResourceCheck(scope: ResourceHealthScope): Promise<ResourceCheck> {

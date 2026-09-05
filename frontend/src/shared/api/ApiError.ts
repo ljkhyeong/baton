@@ -12,8 +12,9 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly requestId?: string
+  readonly retryAfterSeconds?: number
 
-  constructor(status: number, response: ErrorResponse, requestId?: string | null) {
+  constructor(status: number, response: ErrorResponse, requestId?: string | null, retryAfterSeconds?: number) {
     const normalizedRequestId = requestId?.trim() || undefined
     const message = status >= 500 && normalizedRequestId
       ? `${response.message} (요청 ID: ${normalizedRequestId})`
@@ -23,6 +24,7 @@ export class ApiError extends Error {
     this.status = status
     this.code = response.code
     this.requestId = normalizedRequestId
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
