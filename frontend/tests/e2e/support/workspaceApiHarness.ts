@@ -783,13 +783,13 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         return error(
           409,
           'ROLE_HANDOFF_STATE_CONFLICT',
-          '현재 담당자와 담당 시작일이 있는 역할만 바통을 준비할 수 있습니다.',
+          '현재 담당자와 담당 시작일이 있는 역할만 인수인계를 준비할 수 있습니다.',
         )
       }
       if (projection.roleHandoffs.some((handoff) =>
         handoff.roleId === role.id
         && (handoff.status === 'PREPARING' || handoff.status === 'TRANSFERRED'))) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '이미 진행 중인 역할 바통이 있습니다.')
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '이미 진행 중인 역할 인수인계가 있습니다.')
       }
       const input = body as PrepareRoleHandoffRequest
       const handoff: RoleHandoff = {
@@ -830,7 +830,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       const handoff = projection.roleHandoffs.find((candidate) =>
         candidate.id === roleHandoffTransfer[2] && candidate.roleId === roleHandoffTransfer[1])
       if (!role || !handoff) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통을 전달할 수 없습니다.')
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계를 전달할 수 없습니다.')
       }
       const input = body as TransferRoleHandoffRequest
       const activeItems = projection.handoffItems.filter((item) =>
@@ -845,12 +845,12 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         return error(
           409,
           'ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED',
-          '준비도 경고를 확인해야 역할 바통을 전달할 수 있습니다.',
+          '준비도 경고를 확인해야 역할 인수인계를 전달할 수 있습니다.',
         )
       }
       if (handoff.status !== 'PREPARING'
         || input.confirmedByMemberId !== handoff.fromMemberId) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통 상태가 먼저 바뀌었습니다.')
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계 상태가 먼저 바뀌었습니다.')
       }
       handoff.status = 'TRANSFERRED'
       handoff.transferredAt = '2026-07-22T09:10:00Z'
@@ -875,7 +875,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       const input = body as ConfirmRoleHandoffRequest
       if (!role || !handoff || handoff.status !== 'TRANSFERRED'
         || input.confirmedByMemberId !== handoff.toMemberId) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통을 수락할 수 없습니다.')
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계를 수락할 수 없습니다.')
       }
       handoff.status = 'ACCEPTED'
       handoff.acceptedAt = '2026-07-22T09:20:00Z'
@@ -901,7 +901,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       if (!role || !handoff
         || (handoff.status !== 'PREPARING' && handoff.status !== 'TRANSFERRED')
         || input.confirmedByMemberId !== handoff.fromMemberId) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 바통을 취소할 수 없습니다.')
+        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계를 취소할 수 없습니다.')
       }
       handoff.status = 'CANCELLED'
       handoff.cancelledAt = '2026-07-22T09:20:00Z'
@@ -1002,7 +1002,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       routineUpdateGate = null
       if (gate) await gate
       const routineIndex = projection.routines.findIndex((candidate) => candidate.id === routineUpdate[1])
-      if (routineIndex < 0) return error(404, 'ROUTINE_NOT_FOUND', '루틴을 찾을 수 없습니다.')
+      if (routineIndex < 0) return error(404, 'ROUTINE_NOT_FOUND', '반복 업무를 찾을 수 없습니다.')
       if (nextRoutineConflict) {
         projection.routines[routineIndex] = structuredClone(nextRoutineConflict)
         nextRoutineConflict = null
@@ -1025,7 +1025,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       routineArchiveGate = null
       if (gate) await gate
       const routine = projection.routines.find((candidate) => candidate.id === routineArchive[1])
-      if (!routine) return error(404, 'ROUTINE_NOT_FOUND', '루틴을 찾을 수 없습니다.')
+      if (!routine) return error(404, 'ROUTINE_NOT_FOUND', '반복 업무를 찾을 수 없습니다.')
       routine.archivedAt = (body as UpdateRoutineArchiveRequest).archived
         ? '2026-07-21T12:00:00Z'
         : null
@@ -1041,14 +1041,14 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       if (gate) await gate
       if (failRoutineCompletion) {
         failRoutineCompletion = false
-        return error(503, 'ROUTINE_COMPLETION_FAILED', '루틴 상태를 저장하지 못했습니다.')
+        return error(503, 'ROUTINE_COMPLETION_FAILED', '반복 업무 상태를 저장하지 못했습니다.')
       }
       const round = projection.rounds.find((candidate) => candidate.id === routineCompletion[1])
       if (!round || round.archivedAt) {
         return error(404, 'SEASON_ROUND_NOT_FOUND', '시즌 회차를 찾을 수 없습니다.')
       }
       const execution = round.routineExecutions.find((candidate) => candidate.id === routineCompletion[2])
-      if (!execution) return error(404, 'ROUTINE_EXECUTION_NOT_FOUND', '루틴 실행을 찾을 수 없습니다.')
+      if (!execution) return error(404, 'ROUTINE_EXECUTION_NOT_FOUND', '반복 업무 실행을 찾을 수 없습니다.')
       if (nextRoutineCompletionConflict !== null) {
         execution.status = nextRoutineCompletionConflict ? 'DONE' : 'WAITING'
         nextRoutineCompletionConflict = null
@@ -1134,7 +1134,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         (candidate) => candidate.id === handoffItemUpdate[1],
       )
       if (itemIndex < 0) {
-        return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
+        return error(404, 'HANDOFF_ITEM_NOT_FOUND', '인수인계 항목을 찾을 수 없습니다.')
       }
       const updated: HandoffItem = {
         ...projection.handoffItems[itemIndex]!,
@@ -1151,7 +1151,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       const item = projection.handoffItems.find(
         (candidate) => candidate.id === handoffItemArchive[1],
       )
-      if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
+      if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '인수인계 항목을 찾을 수 없습니다.')
       item.archivedAt = (body as UpdateRecordArchiveRequest).archived
         ? '2026-07-21T12:00:00Z'
         : null
@@ -1217,10 +1217,10 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       if (gate) await gate
       if (failHandoffCompletion) {
         failHandoffCompletion = false
-        return error(503, 'HANDOFF_COMPLETION_FAILED', '바통 상태를 저장하지 못했습니다.')
+        return error(503, 'HANDOFF_COMPLETION_FAILED', '인수인계 상태를 저장하지 못했습니다.')
       }
       const item = projection.handoffItems.find((candidate) => candidate.id === handoffCompletion[1])
-      if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '바통 항목을 찾을 수 없습니다.')
+      if (!item) return error(404, 'HANDOFF_ITEM_NOT_FOUND', '인수인계 항목을 찾을 수 없습니다.')
       if (nextHandoffCompletionConflict !== null) {
         item.completed = nextHandoffCompletionConflict
         nextHandoffCompletionConflict = null
@@ -1360,7 +1360,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
 export async function openSharedWorkspace(page: Page) {
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
   await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
 }
 

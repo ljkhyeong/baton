@@ -81,11 +81,11 @@ final class WorkspaceSeasonSuccessorCoordinator {
         UUID sourceSeasonId = sourceSeason.getId();
         if (peopleRepository.existsOpenRoleHandoffBySeasonId(sourceSeasonId)) {
             throw new RoleHandoffStateConflictException(
-                    "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 다음 시즌을 시작해 주세요"
+                    "준비 중이거나 수락을 기다리는 인수인계를 수락 또는 취소한 뒤 다음 시즌을 시작해 주세요"
             );
         }
         List<UUID> roleIds = normalizedCopyIds(command.roleIds(), "복사할 역할");
-        List<UUID> routineIds = normalizedCopyIds(command.routineIds(), "복사할 루틴");
+        List<UUID> routineIds = normalizedCopyIds(command.routineIds(), "복사할 반복 업무");
         UUID targetSeasonId = UUID.randomUUID();
         Season targetSeason = Season.createSuccessor(
                 targetSeasonId,
@@ -134,7 +134,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
         Set<UUID> selectedRoleIds = new HashSet<>(roleIds);
         for (Routine routine : sourceRoutines) {
             if (!selectedRoleIds.contains(routine.getOwnerRoleId())) {
-                throw new DomainValidationException("복사할 루틴의 담당 역할도 함께 선택해야 합니다");
+                throw new DomainValidationException("복사할 반복 업무의 담당 역할도 함께 선택해야 합니다");
             }
         }
 
@@ -166,7 +166,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
         for (Routine sourceRoutine : sourceRoutines) {
             UUID copiedOwnerRoleId = copiedRoleIds.get(sourceRoutine.getOwnerRoleId());
             if (copiedOwnerRoleId == null) {
-                throw new IllegalStateException("복사된 루틴의 담당 역할 매핑을 찾을 수 없습니다");
+                throw new IllegalStateException("복사된 반복 업무의 담당 역할 매핑을 찾을 수 없습니다");
             }
             copiedRoutines.add(sourceRoutine.copyToSeason(
                     UUID.randomUUID(),
@@ -252,7 +252,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
             if (routine == null) {
                 throw new WorkspaceNotFoundException(
                         "ROUTINE_NOT_FOUND",
-                        "복사할 루틴을 찾을 수 없습니다"
+                        "복사할 반복 업무를 찾을 수 없습니다"
                 );
             }
             selected.add(routine);

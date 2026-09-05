@@ -204,7 +204,7 @@ class RoundAutomationPolicyTest {
         assertThat(season.getTimeZone()).isEqualTo("Asia/Seoul");
     }
 
-    @DisplayName("루틴 마감 규칙은 날짜 오프셋과 시각을 함께 검증하고 다음 시즌 복사에도 보존한다")
+    @DisplayName("반복 업무 마감 규칙은 날짜 오프셋과 시각을 함께 검증하고 다음 시즌 복사에도 보존한다")
     @Test
     void validatesAndCopiesRoutineDeadlineRule() {
         UUID sourceRoutineId = UUID.randomUUID();
@@ -242,7 +242,7 @@ class RoundAutomationPolicyTest {
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.of(23, 0));
     }
 
-    @DisplayName("루틴 실행은 마감일 전·마감일 진행 중·마감 시각부터 지연을 구분한다")
+    @DisplayName("반복 업무 실행은 마감일 전·마감일 진행 중·마감 시각부터 지연을 구분한다")
     @Test
     void distinguishesPlannedInProgressAndOverdueBoundaries() {
         RoutineExecution execution = RoutineExecution.snapshot(

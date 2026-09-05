@@ -149,7 +149,7 @@ export function CreationFormFeedback({
   if (recoveryAvailable) {
     return (
       <p className="form-retry-notice" role="status">
-        이전에 저장 결과를 확인하지 못한 요청이 있습니다. 그때와 같은 내용을 다시 제출하면 새 항목을 만들지 않고 결과를 확인합니다.
+        저장 결과를 확인하지 못했습니다. 같은 내용으로 다시 제출하면 중복 없이 결과를 확인합니다.
       </p>
     )
   }

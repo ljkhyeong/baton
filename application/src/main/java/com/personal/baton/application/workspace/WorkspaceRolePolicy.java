@@ -33,7 +33,7 @@ final class WorkspaceRolePolicy {
         repository.findOpenRoleHandoffByRoleIdWithSharedLock(role.getId()).ifPresent(handoff -> {
             if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
                 throw new RoleHandoffStateConflictException(
-                        "전달된 바통의 역할 내용은 수락 또는 취소 전까지 바꿀 수 없습니다"
+                        "전달된 인수인계의 역할 내용은 수락 또는 취소 전까지 바꿀 수 없습니다"
                 );
             }
             if (!Objects.equals(role.getCurrentMemberId(), currentMemberId)
@@ -41,7 +41,7 @@ final class WorkspaceRolePolicy {
                     || !Objects.equals(role.getAssignmentStartDate(), assignmentStartDate)
                     || !Objects.equals(role.getAssignmentEndDate(), assignmentEndDate)) {
                 throw new RoleHandoffStateConflictException(
-                        "진행 중인 바통의 담당자와 담당 기간은 수락 또는 취소 전까지 바꿀 수 없습니다"
+                        "진행 중인 인수인계의 담당자와 담당 기간은 수락 또는 취소 전까지 바꿀 수 없습니다"
                 );
             }
         });
@@ -70,7 +70,7 @@ final class WorkspaceRolePolicy {
                     .filter(handoff -> handoff.getStatus() == RoleHandoffStatus.TRANSFERRED)
                     .ifPresent(handoff -> {
                         throw new RoleHandoffStateConflictException(
-                                "전달된 바통의 항목과 자료는 수락 또는 취소 전까지 바꿀 수 없습니다"
+                                "전달된 인수인계의 항목과 자료는 수락 또는 취소 전까지 바꿀 수 없습니다"
                         );
                     });
         }

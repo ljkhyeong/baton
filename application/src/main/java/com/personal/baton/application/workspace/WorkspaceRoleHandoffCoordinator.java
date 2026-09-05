@@ -92,21 +92,21 @@ final class WorkspaceRoleHandoffCoordinator {
             return resultMapper.toRoleHandoffTransitionResult(role, existing);
         }
         if (peopleRepository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId).isPresent()) {
-            throw conflict("이 역할에는 이미 진행 중인 바통이 있습니다");
+            throw conflict("이 역할에는 이미 진행 중인 인수인계가 있습니다");
         }
         UUID fromMemberId = role.getCurrentMemberId();
         if (fromMemberId == null) {
-            throw conflict("현재 담당자를 지정한 뒤 바통 준비를 시작해 주세요");
+            throw conflict("현재 담당자를 지정한 뒤 인수인계 준비를 시작해 주세요");
         }
         if (role.getAssignmentStartDate() == null) {
-            throw conflict("현재 담당 시작일을 지정한 뒤 바통 준비를 시작해 주세요");
+            throw conflict("현재 담당 시작일을 지정한 뒤 인수인계 준비를 시작해 주세요");
         }
         if (Objects.equals(fromMemberId, command.toMemberId())) {
             throw conflict("현재 담당자와 다음 담당자는 달라야 합니다");
         }
         if (role.getNextMemberId() != null
                 && !Objects.equals(role.getNextMemberId(), command.toMemberId())) {
-            throw conflict("역할에 지정된 다음 담당자와 바통 대상이 다릅니다");
+            throw conflict("역할에 지정된 다음 담당자와 인수인계 대상이 다릅니다");
         }
         memberResolver.requireActiveMembersForNewReferences(
                 teamId,
@@ -167,7 +167,7 @@ final class WorkspaceRoleHandoffCoordinator {
         requireStatus(
                 handoff,
                 RoleHandoffStatus.PREPARING,
-                "준비 중인 바통만 전달할 수 있습니다"
+                "준비 중인 인수인계만 전달할 수 있습니다"
         );
         requireDeclaredConfirmer(
                 handoff.getFromMemberId(),
@@ -237,7 +237,7 @@ final class WorkspaceRoleHandoffCoordinator {
         requireStatus(
                 handoff,
                 RoleHandoffStatus.TRANSFERRED,
-                "전달된 바통만 수락할 수 있습니다"
+                "전달된 인수인계만 수락할 수 있습니다"
         );
         requireDeclaredConfirmer(
                 handoff.getToMemberId(),
@@ -288,12 +288,12 @@ final class WorkspaceRoleHandoffCoordinator {
             return resultMapper.toRoleHandoffTransitionResult(role, handoff);
         }
         if (handoff.getStatus() == RoleHandoffStatus.ACCEPTED) {
-            throw conflict("수락이 끝난 바통은 취소할 수 없습니다");
+            throw conflict("수락이 끝난 인수인계는 취소할 수 없습니다");
         }
         requireDeclaredConfirmer(
                 handoff.getFromMemberId(),
                 command.confirmedByMemberId(),
-                "현재 담당자 명의로 바통 취소를 확인해 주세요"
+                "현재 담당자 명의로 인수인계 취소를 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
 
@@ -317,7 +317,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 .filter(handoff -> handoff.getRoleId().equals(roleId))
                 .orElseThrow(() -> new WorkspaceNotFoundException(
                         "ROLE_HANDOFF_NOT_FOUND",
-                        "역할 바통을 찾을 수 없습니다"
+                        "역할 인수인계를 찾을 수 없습니다"
                 ));
     }
 
@@ -344,7 +344,7 @@ final class WorkspaceRoleHandoffCoordinator {
     private void requireRoleMatchesHandoff(Role role, RoleHandoff handoff) {
         if (!Objects.equals(role.getCurrentMemberId(), handoff.getFromMemberId())
                 || !Objects.equals(role.getNextMemberId(), handoff.getToMemberId())) {
-            throw conflict("역할 담당자가 바통 준비 시점과 달라 최신 내용을 확인해 주세요");
+            throw conflict("역할 담당자가 인수인계 준비 시점과 달라 최신 내용을 확인해 주세요");
         }
     }
 

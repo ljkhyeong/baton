@@ -22,8 +22,8 @@ const reasonLabels: Record<string, string> = {
   ROLE_UNASSIGNED: '현재 담당자가 없는 역할',
   ROLE_SUCCESSOR_MISSING: '다음 담당자가 정해지지 않은 역할',
   ROLE_PREPARATION_INCOMPLETE: '인수인계 준비가 부족한 역할',
-  ROUTINE_REPEATEDLY_OVERDUE: '여러 회차에서 마감이 지난 루틴',
-  HANDOFF_INCOMPLETE: '전달 또는 수락을 마치지 못한 바통',
+  ROUTINE_REPEATEDLY_OVERDUE: '여러 회차에서 마감이 지난 반복 업무',
+  HANDOFF_INCOMPLETE: '전달 또는 수락을 마치지 못한 인수인계',
 }
 const severityLabels: Record<string, string> = {
   HIGH: '높음', MEDIUM: '보통', LOW: '낮음', CRITICAL: '긴급', WARNING: '주의',
@@ -50,7 +50,7 @@ export function BriefEditionPanel(props: PanelProps) {
   const [open, setOpen] = useState(false)
   return (
     <details className="brief-panel" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary><h2>주간 운영 요약</h2><span>생성 시점의 점검 항목</span></summary>
+      <summary><h2>주간 운영 요약</h2><span>생성 시점의 점검 결과</span></summary>
       {open && <BriefAccess {...props} />}
     </details>
   )
@@ -142,21 +142,21 @@ function EditionSnapshot({ edition }: { edition: BriefEdition }) {
       <h3><time dateTime={edition.weekStart}>{edition.weekStart}</time> 시작 주</h3>
       <p><time dateTime={edition.generatedAt}>{formatTime.format(new Date(edition.generatedAt))}</time> 생성 · {edition.zoneId}</p>
     </header>
-    {edition.items.length === 0 ? <p>이 요약에 포함된 점검 항목이 없습니다. 모든 업무가 완료되었다는 뜻은 아닙니다.</p> : (
+    {edition.items.length === 0 ? <p>요약에 포함된 점검 항목이 없습니다. 남은 업무는 오늘 화면에서 확인하세요.</p> : (
       <ul className="brief-items">
         {edition.items.map((item, index) => <li key={`${item.sourceReference}:${index}`}>
           <div className="brief-item-status">
-            <span>심각도: {severityLabels[item.severity] ?? item.severity}</span>
-            <span>{statusLabels[item.status] ?? `상태: ${item.status}`}</span>
+            <span>심각도: {severityLabels[item.severity] ?? '확인 필요'}</span>
+            <span>{statusLabels[item.status] ?? '상태 확인 필요'}</span>
           </div>
-          <h4>{reasonLabels[item.reasonCode] ?? '기타 점검 항목'}</h4>
+          <h4>{reasonLabels[item.reasonCode] ?? '추가 점검 항목'}</h4>
           <p><time dateTime={item.observedAt}>{formatTime.format(new Date(item.observedAt))}</time> 관찰</p>
-          <details className="brief-item-details"><summary>기록 식별 정보</summary>
-            <dl><dt>점검 유형</dt><dd>{item.reasonCode}</dd><dt>원본 참조</dt><dd>{item.sourceReference}</dd></dl>
+          <details className="brief-item-details"><summary>문의용 상세 정보</summary>
+            <dl><dt>점검 코드</dt><dd>{item.reasonCode}</dd><dt>원본 기록 ID</dt><dd>{item.sourceReference}</dd></dl>
           </details>
         </li>)}
       </ul>
     )}
-    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 ‘확인이 필요한 업무’에서 확인하세요.</p>
+    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 운영 점검에서 확인하세요.</p>
   </article>
 }

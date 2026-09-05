@@ -48,7 +48,7 @@ class SeasonCopyPolicyTest {
         assertThat(copied.getAssignmentEndDate()).isNull();
     }
 
-    @DisplayName("루틴을 다음 시즌에 복사하면 정의와 원본 계보를 유지하고 담당 역할만 새 역할로 바꾼다")
+    @DisplayName("반복 업무를 다음 시즌에 복사하면 정의와 원본 계보를 유지하고 담당 역할만 새 역할로 바꾼다")
     @Test
     void copiesRoutineDefinitionWithMappedOwnerRole() {
         UUID sourceRoutineId = UUID.randomUUID();

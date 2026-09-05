@@ -208,7 +208,7 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/')
 })
 
-test('역할 바통 endpoint decoder는 서버가 반환한 도메인 상태를 재계산하지 않는다', async ({ page }) => {
+test('역할 인수인계 endpoint decoder는 서버가 반환한 도메인 상태를 재계산하지 않는다', async ({ page }) => {
   const response = domainInconsistentRoleHandoffResponse()
   const decoders: DecoderName[] = [
     'decodePrepareRoleHandoffResponse',
@@ -398,7 +398,7 @@ test('연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해�
       }),
     },
     {
-      name: '다른 역할이 소유한 반복 루틴',
+      name: '다른 역할이 소유한 반복 업무',
       mutate: (projection) => {
         const otherRoleId = '97979797-9797-4797-8797-979797979797'
         projection.roles.push({
@@ -414,7 +414,7 @@ test('연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해�
       },
     },
     {
-      name: '반복 지연이 아닌 신호의 루틴 식별자',
+      name: '반복 지연이 아닌 신호의 반복 업무 식별자',
       mutate: (projection) => addContinuitySignal(projection, {
         routineId: projection.routines[0]!.id,
       }),
@@ -477,7 +477,7 @@ test('워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에
       },
     },
     {
-      name: '필수 nullable 루틴 마감 필드 누락',
+      name: '필수 nullable 반복 업무 마감 필드 누락',
       mutate: (projection) => {
         Reflect.deleteProperty(projection.routines[0]!, 'deadlineDayOffset')
       },
@@ -502,13 +502,13 @@ test('워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에
       },
     },
     {
-      name: '루틴 마감 오프셋의 잘못된 primitive type',
+      name: '반복 업무 마감 오프셋의 잘못된 primitive type',
       mutate: (projection) => {
         Reflect.set(projection.routines[0]!, 'deadlineDayOffset', '1')
       },
     },
     {
-      name: '루틴 마감의 잘못된 local time',
+      name: '반복 업무 마감의 잘못된 local time',
       mutate: (projection) => {
         projection.routines[0]!.deadlineTime = '24:00:00'
       },
@@ -520,7 +520,7 @@ test('워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에
       },
     },
     {
-      name: '다른 부모 회차를 가리키는 루틴 실행',
+      name: '다른 부모 회차를 가리키는 반복 업무 실행',
       mutate: (projection) => {
         projection.rounds[0]!.routineExecutions[0]!.roundId = projection.rounds[1]!.id
       },

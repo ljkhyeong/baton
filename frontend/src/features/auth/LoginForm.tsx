@@ -30,7 +30,7 @@ const providerLabels = {
 const oauthCallbackErrorMessages = {
   login_failed: {
     title: '소셜 로그인을 완료하지 못했습니다.',
-    detail: '다시 시도하거나 다른 로그인 수단을 선택해 주세요.',
+    detail: '다시 시도하거나 다른 로그인 방법을 선택해 주세요.',
   },
   temporarily_unavailable: {
     title: '현재 인증 요청을 처리할 수 없습니다.',
@@ -264,15 +264,15 @@ export default function LoginForm() {
 
       {capabilitiesQuery.isPending && (
         <div className="auth-capability-state" role="status">
-          <strong>소셜 로그인 수단을 확인하고 있습니다.</strong>
-          <p>자체 이메일 로그인은 지금도 사용할 수 있습니다.</p>
+          <strong>소셜 로그인 방법을 확인하고 있습니다.</strong>
+          <p>이메일 로그인은 지금도 사용할 수 있습니다.</p>
         </div>
       )}
 
       {capabilitiesQuery.isError && (
         <div className="auth-capability-state auth-capability-state-error" role="alert">
-          <strong>소셜 로그인 수단을 불러오지 못했습니다.</strong>
-          <p>자체 이메일 로그인은 계속 사용할 수 있습니다.</p>
+          <strong>소셜 로그인 방법을 불러오지 못했습니다.</strong>
+          <p>이메일 로그인은 계속 사용할 수 있습니다.</p>
           <button
             className="auth-retry-button"
             type="button"
@@ -363,7 +363,7 @@ export default function LoginForm() {
       {capabilitiesQuery.isSuccess
         && capabilitiesQuery.data.localRegistrationEnabled && (
           <p className="auth-switch-copy">
-            자체 이메일 계정이 없나요? <Link to={returnTo === '/'
+            이메일 계정이 없나요? <Link to={returnTo === '/'
               ? '/register'
               : `/register?${new URLSearchParams({ returnTo })}`}>계정 만들기</Link>
           </p>

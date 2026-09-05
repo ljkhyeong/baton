@@ -97,7 +97,7 @@ export function DecisionModal({
       title={editing ? '결정 기록 수정' : '결정과 이유 남기기'}
       description={editing
         ? '잘못 적은 내용과 작성자, 관련 역할을 바로잡습니다. 처음 기록한 시각은 그대로 남아요.'
-        : '나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요.'}
+        : '결정한 내용과 이유, 검토한 대안을 적어 주세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -118,7 +118,7 @@ export function DecisionModal({
           />
         </label>
         <fieldset className="decision-text-editor">
-          <legend>결정의 맥락</legend>
+          <legend>결정 이유와 대안</legend>
           <label>
             <span>본문 형식</span>
             <select value={textFormat} onChange={(event) => setTextFormat(event.target.value as 'PLAIN_TEXT' | 'MARKDOWN')}>
@@ -418,7 +418,7 @@ export function HandoffItemModal({
   }
   return (
     <ModalShell
-      title={editing ? '인수인계 문서 항목 수정' : '인수인계 문서 항목 추가'}
+      title={editing ? '인수인계 항목 수정' : '인수인계 항목 추가'}
       description={editing
         ? '잘못 적은 역할, 내용이나 분류를 고칩니다. 준비 완료 표시는 그대로 유지돼요.'
         : '다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요.'}

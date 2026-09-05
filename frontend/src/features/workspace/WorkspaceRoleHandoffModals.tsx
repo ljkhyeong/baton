@@ -99,8 +99,8 @@ export function RoleHandoffModal({
   const activeResources = resources.filter((resource) => resource.roleId === role.id)
   const incompleteItemCount = activeItems.filter((item) => !item.completed).length
   const warnings = [
-    activeItems.length === 0 ? '활성 바통 항목이 없습니다.' : '',
-    incompleteItemCount > 0 ? `미완료 바통 항목이 ${incompleteItemCount}개 있습니다.` : '',
+    activeItems.length === 0 ? '활성 인수인계 항목이 없습니다.' : '',
+    incompleteItemCount > 0 ? `미완료 인수인계 항목이 ${incompleteItemCount}개 있습니다.` : '',
     activeResources.length === 0 ? '연결한 참고 자료가 없습니다.' : '',
   ].filter(Boolean)
   const fromMember = getMember(members, handoff?.fromMemberId ?? role.currentMemberId)
@@ -138,28 +138,28 @@ export function RoleHandoffModal({
 
   const modalCopy = {
     prepare: {
-      title: '역할 바통 준비 시작',
+      title: '역할 인수인계 준비 시작',
       description: '다음 담당자와 수락 뒤 적용할 담당 기간을 먼저 확정합니다.',
-      submit: '바통 준비 시작',
-      pending: '바통 준비하는 중…',
+      submit: '인수인계 준비 시작',
+      pending: '인수인계 준비하는 중…',
     },
     transfer: {
-      title: '바통 전달 전 확인',
-      description: '현재 인수인계 문서의 준비도를 확인하고 다음 담당자에게 전달합니다.',
-      submit: '바통 전달하기',
-      pending: '바통 전달하는 중…',
+      title: '인수인계 전달 전 확인',
+      description: '미완료 항목과 자료를 확인한 뒤 다음 담당자에게 전달합니다.',
+      submit: '인수인계 전달하기',
+      pending: '인수인계 전달하는 중…',
     },
     accept: {
-      title: '역할 바통 수락',
+      title: '역할 인수인계 수락',
       description: '수락하면 역할의 현재 담당자와 담당 기간이 다음 담당자 정보로 바뀝니다.',
       submit: `${toMember?.name ?? '다음 담당자'}님 명의로 수락 기록`,
-      pending: '바통 수락하는 중…',
+      pending: '인수인계 수락하는 중…',
     },
     cancel: {
-      title: '역할 바통 취소',
-      description: '수락 전 바통을 취소하고 역할과 인수인계 문서를 다시 편집할 수 있게 합니다.',
-      submit: '바통 전달 취소',
-      pending: '바통 취소하는 중…',
+      title: '역할 인수인계 취소',
+      description: '수락 전 인수인계를 취소하고 역할과 인수인계 문서를 다시 편집할 수 있게 합니다.',
+      submit: '인수인계 전달 취소',
+      pending: '인수인계 취소하는 중…',
     },
   }[mode]
 
@@ -223,14 +223,14 @@ export function RoleHandoffModal({
             </div>
             {mode === 'transfer' && (
               <>
-                <dl className="handoff-snapshot-grid" aria-label="전달 전 인수인계 문서 준비도">
+                <dl className="handoff-snapshot-grid" aria-label="전달 전 체크리스트와 자료 현황">
                   <div><dt>활성 항목</dt><dd>{activeItems.length}</dd></div>
                   <div><dt>미완료</dt><dd>{incompleteItemCount}</dd></div>
                   <div><dt>참고 자료</dt><dd>{activeResources.length}</dd></div>
                 </dl>
                 {warnings.length > 0 && (
                   <div className="handoff-warning-box">
-                    <strong>준비도 경고</strong>
+                    <strong>전달 전 확인 사항</strong>
                     <ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
                     <label>
                       <input
@@ -238,7 +238,7 @@ export function RoleHandoffModal({
                         checked={warningAcknowledged}
                         onChange={(event) => setWarningAcknowledged(event.target.checked)}
                       />
-                      <span>준비도 경고를 확인했습니다</span>
+                      <span>미완료 항목과 자료 누락을 확인했습니다</span>
                     </label>
                   </div>
                 )}
@@ -335,7 +335,7 @@ export function HandoffPreview({
     >
       <div className="book-preview">
         <div className="book-progress">
-          <span>준비도</span>
+          <span>체크리스트 완료율</span>
           <strong>{progress}%</strong>
         </div>
         <section>
@@ -358,7 +358,7 @@ export function HandoffPreview({
                   ))}
                 </ul>
               )
-            : <p>연결된 반복 루틴이 아직 없습니다.</p>}
+            : <p>연결된 반복 업무가 아직 없습니다.</p>}
         </section>
         <section>
           <span>03 · 중요한 결정</span>

@@ -95,8 +95,8 @@ export function TodayView({
     <>
       <PageHeader
         eyebrow={`${calendarLabel} · ${season.name}`}
-        title={`${pendingCount}개의 바통이 남았어요`}
-        description="이번 운영에서 멈춘 흐름과 다음 담당자를 확인하세요."
+        title={`이번 회차 미완료 업무 ${pendingCount}개`}
+        description="남은 업무와 담당자를 확인하세요."
         action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
       />
       {personalWork}
@@ -112,7 +112,7 @@ export function TodayView({
       />
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="section-heading">
-          <div><span className="section-kicker">이번 운영</span><h2 id="relay-title">바통 라인</h2></div>
+          <div><span className="section-kicker">이번 운영</span><h2 id="relay-title">이번 회차 업무</h2></div>
           <div className="round-meta">
             <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0}</strong>
             <span>
@@ -123,7 +123,7 @@ export function TodayView({
           </div>
         </div>
         {!orderedRoutines.length ? (
-          <ActionableEmpty title="아직 운영 루틴이 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
+          <ActionableEmpty title="아직 반복 업무가 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
           <div className="relay-line" role="list">
             {orderedRoutines.map(({ id, routine, execution }, index) => {
@@ -145,11 +145,11 @@ export function TodayView({
         ) : (
           <ActionableEmpty
             title={archivedRoundCount
-              ? '현재 운영에 꺼내 둔 회차가 없어요'
+              ? '모든 회차가 보관되어 있습니다.'
               : '아직 운영 회차가 없어요'}
             description={archivedRoundCount
               ? '운영 화면의 보관함에서 회차를 복원하거나 새 회차를 만들어 주세요.'
-              : '준비한 루틴을 이번 운영의 실행 목록으로 복사해 보세요.'}
+              : '회차를 만들면 등록한 반복 업무가 추가됩니다.'}
             actionLabel={archivedRoundCount ? '운영에서 회차 관리하기' : '첫 회차 만들기'}
             onAction={archivedRoundCount ? () => onNavigate('rhythm') : onAddRound}
             disabled={!archivedRoundCount && changesDisabled}
@@ -161,7 +161,7 @@ export function TodayView({
           <div className="section-heading compact">
             <div>
               <span className="section-kicker">이번 회차 체크리스트</span>
-              <h2 id="today-round-checklist-title">{selectedRound.name} 루틴 완료하기</h2>
+              <h2 id="today-round-checklist-title">{selectedRound.name} 반복 업무 완료하기</h2>
             </div>
             <span className="today-round-progress">
               {completedCount}/{selectedRound.routineExecutions.length} 완료
@@ -191,7 +191,8 @@ export function TodayView({
         <section className="plain-section" aria-labelledby="continuity-radar-title">
           <div className="section-heading compact">
             <div>
-              <h2 id="continuity-radar-title">확인이 필요한 업무</h2>
+              <span className="section-kicker">주의가 필요한 곳</span>
+              <h2 id="continuity-radar-title">운영 점검</h2>
             </div>
             <span className="continuity-count">
               {workspace.continuitySignals.length}개
@@ -229,7 +230,7 @@ export function TodayView({
             </div>
           ) : (
             <p className="quiet-state">
-              자동 점검에서 확인된 주의 항목이 없습니다.
+              자동 점검에서 발견된 문제가 없습니다.
             </p>
           )}
         </section>

@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 class WorkspaceSeasonSettingsCoordinatorTest {
 
     @Test
-    @DisplayName("시즌 이름만 바꾸면 기존 회차와 역할·바통의 기간을 다시 조회하지 않는다")
+    @DisplayName("시즌 이름만 바꾸면 기존 회차와 역할·인수인계의 기간을 다시 조회하지 않는다")
     void renamesSeasonWithoutReloadingExistingContent() {
         WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
         WorkspaceOperationsRepository operationsRepository = mock(WorkspaceOperationsRepository.class);

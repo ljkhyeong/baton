@@ -292,7 +292,7 @@ test('@webkit dialog는 Escape로 닫히고 진입 버튼으로 focus를 돌려�
   await expect(opener).toBeFocused()
 })
 
-test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실행 스냅샷은 유지한다', async ({ page }, testInfo) => {
+test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차의 실행 스냅샷은 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -327,23 +327,23 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   })
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
+  await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
 
-  const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
-  await expect(routineDialog.getByLabel('루틴 이름')).toHaveValue('문제 5개 선정')
+  const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
+  await expect(routineDialog.getByLabel('반복 업무 이름')).toHaveValue('문제 5개 선정')
   await expect(routineDialog.getByLabel('담당 역할')).toHaveValue(ROLE_ID)
-  await routineDialog.getByLabel('루틴 이름').fill('문제 6개 선정')
+  await routineDialog.getByLabel('반복 업무 이름').fill('문제 6개 선정')
   await routineDialog.getByLabel('운영 단계').selectOption('DURING')
   await routineDialog.getByLabel('언제까지').fill('목요일 20:00')
   await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
-  await expect(page.locator('.toast[role="status"]')).toContainText('루틴 정보를 수정했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('반복 업무 정보를 수정했어요.')
   const beforePhase = page.locator('.rhythm-phase').filter({ has: page.getByRole('heading', { name: '모임 전' }) })
   const snapshottedRoutine = beforePhase.locator('.routine-row').filter({ hasText: '문제 5개 선정' })
   await expect(snapshottedRoutine).toContainText('그래프 2개 · DP 2개 · 구현 1개')
   await expect(snapshottedRoutine).toContainText('수요일 18:00')
-  await expect(page.getByRole('button', { name: '문제 6개 선정 루틴 수정' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '문제 6개 선정 반복 업무 수정' })).toBeVisible()
   await expect(page.locator('.routine-row').filter({ hasText: '문제 6개 선정' })).toHaveCount(0)
   const routineCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
   expectScopedCall(routineCall, {
@@ -361,10 +361,10 @@ test('@operations 역할과 루틴 정의를 수정해도 기존 회차의 실�
   await expect(page.locator('.role-row-open').filter({ hasText: '문제 운영 큐레이터' })).toBeVisible()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
   await expect(page.locator('.rhythm-phase').filter({ has: page.getByRole('heading', { name: '모임 전' }) }).locator('.routine-row').filter({ hasText: '문제 5개 선정' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '문제 6개 선정 루틴 수정' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '문제 6개 선정 반복 업무 수정' })).toBeVisible()
 })
 
-test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하고 최신 폼을 다시 연다', async ({ page }, testInfo) => {
+test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보존하고 최신 폼을 다시 연다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -413,30 +413,30 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
   await reopenedRoleDialog.getByRole('button', { name: '닫기' }).click()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
-  const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
-  await routineDialog.getByLabel('루틴 이름').fill('내 화면의 낡은 루틴 수정')
+  await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
+  await routineDialog.getByLabel('반복 업무 이름').fill('내 화면의 낡은 반복 업무 수정')
 
   api.conflictNextRoutineUpdate({
     ...api.projection().routines[0]!,
-    title: '다른 구성원이 갱신한 루틴',
+    title: '다른 구성원이 갱신한 반복 업무',
     phase: 'AFTER',
     dueLabel: '금요일 22:00',
-    detail: '서버에서 먼저 갱신한 최신 루틴 설명입니다.',
+    detail: '서버에서 먼저 갱신한 최신 반복 업무 설명입니다.',
   })
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(routineDialog).toBeHidden()
   await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
-  await expect(draft).toHaveValue(/내 화면의 낡은 루틴 수정/)
+  await expect(draft).toHaveValue(/내 화면의 낡은 반복 업무 수정/)
   await expect(draft).not.toHaveValue(/내 화면의 낡은 역할 수정/)
-  await page.getByRole('button', { name: '다른 구성원이 갱신한 루틴 루틴 수정' }).click()
-  const reopenedRoutineDialog = page.getByRole('dialog', { name: '루틴 수정' })
-  await expect(reopenedRoutineDialog.getByLabel('루틴 이름')).toHaveValue('다른 구성원이 갱신한 루틴')
+  await page.getByRole('button', { name: '다른 구성원이 갱신한 반복 업무 반복 업무 수정' }).click()
+  const reopenedRoutineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
+  await expect(reopenedRoutineDialog.getByLabel('반복 업무 이름')).toHaveValue('다른 구성원이 갱신한 반복 업무')
   await expect(reopenedRoutineDialog.getByLabel('운영 단계')).toHaveValue('AFTER')
   await expect(reopenedRoutineDialog.getByLabel('언제까지')).toHaveValue('금요일 22:00')
   await expect(reopenedRoutineDialog.getByLabel('세부 설명'))
-    .toHaveValue('서버에서 먼저 갱신한 최신 루틴 설명입니다.')
+    .toHaveValue('서버에서 먼저 갱신한 최신 반복 업무 설명입니다.')
 
   expect(api.calls.filter(
     (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/roles/${ROLE_ID}`,
@@ -614,8 +614,8 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
   api.holdNextRoutineUpdate()
-  await page.getByRole('button', { name: '문제 5개 선정 루틴 수정' }).click()
-  const routineDialog = page.getByRole('dialog', { name: '루틴 수정' })
+  await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
   await routineDialog.getByLabel('언제까지').fill('저장 완료 후 공개')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
   await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
@@ -677,9 +677,9 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
   }
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByRole('button', { name: '루틴 추가' }).click()
-  const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
-  await routineDialog.getByLabel('루틴 이름').fill('생성 잠금 루틴')
+  await page.getByRole('button', { name: '반복 업무 추가' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
+  await routineDialog.getByLabel('반복 업무 이름').fill('생성 잠금 반복 업무')
   await routineDialog.getByLabel('언제까지').fill('모임 하루 전')
   await routineDialog.getByLabel('세부 설명').fill('서버 응답을 받은 뒤에만 생성 화면을 닫습니다.')
   await expectPendingCreationDialogLocked({
@@ -687,7 +687,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
     dialog: routineDialog,
     operation: 'routine',
     page,
-    submitLabel: '루틴 만들기',
+    submitLabel: '반복 업무 만들기',
   })
 
   await page.getByRole('button', { name: '회차 만들기' }).click()
@@ -714,9 +714,9 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
     submitLabel: '결정 기록하기',
   })
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   await page.getByRole('button', { name: '항목 추가', exact: true }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('생성 요청이 끝날 때까지 dialog 유지')
   await expectPendingCreationDialogLocked({
     api,
@@ -727,14 +727,14 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
   })
 
   await page.getByRole('tab', { name: /문제 큐레이터/ }).click()
-  await page.getByRole('button', { name: '바통 준비 시작' }).click()
-  const roleHandoffDialog = page.getByRole('dialog', { name: '역할 바통 준비 시작' })
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const roleHandoffDialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
   await expectPendingCreationDialogLocked({
     api,
     dialog: roleHandoffDialog,
     operation: 'roleHandoff',
     page,
-    submitLabel: '바통 준비 시작',
+    submitLabel: '인수인계 준비 시작',
   })
 
   for (const operation of Object.keys(CONTENT_CREATION_PATHS) as ContentCreationOperation[]) {
@@ -778,12 +778,12 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   }
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByRole('button', { name: '루틴 추가' }).click()
-  const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
-  await routineDialog.getByLabel('루틴 이름').fill('저장 차단 루틴')
+  await page.getByRole('button', { name: '반복 업무 추가' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
+  await routineDialog.getByLabel('반복 업무 이름').fill('저장 차단 반복 업무')
   await routineDialog.getByLabel('언제까지').fill('수요일 18:00')
   await routineDialog.getByLabel('세부 설명').fill('저장 가능한 경우에만 전송합니다.')
-  await expectStorageBlock(routineDialog, '루틴 만들기')
+  await expectStorageBlock(routineDialog, '반복 업무 만들기')
 
   await page.getByRole('button', { name: '회차 만들기' }).click()
   const roundDialog = page.getByRole('dialog', { name: '회차 만들기' })
@@ -797,9 +797,9 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('응답 유실 뒤 중복 생성을 막기 위해서입니다.')
   await expectStorageBlock(decisionDialog, '결정 기록하기')
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('저장 차단 확인')
   await expectStorageBlock(handoffDialog, '항목 추가하기')
 
@@ -841,9 +841,9 @@ test('legacy 콘텐츠 pending의 request guard를 저장하지 못하면 replay
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+  const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await dialog.getByLabel('역할').selectOption(ROLE_ID)
   await dialog.getByLabel('남길 내용').fill('legacy guard upgrade 확인')
   await dialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
@@ -936,12 +936,12 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   ])
 
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
   await expect(cleanupBanner).toBeVisible()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('다른 작업의 새 키는 아직 만들지 않기')
   await handoffDialog.getByRole('button', { name: '항목 추가하기' }).click()
 
@@ -973,7 +973,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 
   await page.getByRole('button', { name: '항목 추가' }).click()
-  const recoveredDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+  const recoveredDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await recoveredDialog.getByLabel('남길 내용').fill('cleanup 뒤 새 작업 허용')
   await recoveredDialog.getByRole('button', { name: '항목 추가하기' }).click()
   await expect(page.getByRole('checkbox', { name: 'cleanup 뒤 새 작업 허용' })).toBeVisible()
@@ -992,9 +992,9 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
   await openSharedWorkspace(page)
 
   const openHandoffCreation = async () => {
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
     await page.getByRole('button', { name: '항목 추가' }).click()
-    const dialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+    const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
     await dialog.getByLabel('남길 내용').fill('guard 원본 요청 재확인')
     return dialog
   }
@@ -1020,7 +1020,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
     sessionStorage.setItem(releaseKey, 'true')
   }, CONTENT_CREATION_GUARD_FAILURE_RELEASE_KEY)
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
   await expect(page.getByRole('alert', { name: '콘텐츠 생성 완료 기록 정리' }))
     .toHaveCount(0)
 
@@ -1104,34 +1104,34 @@ test('콘텐츠 생성 성공 응답이 손상되면 journal을 유지하고 같
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으로 구분하고 원래 결과도 복구한다', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name === 'mobile', '루틴 journal 요청 동일성은 데스크톱 Chromium에서 한 번만 검증합니다.')
+test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으로 구분하고 원래 결과도 복구한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '반복 업무 journal 요청 동일성은 데스크톱 Chromium에서 한 번만 검증합니다.')
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('routine')
   await openSharedWorkspace(page)
 
   const openAndFillRoutine = async (deadlineDayOffset: string, deadlineTime: string) => {
     await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-    await page.getByRole('button', { name: '루틴 추가' }).click()
-    const dialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
-    await dialog.getByLabel('루틴 이름').fill('마감 journal 경계 확인')
+    await page.getByRole('button', { name: '반복 업무 추가' }).click()
+    const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
+    await dialog.getByLabel('반복 업무 이름').fill('마감 journal 경계 확인')
     await dialog.getByLabel('언제까지').fill('모임 전에 확인')
-    await dialog.getByLabel('실제 마감일').selectOption(deadlineDayOffset)
-    await dialog.getByLabel('실제 마감 시각').fill(deadlineTime)
+    await dialog.getByLabel('마감일').selectOption(deadlineDayOffset)
+    await dialog.getByLabel('마감 시각').fill(deadlineTime)
     await dialog.getByLabel('세부 설명').fill('마감 규칙도 요청 동일성에 포함합니다.')
     return dialog
   }
 
   const firstDialog = await openAndFillRoutine('-3', '19:00')
-  await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await firstDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(firstDialog.getByRole('alert')).toContainText(
     '입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.',
   )
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/routines`)
 
-  await firstDialog.getByLabel('실제 마감일').selectOption('0')
-  await firstDialog.getByLabel('실제 마감 시각').fill('20:00')
-  await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await firstDialog.getByLabel('마감일').selectOption('0')
+  await firstDialog.getByLabel('마감 시각').fill('20:00')
+  await firstDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(firstDialog.getByRole('alert')).toContainText(
     '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다.',
   )
@@ -1148,9 +1148,9 @@ test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으
     deadlineTime: '19:00',
   })
 
-  await firstDialog.getByLabel('실제 마감일').selectOption('-3')
-  await firstDialog.getByLabel('실제 마감 시각').fill('19:00')
-  await firstDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await firstDialog.getByLabel('마감일').selectOption('-3')
+  await firstDialog.getByLabel('마감 시각').fill('19:00')
+  await firstDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(firstDialog).toHaveCount(0)
 
   attempts = api.calls.filter(
@@ -1161,7 +1161,7 @@ test('@operations 루틴 응답 유실 뒤 실제 마감 변경을 새 요청으
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 
   const changedRequestDialog = await openAndFillRoutine('0', '20:00')
-  await changedRequestDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await changedRequestDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(changedRequestDialog).toHaveCount(0)
 
   attempts = api.calls.filter(
@@ -1186,7 +1186,7 @@ test('확인되지 않은 생성 요청이 한도에 이르면 기존 요청 정
         operation: 'handoffItem',
         normalizedPayload: JSON.stringify({
           roleId: `another-role-${index}`,
-          label: `미확인 바통 ${index}`,
+          label: `미확인 인수인계 ${index}`,
           category: 'ADVICE',
         }),
         idempotencyKey,

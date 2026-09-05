@@ -190,13 +190,13 @@ public class Role {
                 "다음 담당자 식별자는 필수입니다"
         );
         if (currentMemberId == null) {
-            throw new RoleHandoffTransitionException("현재 담당자가 없는 역할은 바통을 준비할 수 없습니다");
+            throw new RoleHandoffTransitionException("현재 담당자가 없는 역할은 인수인계를 준비할 수 없습니다");
         }
         if (currentMemberId.equals(validatedToMemberId)) {
             throw new DomainValidationException("현재 담당자와 다음 담당자는 달라야 합니다");
         }
         if (nextMemberId != null && !nextMemberId.equals(validatedToMemberId)) {
-            throw new RoleHandoffTransitionException("역할에 지정된 다음 담당자와 바통 대상이 다릅니다");
+            throw new RoleHandoffTransitionException("역할에 지정된 다음 담당자와 인수인계 대상이 다릅니다");
         }
         nextMemberId = validatedToMemberId;
     }
@@ -221,7 +221,7 @@ public class Role {
         );
         if (!validatedFromMemberId.equals(currentMemberId)
                 || !validatedToMemberId.equals(nextMemberId)) {
-            throw new RoleHandoffTransitionException("역할의 현재·다음 담당자가 준비된 바통과 다릅니다");
+            throw new RoleHandoffTransitionException("역할의 현재·다음 담당자가 준비된 인수인계와 다릅니다");
         }
         if (incomingAssignmentEndDate != null
                 && validatedStartDate.isAfter(incomingAssignmentEndDate)) {
@@ -240,7 +240,7 @@ public class Role {
                 "다음 담당자 식별자는 필수입니다"
         );
         if (!validatedToMemberId.equals(nextMemberId)) {
-            throw new RoleHandoffTransitionException("역할의 다음 담당자가 취소할 바통과 다릅니다");
+            throw new RoleHandoffTransitionException("역할의 다음 담당자가 취소할 인수인계와 다릅니다");
         }
         nextMemberId = null;
     }

@@ -106,7 +106,7 @@ class ContinuitySignalAnalyzerTest {
                         assertThat(signal.reason()).contains("현재 담당자와 같은", "넘길 수 없습니다"));
     }
 
-    @DisplayName("위험 신호가 있는 역할은 책임과 활성 바통 항목과 자료의 실제 공백을 함께 설명한다")
+    @DisplayName("위험 신호가 있는 역할은 책임과 활성 인수인계 항목과 자료의 실제 공백을 함께 설명한다")
     @Test
     void explainsPreparationGapsAndIgnoresArchivedItems() {
         Role prepared = role(
@@ -159,14 +159,14 @@ class ContinuitySignalAnalyzerTest {
                             .contains(
                                     "개인 메모에만 맥락이 있습니다",
                                     "책임 목록",
-                                    "활성 바통 항목",
+                                    "활성 인수인계 항목",
                                     "역할 자료"
                             );
                     assertThat(signal.recommendedAction()).contains("보완");
                 });
     }
 
-    @DisplayName("서로 다른 활성 회차에서 두 번 지연된 루틴만 반복 지연으로 알린다")
+    @DisplayName("서로 다른 활성 회차에서 두 번 지연된 반복 업무만 반복 지연으로 알린다")
     @Test
     void findsRepeatedOverdueOnlyAcrossActiveRounds() {
         Role owner = role(
@@ -216,7 +216,7 @@ class ContinuitySignalAnalyzerTest {
                 });
     }
 
-    @DisplayName("가까운 바통은 준비 중에는 현재 항목을 보고 전달 뒤에는 전달 snapshot을 본다")
+    @DisplayName("가까운 인수인계는 준비 중에는 현재 항목을 보고 전달 뒤에는 전달 당시 기록을 본다")
     @Test
     void usesCurrentAndTransferredHandoffReadiness() {
         Role preparingRole = role(
@@ -269,17 +269,17 @@ class ContinuitySignalAnalyzerTest {
         assertThat(signals)
                 .filteredOn(signal -> signal.roleId().equals(preparingRole.getId()))
                 .singleElement()
-                .satisfies(signal -> assertThat(signal.reason()).contains("활성 바통 항목이 없습니다"));
+                .satisfies(signal -> assertThat(signal.reason()).contains("활성 인수인계 항목이 없습니다"));
         assertThat(signals)
                 .filteredOn(signal -> signal.roleId().equals(transferredRole.getId()))
                 .singleElement()
                 .satisfies(signal -> {
-                    assertThat(signal.reason()).contains("미완료 바통 항목이 1개");
+                    assertThat(signal.reason()).contains("미완료 인수인계 항목이 1개");
                     assertThat(signal.recommendedAction()).contains("수락");
                 });
     }
 
-    @DisplayName("활동 종료한 현재 담당자와 후임과 열린 바통 참여자를 실제 공백으로 알린다")
+    @DisplayName("활동 종료한 현재 담당자와 후임과 열린 인수인계 참여자를 실제 공백으로 알린다")
     @Test
     void findsUnavailableMembersInAssignmentsAndOpenHandoffs() {
         Member inactive = member(NEXT_MEMBER_ID, "김준호");
@@ -386,7 +386,7 @@ class ContinuitySignalAnalyzerTest {
                 });
     }
 
-    @DisplayName("후임만 정했거나 전달과 수락이 남은 가까운 바통은 준비도와 무관하게 알린다")
+    @DisplayName("후임만 정했거나 전달과 수락이 남은 가까운 인수인계는 준비도와 무관하게 알린다")
     @Test
     void findsMissingAndPendingHandoffTransitions() {
         Role notStarted = role(

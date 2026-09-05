@@ -27,7 +27,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
   return <details className="notification-inbox">
     <summary>내 알림 {inbox.data ? `· 안 읽음 ${unread}건` : ''}</summary>
-    <p>내 설정에 맞는 마감·지연 업무와 수락할 바통입니다. 완료된 업무는 목록에서 빠집니다.</p>
+    <p>내 설정에 맞는 마감·지연 업무와 수락할 인수인계입니다. 완료된 업무는 목록에서 빠집니다.</p>
     <button type="button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>알림 설정</button>
     {settingsOpen && <NotificationPreferencesPanel key={scope.accountId} accountId={scope.accountId} />}
     {inbox.isPending ? <p role="status">알림을 불러오고 있습니다.</p>
@@ -38,7 +38,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
               if (item.kind === 'HANDOFF_REQUEST') onOpenHandoff(item.roleId)
               else if (item.roundId) onOpenRound(item.roundId, item.sourceId)
             }}>
-              <span>{item.kind === 'HANDOFF_REQUEST' ? '바통 수락 요청' : item.kind === 'OVERDUE' ? '기한 지남' : '마감 임박'} · {item.read ? '읽음' : '안 읽음'}</span>
+              <span>{item.kind === 'HANDOFF_REQUEST' ? '인수인계 수락 요청' : item.kind === 'OVERDUE' ? '기한 지남' : '마감 임박'} · {item.read ? '읽음' : '안 읽음'}</span>
               <strong>{item.title}</strong>
               <small>{date.format(new Date(item.occurredAt))}{item.kind === 'HANDOFF_REQUEST' ? ' 전달' : ' 마감'} · 원본 보기</small>
             </button>

@@ -58,7 +58,7 @@ function errorMessage(error: unknown) {
 }
 
 const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 남아 새 요청을 저장할 수 없습니다. 아래에서 같은 요청의 결과를 확인하거나, 이미 확인한 복구 기록을 폐기한 뒤 다시 시도해 주세요.'
+const pendingCreationLimitMessage = '확인하지 못한 생성 요청이 5개 남아 새 요청을 저장할 수 없습니다. 아래에서 같은 요청의 결과를 확인하거나, 이미 확인한 요청을 복구 목록에서 삭제한 뒤 다시 시도해 주세요.'
 const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 탭 사이의 생성 요청을 안전하게 조정할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 다시 열어 주세요.'
 const creationJournalCleanupRequiredMessage = '이전 생성 요청의 완료 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 완료 기록 정리를 다시 확인해 주세요.'
@@ -104,7 +104,7 @@ function confirmationMessage(
 ) {
   switch (reason) {
     case 'pendingMissing':
-      return '이 입력의 복구 기록이 다른 탭에서 확인되었거나 폐기되었습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
+      return '다른 탭에서 이 요청의 결과를 확인했거나 복구 목록에서 삭제했습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
     case 'pendingChanged':
       return '이 입력의 복구 기록이 다른 탭에서 변경되었습니다. 어느 요청이 처리됐는지 최근 목록이나 다른 탭에서 확인한 뒤 새 요청으로 전환해 주세요.'
     case 'concurrentAttempt':

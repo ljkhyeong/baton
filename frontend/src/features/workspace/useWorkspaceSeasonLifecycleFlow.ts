@@ -138,7 +138,7 @@ export function useWorkspaceSeasonLifecycleFlow({
     if (!workspace || updateSeasonEndingMutation.isPending) return
     const ending = !workspace.season.endedAt
     const confirmed = window.confirm(ending
-      ? '시즌을 종료하면 역할, 운영, 기록과 바통을 더 이상 바꿀 수 없습니다. 종료할까요?'
+      ? '시즌을 종료하면 역할, 운영, 기록과 인수인계를 더 이상 바꿀 수 없습니다. 종료할까요?'
       : '이 시즌을 다시 열면 기록을 다시 수정할 수 있습니다. 다시 열까요?')
     if (!confirmed) return
 

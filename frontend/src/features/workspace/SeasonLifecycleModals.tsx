@@ -334,7 +334,7 @@ export function NextSeasonModal({
     const invalidRoutine = routines.find((routine) =>
       selectedRoutineIds.has(routine.id) && !selectedRoleIds.has(routine.ownerRoleId))
     if (invalidRoutine) {
-      setValidationError(`${invalidRoutine.title} 루틴의 담당 역할도 함께 선택해 주세요.`)
+      setValidationError(`${invalidRoutine.title} 반복 업무의 담당 역할도 함께 선택해 주세요.`)
       return
     }
     setValidationError('')
@@ -346,7 +346,7 @@ export function NextSeasonModal({
       className="season-modal"
       kicker="시즌"
       title="다음 시즌 시작"
-      description="가져올 역할과 루틴만 고르고, 과거 실행과 결정은 현재 시즌에 그대로 보존합니다."
+      description="가져올 역할과 반복 업무만 고르고, 과거 실행과 결정은 현재 시즌에 그대로 보존합니다."
       closeDisabled={pending}
       onClose={onClose}
     >
@@ -354,8 +354,8 @@ export function NextSeasonModal({
         <div className="season-copy-boundary">
           <Icon name="spark" size={17} />
           <p>
-            역할의 목적·책임과 선택한 루틴 정의를 복사합니다.
-            담당자·담당 기간은 비워 두며, 회차 실행·결정·바통 기록은 복사하지 않습니다.
+            역할의 목적·책임과 선택한 반복 업무 정의를 복사합니다.
+            담당자·담당 기간은 비워 두며, 회차 실행·결정·인수인계 기록은 복사하지 않습니다.
           </p>
         </div>
         <div className="form-grid">
@@ -401,7 +401,7 @@ export function NextSeasonModal({
         </fieldset>
 
         <fieldset className="season-copy-options">
-          <legend>가져올 반복 루틴</legend>
+          <legend>가져올 반복 업무</legend>
           {routines.length ? routines.map((routine) => {
             const owner = roles.find((role) => role.id === routine.ownerRoleId)
             return (
@@ -417,7 +417,7 @@ export function NextSeasonModal({
                 </span>
               </label>
             )
-          }) : <p>가져올 반복 루틴이 없습니다.</p>}
+          }) : <p>가져올 반복 업무가 없습니다.</p>}
         </fieldset>
 
         {validationError && <p className="form-error" role="alert">{validationError}</p>}

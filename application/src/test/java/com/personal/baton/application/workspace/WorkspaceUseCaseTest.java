@@ -150,7 +150,7 @@ import static org.mockito.Mockito.mock;
 class WorkspaceUseCaseTest {
 
     @Test
-    @DisplayName("템플릿 팀 생성은 역할과 루틴을 함께 저장하고 재전송 시 중복하지 않는다")
+    @DisplayName("템플릿 팀 생성은 역할과 반복 업무를 함께 저장하고 재전송 시 중복하지 않는다")
     void createsTemplateOnce() {
         var command = new CreateWorkspaceCommand("템플릿 스터디", "첫 시즌", LocalDate.of(2026, 7, 1),
                 LocalDate.of(2026, 8, 31), List.of("박민서"), WorkspaceTemplate.STUDY_V1);
@@ -296,7 +296,7 @@ class WorkspaceUseCaseTest {
     }
 
     @Nested
-    @DisplayName("접근·구성원·역할 바통")
+    @DisplayName("접근·구성원·역할 인수인계")
     class PeopleAndHandoff {
 
     @DisplayName("팀 범위 읽기 접근 키는 시즌 종료 뒤에도 연결 상태 조회에 사용할 수 있다")
@@ -682,7 +682,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("routine-cross-team-role"),
                 otherWorkspace.accessKey(),
                 new CreateRoutineCommand(
-                        "교차 팀 루틴",
+                        "교차 팀 반복 업무",
                         RoutinePhase.DURING,
                         "모임 중",
                         role.id(),
@@ -720,14 +720,14 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
     }
 
-    @DisplayName("역할 바통은 전달과 수락으로 담당 기간을 바꾸고 취소된 전달 재시도를 현재 상태로 재생한다")
+    @DisplayName("역할 인수인계는 전달과 수락으로 담당 기간을 바꾸고 취소된 전달 재시도를 현재 상태로 재생한다")
     @Test
     void transfersAcceptsAndCancelsRoleHandoffs() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-role-handoff-lifecycle-01",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "바통 실사용 스터디",
+                        "인수인계 실사용 스터디",
                         "파일럿 시즌",
                         LocalDate.of(2026, 7, 1),
                         LocalDate.of(2026, 9, 30),
@@ -963,7 +963,7 @@ class WorkspaceUseCaseTest {
                 "workspace-role-record-freeze-0001",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "바통 기록 동결 스터디",
+                        "인수인계 기록 동결 스터디",
                         "파일럿 시즌",
                         LocalDate.of(2026, 7, 1),
                         LocalDate.of(2026, 9, 30),
@@ -1143,14 +1143,14 @@ class WorkspaceUseCaseTest {
         ).title()).isEqualTo("취소 뒤 갱신한 진행 문서");
     }
 
-    @DisplayName("바통 항목 수정은 전달 커밋 뒤 최신 동결 상태를 다시 확인한다")
+    @DisplayName("인수인계 항목 수정은 전달 커밋 뒤 최신 동결 상태를 다시 확인한다")
     @Test
     void rejectsHandoffItemUpdateAfterConcurrentTransfer() throws Exception {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-role-handoff-freeze-lock-01",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "바통 동결 직렬화 스터디",
+                        "인수인계 동결 직렬화 스터디",
                         "파일럿 시즌",
                         LocalDate.of(2026, 7, 1),
                         LocalDate.of(2026, 9, 30),
@@ -1222,7 +1222,7 @@ class WorkspaceUseCaseTest {
             if (firstSeasonLock.compareAndSet(true, false)) {
                 itemReachedSeasonLock.countDown();
                 if (!allowItemSeasonLock.await(10, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("바통 항목의 시즌 잠금 대기 시간이 초과됐습니다");
+                    throw new IllegalStateException("인수인계 항목의 시즌 잠금 대기 시간이 초과됐습니다");
                 }
                 itemSeasonLockRequested.countDown();
             }
@@ -1238,7 +1238,7 @@ class WorkspaceUseCaseTest {
             RoleHandoff saved = peopleRepository.saveRoleHandoff(invocation.getArgument(0));
             transferFlushed.countDown();
             if (!allowTransferCommit.await(10, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("역할 바통 전달 transaction 해제 대기 시간이 초과됐습니다");
+                throw new IllegalStateException("역할 인수인계 전달 transaction 해제 대기 시간이 초과됐습니다");
             }
             return saved;
         }).when(coordinatedPeopleRepository).saveRoleHandoff(any(RoleHandoff.class));
@@ -1321,7 +1321,7 @@ class WorkspaceUseCaseTest {
         }
     }
 
-    @DisplayName("구성원 이름과 활성 상태를 바꿔도 기존 역할·결정·바통 참조와 생성 재생을 보존한다")
+    @DisplayName("구성원 이름과 활성 상태를 바꿔도 기존 역할·결정·인수인계 참조와 생성 재생을 보존한다")
     @Test
     void updatesMemberLifecycleWithoutBreakingExistingReferences() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
@@ -1797,10 +1797,10 @@ class WorkspaceUseCaseTest {
     }
 
     @Nested
-    @DisplayName("루틴·회차·역할 자료")
+    @DisplayName("반복 업무·회차·역할 자료")
     class OperationsAndResources {
 
-    @DisplayName("회차는 생성 시점의 루틴을 스냅샷하고 이후 회차와 완료 상태를 독립적으로 보존한다")
+    @DisplayName("회차는 생성 시점의 반복 업무를 스냅샷하고 이후 회차와 완료 상태를 독립적으로 보존한다")
     @Test
     void snapshotsRoutineDefinitionsPerRoundAndKeepsCompletionIndependent() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
@@ -2049,14 +2049,14 @@ class WorkspaceUseCaseTest {
                 });
     }
 
-    @DisplayName("루틴 보관과 자동 일정 변경 뒤에도 생성 재시도와 기존 실행을 보존한다")
+    @DisplayName("반복 업무 보관과 자동 일정 변경 뒤에도 생성 재시도와 기존 실행을 보존한다")
     @Test
     void archivesAndRestoresRoutineWithoutChangingExistingExecutions() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-routine-archive-lifecycle-001",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "루틴 보관 스터디",
+                        "반복 업무 보관 스터디",
                         "2026 여름",
                         LocalDate.of(2026, 7, 1),
                         LocalDate.of(2026, 8, 31),
@@ -2361,14 +2361,14 @@ class WorkspaceUseCaseTest {
                 });
     }
 
-    @DisplayName("루틴 수정은 대상 시즌과 담당 역할의 팀 소속을 검증한다")
+    @DisplayName("반복 업무 수정은 대상 시즌과 담당 역할의 팀 소속을 검증한다")
     @Test
     void validatesRoutineUpdateSeasonAndOwnerRoleOwnership() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-routine-update-validation-01",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "루틴 수정 검증 스터디",
+                        "반복 업무 수정 검증 스터디",
                         "파일럿 시즌",
                         LocalDate.of(2026, 7, 21),
                         LocalDate.of(2026, 9, 30),
@@ -2412,7 +2412,7 @@ class WorkspaceUseCaseTest {
                 "workspace-routine-update-other-team-01",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "다른 루틴 수정 스터디",
+                        "다른 반복 업무 수정 스터디",
                         "다른 시즌",
                         LocalDate.of(2026, 7, 21),
                         LocalDate.of(2026, 9, 30),
@@ -2433,7 +2433,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("routine-update-other-routine"),
                 other.accessKey(),
                 new CreateRoutineCommand(
-                        "다른 루틴", RoutinePhase.DURING, "모임 중", otherRole.id(), "다른 팀 루틴입니다", null, null)
+                        "다른 반복 업무", RoutinePhase.DURING, "모임 중", otherRole.id(), "다른 팀 반복 업무입니다", null, null)
         );
 
         assertThatThrownBy(() -> operationsUseCase.updateRoutine(
@@ -2453,7 +2453,7 @@ class WorkspaceUseCaseTest {
                 otherRoutine.id(),
                 created.accessKey(),
                 new UpdateRoutineCommand(
-                        "다른 시즌 루틴", RoutinePhase.DURING, "모임 중", role.id(), "수정할 수 없습니다", null, null)
+                        "다른 시즌 반복 업무", RoutinePhase.DURING, "모임 중", role.id(), "수정할 수 없습니다", null, null)
         )).isInstanceOfSatisfying(
                 WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROUTINE_NOT_FOUND")
@@ -3314,7 +3314,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("rollback-invalid-role"),
                 created.accessKey(),
                 new CreateRoutineCommand(
-                        "잘못된 루틴",
+                        "잘못된 반복 업무",
                         RoutinePhase.BEFORE,
                         "모임 전",
                         UUID.randomUUID(),
@@ -3366,14 +3366,14 @@ class WorkspaceUseCaseTest {
         assertThat(contentReservationCount(created.teamId())).isEqualTo(reservationsBefore);
     }
 
-    @DisplayName("같은 루틴 생성 멱등 키의 두 트랜잭션이 겹치면 한 건만 저장되고 재시도할 수 있다")
+    @DisplayName("같은 반복 업무 생성 멱등 키의 두 트랜잭션이 겹치면 한 건만 저장되고 재시도할 수 있다")
     @Test
     void serializesConcurrentRoutineCreationWithDatabaseReservation() throws Exception {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-content-concurrent-routine-01",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "동시 루틴 스터디",
+                        "동시 반복 업무 스터디",
                         "파일럿 시즌",
                         LocalDate.of(2026, 7, 21),
                         LocalDate.of(2026, 8, 31),
@@ -3389,7 +3389,7 @@ class WorkspaceUseCaseTest {
         );
         String idempotencyKey = contentIdempotencyKey("concurrent-routine-request");
         CreateRoutineCommand command = new CreateRoutineCommand(
-                "동시 요청 루틴",
+                "동시 요청 반복 업무",
                 RoutinePhase.DURING,
                 "모임 중",
                 role.id(),
@@ -3467,7 +3467,7 @@ class WorkspaceUseCaseTest {
                     "SELECT COUNT(*) FROM routines WHERE season_id = UUID_TO_BIN(?) AND title = ?",
                     Integer.class,
                     created.seasonId().toString(),
-                    "동시 요청 루틴"
+                    "동시 요청 반복 업무"
             )).isEqualTo(1);
         } finally {
             executor.shutdownNow();
@@ -4164,7 +4164,7 @@ class WorkspaceUseCaseTest {
         assertThat(plain.textFormat()).isEqualTo(DecisionTextFormat.PLAIN_TEXT);
     }
 
-    @DisplayName("결정과 바통은 내용을 정정하고 보관했다가 원래 상태로 복원한다")
+    @DisplayName("결정과 인수인계는 내용을 정정하고 보관했다가 원래 상태로 복원한다")
     @Test
     void revisesArchivesAndRestoresDecisionAndHandoffItem() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
@@ -4199,7 +4199,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("record-revision-recorder"),
                 created.accessKey(),
                 new CreateRoleCommand(
-                        "기록자", "결정과 바통을 정리합니다", junho.id(), null, null, null, List.of(), null)
+                        "기록자", "결정과 인수인계를 정리합니다", junho.id(), null, null, null, List.of(), null)
         );
         String decisionKey = contentIdempotencyKey("record-revision-decision");
         String handoffKey = contentIdempotencyKey("record-revision-handoff");
@@ -4449,7 +4449,7 @@ class WorkspaceUseCaseTest {
                 .containsExactlyElementsOf(expectedOrder);
     }
 
-    @DisplayName("결정과 바통 수정은 시즌과 팀 소유권을 모두 지킨다")
+    @DisplayName("결정과 인수인계 수정은 시즌과 팀 소유권을 모두 지킨다")
     @Test
     void enforcesRecordRevisionOwnershipBoundaries() {
         CreatedWorkspaceResult primary = lifecycleUseCase.createWorkspace(
@@ -4595,7 +4595,7 @@ class WorkspaceUseCaseTest {
                 secondary.accessKey(),
                 new UpdateHandoffItemCommand(
                         secondaryRole.id(),
-                        "다른 팀이 바꾸려는 바통",
+                        "다른 팀이 바꾸려는 인수인계",
                         HandoffCategory.ADVICE
                 )
         )).isInstanceOfSatisfying(
@@ -4635,7 +4635,7 @@ class WorkspaceUseCaseTest {
                 primary.accessKey(),
                 new UpdateHandoffItemCommand(
                         secondaryRole.id(),
-                        "외부 역할로 옮기려는 바통",
+                        "외부 역할로 옮기려는 인수인계",
                         HandoffCategory.ADVICE
                 )
         )).isInstanceOf(SeasonEndedException.class);
@@ -5223,14 +5223,14 @@ class WorkspaceUseCaseTest {
         }
     }
 
-    @DisplayName("루틴 보관이 시즌 배타 잠금을 먼저 잡으면 수동 회차는 커밋을 기다린 뒤 보관된 정의를 제외한다")
+    @DisplayName("반복 업무 보관이 시즌 배타 잠금을 먼저 잡으면 수동 회차는 커밋을 기다린 뒤 보관된 정의를 제외한다")
     @Test
     void serializesRoutineArchiveBeforeManualRoundCreation() throws Exception {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-routine-archive-round-lock-01",
                 CREATION_KEY,
                 new CreateWorkspaceCommand(
-                        "루틴 보관 회차 직렬화 스터디",
+                        "반복 업무 보관 회차 직렬화 스터디",
                         "파일럿 시즌",
                         LocalDate.of(2026, 7, 21),
                         LocalDate.of(2026, 8, 31),
@@ -5686,7 +5686,7 @@ class WorkspaceUseCaseTest {
         }
     }
 
-    @DisplayName("같은 버전의 결정과 바통을 읽은 두 저장은 변경을 모두 커밋할 수 없다")
+    @DisplayName("같은 버전의 결정과 인수인계를 읽은 두 저장은 변경을 모두 커밋할 수 없다")
     @Test
     void rejectsStaleDecisionAndHandoffItemUpdates() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
@@ -5727,7 +5727,7 @@ class WorkspaceUseCaseTest {
                 contentIdempotencyKey("record-lock-handoff"),
                 created.accessKey(),
                 new CreateHandoffItemCommand(
-                        role.id(), "원래 바통", HandoffCategory.RESPONSIBILITY)
+                        role.id(), "원래 인수인계", HandoffCategory.RESPONSIBILITY)
         );
 
         EntityManager firstEntityManager = entityManagerFactory.createEntityManager();
@@ -5756,8 +5756,8 @@ class WorkspaceUseCaseTest {
             HandoffItem staleHandoffItem = fourthEntityManager.find(HandoffItem.class, handoffItem.id());
             thirdEntityManager.detach(firstHandoffItem);
             fourthEntityManager.detach(staleHandoffItem);
-            firstHandoffItem.update(role.id(), "첫 바통", HandoffCategory.RESOURCE);
-            staleHandoffItem.update(role.id(), "늦은 바통", HandoffCategory.ADVICE);
+            firstHandoffItem.update(role.id(), "첫 인수인계", HandoffCategory.RESOURCE);
+            staleHandoffItem.update(role.id(), "늦은 인수인계", HandoffCategory.ADVICE);
             recordsRepository.saveHandoffItem(firstHandoffItem);
             assertThatThrownBy(() -> recordsRepository.saveHandoffItem(staleHandoffItem))
                     .isInstanceOf(WorkspaceContentConflictException.class);

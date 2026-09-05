@@ -104,7 +104,7 @@ public class RoleHandoff {
             LocalDate incomingAssignmentEndDate,
             Instant preparedAt
     ) {
-        this.id = Objects.requireNonNull(id, "역할 바통 식별자는 필수입니다");
+        this.id = Objects.requireNonNull(id, "역할 인수인계 식별자는 필수입니다");
         this.teamId = Objects.requireNonNull(teamId, "팀 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
         this.roleId = Objects.requireNonNull(roleId, "역할 식별자는 필수입니다");
@@ -132,7 +132,7 @@ public class RoleHandoff {
         this.incomingAssignmentStartDate = validatedIncomingStartDate;
         this.incomingAssignmentEndDate = incomingAssignmentEndDate;
         this.status = RoleHandoffStatus.PREPARING;
-        this.preparedAt = Objects.requireNonNull(preparedAt, "바통 준비 시각은 필수입니다");
+        this.preparedAt = Objects.requireNonNull(preparedAt, "인수인계 준비 시각은 필수입니다");
     }
 
     public static RoleHandoff prepare(
@@ -172,18 +172,18 @@ public class RoleHandoff {
             boolean warningAcknowledged
     ) {
         if (!canTransfer(confirmedByMemberId)) {
-            throw new RoleHandoffTransitionException("이전 담당자만 준비 중인 바통을 전달할 수 있습니다");
+            throw new RoleHandoffTransitionException("이전 담당자만 준비 중인 인수인계를 전달할 수 있습니다");
         }
         if (hasWarnings(activeItemCount, incompleteItemCount, resourceCount)
                 && !warningAcknowledged) {
-            throw new DomainValidationException("미완료 항목과 빠진 자료 경고를 확인해야 바통을 전달할 수 있습니다");
+            throw new DomainValidationException("미완료 항목과 빠진 자료 경고를 확인해야 인수인계를 전달할 수 있습니다");
         }
         Instant validatedTransferredAt = Objects.requireNonNull(
                 transferredAt,
-                "바통 전달 시각은 필수입니다"
+                "인수인계 전달 시각은 필수입니다"
         );
         if (validatedTransferredAt.isBefore(preparedAt)) {
-            throw new DomainValidationException("바통 전달 시각은 준비 시각보다 이를 수 없습니다");
+            throw new DomainValidationException("인수인계 전달 시각은 준비 시각보다 이를 수 없습니다");
         }
 
         this.status = RoleHandoffStatus.TRANSFERRED;
@@ -197,11 +197,11 @@ public class RoleHandoff {
 
     public void accept(UUID confirmedByMemberId, Instant acceptedAt) {
         if (!canAccept(confirmedByMemberId)) {
-            throw new RoleHandoffTransitionException("다음 담당자만 전달된 바통을 수락할 수 있습니다");
+            throw new RoleHandoffTransitionException("다음 담당자만 전달된 인수인계를 수락할 수 있습니다");
         }
-        Instant validatedAcceptedAt = Objects.requireNonNull(acceptedAt, "바통 수락 시각은 필수입니다");
+        Instant validatedAcceptedAt = Objects.requireNonNull(acceptedAt, "인수인계 수락 시각은 필수입니다");
         if (validatedAcceptedAt.isBefore(transferredAt)) {
-            throw new DomainValidationException("바통 수락 시각은 전달 시각보다 이를 수 없습니다");
+            throw new DomainValidationException("인수인계 수락 시각은 전달 시각보다 이를 수 없습니다");
         }
 
         this.status = RoleHandoffStatus.ACCEPTED;
@@ -211,12 +211,12 @@ public class RoleHandoff {
 
     public void cancel(UUID confirmedByMemberId, Instant cancelledAt) {
         if (!canCancel(confirmedByMemberId)) {
-            throw new RoleHandoffTransitionException("이전 담당자만 열린 바통을 취소할 수 있습니다");
+            throw new RoleHandoffTransitionException("이전 담당자만 열린 인수인계를 취소할 수 있습니다");
         }
-        Instant validatedCancelledAt = Objects.requireNonNull(cancelledAt, "바통 취소 시각은 필수입니다");
+        Instant validatedCancelledAt = Objects.requireNonNull(cancelledAt, "인수인계 취소 시각은 필수입니다");
         Instant lowerBound = transferredAt == null ? preparedAt : transferredAt;
         if (validatedCancelledAt.isBefore(lowerBound)) {
-            throw new DomainValidationException("바통 취소 시각은 현재 단계가 시작된 시각보다 이를 수 없습니다");
+            throw new DomainValidationException("인수인계 취소 시각은 현재 단계가 시작된 시각보다 이를 수 없습니다");
         }
 
         this.status = RoleHandoffStatus.CANCELLED;
@@ -259,10 +259,10 @@ public class RoleHandoff {
             int resourceCount
     ) {
         if (activeItemCount < 0 || incompleteItemCount < 0 || resourceCount < 0) {
-            throw new DomainValidationException("바통 스냅샷 개수는 음수일 수 없습니다");
+            throw new DomainValidationException("인수인계 스냅샷 개수는 음수일 수 없습니다");
         }
         if (incompleteItemCount > activeItemCount) {
-            throw new DomainValidationException("미완료 바통 항목 수는 전체 항목 수를 초과할 수 없습니다");
+            throw new DomainValidationException("미완료 인수인계 항목 수는 전체 항목 수를 초과할 수 없습니다");
         }
     }
 

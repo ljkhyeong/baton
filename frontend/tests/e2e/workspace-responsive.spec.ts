@@ -165,7 +165,7 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
   await expect(archiveSummary).toBeFocused()
   await expectVisibleFocus(archiveSummary, palette.canvas)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   const selectedRoleTab = page.getByRole('tab', { selected: true })
   await selectedRoleTab.focus()
   await page.keyboard.press('Tab')
@@ -174,7 +174,7 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
   await expect(tabPanel).toBeFocused()
   await expectVisibleFocus(tabPanel, palette.canvas)
 
-  const prepareButton = tabPanel.getByRole('button', { name: '바통 준비 시작' })
+  const prepareButton = tabPanel.getByRole('button', { name: '인수인계 준비 시작' })
   if (testInfo.project.name === 'webkit') {
     await prepareButton.focus()
   } else {
@@ -228,21 +228,21 @@ test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계
   await expect(page.locator('.main-surface')).toBeFocused()
 })
 
-test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다', async ({ page }, testInfo) => {
+test('@responsive 390x844에서 반복 업무 추가와 완료를 수행할 수 있다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
   await installApi(page)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByRole('button', { name: '루틴 추가' }).click()
+  await page.getByRole('button', { name: '반복 업무 추가' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
+  const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await expect(dialog).toBeInViewport()
-  await dialog.getByLabel('루틴 이름').fill('다음 문제 예고')
+  await dialog.getByLabel('반복 업무 이름').fill('다음 문제 예고')
   await dialog.getByLabel('운영 단계').selectOption('AFTER')
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
   await dialog.getByLabel('언제까지').fill('금요일 20:00')
   await dialog.getByLabel('세부 설명').fill('다음 주 주제를 한 줄로 공유합니다.')
-  await dialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await dialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(page.locator('.routine-row').filter({ hasText: '다음 문제 예고' })).toContainText('다음 회차부터')
   await page.getByRole('button', { name: '회차 만들기' }).click()
   const roundDialog = page.getByRole('dialog', { name: '회차 만들기' })
@@ -251,7 +251,7 @@ test('@responsive 390x844에서 루틴 추가와 완료를 수행할 수 있다'
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
 
-  const todayChecklist = page.getByRole('region', { name: '3회차 루틴 완료하기' })
+  const todayChecklist = page.getByRole('region', { name: '3회차 반복 업무 완료하기' })
   const todayToggle = todayChecklist.getByRole('button', { name: '다음 문제 예고 완료 처리' })
   await todayToggle.scrollIntoViewIfNeeded()
   await expect(todayToggle).toBeInViewport()
@@ -266,5 +266,5 @@ test('@smoke 일시적인 조회 오류에서 다시 시도할 수 있다', asyn
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '다시 시도하기' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
 })

@@ -35,7 +35,7 @@ async function setup(page: Page, options: { empty?: boolean; failFirst?: boolean
       const query = url.searchParams.get('query') ?? ''
       const includeRevoked = url.searchParams.get('includeRevoked') !== 'false'
       const all = [
-        { subscriptionId: SUBSCRIPTION, teamId: TEAM, seasonId: SEASON, teamName: '바통 독서 팀', seasonName: '가을 시즌',
+        { subscriptionId: SUBSCRIPTION, teamId: TEAM, seasonId: SEASON, teamName: '인수인계 독서 팀', seasonName: '가을 시즌',
           managementStatus: revoked ? 'REVOKED' : pending ? options.pending ?? 'REVOCATION_PENDING' : 'CHECK_REQUIRED' },
         { subscriptionId: OTHER_SUBSCRIPTION, teamId: OTHER_TEAM, seasonId: NEXT_SEASON,
           teamName: '운동 모임', seasonName: '여름 시즌', managementStatus: 'REVOKED' },
@@ -71,14 +71,14 @@ async function setup(page: Page, options: { empty?: boolean; failFirst?: boolean
 
 test('계정에서 여러 팀의 구독을 보고 접근 권한 없이 본인 구독을 해제한다 @smoke @responsive', async ({ page }, testInfo) => {
   const { list, calls } = await setup(page)
-  await expect(list.getByText('바통 독서 팀', { exact: true })).toBeVisible()
+  await expect(list.getByText('인수인계 독서 팀', { exact: true })).toBeVisible()
   expect(calls.filter(call => call.endsWith('/calendar-subscription'))).toEqual([])
   await list.getByRole('button', { name: '구독 더 보기' }).click()
   await expect(list.getByText('운동 모임', { exact: true })).toBeVisible()
   await expect(list.getByRole('button', { name: '구독 더 보기' })).toHaveCount(0)
-  await list.locator('summary').filter({ hasText: '바통 독서 팀' }).click()
+  await list.locator('summary').filter({ hasText: '인수인계 독서 팀' }).click()
   await expect(list.getByText('구독 중입니다.', { exact: true })).toBeVisible()
-  const summary = list.locator('summary').filter({ hasText: '바통 독서 팀' })
+  const summary = list.locator('summary').filter({ hasText: '인수인계 독서 팀' })
   await expect(summary).toContainText('구독 중')
   await expect(summary.locator('time')).toContainText('확인')
   await summary.click()
@@ -91,7 +91,7 @@ test('계정에서 여러 팀의 구독을 보고 접근 권한 없이 본인 �
   expect(calls.filter(call => call.startsWith('DELETE'))).toHaveLength(0)
   await list.getByRole('button', { name: '구독 해제 확인', exact: true }).click()
   await expect(list.getByText('구독을 해제했습니다.', { exact: true })).toBeVisible()
-  await expect(list.locator('summary').filter({ hasText: '바통 독서 팀' })).toContainText('해제됨')
+  await expect(list.locator('summary').filter({ hasText: '인수인계 독서 팀' })).toContainText('해제됨')
   expect(calls.filter(call => call.startsWith('DELETE'))).toHaveLength(1)
   expect(calls.some(call => call.endsWith('/workspace'))).toBe(false)
   await list.screenshot({ path: testInfo.outputPath('my-calendar-subscriptions.png') })
@@ -111,7 +111,7 @@ test('다음 페이지 조회가 실패해도 기존 구독을 유지하고 더 
   const { list } = await setup(page, { failNext: true })
   await list.getByRole('button', { name: '구독 더 보기' }).click()
   await expect(list.getByRole('alert')).toContainText('이전 목록은 유지됩니다.')
-  await expect(list.getByText('바통 독서 팀', { exact: true })).toBeVisible()
+  await expect(list.getByText('인수인계 독서 팀', { exact: true })).toBeVisible()
   await list.getByRole('button', { name: '구독 더 보기' }).click()
   await expect(list.getByText('운동 모임', { exact: true })).toBeVisible()
   await expect(list.getByRole('alert')).toHaveCount(0)
@@ -120,7 +120,7 @@ test('다음 페이지 조회가 실패해도 기존 구독을 유지하고 더 
 test('화면 계정과 다른 계정의 목록 응답은 표시하거나 조작하지 않는다 @smoke', async ({ page }) => {
   const { list, calls } = await setup(page, { wrongAccount: true })
   await expect(list.getByRole('alert')).toBeVisible()
-  await expect(list.getByText('바통 독서 팀', { exact: true })).toHaveCount(0)
+  await expect(list.getByText('인수인계 독서 팀', { exact: true })).toHaveCount(0)
   await expect(list.locator('summary')).toHaveCount(0)
   expect(calls.filter(call => call.endsWith('/calendar-subscription'))).toEqual([])
 })
@@ -129,7 +129,7 @@ for (const pending of ['IN_PROGRESS', 'REVOCATION_PENDING'] as const) {
   test(`${pending} 상태는 자동 조회로 완료되고 확인한 상태와 시각을 목록에 남긴다 @smoke`, async ({ page }) => {
     await page.clock.install()
     const { list, calls, finish } = await setup(page, { pending })
-    const summary = list.locator('summary').filter({ hasText: '바통 독서 팀' })
+    const summary = list.locator('summary').filter({ hasText: '인수인계 독서 팀' })
     await summary.click()
     await expect(list.getByText('이 항목을 열어 둔 동안', { exact: false })).toBeVisible()
     finish()
@@ -146,7 +146,7 @@ for (const pending of ['IN_PROGRESS', 'REVOCATION_PENDING'] as const) {
 test('자동 조회는 제한 시간 뒤 멈추고 수동 확인으로 재개하며 항목을 닫으면 중단한다 @smoke', async ({ page }) => {
   await page.clock.install()
   const { list, calls } = await setup(page, { pending: 'IN_PROGRESS' })
-  const summary = list.locator('summary').filter({ hasText: '바통 독서 팀' })
+  const summary = list.locator('summary').filter({ hasText: '인수인계 독서 팀' })
   await summary.click()
   await expect(summary.locator('time')).toBeVisible()
   const readCount = () => calls.filter(call => call.endsWith('/calendar-subscription')).length
@@ -176,7 +176,7 @@ test('자동 조회는 제한 시간 뒤 멈추고 수동 확인으로 재개하
 test('자동 상태 조회가 실패하면 요청을 반복하지 않고 사용자 재확인을 기다린다 @smoke', async ({ page }) => {
   await page.clock.install()
   const { list, calls, failStatus } = await setup(page, { pending: 'REVOCATION_PENDING' })
-  await list.locator('summary').filter({ hasText: '바통 독서 팀' }).click()
+  await list.locator('summary').filter({ hasText: '인수인계 독서 팀' }).click()
   await expect(list.locator('time')).toBeVisible()
   failStatus(true)
   await page.clock.runFor(3_100)
@@ -193,7 +193,7 @@ test('자동 상태 조회가 실패하면 요청을 반복하지 않고 사용�
 
 test('검색은 아직 불러오지 않은 구독을 찾고 필터를 바꾸면 첫 페이지에서 다시 조회한다 @smoke @responsive', async ({ page }, testInfo) => {
   const { list, calls } = await setup(page)
-  await expect(list.getByText('바통 독서 팀', { exact: true })).toBeVisible()
+  await expect(list.getByText('인수인계 독서 팀', { exact: true })).toBeVisible()
   await list.getByLabel('팀·시즌 검색', { exact: true }).fill('  운동  ')
   await list.getByRole('button', { name: '검색', exact: true }).click()
   await expect(list.getByText('운동 모임', { exact: true })).toBeVisible()
@@ -206,7 +206,7 @@ test('검색은 아직 불러오지 않은 구독을 찾고 필터를 바꾸면 
   await expect(list.getByText('운동 모임', { exact: true })).toBeVisible()
   await list.screenshot({ path: testInfo.outputPath('calendar-subscription-search.png') })
   await list.getByRole('button', { name: '검색·필터 초기화' }).click()
-  await expect(list.getByText('바통 독서 팀', { exact: true })).toBeVisible()
+  await expect(list.getByText('인수인계 독서 팀', { exact: true })).toBeVisible()
   await expect(list.getByRole('button', { name: '구독 더 보기' })).toBeVisible()
   await expect(list.getByLabel('팀·시즌 검색', { exact: true })).toHaveValue('')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
@@ -216,7 +216,7 @@ test('검색은 아직 불러오지 않은 구독을 찾고 필터를 바꾸면 
 test('해제 응답을 놓쳐도 상태 조회로 완료를 확인하고 이전 오류를 정리한다 @smoke', async ({ page }) => {
   await page.clock.install()
   const { list, calls, finish } = await setup(page, { revokePending: true })
-  await list.locator('summary').filter({ hasText: '바통 독서 팀' }).click()
+  await list.locator('summary').filter({ hasText: '인수인계 독서 팀' }).click()
   await list.getByRole('button', { name: '구독 해제', exact: true }).click()
   await list.getByRole('button', { name: '구독 해제 확인', exact: true }).click()
   await expect(list.getByRole('alert')).toContainText('구독 해제 결과를 확인하지 못했습니다.')
@@ -235,7 +235,7 @@ test('자동 확인으로 해제가 완료되면 검색·숨김 조건을 유지
   await list.getByLabel('팀·시즌 검색', { exact: true }).fill('독서')
   await list.getByRole('button', { name: '검색', exact: true }).click()
   await list.getByLabel('해제된 구독 숨기기').check()
-  await list.locator('summary').filter({ hasText: '바통 독서 팀' }).click()
+  await list.locator('summary').filter({ hasText: '인수인계 독서 팀' }).click()
   await expect(list.locator('time')).toBeVisible()
   const listReads = () => calls.filter(call => call.startsWith('GET /api/v1/me/calendar-subscriptions'))
   const before = listReads().length

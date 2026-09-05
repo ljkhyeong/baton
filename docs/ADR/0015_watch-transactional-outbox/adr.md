@@ -1,4 +1,4 @@
-# ADR-0015: BATON–WATCH 트랜잭셔널 아웃박스와 수렴형 동기화
+# ADR-0015: BATON–WATCH 트랜잭셔널 아웃박스와 현재 상태 재동기화
 
 - 상태: 채택
 - 결정일: 2026-08-01
@@ -109,6 +109,6 @@ HTTP 어댑터는 WATCH의 현재 컨트롤러 계약을 대상으로 별도 단
 ## 관련 문서
 
 - [BATON–WATCH 역할 자료 감시 계약](../../PRD/0004_watch-integration-contract/spec.md)
-- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [제품 명세](../../PRD/0001_product-baseline/spec.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
 - [서버 요청 시간 예산](../0009_server-request-time-budget/adr.md)

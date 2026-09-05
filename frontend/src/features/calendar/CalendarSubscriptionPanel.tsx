@@ -21,7 +21,7 @@ const labels: Record<CalendarStatus, string> = {
 export function CalendarSubscriptionPanel(props: Props) {
   const [open, setOpen] = useState(false)
   return <details className="calendar-panel" onToggle={(event) => setOpen(event.currentTarget.open)}>
-    <summary><h2>내 캘린더에 추가</h2><span>회차 일정과 루틴 마감</span></summary>
+    <summary><h2>내 캘린더에 추가</h2><span>회차 일정과 반복 업무 마감</span></summary>
     {open && <CalendarAccess {...props} />}
   </details>
 }
@@ -138,7 +138,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     catch { setCopied('복사하지 못했습니다. 주소를 선택해 직접 복사해 주세요.') }
   }
   return <div className="calendar-content">
-    <p>회차 일정과 루틴 마감을 캘린더 앱에서 확인하세요. 일정은 BATON에서만 수정할 수 있습니다.</p>
+    <p>회차 일정과 반복 업무 마감을 캘린더 앱에서 확인하세요. 일정은 BATON에서만 수정할 수 있습니다.</p>
     {subscription.isPending && <p role="status">구독 상태를 확인하고 있습니다.</p>}
     {status && <p role="status">{labels[status]}</p>}
     {processing && <p className="calendar-polling-note" role="status">

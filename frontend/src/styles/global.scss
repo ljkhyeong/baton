@@ -166,7 +166,6 @@ a {
 .auth-story-copy .section-kicker { color: #a8b4ae; }
 .auth-story-copy h1 { margin: 15px 0 20px; font-size: clamp(38px, 4.8vw, 68px); font-weight: 720; letter-spacing: -.055em; line-height: 1.06; }
 .auth-story-copy > p { max-width: 520px; margin: 0; color: #b6c0bb; font-size: 13px; line-height: 1.8; word-break: keep-all; }
-.auth-story-note { color: #8f9b95; font-size: 9px; line-height: 1.6; }
 
 .auth-identity-rail {
   position: relative;
@@ -3067,7 +3066,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .auth-story { min-height: auto; padding: 34px 26px 38px; }
   .auth-story-copy { margin: 66px 0 0; }
   .auth-story-copy h1 { font-size: 39px; }
-  .auth-story-note { display: none; }
   .auth-panel { min-height: auto; padding: 46px 24px 72px; }
 }
 

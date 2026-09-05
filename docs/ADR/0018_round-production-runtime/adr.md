@@ -5,7 +5,7 @@
 
 ## 배경
 
-BATON은 Account 세션, `AccountMembership`, 서버 권위 방 매핑과 300초 RS256 참여권
+BATON은 Account 세션, `AccountMembership`, 서버에서 관리하는 방 매핑과 300초 RS256 참여권
 발급을 구현했다. ROUND는 같은 참여권의 JWK 검증, 방에 결합된 TURN 자격 증명과 WebSocket
 시그널링을 구현했다. 로컬 사설 CA E2E도 두 서비스를 같은 브라우저 출처로 연결하지만,
 기존 프로덕션 Compose와 Caddy는 BATON 애플리케이션·웹·MySQL만 배포하므로 실제 공개 `/room`·TURN·WSS

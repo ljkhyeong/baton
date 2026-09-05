@@ -23,11 +23,11 @@ Idempotency-Key: <본문 eventId와 같은 UUID>
 
 ```text
 WATCH HTTPS 요청
-  └─ 별도 Bearer 인증과 이벤트 봉투 검증
+  └─ 별도 Bearer 인증과 이벤트 전체 내용 검증
        └─ watch_health_event_inbox 삽입 또는 기존 행 잠금
             ├─ 신규·동일 재전송: 트랜잭션 커밋
             │    └─ 202 접수증(eventId, 최초 acceptedAt)
-            └─ 같은 ID의 다른 이벤트 봉투: 기존 행 불변 유지 + 409
+            └─ 같은 ID의 다른 이벤트 전체 내용: 기존 행 불변 유지 + 409
 ```
 
 ### 인증과 식별자
@@ -38,17 +38,17 @@ WATCH HTTPS 요청
 - `resourceReference`는 설정된 이름공간의 `baton-manager:<namespace>:role-resource:<정규 형식 UUID>`만 허용한다.
 - 참조 검증은 이름공간과 정규 형식 UUID만 확인한다. `RoleResource` 존재 조회를 하지 않고 인박스에 원본 FK도 두지 않는다.
 
-### 불변 이벤트 봉투와 멱등성
+### 불변 이벤트 전체 내용과 멱등성
 
-V17의 `watch_health_event_inbox`는 이벤트 UUID를 기본 키로 사용하고 이벤트 유형, 자료 참조와 파생한 자료 UUID, 소스 리비전, null을 허용하는 시도 UUID, 이전·현재 상태, 변경 시각, 이벤트 봉투 SHA-256 지문과 최초 접수 시각을 저장한다.
+V17의 `watch_health_event_inbox`는 이벤트 UUID를 기본 키로 사용하고 이벤트 유형, 자료 참조와 파생한 자료 UUID, 소스 리비전, null을 허용하는 시도 UUID, 이전·현재 상태, 변경 시각, 이벤트 전체 내용 SHA-256 지문과 최초 접수 시각을 저장한다.
 
-신규 이벤트는 한 트랜잭션에서 삽입한다. 같은 이벤트 ID가 이미 있으면 행을 잠그고 타입이 지정된 이벤트 봉투의 필드 전체와 지문을 비교한다.
+신규 이벤트는 한 트랜잭션에서 삽입한다. 같은 이벤트 ID가 이미 있으면 행을 잠그고 타입이 지정된 이벤트 전체 내용의 필드 전체와 지문을 비교한다.
 
-- 같은 이벤트 ID와 같은 이벤트 봉투: 동일 재전송으로 처리해 새 행을 만들지 않고 최초 `acceptedAt`을 반환한다.
-- 같은 이벤트 ID와 다른 이벤트 봉투: `409 WATCH_EVENT_ID_CONFLICT`로 거부한다.
+- 같은 이벤트 ID와 같은 이벤트 전체 내용: 동일 재전송으로 처리해 새 행을 만들지 않고 최초 `acceptedAt`을 반환한다.
+- 같은 이벤트 ID와 다른 이벤트 전체 내용: `409 WATCH_EVENT_ID_CONFLICT`로 거부한다.
 - 서로 다른 이벤트 ID: 소스 리비전, 변경 시각이나 도착 순서와 관계없이 모두 저장한다.
 
-지문은 빠른 동일성 판정을 돕지만 저장한 타입 지정 이벤트 봉투도 함께 비교한다. 해시 일치만으로 동일 재전송을 인정하지 않는다.
+지문은 빠른 동일성 판정을 돕지만 저장한 타입 지정 이벤트 전체 내용도 함께 비교한다. 해시 일치만으로 동일 재전송을 인정하지 않는다.
 
 ### 시간 정밀도
 
@@ -100,7 +100,7 @@ WATCH가 전달 순서를 보장하지 않아 오래된 이벤트가 최신 상�
 - WATCH의 중복 전달과 BATON 응답 유실에 같은 접수증으로 안전하게 대응한다.
 - 이벤트 도착 순서와 원본 자료 생명주기에서 사실 수신을 분리한다.
 - 서로 다른 모든 이벤트를 보존해 이후 프로젝션 순서 정책과 장애 분석의 근거를 남긴다.
-- 나노초 단위 `changedAt`까지 동일 이벤트 봉투 재전송을 정확히 판정한다.
+- 나노초 단위 `changedAt`까지 동일 이벤트 전체 내용 재전송을 정확히 판정한다.
 
 ### 비용과 한계
 
@@ -125,7 +125,7 @@ WATCH가 전달 순서를 보장하지 않아 오래된 이벤트가 최신 상�
 ## 관련 문서
 
 - [BATON–WATCH 역할 자료 감시 계약](../../PRD/0004_watch-integration-contract/spec.md)
-- [API 계약 기준선](../../PRD/0002_api-contract/spec.md)
-- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
-- [WATCH 트랜잭셔널 아웃박스와 수렴형 동기화](../0015_watch-transactional-outbox/adr.md)
+- [API 명세](../../PRD/0002_api-contract/spec.md)
+- [제품 명세](../../PRD/0001_product-baseline/spec.md)
+- [WATCH 트랜잭셔널 아웃박스와 현재 상태 재동기화](../0015_watch-transactional-outbox/adr.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)

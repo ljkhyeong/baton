@@ -98,6 +98,6 @@ com.personal.baton.bootstrap.<concern>
 
 ## 관련 문서
 
-- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [제품 명세](../../PRD/0001_product-baseline/spec.md)
 - [테스트 전략](../0002_test-strategy/adr.md)
 - [첫 파일럿 자체 호스팅 배포](../0003_pilot-self-hosted-deployment/adr.md)

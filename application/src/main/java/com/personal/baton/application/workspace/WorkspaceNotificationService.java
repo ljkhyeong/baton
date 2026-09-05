@@ -78,7 +78,7 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
         for (var handoff : workspace.roleHandoffs()) {
             if (!settings.isHandoffEnabled() || handoff.status() != RoleHandoffStatus.TRANSFERRED || !member.getId().equals(handoff.toMemberId())) continue;
             String roleName = workspace.roles().stream().filter(role -> role.id().equals(handoff.roleId()))
-                    .map(role -> role.name()).findFirst().orElse("역할 바통");
+                    .map(role -> role.name()).findFirst().orElse("역할 인수인계");
             pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.HANDOFF_REQUEST,
                     handoff.id(), handoff.roleId(), null, roleName, handoff.transferredAt()));
         }

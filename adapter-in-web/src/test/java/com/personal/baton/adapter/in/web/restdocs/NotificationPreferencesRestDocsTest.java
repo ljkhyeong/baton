@@ -76,12 +76,12 @@ class NotificationPreferencesRestDocsTest {
                         requestHeaders(headerWithName("Origin").description("BATON 동일 출처"), headerWithName("Sec-Fetch-Site").description("same-origin"), headerWithName("X-CSRF-TOKEN").description("세션 CSRF 토큰")),
                         requestFields(constrained.withPath("expectedAccountId").description("현재 로그인 계정"), constrained.withPath("expectedVersion").description("조회한 설정 버전. 미설정은 -1"),
                                 constrained.withPath("deadlineSoonEnabled").description("마감 임박 알림"), constrained.withPath("overdueEnabled").description("기한 지남 알림"),
-                                constrained.withPath("handoffEnabled").description("바통 수락 요청 알림"), constrained.withPath("deadlineLeadHours").description("마감 1~168시간 전")),
+                                constrained.withPath("handoffEnabled").description("인수인계 수락 요청 알림"), constrained.withPath("deadlineLeadHours").description("마감 1~168시간 전")),
                         responseHeaders(headerWithName("Cache-Control").description("개인 설정 캐시 금지")), fields()));
     }
     private ResponseFieldsSnippet fields() { return responseFields(fieldWithPath("accountId").description("현재 계정"), fieldWithPath("version").description("설정 버전. 미설정은 -1"),
             fieldWithPath("deadlineSoonEnabled").description("마감 임박 알림 사용"), fieldWithPath("overdueEnabled").description("기한 지남 알림 사용"),
-            fieldWithPath("handoffEnabled").description("바통 수락 요청 알림 사용"), fieldWithPath("deadlineLeadHours").description("마감 몇 시간 전부터 표시할지")); }
+            fieldWithPath("handoffEnabled").description("인수인계 수락 요청 알림 사용"), fieldWithPath("deadlineLeadHours").description("마감 몇 시간 전부터 표시할지")); }
     private UsernamePasswordAuthenticationToken auth() { return UsernamePasswordAuthenticationToken.authenticated(new Principal(ACCOUNT, 0), null, List.of()); }
     private record Principal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
 }

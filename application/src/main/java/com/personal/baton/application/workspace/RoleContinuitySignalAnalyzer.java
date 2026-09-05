@@ -73,7 +73,7 @@ final class RoleContinuitySignalAnalyzer {
                         null,
                         role.getName() + " 후임 공백",
                         successorReason(role, nextMember, assignmentEndDate, today),
-                        "현재 담당자와 다른 활동 중인 다음 담당자를 정하고 역할 바통 준비를 시작하세요.",
+                        "현재 담당자와 다른 활동 중인 다음 담당자를 정하고 역할 인수인계 준비를 시작하세요.",
                         assignmentEndDate
                 ));
             }
@@ -117,9 +117,9 @@ final class RoleContinuitySignalAnalyzer {
             gaps.add("책임 목록");
         }
         if (activeItems.isEmpty()) {
-            gaps.add("활성 바통 항목");
+            gaps.add("활성 인수인계 항목");
         } else if (incompleteItemCount > 0) {
-            gaps.add("미완료 바통 항목 " + incompleteItemCount + "개");
+            gaps.add("미완료 인수인계 항목 " + incompleteItemCount + "개");
         }
         if (resourceCount == 0) {
             gaps.add("역할 자료");

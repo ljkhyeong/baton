@@ -56,8 +56,8 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
           workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} />
         <div className="personal-work-columns">
           <div>
-            <h3>미완료 루틴</h3>
-            {unfinished.length === 0 ? <p>남은 담당 루틴이 없습니다.</p> : <ul>
+            <h3>미완료 반복 업무</h3>
+            {unfinished.length === 0 ? <p>남은 담당 반복 업무가 없습니다.</p> : <ul>
               {unfinished.map(({ round, execution }) => <li key={execution.id}>
                 <button type="button" onClick={() => onOpenRound(round.id, execution.id)}>
                   <strong>{execution.title}</strong>
@@ -68,8 +68,8 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             </ul>}
           </div>
           <div>
-            <h3>내 수락을 기다리는 바통</h3>
-            {awaiting.length === 0 ? <p>수락을 기다리는 바통이 없습니다.</p> : <ul>
+            <h3>내 수락을 기다리는 인수인계</h3>
+            {awaiting.length === 0 ? <p>수락을 기다리는 인수인계가 없습니다.</p> : <ul>
               {awaiting.map((handoff) => <li key={handoff.id}>
                 <button type="button" onClick={() => onOpenHandoff(handoff.roleId)}>
                   <strong>{workspace.roles.find((role) => role.id === handoff.roleId)?.name}</strong>
@@ -79,7 +79,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             </ul>}
           </div>
         </div>
-        <small>업무를 모아 보여주는 기능이며, 공유 링크의 접근 권한이나 담당자 확인 방식을 바꾸지 않습니다. 마감은 {workspace.season.timeZone} 기준입니다.</small>
+        <small>마감은 {workspace.season.timeZone} 기준입니다.</small>
       </>
     }
   }

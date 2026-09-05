@@ -63,7 +63,7 @@ class RoundAutomationApplicationTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    @DisplayName("실제 마감 규칙이 없는 루틴이 있으면 자동 회차 일정을 처음 활성화하거나 재개할 수 없다")
+    @DisplayName("실제 마감 규칙이 없는 반복 업무가 있으면 자동 회차 일정을 처음 활성화하거나 재개할 수 없다")
     void rejectsScheduleActivationWhenRoutineHasNoDeadlineRule(boolean resuming) {
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
@@ -87,7 +87,7 @@ class RoundAutomationApplicationTest {
                 scheduleCommand(true)
         ))
                 .isInstanceOf(DomainValidationException.class)
-                .hasMessageContaining("모든 루틴에 실제 마감 규칙");
+                .hasMessageContaining("모든 반복 업무에 실제 마감 규칙");
         verify(seasonRepository, never()).saveSeason(any());
     }
 
@@ -268,7 +268,7 @@ class RoundAutomationApplicationTest {
     }
 
     @Test
-    @DisplayName("수동 회차를 옮기면 루틴 실행의 실제 마감 시각도 다시 계산한다")
+    @DisplayName("수동 회차를 옮기면 반복 업무 실행의 마감 시각도 다시 계산한다")
     void recalculatesManualRoundDeadlinesWhenMeetingDateMoves() {
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();
@@ -434,7 +434,7 @@ class RoundAutomationApplicationTest {
     }
 
     @Test
-    @DisplayName("활성 루틴이 없으면 빈 자동 회차를 저장하지 않고 발생 커서만 전진한다")
+    @DisplayName("활성 반복 업무가 없으면 빈 자동 회차를 저장하지 않고 발생 커서만 전진한다")
     void skipsAutomaticRoundWithoutActiveRoutinesAndAdvancesOccurrence() {
         UUID teamId = UUID.randomUUID();
         UUID seasonId = UUID.randomUUID();

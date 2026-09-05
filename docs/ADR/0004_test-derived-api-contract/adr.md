@@ -73,7 +73,7 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 바이트 단위로 비교한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 오퍼레이션별 경로·메서드·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 디스크립터가 검증하므로 별도의 수기 오퍼레이션 목록이나 의미 검증기를 중복 관리하지 않는다. Spring Security가 직접 처리하는 로컬 세션·로그아웃도 실제 필터 체인 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·콜백 경로만 실제 필터 체인 보안 통합 테스트로 고정한다. 루틴 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` `operationId`로 고정한다. GitHub Actions 품질 관문도 풀 리퀘스트와 `main` 푸시에서 `build checkApiContract`를 한 Gradle 호출로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
+`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 바이트 단위로 비교한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 오퍼레이션별 경로·메서드·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 디스크립터가 검증하므로 별도의 수기 오퍼레이션 목록이나 의미 검증기를 중복 관리하지 않는다. Spring Security가 직접 처리하는 로컬 세션·로그아웃도 실제 필터 체인 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·콜백 경로만 실제 필터 체인 보안 통합 테스트로 고정한다. 반복 업무 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` `operationId`로 고정한다. GitHub Actions 품질 관문도 풀 리퀘스트와 `main` 푸시에서 `build checkApiContract`를 한 Gradle 호출로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
 
 ## 결과
 
@@ -114,12 +114,12 @@ cd frontend && npm ci && cd ..
 
 ## 관련 문서
 
-- [API 계약 기준선](../../PRD/0002_api-contract/spec.md)
+- [API 명세](../../PRD/0002_api-contract/spec.md)
 - [테스트 전략](../0002_test-strategy/adr.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
-- [루틴 정의와 회차 실행 분리](../0006_routine-definition-and-round-execution/adr.md)
-- [결정과 바통의 가역 보관](../0007_reversible-record-archive/adr.md)
-- [운영 회차 정정과 가역 보관](../0008_revisable-round-lifecycle/adr.md)
+- [반복 업무 정의와 회차 실행 분리](../0006_routine-definition-and-round-execution/adr.md)
+- [결정과 인수인계의 보관·복원](../0007_reversible-record-archive/adr.md)
+- [운영 회차 정정과 보관·복원](../0008_revisable-round-lifecycle/adr.md)
 - [구성원 활동 종료와 참조 보존](../0010_reversible-member-lifecycle/adr.md)
 - [시즌 종료와 다음 시즌 전환](../0011_season_lifecycle/adr.md)
-- [역할 바통 전달 생명주기](../0013_role_handoff_lifecycle/adr.md)
+- [역할 인수인계 전달 생명주기](../0013_role_handoff_lifecycle/adr.md)

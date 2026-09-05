@@ -11,7 +11,7 @@ import { useAccountSecurity } from '@/features/auth/useAccountSecurity'
 const identityLabels = {
   google: 'Google',
   naver: 'Naver',
-  local_email: '자체 이메일',
+  local_email: '이메일',
 } as const
 
 function errorMessage(error: unknown) {
@@ -90,11 +90,11 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
           <h3 id="account-summary-title">{accountQuery.data.displayName}</h3>
           <p>계정 ID {accountQuery.data.accountId}</p>
         </div>
-        <ul className="account-identity-list" aria-label="연결된 로그인 수단">
+        <ul className="account-identity-list" aria-label="연결된 로그인 방법">
           {accountQuery.data.identities.map((identity) => (
             <li key={identity.provider}>
               <strong>{identityLabels[identity.provider]}</strong>
-              <span>{identity.email ?? '이메일을 제공하지 않은 로그인 수단'}</span>
+              <span>{identity.email ?? '이메일을 제공하지 않은 로그인 방법'}</span>
               {identity.email && (
                 <small>{identity.emailVerified ? '확인된 이메일' : '확인되지 않은 이메일'}</small>
               )}

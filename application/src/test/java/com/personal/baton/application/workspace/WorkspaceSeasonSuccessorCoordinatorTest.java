@@ -72,7 +72,7 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
     @Mock
     private WatchMonitorChangeRecorder watchMonitorChangeRecorder;
 
-    @DisplayName("다음 시즌 정의는 역할과 루틴을 순서대로 한 번씩 일괄 저장한다")
+    @DisplayName("다음 시즌 정의는 역할과 반복 업무를 순서대로 한 번씩 일괄 저장한다")
     @Test
     void savesCopiedDefinitionsInOrderedBatches() {
         UUID teamId = UUID.randomUUID();
@@ -179,7 +179,7 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
         assertThat(result.copiedRoutines()).hasSize(2);
     }
 
-    @DisplayName("보관된 루틴은 다음 시즌 복사 대상으로 선택할 수 없다")
+    @DisplayName("보관된 반복 업무는 다음 시즌 복사 대상으로 선택할 수 없다")
     @Test
     void excludesArchivedRoutineFromNextSeasonSelection() {
         UUID teamId = UUID.randomUUID();
@@ -228,7 +228,7 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 )
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)
-                .hasMessageContaining("복사할 루틴");
+                .hasMessageContaining("복사할 반복 업무");
         verify(seasonRepository, never()).saveSeason(any());
         verify(operationsRepository, never()).saveRoutines(anyList());
     }

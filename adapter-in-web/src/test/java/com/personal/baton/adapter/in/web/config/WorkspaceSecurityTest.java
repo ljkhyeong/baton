@@ -149,7 +149,7 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.team.id").value(TEAM_ID.toString()));
     }
 
-    @DisplayName("회차 루틴 실행 변경 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
+    @DisplayName("회차 반복 업무 실행 변경 경로는 사용자 인증 세션과 CSRF 토큰 없이 application 접근 키 검증으로 진입한다")
     @Test
     void permitsRoutineExecutionWriteWithoutAuthenticationOrCsrf() throws Exception {
         when(operationsUseCase.updateRoutineExecutionCompletion(

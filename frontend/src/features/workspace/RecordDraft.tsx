@@ -52,7 +52,7 @@ export function useRecordDraft(scope: WorkspaceScope | null, kind: RecordDraftKi
         }
         setKey(storageKey)
       } catch {
-        setMessage('탭 저장소를 사용할 수 없어 초안을 복구하거나 저장하지 못합니다. 입력 내용을 따로 복사해 주세요.')
+        setMessage('초안을 저장하거나 불러올 수 없습니다. 입력 내용을 복사해 두세요.')
       }
     }).catch(() => { if (current) setMessage('이 브라우저에서는 초안 저장을 사용할 수 없습니다.') })
     return () => { current = false }

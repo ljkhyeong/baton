@@ -347,7 +347,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     teamId,
     seasonId,
     onRoleHandoffConflict: () => beginContentConflictRecovery(
-      '다른 구성원이 먼저 바꾼 최신 역할 바통 상태를 불러왔어요.',
+      '다른 구성원이 먼저 바꾼 최신 역할 인수인계 상태를 불러왔어요.',
     ),
     onWorkspaceContentConflict: () => beginContentConflictRecovery(
       '다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.',
@@ -394,7 +394,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
 
   if (workspaceQuery.isPending) {
-    return <WorkspaceState title="작업 공간을 불러오는 중이에요" description="팀의 바통과 이번 시즌 기록을 모으고 있습니다." busy />
+    return <WorkspaceState title="작업 공간을 불러오는 중이에요" description="팀의 인수인계와 이번 시즌 기록을 모으고 있습니다." busy />
   }
 
   if (!workspaceQuery.data || workspaceAccessDenied) {

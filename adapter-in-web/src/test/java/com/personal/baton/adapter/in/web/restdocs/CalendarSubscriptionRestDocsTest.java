@@ -104,7 +104,7 @@ class CalendarSubscriptionRestDocsTest {
     @DisplayName("내 구독 목록은 계정별 관리 정보와 다음 페이지를 반환하고 주소를 포함하지 않는다")
     void documentsList() throws Exception {
         var row = new CalendarSubscriptionUseCase.Summary(EDITION_ID, TEAM_ID, SEASON_ID,
-                "바통 독서 팀", "가을 시즌", CalendarSubscriptionUseCase.ManagementStatus.CHECK_REQUIRED);
+                "인수인계 독서 팀", "가을 시즌", CalendarSubscriptionUseCase.ManagementStatus.CHECK_REQUIRED);
         when(subscriptions.list(ACCOUNT_ID, EXECUTION_ID, "독서", false)).thenReturn(
                 new CalendarSubscriptionUseCase.SubscriptionPage(List.of(row), SEASON_ID));
         mockMvc.perform(get(CalendarSubscriptionController.LIST_PATH)

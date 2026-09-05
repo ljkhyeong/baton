@@ -15,7 +15,7 @@ import type {
 } from './types'
 
 export const routineTimingStatusCopy = {
-  UNSCHEDULED: '자동 판정 없음',
+  UNSCHEDULED: '마감 미설정',
   PLANNED: '예정',
   IN_PROGRESS: '진행',
   OVERDUE: '지연',
@@ -181,7 +181,7 @@ export function RoundControl({
         </button>
       </div>
       {!hasRoutines && (
-        <p id="round-create-hint">반복 루틴을 하나 이상 만든 뒤 운영 회차를 만들 수 있어요.</p>
+        <p id="round-create-hint">반복 업무를 하나 이상 만든 뒤 운영 회차를 만들 수 있어요.</p>
       )}
     </section>
   )
@@ -207,12 +207,12 @@ export function RoutineRow({ routine, execution, role, members, timeZone, onTogg
       <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member ? memberDisplayName(member) : '담당자 미정'}</small></span></button>
       {routine ? (
         <span className="routine-actions">
-          <button type="button" className="inline-edit-button" aria-label={`${routine.title} 루틴 수정`} disabled={pending || archivePending} onClick={() => onEdit(routine)}>수정</button>
+          <button type="button" className="inline-edit-button" aria-label={`${routine.title} 반복 업무 수정`} disabled={pending || archivePending} onClick={() => onEdit(routine)}>수정</button>
           {onArchive && (
             <button
               type="button"
               className="inline-edit-button routine-archive-button"
-              aria-label={`${routine.title} 루틴 보관`}
+              aria-label={`${routine.title} 반복 업무 보관`}
               aria-busy={archivePending}
               disabled={pending || archivePending}
               onClick={() => onArchive(routine, true)}

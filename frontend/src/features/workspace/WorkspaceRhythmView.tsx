@@ -74,7 +74,7 @@ export function RhythmView({
     && routines.length === 0
   return (
     <>
-      <PageHeader eyebrow="반복되는 운영 리듬" title="우리 팀은 이렇게 움직여요" description="매번 설명하던 일을 루틴으로 만들고, 완료되면 다음 역할로 넘깁니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>루틴 추가</PrimaryButton>} />
+      <PageHeader eyebrow="회차별 진행 관리" title="반복 업무" description="반복 업무를 등록하고 회차별 완료 여부를 확인합니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
       <section
         className={`round-schedule-card ${season.roundSchedule?.enabled ? 'active' : ''}`}
         aria-labelledby="round-schedule-title"
@@ -89,7 +89,7 @@ export function RhythmView({
           <p>
             {season.roundSchedule
               ? `${season.timeZone} · ${roundScheduleWaitingForRoutine
-                ? '활성 루틴 대기 중'
+                ? '활성 반복 업무 대기 중'
                 : season.roundSchedule.enabled ? '자동 생성 중' : '일시중지'}`
               : `${season.timeZone} 기준 반복 일정을 설정해 보세요.`}
             {season.roundSchedule?.nextOccurrenceDate
@@ -183,11 +183,11 @@ export function RhythmView({
             </section>
           ))}
         </div>
-      ) : <ActionableEmpty title={archivedRoutines.length ? '현재 운영할 루틴이 없어요' : '아직 반복 루틴이 없어요'} description={archivedRoutines.length ? '보관함에서 다시 필요한 루틴을 복원하거나 새 루틴을 추가해 주세요.' : '모임 전·중·후에 반복할 일을 역할과 연결해 주세요.'} actionLabel={roles.length ? '새 루틴 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
+      ) : <ActionableEmpty title={archivedRoutines.length ? '현재 운영할 반복 업무가 없어요' : '아직 반복 업무가 없어요'} description={archivedRoutines.length ? '보관함에서 다시 필요한 반복 업무를 복원하거나 새 반복 업무를 추가해 주세요.' : '모임 전·중·후에 반복할 일을 역할과 연결해 주세요.'} actionLabel={roles.length ? '새 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
       {timelineItems.length > 0 && <button type="button" className="add-routine-line" disabled={changesDisabled} onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
       {archivedRoutines.length > 0 && (
         <details className="archive-shelf routine-archive-shelf">
-          <summary>보관한 루틴 {archivedRoutines.length}개</summary>
+          <summary>보관한 반복 업무 {archivedRoutines.length}개</summary>
           <div className="archive-list">
             {archivedRoutines.map((routine) => {
               const busy = busyRoutineIds.has(routine.id)
@@ -203,7 +203,7 @@ export function RhythmView({
                   </span>
                   <button
                     type="button"
-                    aria-label={`${routine.title} 루틴 복원`}
+                    aria-label={`${routine.title} 반복 업무 복원`}
                     aria-busy={busy}
                     disabled={changesDisabled || busy}
                     onClick={() => onUpdateRoutineArchive(routine, false)}

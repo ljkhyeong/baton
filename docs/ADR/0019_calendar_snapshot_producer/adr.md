@@ -5,7 +5,7 @@
 
 ## 배경
 
-BATON의 회차와 루틴 마감은 MySQL 트랜잭션에서 확정되고 BATON CAL은 별도 PostgreSQL과 배포
+BATON의 회차와 반복 업무 마감은 MySQL 트랜잭션에서 확정되고 BATON CAL은 별도 PostgreSQL과 배포
 단위를 가진다. 원본 저장 중 CAL을 동기 호출하면 외부 장애가 사용자 변경을 막고, 커밋 뒤 응답만
 유실되면 두 서비스 상태가 갈라진다. 또한 BATON의 JPA 엔티티나 Java DTO를 CAL과 공유하면 두
 서비스의 배포와 언어 선택이 결합된다.

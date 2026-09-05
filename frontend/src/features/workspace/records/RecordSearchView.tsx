@@ -28,7 +28,7 @@ export const initialRecordSearchFilters: RecordSearchFilters = {
 
 const kindCopy = {
   decision: '결정',
-  handoff: '바통',
+  handoff: '인수인계',
   resource: '자료',
 } satisfies Record<RecordSearchResult['kind'], string>
 
@@ -52,7 +52,7 @@ function resultSecondaryText(result: RecordSearchResult) {
 }
 
 function resultActionLabel(result: RecordSearchResult) {
-  if (result.kind === 'decision') return '결정 원장에서 보기'
+  if (result.kind === 'decision') return '결정 기록에서 보기'
   if (result.kind === 'handoff') return '인수인계 문서에서 보기'
   return '역할에서 보기'
 }
@@ -117,16 +117,16 @@ export function RecordSearchView({
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">기록 검색</span>
-          <h1>결정의 이유부터 다음 사람의 자료까지</h1>
-          <p>선택한 시즌의 결정, 바통 항목과 역할 자료를 한 흐름에서 다시 찾습니다.</p>
+          <span className="eyebrow">{season.name}</span>
+          <h1>기록 검색</h1>
+          <p>선택한 시즌의 결정·인수인계·자료를 검색합니다.</p>
         </div>
       </header>
 
       <form
         className="record-search-panel"
         role="search"
-        aria-label="결정, 바통과 자료 검색"
+        aria-label="결정, 인수인계와 자료 검색"
         onSubmit={(event) => event.preventDefault()}
       >
         {scopeControl}
@@ -151,9 +151,9 @@ export function RecordSearchView({
               onChange={(event) =>
                 updateFilter('type', event.target.value as RecordSearchFilters['type'])}
             >
-              <option value="all">결정 · 바통 · 자료</option>
+              <option value="all">결정 · 인수인계 · 자료</option>
               <option value="decision">결정만</option>
-              <option value="handoff">바통만</option>
+              <option value="handoff">인수인계만</option>
               <option value="resource">자료만</option>
             </select>
           </label>

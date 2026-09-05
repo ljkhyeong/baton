@@ -103,7 +103,7 @@ export default function PendingWorkspaceCreationPanel({
     if (result === 'discarded' || result === 'missing') {
       setConfirmingId(null)
       setNotice(result === 'discarded'
-        ? '복구 기록을 폐기했습니다. 서버에 이미 만들어진 작업 공간은 삭제되지 않았습니다.'
+        ? '복구 목록에서 삭제했습니다. 서버의 작업 공간은 유지됩니다.'
         : '다른 탭에서 이미 정리한 복구 기록입니다.')
       onRefresh()
       requestAnimationFrame(() => {
@@ -121,7 +121,7 @@ export default function PendingWorkspaceCreationPanel({
       return
     }
     if (result === 'unsupported') {
-      setError('이 브라우저에서는 복구 기록을 안전하게 처리할 수 없습니다. 브라우저를 최신 버전으로 업데이트하거나 다른 브라우저에서 결과 확인 또는 폐기를 진행해 주세요.')
+      setError('이 브라우저에서는 복구 기록을 처리할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.')
       return
     }
     if (result === 'changed') {
@@ -129,7 +129,7 @@ export default function PendingWorkspaceCreationPanel({
       onRefresh()
       return
     }
-    setError('브라우저 저장소에서 복구 기록을 폐기하지 못했습니다. 저장소 권한을 확인해 주세요.')
+    setError('복구 목록에서 삭제하지 못했습니다. 저장소 권한을 확인해 주세요.')
   }
 
   const load = (item: PendingWorkspaceCreationItem) => {
@@ -152,7 +152,7 @@ export default function PendingWorkspaceCreationPanel({
         >
           <summary>
             <span>확인하지 못한 생성 요청 <strong>{items.length}개</strong></span>
-            <small>복구 대기</small>
+            <small>생성 결과 미확인</small>
           </summary>
           <p className="pending-workspaces-intro">
             완료 여부를 확인하지 못한 요청입니다. 저장된 입력과 같은 키로 다시 제출하면
@@ -195,13 +195,13 @@ export default function PendingWorkspaceCreationPanel({
                       onClick={() => openConfirmation(item)}
                       aria-expanded={confirming}
                       aria-controls={confirming ? confirmationId : undefined}
-                      aria-label={`${label} 복구 기록 폐기`}
+                      aria-label={`${label} 복구 목록에서 삭제`}
                       ref={(element) => {
                         if (element) discardButtonRefs.current.set(item.idempotencyKey, element)
                         else discardButtonRefs.current.delete(item.idempotencyKey)
                       }}
                     >
-                      복구 기록 폐기
+                      복구 목록에서 삭제
                     </button>
                   </div>
 
@@ -212,9 +212,9 @@ export default function PendingWorkspaceCreationPanel({
                       role="group"
                       aria-labelledby={confirmationTitleId}
                     >
-                      <strong id={confirmationTitleId}>이 복구 기록을 폐기할까요?</strong>
+                      <strong id={confirmationTitleId}>복구 목록에서 삭제할까요?</strong>
                       <p>
-                        서버에서 이미 처리된 요청이라면 폐기 후 이 브라우저에서 공유 키를 되찾지 못할 수 있습니다.
+                        작업 공간이 이미 생성됐다면 공유 키를 이 브라우저에서 복구하지 못할 수 있습니다.
                         서버의 작업 공간 자체는 삭제되지 않습니다.
                       </p>
                       <div>
@@ -233,7 +233,7 @@ export default function PendingWorkspaceCreationPanel({
                           disabled={discardingId !== null}
                           onClick={() => void discard(item)}
                         >
-                          {discardingId === item.idempotencyKey ? '폐기하는 중…' : '확인하고 폐기'}
+                          {discardingId === item.idempotencyKey ? '삭제하는 중…' : '목록에서 삭제'}
                         </button>
                       </div>
                     </div>

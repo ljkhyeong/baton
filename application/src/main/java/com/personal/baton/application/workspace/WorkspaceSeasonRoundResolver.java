@@ -42,7 +42,7 @@ final class WorkspaceSeasonRoundResolver {
                 .filter(execution -> execution.getSeasonRoundId().equals(roundId))
                 .orElseThrow(() -> new WorkspaceNotFoundException(
                         "ROUTINE_EXECUTION_NOT_FOUND",
-                        "루틴 실행 기록을 찾을 수 없습니다"
+                        "반복 업무 실행 기록을 찾을 수 없습니다"
                 ));
     }
 

@@ -41,8 +41,8 @@ export function RolesView({
     <>
       <PageHeader
         eyebrow="역할과 담당자"
-        title="사람이 바뀌어도 역할은 남아요"
-        description="현재 담당자와 다음 담당자, 반복되는 책임을 한눈에 확인하세요."
+        title="역할과 담당자"
+        description="현재 담당자와 다음 담당자, 담당 업무를 확인하세요."
         action={(
           <div className="action-cluster">
             <button
@@ -59,7 +59,7 @@ export function RolesView({
       />
       {roles.length ? (
         <section className="role-directory">
-          <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>바통 준비</span></div>
+          <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>인수인계 준비</span></div>
           {roles.map((role) => {
             const owner = getMember(members, role.currentMemberId)
             const next = getMember(members, role.nextMemberId)
@@ -83,8 +83,8 @@ export function RolesView({
             )
           })}
         </section>
-      ) : <ActionableEmpty title="아직 역할이 없어요" description="사람보다 오래 남을 첫 책임을 역할로 만들어 보세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
-      <p className="directory-note"><Icon name="spark" size={15} /> 사람을 먼저 초대하기보다, 팀에 꼭 필요한 책임부터 역할로 정리해 보세요.</p>
+      ) : <ActionableEmpty title="아직 역할이 없어요" description="담당 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
+      <p className="directory-note"><Icon name="spark" size={15} /> 역할별 담당 업무를 정하고 담당자를 지정하세요.</p>
     </>
   )
 }

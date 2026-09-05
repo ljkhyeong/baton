@@ -174,7 +174,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation GET_WORKSPACE = new OperationDocumentation(
             "워크스페이스 조회",
-            "오늘 화면에 필요한 팀, 시즌, 역할, 역할 자료, 루틴 정의, 회차별 실행, 결정과 인수인계 프로젝션을 조회한다."
+            "오늘 화면에 필요한 팀, 시즌, 역할, 역할 자료, 반복 업무 정의, 회차별 실행, 결정과 인수인계 프로젝션을 조회한다."
     );
     private static final OperationDocumentation UPDATE_SEASON = new OperationDocumentation(
             "시즌 정보 수정",
@@ -194,7 +194,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation CREATE_NEXT_SEASON = new OperationDocumentation(
             "다음 시즌 시작",
-            "현재 시즌을 종료하고 선택한 역할과 루틴 정의만 새 시즌 snapshot으로 이어 간다."
+            "현재 시즌을 종료하고 선택한 역할과 반복 업무 정의만 새 시즌 snapshot으로 이어 간다."
     );
     private static final OperationDocumentation CREATE_MEMBER = new OperationDocumentation(
             "구성원 추가",
@@ -226,36 +226,36 @@ class WorkspaceRestDocsTest {
             "현재 시즌의 역할 이름, 담당자, 책임과 위험 신호를 수정한다."
     );
     private static final OperationDocumentation PREPARE_ROLE_HANDOFF = new OperationDocumentation(
-            "역할 바통 준비",
+            "역할 인수인계 준비",
             "이전·다음 담당자와 두 담당 기간을 고정해 역할 교대를 준비한다."
     );
     private static final OperationDocumentation TRANSFER_ROLE_HANDOFF = new OperationDocumentation(
-            "역할 바통 전달",
-            "이전 담당자 명의의 확인과 준비도 경고 확인을 기록해 바통을 수락 대기로 전환한다."
+            "역할 인수인계 전달",
+            "이전 담당자 명의의 확인과 준비도 경고 확인을 기록해 인수인계를 수락 대기로 전환한다."
     );
     private static final OperationDocumentation ACCEPT_ROLE_HANDOFF = new OperationDocumentation(
-            "역할 바통 수락",
+            "역할 인수인계 수락",
             "다음 담당자 명의의 확인과 함께 역할 담당자와 담당 기간을 원자적으로 전환한다."
     );
     private static final OperationDocumentation CANCEL_ROLE_HANDOFF = new OperationDocumentation(
-            "역할 바통 취소",
-            "수락 전 역할 바통을 취소하고 역할의 다음 담당자 예약을 되돌린다."
+            "역할 인수인계 취소",
+            "수락 전 역할 인수인계를 취소하고 역할의 다음 담당자 예약을 되돌린다."
     );
     private static final OperationDocumentation CREATE_ROUTINE = new OperationDocumentation(
-            "루틴 생성",
-            "현재 시즌에 반복해서 실행할 팀 루틴 정의를 등록한다."
+            "반복 업무 생성",
+            "현재 시즌에 반복해서 실행할 팀 반복 업무 정의를 등록한다."
     );
     private static final OperationDocumentation UPDATE_ROUTINE = new OperationDocumentation(
-            "루틴 수정",
-            "현재 시즌의 팀 루틴 정의를 수정한다."
+            "반복 업무 수정",
+            "현재 시즌의 팀 반복 업무 정의를 수정한다."
     );
     private static final OperationDocumentation UPDATE_ROUTINE_ARCHIVE = new OperationDocumentation(
-            "루틴 보관 상태 변경",
-            "루틴 정의를 활성 목록에서 보관하거나 다시 복원한다."
+            "반복 업무 보관 상태 변경",
+            "반복 업무 정의를 활성 목록에서 보관하거나 다시 복원한다."
     );
     private static final OperationDocumentation CREATE_SEASON_ROUND = new OperationDocumentation(
             "시즌 회차 생성",
-            "시즌에 수동 회차를 만들고 현재 루틴 정의를 실행 항목으로 복제한다."
+            "시즌에 수동 회차를 만들고 현재 반복 업무 정의를 실행 항목으로 복제한다."
     );
     private static final OperationDocumentation UPDATE_SEASON_ROUND = new OperationDocumentation(
             "시즌 회차 수정",
@@ -263,11 +263,11 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation UPDATE_SEASON_ROUND_ARCHIVE = new OperationDocumentation(
             "시즌 회차 보관 상태 변경",
-            "회차와 루틴 실행 기록을 지우지 않고 활성 목록에서 보관하거나 다시 복원한다."
+            "회차와 반복 업무 실행 기록을 지우지 않고 활성 목록에서 보관하거나 다시 복원한다."
     );
     private static final OperationDocumentation UPDATE_ROUTINE_EXECUTION_COMPLETION = new OperationDocumentation(
-            "회차 루틴 실행 완료 상태 변경",
-            "특정 회차의 루틴 실행 완료 여부를 WAITING 또는 DONE 상태로 변경한다."
+            "회차 반복 업무 실행 완료 상태 변경",
+            "특정 회차의 반복 업무 실행 완료 여부를 WAITING 또는 DONE 상태로 변경한다."
     );
     private static final OperationDocumentation CREATE_DECISION = new OperationDocumentation(
             "결정 생성",
@@ -392,7 +392,7 @@ class WorkspaceRestDocsTest {
                                         "endDate", "시즌 종료일(ISO-8601 날짜)"),
                                 requestStringArrayField(WorkspaceRequests.CreateWorkspaceRequest.class,
                                         "memberNames", "memberNames[]", "한 명 이상의 구성원 이름"),
-                                enumField(WorkspaceTemplate.class, "template", "시작 템플릿. 생략 또는 null이면 빈 역할·루틴 구성").optional()
+                                enumField(WorkspaceTemplate.class, "template", "시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성").optional()
                         ),
                         responseHeadersWithRequestId(
                                 headerWithName("Location")
@@ -431,7 +431,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.continuitySignals[0].type")
                         .value("HANDOFF_INCOMPLETE"))
                 .andExpect(jsonPath("$.continuitySignals[0].recommendedAction")
-                        .value("다음 담당자가 바통을 수락하고 남은 항목을 확인하세요."))
+                        .value("다음 담당자가 인수인계를 수락하고 남은 항목을 확인하세요."))
                 .andDo(document(
                         "getWorkspace",
                         GET_WORKSPACE,
@@ -850,7 +850,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("다음 시즌 시작 API는 선택한 역할과 루틴의 새 식별자 대응을 반환한다")
+    @DisplayName("다음 시즌 시작 API는 선택한 역할과 반복 업무의 새 식별자 대응을 반환한다")
     @Test
     void documentsCreateNextSeason() throws Exception {
         when(lifecycleUseCase.createNextSeason(
@@ -898,7 +898,7 @@ class WorkspaceRestDocsTest {
                                         WorkspaceRequests.CreateNextSeasonRequest.class,
                                         "copyRoutineIds",
                                         "copyRoutineIds[]",
-                                        "다음 시즌으로 이어 갈 원본 루틴 UUID 집합"
+                                        "다음 시즌으로 이어 갈 원본 반복 업무 UUID 집합"
                                 )
                         ),
                         responseHeadersWithRequestId(
@@ -1024,7 +1024,7 @@ class WorkspaceRestDocsTest {
     }
 
     @Nested
-    @DisplayName("구성원·역할 바통 계약")
+    @DisplayName("구성원·역할 인수인계 계약")
     class PeopleContract {
 
     @DisplayName("구성원 추가 API는 팀 구성원을 저장하고 표시 정보를 반환한다")
@@ -1584,7 +1584,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleResponseFields())));
     }
 
-    @DisplayName("역할 바통 준비 API는 다음 담당 기간을 고정하고 고유한 바통을 만든다")
+    @DisplayName("역할 인수인계 준비 API는 다음 담당 기간을 고정하고 고유한 인수인계를 만든다")
     @Test
     void documentsPrepareRoleHandoff() throws Exception {
         when(peopleUseCase.prepareRoleHandoff(
@@ -1644,12 +1644,12 @@ class WorkspaceRestDocsTest {
                                 )
                         ),
                         responseHeadersWithRequestId(
-                                headerWithName("Location").description("준비한 역할 바통 URI")
+                                headerWithName("Location").description("준비한 역할 인수인계 URI")
                         ),
                         responseFields(roleHandoffTransitionResponseFields())));
     }
 
-    @DisplayName("역할 바통 전달 API는 이전 담당자의 확인과 준비도 스냅샷을 기록한다")
+    @DisplayName("역할 인수인계 전달 API는 이전 담당자의 확인과 준비도 스냅샷을 기록한다")
     @Test
     void documentsTransferRoleHandoff() throws Exception {
         when(peopleUseCase.transferRoleHandoff(
@@ -1700,7 +1700,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleHandoffTransitionResponseFields())));
     }
 
-    @DisplayName("역할 바통 수락 API는 다음 담당자의 확인과 역할 배정을 함께 반영한다")
+    @DisplayName("역할 인수인계 수락 API는 다음 담당자의 확인과 역할 배정을 함께 반영한다")
     @Test
     void documentsAcceptRoleHandoff() throws Exception {
         when(peopleUseCase.acceptRoleHandoff(
@@ -1743,7 +1743,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleHandoffTransitionResponseFields())));
     }
 
-    @DisplayName("역할 바통 취소 API는 수락 전 바통과 다음 담당자 예약을 되돌린다")
+    @DisplayName("역할 인수인계 취소 API는 수락 전 인수인계와 다음 담당자 예약을 되돌린다")
     @Test
     void documentsCancelRoleHandoff() throws Exception {
         when(peopleUseCase.cancelRoleHandoff(
@@ -1785,7 +1785,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleHandoffTransitionResponseFields())));
     }
 
-    @DisplayName("이미 열린 역할 바통이 있으면 새 준비 요청은 안정적인 409 상태 충돌을 반환한다")
+    @DisplayName("이미 열린 역할 인수인계가 있으면 새 준비 요청은 안정적인 409 상태 충돌을 반환한다")
     @Test
     void documentsPrepareRoleHandoffStateConflict() throws Exception {
         when(peopleUseCase.prepareRoleHandoff(
@@ -1796,7 +1796,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(WorkspacePeopleCommands.PrepareRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
-                "이 역할에는 이미 진행 중인 바통이 있습니다"
+                "이 역할에는 이미 진행 중인 인수인계가 있습니다"
         ));
 
         mockMvc.perform(post(
@@ -1817,7 +1817,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("바통 준비도 경고를 확인하지 않으면 전달 API는 확인이 필요한 409를 반환한다")
+    @DisplayName("인수인계 준비도 경고를 확인하지 않으면 전달 API는 확인이 필요한 409를 반환한다")
     @Test
     void documentsTransferRoleHandoffWarningConfirmationRequired() throws Exception {
         when(peopleUseCase.transferRoleHandoff(
@@ -1854,7 +1854,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("전달할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
+    @DisplayName("전달할 역할 인수인계가 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsTransferRoleHandoffNotFound() throws Exception {
         when(peopleUseCase.transferRoleHandoff(
@@ -1866,7 +1866,7 @@ class WorkspaceRestDocsTest {
                 any(WorkspacePeopleCommands.TransferRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
-                "역할 바통을 찾을 수 없습니다"
+                "역할 인수인계를 찾을 수 없습니다"
         ));
 
         mockMvc.perform(patch(
@@ -1893,7 +1893,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("수락할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
+    @DisplayName("수락할 역할 인수인계가 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsAcceptRoleHandoffNotFound() throws Exception {
         when(peopleUseCase.acceptRoleHandoff(
@@ -1905,7 +1905,7 @@ class WorkspaceRestDocsTest {
                 any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
-                "역할 바통을 찾을 수 없습니다"
+                "역할 인수인계를 찾을 수 없습니다"
         ));
 
         mockMvc.perform(patch(
@@ -1927,7 +1927,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("잘못된 확인자가 역할 바통을 수락하면 안정적인 409 상태 충돌을 반환한다")
+    @DisplayName("잘못된 확인자가 역할 인수인계를 수락하면 안정적인 409 상태 충돌을 반환한다")
     @Test
     void documentsAcceptRoleHandoffStateConflict() throws Exception {
         when(peopleUseCase.acceptRoleHandoff(
@@ -1960,7 +1960,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("취소할 역할 바통이 없으면 식별 가능한 404 오류를 반환한다")
+    @DisplayName("취소할 역할 인수인계가 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsCancelRoleHandoffNotFound() throws Exception {
         when(peopleUseCase.cancelRoleHandoff(
@@ -1972,7 +1972,7 @@ class WorkspaceRestDocsTest {
                 any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROLE_HANDOFF_NOT_FOUND",
-                "역할 바통을 찾을 수 없습니다"
+                "역할 인수인계를 찾을 수 없습니다"
         ));
 
         mockMvc.perform(patch(
@@ -1994,7 +1994,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("수락이 끝난 역할 바통을 취소하면 안정적인 409 상태 충돌을 반환한다")
+    @DisplayName("수락이 끝난 역할 인수인계를 취소하면 안정적인 409 상태 충돌을 반환한다")
     @Test
     void documentsCancelRoleHandoffStateConflict() throws Exception {
         when(peopleUseCase.cancelRoleHandoff(
@@ -2005,7 +2005,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(WorkspacePeopleCommands.ConfirmRoleHandoffCommand.class)
         )).thenThrow(new RoleHandoffStateConflictException(
-                "수락이 끝난 바통은 취소할 수 없습니다"
+                "수락이 끝난 인수인계는 취소할 수 없습니다"
         ));
 
         mockMvc.perform(patch(
@@ -2030,10 +2030,10 @@ class WorkspaceRestDocsTest {
     }
 
     @Nested
-    @DisplayName("루틴·회차 계약")
+    @DisplayName("반복 업무·회차 계약")
     class OperationsContract {
 
-    @DisplayName("루틴 생성 API는 완료 상태가 없는 반복 실행 정의를 반환한다")
+    @DisplayName("반복 업무 생성 API는 완료 상태가 없는 반복 실행 정의를 반환한다")
     @Test
     void documentsCreateRoutine() throws Exception {
         when(operationsUseCase.createRoutine(
@@ -2070,15 +2070,15 @@ class WorkspaceRestDocsTest {
                         contentCreationHeaders(),
                         requestFields(
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "title", "루틴 제목"),
+                                        "title", "반복 업무 제목"),
                                 requestEnumField(WorkspaceRequests.CreateRoutineRequest.class,
                                         RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
                                         "dueLabel", "사용자에게 보일 기한 문구"),
                                 optionalRequestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "deadlineDayOffset", "모임 날짜 기준 실제 마감일 오프셋"),
+                                        "deadlineDayOffset", "모임 날짜 기준 마감일 오프셋"),
                                 optionalRequestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "deadlineTime", "시즌 시간대 기준 실제 마감 시각"),
+                                        "deadlineTime", "시즌 시간대 기준 마감 시각"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
                                         "ownerRoleId", "담당 역할 UUID"),
                                 requestField(WorkspaceRequests.CreateRoutineRequest.class,
@@ -2087,7 +2087,7 @@ class WorkspaceRestDocsTest {
                         responseFields(routineResponseFields())));
     }
 
-    @DisplayName("루틴 수정 API는 완료 상태와 분리된 반복 실행 정의를 반환한다")
+    @DisplayName("반복 업무 수정 API는 완료 상태와 분리된 반복 실행 정의를 반환한다")
     @Test
     void documentsUpdateRoutine() throws Exception {
         when(operationsUseCase.updateRoutine(
@@ -2120,15 +2120,15 @@ class WorkspaceRestDocsTest {
                         accessKeyHeader(),
                         requestFields(
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "title", "루틴 제목"),
+                                        "title", "반복 업무 제목"),
                                 requestEnumField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         "dueLabel", "사용자에게 보일 기한 문구"),
                                 optionalRequestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "deadlineDayOffset", "모임 날짜 기준 실제 마감일 오프셋"),
+                                        "deadlineDayOffset", "모임 날짜 기준 마감일 오프셋"),
                                 optionalRequestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "deadlineTime", "시즌 시간대 기준 실제 마감 시각"),
+                                        "deadlineTime", "시즌 시간대 기준 마감 시각"),
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
                                         "ownerRoleId", "담당 역할 UUID"),
                                 requestField(WorkspaceRequests.UpdateRoutineRequest.class,
@@ -2137,7 +2137,7 @@ class WorkspaceRestDocsTest {
                         responseFields(routineResponseFields())));
     }
 
-    @DisplayName("루틴 보관 API는 서버가 기록한 보관 시각을 포함한 전체 정의를 반환한다")
+    @DisplayName("반복 업무 보관 API는 서버가 기록한 보관 시각을 포함한 전체 정의를 반환한다")
     @Test
     void documentsUpdateRoutineArchive() throws Exception {
         Instant archivedAt = Instant.parse("2026-07-20T04:05:06Z");
@@ -2169,7 +2169,7 @@ class WorkspaceRestDocsTest {
                         responseFields(routineResponseFields())));
     }
 
-    @DisplayName("시즌 회차 생성 API는 현재 루틴의 실행 항목을 포함해 반환한다")
+    @DisplayName("시즌 회차 생성 API는 현재 반복 업무의 실행 항목을 포함해 반환한다")
     @Test
     void documentsCreateSeasonRound() throws Exception {
         when(operationsUseCase.createSeasonRound(
@@ -2321,7 +2321,7 @@ class WorkspaceRestDocsTest {
                         responseFields(seasonRoundResponseFields())));
     }
 
-    @DisplayName("회차 루틴 실행 완료 API는 completed 값에 따라 DONE 상태를 반환한다")
+    @DisplayName("회차 반복 업무 실행 완료 API는 completed 값에 따라 DONE 상태를 반환한다")
     @Test
     void documentsUpdateRoutineExecutionCompletion() throws Exception {
         when(operationsUseCase.updateRoutineExecutionCompletion(
@@ -3201,7 +3201,7 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
                                         "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
                                 optionalRequestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "description", "자료 사용 맥락")
+                                        "description", "자료 자료 설명")
                         ),
                         responseFields(roleResourceResponseFields())));
     }
@@ -3250,7 +3250,7 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
                                         "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
                                 optionalRequestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "description", "자료 사용 맥락")
+                                        "description", "자료 자료 설명")
                         ),
                         responseFields(roleResourceResponseFields())));
     }
@@ -3758,7 +3758,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("회차를 찾을 수 없으면 회차 루틴 실행 완료 API는 식별 가능한 404 오류를 반환한다")
+    @DisplayName("회차를 찾을 수 없으면 회차 반복 업무 실행 완료 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsSeasonRoundNotFound() throws Exception {
         when(operationsUseCase.updateRoutineExecutionCompletion(
@@ -3791,7 +3791,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 실행을 찾을 수 없으면 회차 루틴 실행 완료 API는 식별 가능한 404 오류를 반환한다")
+    @DisplayName("반복 업무 실행을 찾을 수 없으면 회차 반복 업무 실행 완료 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsRoutineExecutionNotFound() throws Exception {
         when(operationsUseCase.updateRoutineExecutionCompletion(
@@ -3803,7 +3803,7 @@ class WorkspaceRestDocsTest {
                 true
         )).thenThrow(new WorkspaceNotFoundException(
                 "ROUTINE_EXECUTION_NOT_FOUND",
-                "루틴 실행 기록을 찾을 수 없습니다"
+                "반복 업무 실행 기록을 찾을 수 없습니다"
         ));
 
         mockMvc.perform(patch(
@@ -3818,7 +3818,7 @@ class WorkspaceRestDocsTest {
                         .content("{\"completed\": true}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROUTINE_EXECUTION_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("루틴 실행 기록을 찾을 수 없습니다"))
+                .andExpect(jsonPath("$.message").value("반복 업무 실행 기록을 찾을 수 없습니다"))
                 .andDo(document(
                         "updateRoutineExecutionCompletionExecutionNotFound",
                         UPDATE_ROUTINE_EXECUTION_COMPLETION,
@@ -3827,7 +3827,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("회차 루틴 실행 완료 상태 변경이 다른 변경과 충돌하면 409 오류를 반환한다")
+    @DisplayName("회차 반복 업무 실행 완료 상태 변경이 다른 변경과 충돌하면 409 오류를 반환한다")
     @Test
     void documentsUpdateRoutineExecutionCompletionContentConflict() throws Exception {
         when(operationsUseCase.updateRoutineExecutionCompletion(
@@ -3859,7 +3859,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("수정할 루틴이 없으면 루틴 수정 API는 식별 가능한 404 오류를 반환한다")
+    @DisplayName("수정할 반복 업무가 없으면 반복 업무 수정 API는 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateRoutineNotFound() throws Exception {
         when(operationsUseCase.updateRoutine(
@@ -3869,7 +3869,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(UpdateRoutineCommand.class)
         ))
-                .thenThrow(new WorkspaceNotFoundException("ROUTINE_NOT_FOUND", "루틴을 찾을 수 없습니다"));
+                .thenThrow(new WorkspaceNotFoundException("ROUTINE_NOT_FOUND", "반복 업무를 찾을 수 없습니다"));
 
         mockMvc.perform(put(
                         "/api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}",
@@ -3881,7 +3881,7 @@ class WorkspaceRestDocsTest {
                         .content(validUpdateRoutineRequest()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROUTINE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("루틴을 찾을 수 없습니다"))
+                .andExpect(jsonPath("$.message").value("반복 업무를 찾을 수 없습니다"))
                 .andDo(document(
                         "updateRoutineNotFound",
                         UPDATE_ROUTINE,
@@ -3890,7 +3890,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 수정이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
+    @DisplayName("반복 업무 수정이 다른 변경과 충돌하면 재시도를 안내하는 409 오류를 반환한다")
     @Test
     void documentsUpdateRoutineContentConflict() throws Exception {
         when(operationsUseCase.updateRoutine(
@@ -3920,7 +3920,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 보관 API는 보관 여부가 없으면 400 입력 오류를 반환한다")
+    @DisplayName("반복 업무 보관 API는 보관 여부가 없으면 400 입력 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveInvalidInput() throws Exception {
         mockMvc.perform(patch(
@@ -3941,7 +3941,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 보관 API는 접근 키가 틀리면 403 오류를 반환한다")
+    @DisplayName("반복 업무 보관 API는 접근 키가 틀리면 403 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveAccessDenied() throws Exception {
         when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
@@ -3965,13 +3965,13 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 보관 API는 대상이 없으면 식별 가능한 404 오류를 반환한다")
+    @DisplayName("반복 업무 보관 API는 대상이 없으면 식별 가능한 404 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveNotFound() throws Exception {
         when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
                 .thenThrow(new WorkspaceNotFoundException(
                         "ROUTINE_NOT_FOUND",
-                        "루틴을 찾을 수 없습니다"
+                        "반복 업무를 찾을 수 없습니다"
                 ));
 
         mockMvc.perform(patch(
@@ -3984,7 +3984,7 @@ class WorkspaceRestDocsTest {
                         .content("{\"archived\": true}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROUTINE_NOT_FOUND"))
-                .andExpect(jsonPath("$.message").value("루틴을 찾을 수 없습니다"))
+                .andExpect(jsonPath("$.message").value("반복 업무를 찾을 수 없습니다"))
                 .andDo(document(
                         "updateRoutineArchiveNotFound",
                         UPDATE_ROUTINE_ARCHIVE,
@@ -3993,7 +3993,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("루틴 보관이 다른 변경과 충돌하면 409 오류를 반환한다")
+    @DisplayName("반복 업무 보관이 다른 변경과 충돌하면 409 오류를 반환한다")
     @Test
     void documentsUpdateRoutineArchiveContentConflict() throws Exception {
         when(operationsUseCase.updateRoutineArchive(TEAM_ID, SEASON_ID, ROUTINE_ID, ACCESS_KEY, true))
@@ -4115,11 +4115,11 @@ class WorkspaceRestDocsTest {
                         ContinuitySignalSeverity.WARNING,
                         ROLE_ID,
                         null,
-                        "질문 큐레이터 바통 수락 대기",
+                        "질문 큐레이터 인수인계 수락 대기",
                         "질문 큐레이터 역할의 새 담당 시작일이 2026-08-01입니다. "
-                                + "전달 snapshot에 미완료 바통 항목이 1개 있고 "
+                                + "전달 당시 기록에 미완료 인수인계 항목이 1개 있고 "
                                 + "아직 수락하지 않았습니다.",
-                        "다음 담당자가 바통을 수락하고 남은 항목을 확인하세요.",
+                        "다음 담당자가 인수인계를 수락하고 남은 항목을 확인하세요.",
                         LocalDate.of(2026, 8, 1)
                 ))
         );
@@ -4653,7 +4653,7 @@ class WorkspaceRestDocsTest {
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID"),
                 parameterWithName("roleId").description("역할 UUID"),
-                parameterWithName("handoffId").description("역할 바통 UUID")
+                parameterWithName("handoffId").description("역할 인수인계 UUID")
         );
     }
 
@@ -4669,7 +4669,7 @@ class WorkspaceRestDocsTest {
         return pathParameters(
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID"),
-                parameterWithName("routineId").description("루틴 UUID")
+                parameterWithName("routineId").description("반복 업무 UUID")
         );
     }
 
@@ -4702,7 +4702,7 @@ class WorkspaceRestDocsTest {
                 parameterWithName("teamId").description("팀 UUID"),
                 parameterWithName("seasonId").description("시즌 UUID"),
                 parameterWithName("roundId").description("시즌 회차 UUID"),
-                parameterWithName("executionId").description("회차 루틴 실행 UUID")
+                parameterWithName("executionId").description("회차 반복 업무 실행 UUID")
         );
     }
 
@@ -4796,7 +4796,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("season.roundSchedule.nextOccurrenceDate")
                         .optional()
                         .description("다음 생성 대상 발생일"),
-                fieldWithPath("seasons").type(JsonFieldType.ARRAY).description("팀의 서버 권위 시즌 목록"),
+                fieldWithPath("seasons").type(JsonFieldType.ARRAY).description("팀의 서버에서 관리하는 시즌 목록"),
                 fieldWithPath("seasons[].id").description("시즌 UUID"),
                 fieldWithPath("seasons[].name").description("시즌 이름"),
                 fieldWithPath("seasons[].startDate").description("시즌 시작일"),
@@ -4853,13 +4853,13 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roles[].previousRoleId").type(JsonFieldType.STRING).optional()
                         .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
                 fieldWithPath("roles[].risk").optional().description("위험 신호"),
-                fieldWithPath("routines").type(JsonFieldType.ARRAY).description("루틴 목록"),
-                fieldWithPath("routines[].id").description("루틴 UUID"),
-                fieldWithPath("routines[].title").description("루틴 제목"),
+                fieldWithPath("routines").type(JsonFieldType.ARRAY).description("반복 업무 목록"),
+                fieldWithPath("routines[].id").description("반복 업무 UUID"),
+                fieldWithPath("routines[].title").description("반복 업무 제목"),
                 enumField(RoutinePhase.class, "routines[].phase", "실행 단계"),
                 fieldWithPath("routines[].dueLabel").description("기한 문구"),
                 fieldWithPath("routines[].ownerRoleId").description("담당 역할 UUID"),
-                fieldWithPath("routines[].detail").description("루틴 상세"),
+                fieldWithPath("routines[].detail").description("반복 업무 상세"),
                 fieldWithPath("routines[].deadlineDayOffset")
                         .optional()
                         .description("모임 날짜 기준 마감일 오프셋"),
@@ -4892,11 +4892,11 @@ class WorkspaceRestDocsTest {
                         "회차의 예정, 진행, 지연 또는 완료 상태"),
                 fieldWithPath("rounds[].routineExecutions")
                         .type(JsonFieldType.ARRAY)
-                        .description("회차를 만들 때 복제한 루틴 실행 목록"),
-                fieldWithPath("rounds[].routineExecutions[].id").description("회차 루틴 실행 UUID"),
+                        .description("회차를 만들 때 복제한 반복 업무 실행 목록"),
+                fieldWithPath("rounds[].routineExecutions[].id").description("회차 반복 업무 실행 UUID"),
                 fieldWithPath("rounds[].routineExecutions[].roundId").description("소속 회차 UUID"),
-                fieldWithPath("rounds[].routineExecutions[].routineId").description("원본 루틴 정의 UUID"),
-                fieldWithPath("rounds[].routineExecutions[].title").description("회차 생성 시점의 루틴 제목"),
+                fieldWithPath("rounds[].routineExecutions[].routineId").description("원본 반복 업무 정의 UUID"),
+                fieldWithPath("rounds[].routineExecutions[].title").description("회차 생성 시점의 반복 업무 제목"),
                 enumField(RoutinePhase.class, "rounds[].routineExecutions[].phase", "회차 생성 시점의 실행 단계"),
                 fieldWithPath("rounds[].routineExecutions[].dueLabel").description("회차 생성 시점의 기한 문구"),
                 fieldWithPath("rounds[].routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
@@ -4942,7 +4942,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
                 fieldWithPath("resources[].title").description("자료 제목"),
                 fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
-                fieldWithPath("resources[].description").optional().description("자료 사용 맥락"),
+                fieldWithPath("resources[].description").optional().description("자료 자료 설명"),
                 fieldWithPath("resources[].createdAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -4953,8 +4953,8 @@ class WorkspaceRestDocsTest {
                         .description("보관한 UTC 시각"),
                 fieldWithPath("roleHandoffs")
                         .type(JsonFieldType.ARRAY)
-                        .description("역할별 바통 준비·전달·수락·취소 이력"),
-                fieldWithPath("roleHandoffs[].id").description("역할 바통 UUID"),
+                        .description("역할별 인수인계 준비·전달·수락·취소 이력"),
+                fieldWithPath("roleHandoffs[].id").description("역할 인수인계 UUID"),
                 fieldWithPath("roleHandoffs[].roleId").description("대상 역할 UUID"),
                 fieldWithPath("roleHandoffs[].fromMemberId").description("이전 담당자 UUID"),
                 fieldWithPath("roleHandoffs[].toMemberId").description("다음 담당자 UUID"),
@@ -5018,7 +5018,7 @@ class WorkspaceRestDocsTest {
                 enumField(
                         ContinuitySignalType.class,
                         "continuitySignals[].type",
-                        "역할 공백, 후임 공백, 준비 부족, 반복 지연 또는 미완료 바통 유형"
+                        "역할 공백, 후임 공백, 준비 부족, 반복 지연 또는 미완료 인수인계 유형"
                 ),
                 enumField(
                         ContinuitySignalSeverity.class,
@@ -5030,7 +5030,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("continuitySignals[].routineId")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("반복 지연 신호가 가리키는 루틴 UUID"),
+                        .description("반복 지연 신호가 가리키는 반복 업무 UUID"),
                 fieldWithPath("continuitySignals[].title")
                         .description("신호의 짧은 제목"),
                 fieldWithPath("continuitySignals[].reason")
@@ -5157,9 +5157,9 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("copiedRoles[].roleId").description("새 역할 UUID"),
                 fieldWithPath("copiedRoutines")
                         .type(JsonFieldType.ARRAY)
-                        .description("복사한 루틴 식별자 대응"),
-                fieldWithPath("copiedRoutines[].sourceRoutineId").description("원본 루틴 UUID"),
-                fieldWithPath("copiedRoutines[].routineId").description("새 루틴 UUID")
+                        .description("복사한 반복 업무 식별자 대응"),
+                fieldWithPath("copiedRoutines[].sourceRoutineId").description("원본 반복 업무 UUID"),
+                fieldWithPath("copiedRoutines[].routineId").description("새 반복 업무 UUID")
         };
     }
 
@@ -5201,8 +5201,8 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("role.previousRoleId").type(JsonFieldType.STRING).optional()
                         .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
                 fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("위험 신호"),
-                fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 바통"),
-                fieldWithPath("handoff.id").description("역할 바통 UUID"),
+                fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 인수인계"),
+                fieldWithPath("handoff.id").description("역할 인수인계 UUID"),
                 fieldWithPath("handoff.roleId").description("대상 역할 UUID"),
                 fieldWithPath("handoff.fromMemberId").description("이전 담당자 UUID"),
                 fieldWithPath("handoff.toMemberId").description("다음 담당자 UUID"),
@@ -5265,8 +5265,8 @@ class WorkspaceRestDocsTest {
 
     private FieldDescriptor[] routineResponseFields() {
         return new FieldDescriptor[]{
-                fieldWithPath("id").description("루틴 UUID"),
-                fieldWithPath("title").description("루틴 제목"),
+                fieldWithPath("id").description("반복 업무 UUID"),
+                fieldWithPath("title").description("반복 업무 제목"),
                 enumField(RoutinePhase.class, "phase", "실행 단계"),
                 fieldWithPath("dueLabel").description("기한 문구"),
                 fieldWithPath("ownerRoleId").description("담당 역할 UUID"),
@@ -5289,11 +5289,11 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("id").description("시즌 회차 UUID"),
                 fieldWithPath("name").description("시즌 안에서 유일한 회차 이름"),
                 fieldWithPath("meetingDate").optional().description("모임 날짜"),
-                fieldWithPath("routineExecutions").type(JsonFieldType.ARRAY).description("회차 루틴 실행 목록"),
-                fieldWithPath("routineExecutions[].id").description("회차 루틴 실행 UUID"),
+                fieldWithPath("routineExecutions").type(JsonFieldType.ARRAY).description("회차 반복 업무 실행 목록"),
+                fieldWithPath("routineExecutions[].id").description("회차 반복 업무 실행 UUID"),
                 fieldWithPath("routineExecutions[].roundId").description("소속 회차 UUID"),
-                fieldWithPath("routineExecutions[].routineId").description("원본 루틴 정의 UUID"),
-                fieldWithPath("routineExecutions[].title").description("회차 생성 시점의 루틴 제목"),
+                fieldWithPath("routineExecutions[].routineId").description("원본 반복 업무 정의 UUID"),
+                fieldWithPath("routineExecutions[].title").description("회차 생성 시점의 반복 업무 제목"),
                 enumField(RoutinePhase.class, "routineExecutions[].phase", "회차 생성 시점의 실행 단계"),
                 fieldWithPath("routineExecutions[].dueLabel").description("회차 생성 시점의 기한 문구"),
                 fieldWithPath("routineExecutions[].ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
@@ -5327,10 +5327,10 @@ class WorkspaceRestDocsTest {
 
     private FieldDescriptor[] routineExecutionResponseFields() {
         return new FieldDescriptor[]{
-                fieldWithPath("id").description("회차 루틴 실행 UUID"),
+                fieldWithPath("id").description("회차 반복 업무 실행 UUID"),
                 fieldWithPath("roundId").description("소속 회차 UUID"),
-                fieldWithPath("routineId").description("원본 루틴 정의 UUID"),
-                fieldWithPath("title").description("회차 생성 시점의 루틴 제목"),
+                fieldWithPath("routineId").description("원본 반복 업무 정의 UUID"),
+                fieldWithPath("title").description("회차 생성 시점의 반복 업무 제목"),
                 enumField(RoutinePhase.class, "phase", "회차 생성 시점의 실행 단계"),
                 fieldWithPath("dueLabel").description("회차 생성 시점의 기한 문구"),
                 fieldWithPath("ownerRoleId").description("회차 생성 시점의 담당 역할 UUID"),
@@ -5401,7 +5401,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roleId").description("소유 역할 UUID"),
                 fieldWithPath("title").description("자료 제목"),
                 fieldWithPath("url").description("http 또는 https 외부 링크"),
-                fieldWithPath("description").optional().description("자료 사용 맥락"),
+                fieldWithPath("description").optional().description("자료 자료 설명"),
                 fieldWithPath("createdAt")
                         .type(JsonFieldType.STRING)
                         .optional()

@@ -148,7 +148,7 @@ final class WorkspaceRoutineCoordinator {
     private WorkspaceNotFoundException routineNotFound() {
         return new WorkspaceNotFoundException(
                 "ROUTINE_NOT_FOUND",
-                "루틴을 찾을 수 없습니다"
+                "반복 업무를 찾을 수 없습니다"
         );
     }
 

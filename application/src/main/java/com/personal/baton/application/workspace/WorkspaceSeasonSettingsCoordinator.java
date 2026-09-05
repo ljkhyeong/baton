@@ -137,7 +137,7 @@ final class WorkspaceSeasonSettingsCoordinator {
                         && (incomingEndDate.isBefore(validatedStartDate)
                         || incomingEndDate.isAfter(validatedEndDate)))) {
                     throw new DomainValidationException(
-                            "준비 중인 바통의 다음 담당 기간을 제외하도록 시즌 기간을 줄일 수 없습니다"
+                            "준비 중인 인수인계의 다음 담당 기간을 제외하도록 시즌 기간을 줄일 수 없습니다"
                     );
                 }
             }

@@ -58,7 +58,7 @@ class RoutineArchiveApplicationTest {
     private final WorkspaceOperationsRepository operationsRepository = mock(WorkspaceOperationsRepository.class);
     private final WorkspaceRecordsRepository recordsRepository = mock(WorkspaceRecordsRepository.class);
 
-    @DisplayName("루틴 보관은 최초 시각을 유지하고 보관 중 수정과 복사를 막은 뒤 복원할 수 있다")
+    @DisplayName("반복 업무 보관은 최초 시각을 유지하고 보관 중 수정과 복사를 막은 뒤 복원할 수 있다")
     @Test
     void preservesFirstArchiveTimeAndBlocksNormalChangesUntilRestore() {
         Routine routine = routine(UUID.randomUUID(), UUID.randomUUID(), null, null);
@@ -77,14 +77,14 @@ class RoutineArchiveApplicationTest {
                 LocalTime.NOON
         ))
                 .isInstanceOf(DomainValidationException.class)
-                .hasMessageContaining("보관된 루틴");
+                .hasMessageContaining("보관된 반복 업무");
         assertThatThrownBy(() -> routine.copyToSeason(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID()
         ))
                 .isInstanceOf(DomainValidationException.class)
-                .hasMessageContaining("보관된 루틴");
+                .hasMessageContaining("보관된 반복 업무");
 
         routine.updateArchive(false, NOW.plusSeconds(120));
         routine.update(
@@ -101,7 +101,7 @@ class RoutineArchiveApplicationTest {
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.NOON);
     }
 
-    @DisplayName("수동 회차 snapshot은 보관된 루틴 정의를 제외한다")
+    @DisplayName("수동 회차 snapshot은 보관된 반복 업무 정의를 제외한다")
     @Test
     void excludesArchivedRoutineFromManualRoundSnapshot() {
         UUID seasonId = UUID.randomUUID();
@@ -123,7 +123,7 @@ class RoutineArchiveApplicationTest {
                 .isEqualTo(active.getId());
     }
 
-    @DisplayName("루틴 보관은 시즌 배타 잠금을 사용하고 서버 Clock 시각을 결과에 반영한다")
+    @DisplayName("반복 업무 보관은 시즌 배타 잠금을 사용하고 서버 Clock 시각을 결과에 반영한다")
     @Test
     void archivesRoutineWithExclusiveSeasonLockAndServerClock() {
         UUID teamId = UUID.randomUUID();
@@ -148,7 +148,7 @@ class RoutineArchiveApplicationTest {
         verify(seasonRepository, never()).findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId);
     }
 
-    @DisplayName("활성 자동 일정으로 복원하는 루틴에는 실제 마감 규칙이 필요하다")
+    @DisplayName("활성 자동 일정으로 복원하는 반복 업무에는 실제 마감 규칙이 필요하다")
     @Test
     void requiresDeadlineRuleWhenRestoringIntoEnabledSchedule() {
         UUID teamId = UUID.randomUUID();
@@ -180,7 +180,7 @@ class RoutineArchiveApplicationTest {
         verify(operationsRepository, never()).saveRoutine(any());
     }
 
-    @DisplayName("보관된 루틴은 일반 수정 대상에서 찾을 수 없는 것으로 처리한다")
+    @DisplayName("보관된 반복 업무는 일반 수정 대상에서 찾을 수 없는 것으로 처리한다")
     @Test
     void hidesArchivedRoutineFromNormalUpdate() {
         UUID teamId = UUID.randomUUID();
@@ -200,7 +200,7 @@ class RoutineArchiveApplicationTest {
                 routine.getId(),
                 ACCESS_KEY,
                 new UpdateRoutineCommand(
-                        "수정하려는 보관 루틴",
+                        "수정하려는 보관 반복 업무",
                         RoutinePhase.AFTER,
                         "모임 다음 날",
                         routine.getOwnerRoleId(),
@@ -210,11 +210,11 @@ class RoutineArchiveApplicationTest {
                 )
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)
-                .hasMessageContaining("루틴을 찾을 수 없습니다");
+                .hasMessageContaining("반복 업무를 찾을 수 없습니다");
         verify(operationsRepository, never()).saveRoutine(any());
     }
 
-    @DisplayName("자동 일정 활성화는 보관된 루틴의 마감 규칙을 검사하지 않는다")
+    @DisplayName("자동 일정 활성화는 보관된 반복 업무의 마감 규칙을 검사하지 않는다")
     @Test
     void ignoresArchivedRoutineWhenActivatingSchedule() {
         UUID teamId = UUID.randomUUID();
@@ -247,7 +247,7 @@ class RoutineArchiveApplicationTest {
         assertThat(result.roundSchedule().enabled()).isTrue();
     }
 
-    @DisplayName("자동 회차 생성도 보관된 루틴을 검사하거나 snapshot하지 않는다")
+    @DisplayName("자동 회차 생성도 보관된 반복 업무를 검사하거나 snapshot하지 않는다")
     @Test
     void excludesArchivedRoutineFromAutomaticRoundSnapshot() {
         UUID teamId = UUID.randomUUID();
@@ -334,7 +334,7 @@ class RoutineArchiveApplicationTest {
     private Team team(UUID teamId) {
         return Team.create(
                 teamId,
-                "루틴 보관 팀",
+                "반복 업무 보관 팀",
                 DomainSeparatedSha256.hashUtf8Hex(ACCESS_KEY)
         );
     }

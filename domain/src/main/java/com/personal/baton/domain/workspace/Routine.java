@@ -77,7 +77,7 @@ public class Routine {
             Integer deadlineDayOffset,
             LocalTime deadlineTime
     ) {
-        this.id = Objects.requireNonNull(id, "루틴 식별자는 필수입니다");
+        this.id = Objects.requireNonNull(id, "반복 업무 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
         this.previousRoutineId = previousRoutineId;
         update(title, phase, dueLabel, ownerRoleId, detail, deadlineDayOffset, deadlineTime);
@@ -134,11 +134,11 @@ public class Routine {
             LocalTime deadlineTime
     ) {
         requireActive();
-        String normalizedTitle = DomainAssertions.requiredText(title, "루틴 제목", 200);
-        RoutinePhase validatedPhase = Objects.requireNonNull(phase, "루틴 단계는 필수입니다");
-        String normalizedDueLabel = DomainAssertions.requiredText(dueLabel, "루틴 기한 문구", 100);
+        String normalizedTitle = DomainAssertions.requiredText(title, "반복 업무 제목", 200);
+        RoutinePhase validatedPhase = Objects.requireNonNull(phase, "반복 업무 단계는 필수입니다");
+        String normalizedDueLabel = DomainAssertions.requiredText(dueLabel, "반복 업무 기한 문구", 100);
         UUID validatedOwnerRoleId = Objects.requireNonNull(ownerRoleId, "담당 역할은 필수입니다");
-        String normalizedDetail = DomainAssertions.requiredText(detail, "루틴 상세", 1000);
+        String normalizedDetail = DomainAssertions.requiredText(detail, "반복 업무 상세", 1000);
         validateDeadlineRule(deadlineDayOffset, deadlineTime);
 
         this.title = normalizedTitle;
@@ -153,7 +153,7 @@ public class Routine {
     public void updateArchive(boolean archived, Instant archivedAt) {
         if (archived) {
             if (this.archivedAt == null) {
-                this.archivedAt = Objects.requireNonNull(archivedAt, "루틴 보관 시각은 필수입니다");
+                this.archivedAt = Objects.requireNonNull(archivedAt, "반복 업무 보관 시각은 필수입니다");
             }
             return;
         }
@@ -162,7 +162,7 @@ public class Routine {
 
     private void requireActive() {
         if (archivedAt != null) {
-            throw new DomainValidationException("보관된 루틴은 수정하거나 복사할 수 없습니다");
+            throw new DomainValidationException("보관된 반복 업무는 수정하거나 복사할 수 없습니다");
         }
     }
 

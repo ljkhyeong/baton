@@ -14,7 +14,7 @@ export default function PasswordResetRequestForm() {
       <div className="auth-result" role="status">
         <span className="auth-result-mark" aria-hidden="true">✓</span>
         <h3>재설정 요청을 접수했습니다.</h3>
-        <p>인증된 자체 이메일 계정이라면 재설정 메일을 보내드립니다. 스팸함도 확인해 주세요.</p>
+        <p>인증된 이메일 계정이라면 재설정 메일을 보내드립니다. 스팸함도 확인해 주세요.</p>
         <p>링크는 요청 후 30분 동안 한 번만 사용할 수 있습니다. 아직 유효한 링크가 있다면 기존 메일을 사용해 주세요.</p>
         <p>Google·Naver 계정은 해당 서비스에서 비밀번호를 변경해 주세요.</p>
         <Link className="primary-button auth-link-button" to="/login">로그인으로</Link>
@@ -74,7 +74,7 @@ export default function PasswordResetRequestForm() {
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
-      <p>자체 이메일 계정만 재설정할 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
+      <p>이메일 계정만 재설정할 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
       {mutation.isError && (
         <p className="form-error" role="alert">
           {mutation.error instanceof Error ? mutation.error.message : '요청 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'}

@@ -16,7 +16,7 @@ const navItems: {
   { key: 'roles', label: '역할', icon: 'roles' },
   { key: 'rhythm', label: '운영', icon: 'rhythm' },
   { key: 'memory', label: '기록', icon: 'memory' },
-  { key: 'handoff', label: '바통', icon: 'handoff' },
+  { key: 'handoff', label: '인수인계', icon: 'handoff' },
   { key: 'records', label: '탐색', icon: 'search' },
 ]
 
@@ -98,7 +98,7 @@ export function Sidebar({
             {item.key === 'handoff'
               && (workspace.roleHandoffs.some((handoff) => handoff.status === 'TRANSFERRED')
                 || workspace.handoffItems.some((candidate) => !candidate.completed))
-              && <span className="nav-dot" aria-label="확인할 바통 있음" />}
+              && <span className="nav-dot" aria-label="확인할 인수인계 있음" />}
           </button>
         ))}
       </nav>

@@ -22,7 +22,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | CAL 소비자 계약 | `calendar-crossservice` | BATON 일정·시즌 이름·복구 완료 직렬화와 외부 CAL 사전 릴리스 호환성 | `BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 bash ops/tests/calendar-consumer-contract.sh` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·루틴 정의·회차·실행·결정·바통 항목·역할 바통 저장과 조회 프로젝션을 검증한다. Flyway 변경은 대상 이전 버전까지 적용한 대표 데이터를 최신 마이그레이션으로 올린 뒤 데이터·참조·제약·인덱스 같은 실제 이관 사후조건을 확인하는 전용 테스트가 소유한다. 개별 버전의 제품·연동 기대값은 [제품 기준선](../../PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](../../PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](../../PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에 두며 이 문서에는 반복해 열거하지 않는다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·반복 업무 정의·회차·실행·결정·인수인계 항목·역할 인수인계 저장과 조회 프로젝션을 검증한다. Flyway 변경은 대상 이전 버전까지 적용한 대표 데이터를 최신 마이그레이션으로 올린 뒤 데이터·참조·제약·인덱스 같은 실제 이관 사후조건을 확인하는 전용 테스트가 소유한다. 개별 버전의 제품·연동 기대값은 [제품 명세](../../PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](../../PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](../../PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에 두며 이 문서에는 반복해 열거하지 않는다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
 
 `policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 저장소 공개 가시성도 고정한다.
 
@@ -71,9 +71,9 @@ npm run e2e:fullstack
 - UI 동작을 바꾸면 최소한 타입 검사와 프로덕션 빌드를 실행한다.
 - 핵심 작업 공간·시즌 탐색, 공유 키 검증·회전, 최근 작업 공간 복구와 기존 팀 구성원·역할 생성 멱등 재시도는 `e2e:smoke`, 390px 모바일 작업은 `e2e:responsive`로 확인한다.
 - 핵심 흐름은 아니지만 브라우저 엔진 차이를 직접 확인해야 하는 `Headers`, 요청 취소, Web Storage와 네이티브 dialog 대표 사례는 `@webkit`으로 표시한다. 같은 API의 모든 경곗값을 WebKit에서 반복하지 않고 BATON이 실제 사용하는 경로 한 건만 유지한다.
-- 역할·루틴 수정, 루틴 정의 보관·복원과 과거 실행 보존, 수동 회차 생성과 회차별 반복 업무 완료, 종료 시즌 읽기 전용은 `e2e:operations`, 결정 기록은 `e2e:memory`, 역할 자료 생성의 응답 유실 복구·수정 충돌 최신화·보관·복원·외부 링크·재조회, 바통 항목·다음 시즌 생성의 멱등 재시도와 역할 바통 준비·경고 확인·전달·수락·새로고침 보존은 `e2e:handoff`로 확인한다. 결정·바통·자료의 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동은 `e2e:records`가 데스크톱과 390px 모바일에서 확인한다.
+- 역할·반복 업무 수정, 반복 업무 정의 보관·복원과 과거 실행 보존, 수동 회차 생성과 회차별 반복 업무 완료, 종료 시즌 읽기 전용은 `e2e:operations`, 결정 기록은 `e2e:memory`, 역할 자료 생성의 응답 유실 복구·수정 충돌 최신화·보관·복원·외부 링크·재조회, 인수인계 항목·다음 시즌 생성의 멱등 재시도와 역할 인수인계 준비·경고 확인·전달·수락·새로고침 보존은 `e2e:handoff`로 확인한다. 결정·인수인계·자료의 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동은 `e2e:records`가 데스크톱과 390px 모바일에서 확인한다.
 - `e2e` 브라우저 회귀는 테스트별 독립 API 픽스처로 요청 본문, 접근 키 헤더와 새로고침 후 서버 프로젝션 복원을 빠르게 검증한다.
-- `e2e:fullstack`은 고유 Compose 프로젝트의 임시 MySQL, 실행 가능한 Spring Boot JAR와 Vite 개발 프록시를 실제 브라우저로 잇는다. 빈 DB 온보딩부터 기존 팀 구성원 추가, 역할 자료, 루틴·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화, 다음 시즌 역할·루틴 복사와 원본 시즌 읽기 전용 보존, 새로고침 후 DB 영속성까지 한 핵심 경로만 단일 워커로 검증한다.
+- `e2e:fullstack`은 고유 Compose 프로젝트의 임시 MySQL, 실행 가능한 Spring Boot JAR와 Vite 개발 프록시를 실제 브라우저로 잇는다. 빈 DB 온보딩부터 기존 팀 구성원 추가, 역할 자료, 반복 업무·회차, 공유 링크를 통한 두 브라우저 완료 상태 동기화, 다음 시즌 역할·반복 업무 복사와 원본 시즌 읽기 전용 보존, 새로고침 후 DB 영속성까지 한 핵심 경로만 단일 워커로 검증한다.
 - 전 구간 실행기는 기존 로컬·프로덕션 DB를 재사용하지 않고 종료할 때 자신이 만든 컨테이너와 볼륨만 제거한다. 실패 시 Spring, Vite와 MySQL 로그를 별도 산출물 경로에 보존한다.
 - 전체 픽스처 기반 Playwright 검증은 `e2e`, 전 구간 파일럿 스모크는 `e2e:fullstack`을 사용한다. 전체 흐름은 Chromium, 390px 모바일 흐름은 Chromium, 핵심 스모크·반응형 흐름과 `@webkit` 대표 사례는 Safari 호환 WebKit에서도 실행한다. 브라우저 엔진이 없으면 먼저 `npm run e2e:install`을 실행한다.
 - `e2e:fullstack`은 Caddy, TLS와 프로덕션 이미지 실행을 검증하지 않는다. 이 배포 경계는 별도 운영 스모크로 확인한다.
@@ -123,8 +123,8 @@ npm run e2e:fullstack
 ## 관련 문서
 
 - [헥사고날 아키텍처 결정](../0001_hexagonal-architecture/adr.md)
-- [API 계약 기준선](../../PRD/0002_api-contract/spec.md)
+- [API 명세](../../PRD/0002_api-contract/spec.md)
 - [테스트 기반 API 계약 생성](../0004_test-derived-api-contract/adr.md)
 - [시즌 종료와 다음 시즌 전환](../0011_season_lifecycle/adr.md)
-- [역할 바통 전달 생명주기](../0013_role_handoff_lifecycle/adr.md)
+- [역할 인수인계 전달 생명주기](../0013_role_handoff_lifecycle/adr.md)
 - [BATON CAL 일정 스냅샷 생산자 경계](../0019_calendar_snapshot_producer/adr.md)

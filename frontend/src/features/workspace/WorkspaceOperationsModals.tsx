@@ -84,17 +84,17 @@ export function RoutineModal({
   }
   return (
     <ModalShell
-      title={editing ? '루틴 수정' : '반복 루틴 만들기'}
+      title={editing ? '반복 업무 수정' : '반복 업무 만들기'}
       description={editing
         ? '운영 단계와 담당 역할, 기한 문구를 현재 반복 방식에 맞게 고쳐주세요.'
-        : '모임 전·중·후에 누가 무엇을 넘길지 운영 리듬에 추가합니다.'}
+        : '반복할 업무와 담당 역할, 마감을 정합니다.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
         <label>
-          <span>루틴 이름</span>
+          <span>반복 업무 이름</span>
           <input
             autoFocus
             required
@@ -137,12 +137,12 @@ export function RoutineModal({
         </label>
         <div className="form-grid">
           <label>
-            <span>실제 마감일</span>
+            <span>마감일</span>
             <select
               value={deadlineDayOffset}
               onChange={(event) => setDeadlineDayOffset(event.target.value)}
             >
-              <option value="">자동 판정 안 함</option>
+              <option value="">마감 설정 안 함</option>
               <option value="-7">모임 7일 전</option>
               <option value="-3">모임 3일 전</option>
               <option value="-2">모임 2일 전</option>
@@ -155,7 +155,7 @@ export function RoutineModal({
             </select>
           </label>
           <label>
-            <span>실제 마감 시각</span>
+            <span>마감 시각</span>
             <input
               type="time"
               required={deadlineDayOffset !== ''}
@@ -166,7 +166,7 @@ export function RoutineModal({
           </label>
         </div>
         <p className="form-hint">
-          실제 마감은 시즌 시간대로 계산하며, 기한 문구는 팀이 읽기 쉬운 설명으로 함께 남습니다.
+          마감은 시즌 시간대로 계산하며, 기한 문구는 팀이 읽기 쉬운 설명으로 함께 남습니다.
         </p>
         <label>
           <span>세부 설명</span>
@@ -190,8 +190,8 @@ export function RoutineModal({
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
-          submitLabel={editing ? '변경 저장' : '루틴 만들기'}
-          pendingLabel={editing ? '루틴 저장하는 중…' : '루틴 만드는 중…'}
+          submitLabel={editing ? '변경 저장' : '반복 업무 만들기'}
+          pendingLabel={editing ? '반복 업무 저장하는 중…' : '반복 업무 만드는 중…'}
           onClose={onClose}
         />
       </form>
@@ -321,7 +321,7 @@ export function RoundScheduleModal({
           <span>자동 회차 생성 사용</span>
         </label>
         <p className="form-hint">
-          일시중지해도 이미 생성된 회차와 완료 기록은 남습니다. 자동 생성은 실제 마감이 설정된 루틴만 사용합니다.
+          일시중지해도 이미 생성된 회차와 완료 기록은 남습니다. 자동 생성은 마감이 설정된 반복 업무만 사용합니다.
         </p>
         <FormError error={error} />
         <FormActions
@@ -370,8 +370,8 @@ export function SeasonRoundModal({
     <ModalShell
       title={editing ? '회차 정보 수정' : '회차 만들기'}
       description={editing
-        ? '이 회차의 이름과 모임 날짜를 바꾸고, 생성 당시 마감 규칙으로 실제 마감을 다시 계산합니다. 루틴 실행과 완료 상태는 유지됩니다.'
-        : '현재 루틴을 이번 운영의 실행 목록으로 복사합니다. 이후 루틴을 바꿔도 이 회차의 기록은 그대로 남아요.'}
+        ? '이 회차의 이름과 모임 날짜를 바꾸고, 생성 당시 마감 규칙으로 마감을 다시 계산합니다. 반복 업무 실행과 완료 상태는 유지됩니다.'
+        : '현재 반복 업무를 이번 운영의 실행 목록으로 복사합니다. 이후 반복 업무를 바꿔도 이 회차의 기록은 그대로 남아요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}

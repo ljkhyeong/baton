@@ -73,9 +73,9 @@ public class RoutineExecution {
     }
 
     private RoutineExecution(UUID id, UUID seasonRoundId, Routine routine) {
-        this.id = Objects.requireNonNull(id, "루틴 실행 식별자는 필수입니다");
+        this.id = Objects.requireNonNull(id, "반복 업무 실행 식별자는 필수입니다");
         this.seasonRoundId = Objects.requireNonNull(seasonRoundId, "회차 식별자는 필수입니다");
-        Routine source = Objects.requireNonNull(routine, "스냅샷할 루틴은 필수입니다");
+        Routine source = Objects.requireNonNull(routine, "스냅샷할 반복 업무는 필수입니다");
         this.routineId = source.getId();
         this.title = source.getTitle();
         this.phase = source.getPhase();

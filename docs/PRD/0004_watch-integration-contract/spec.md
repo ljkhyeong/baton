@@ -131,7 +131,7 @@ BATON의 상태 조회·표시는 아직 구현하지 않는다. 도입할 때�
 
 ### 6.3 상태 변경 이벤트 수신
 
-WATCH는 상태가 실제로 바뀔 때 다음 엔드포인트로 불변 이벤트 봉투를 전달한다.
+WATCH는 상태가 실제로 바뀔 때 다음 엔드포인트로 불변 이벤트 전체 내용을 전달한다.
 
 ```http
 POST /api/v1/internal/resource-health-events
@@ -155,7 +155,7 @@ Content-Type: application/json
 
 `attemptId`는 점검 시도가 직접 만든 변경이 아닐 때 생략할 수 있다. 상태 값은 `UNKNOWN`, `HEALTHY`, `DEGRADED`, `BROKEN` 중 서로 달라야 하고 계약에 없는 필드는 허용하지 않는다. `resourceReference`는 현재 BATON에 설정한 이름공간과 정규 형식 UUID를 사용한 `baton-manager:<namespace>:role-resource:<uuid>` 형식이어야 한다.
 
-신규 봉투를 내구성 있는 인박스에 커밋한 뒤 `202 Accepted`로 다음 접수증을 반환한다.
+새 이벤트를 인박스에 저장하고 커밋한 뒤 `202 Accepted`로 다음 접수증을 반환한다.
 
 ```json
 {
@@ -164,7 +164,7 @@ Content-Type: application/json
 }
 ```
 
-같은 `eventId`와 동일한 봉투의 동일 재전송은 최초 `acceptedAt`을 보존한 같은 접수증을 `202`로 반환한다. 같은 ID에 다른 봉투를 보내면 `409 WATCH_EVENT_ID_CONFLICT`, 헤더와 본문 ID가 다르면 `400 IDEMPOTENCY_KEY_MISMATCH`, 이름공간 또는 정규 참조가 다르면 `400 WATCH_RESOURCE_REFERENCE_INVALID`다. 인증 누락·중복·불일치와 수신기 비활성 상태는 본문을 처리하기 전에 `401 UNAUTHORIZED`로 수렴한다.
+같은 `eventId`와 동일한 이벤트 내용의 동일 재전송은 최초 `acceptedAt`을 보존한 같은 접수증을 `202`로 반환한다. 같은 ID에 다른 내용을 보내면 `409 WATCH_EVENT_ID_CONFLICT`, 헤더와 본문 ID가 다르면 `400 IDEMPOTENCY_KEY_MISMATCH`, 이름공간 또는 정규 참조가 다르면 `400 WATCH_RESOURCE_REFERENCE_INVALID`다. 인증 누락·중복·불일치와 수신기 비활성 상태는 본문을 처리하기 전에 `401 UNAUTHORIZED`로 수렴한다.
 
 `202`는 인박스 저장 완료만 뜻한다. BATON 상태 프로젝션과 UI 반영, 이벤트 처리 순서 또는 하위 알림 완료를 보장하지 않는다.
 
@@ -186,7 +186,7 @@ Content-Type: application/json
 
 BATON은 Prometheus에 WATCH 아웃박스의 `PENDING`·`PROCESSING`·`FAILED` 수, 만료된 `PROCESSING` 임대 수, 가장 오래된 대기 시간과 마지막 전달 성공 시각을 노출한다. WATCH 인박스는 처리 상태가 아직 없으므로 저장 건수와 마지막 접수 시각만 노출한다. 마지막 전달·접수·정상 갱신 시각의 `0`은 해당 기록이 아직 없다는 뜻이다. 대기 시간의 `0`은 대기 행이 없거나 가장 오래된 행도 생성된 지 1초가 지나지 않은 상태이므로 대기 항목 수와 함께 판단한다. 운영 명령은 이 지표를 읽기만 하며 실패 행을 자동 재처리하거나 삭제하지 않는다. 지표 조회 실패는 제품 요청과 전달 작업을 막지 않고 마지막 정상 스냅샷과 갱신 실패 지표로 구분한다. 호스트의 읽기 전용 주기 점검은 지표 갱신 실패·정체, 영구 실패와 만료 임대를 실패 종료로 기록하되 정상 `PENDING` 재시도만으로는 실패시키지 않는다. 외부 알림과 실패 행 자동 재처리는 하지 않으며 운영자는 README의 순서대로 실패 코드와 재시도 가능 시각을 함께 확인한다.
 
-상태 이벤트 수신기는 V17의 `watch_health_event_inbox`에 이벤트 ID와 전체 봉투 지문을 한 트랜잭션으로 저장하고 같은 행을 잠가 재전송과 충돌을 판정한다. 이벤트 ID가 다른 봉투는 `sourceRevision`, `changedAt`과 도착 순서에 관계없이 모두 보존한다. `changedAt`은 UTC 기준 1000년 이상 10000년 미만만 허용하고, MySQL `DATETIME(6)`과 `0..999` 나노초 나머지로 나눠 원래 `Instant`의 나노초 정밀도를 잃지 않는다. 저장 범위 밖 값은 인박스에 도달하기 전에 `400 INVALID_INPUT`으로 거부한다.
+상태 이벤트 수신기는 V17의 `watch_health_event_inbox`에 이벤트 ID와 이벤트 전체 내용의 지문을 한 트랜잭션으로 저장하고 같은 행을 잠가 재전송과 충돌을 판정한다. 이벤트 ID가 다른 내용은 `sourceRevision`, `changedAt`과 도착 순서에 관계없이 모두 보존한다. `changedAt`은 UTC 기준 1000년 이상 10000년 미만만 허용하고, MySQL `DATETIME(6)`과 `0..999` 나노초 나머지로 나눠 원래 `Instant`의 나노초 정밀도를 잃지 않는다. 저장 범위 밖 값은 인박스에 도달하기 전에 `400 INVALID_INPUT`으로 거부한다.
 
 인박스는 `RoleResource` FK를 두지 않고 수신 트랜잭션에서 원본 자료 존재도 조회하지 않는다. 이미 삭제됐거나 아직 복구되지 않은 원본과 늦게 도착한 이벤트도 송신자가 발급한 정규 참조 기준으로 보존해야 하기 때문이다. 현재 인박스는 추가·중복 제거 경계만 소유하며 상태 프로젝션, 처리 완료 상태와 보존 기간 만료 삭제는 구현하지 않는다.
 
@@ -230,13 +230,13 @@ BATON은 Prometheus에 WATCH 아웃박스의 `PENDING`·`PROCESSING`·`FAILED` �
 - 조정 작업이 기존 자료와 누락 스냅샷을 현재 목표 상태로 수렴시킨다.
 - V17 마이그레이션이 기존 데이터를 보존하고 FK 없는 빈 불변 상태 이벤트 인박스를 추가한다.
 - V17→V18 마이그레이션이 기존 아웃박스를 보존하고 새 유효하지 않은 대상 보상을 식별할 NULL 허용 자기 참조와 무결성 제약을 추가한다.
-- 신규·동일 재전송의 같은 `202` 접수증, 헤더·본문 ID 불일치, 정규 참조 거절과 같은 ID의 다른 봉투 `409`를 검증한다.
+- 신규·동일 재전송의 같은 `202` 접수증, 헤더·본문 ID 불일치, 정규 참조 거절과 같은 ID의 다른 내용 `409`를 검증한다.
 - 서로 다른 이벤트 ID는 전달 순서와 소스 리비전에 관계없이 모두 저장하고 `changedAt`의 나노초 정밀도를 보존한다.
 
 ## 11. 관련 문서
 
-- [제품 기준선](../0001_product-baseline/spec.md)
-- [API 계약 기준선](../0002_api-contract/spec.md)
+- [제품 명세](../0001_product-baseline/spec.md)
+- [API 명세](../0002_api-contract/spec.md)
 - [제품 개발 우선순위](../0003_product-roadmap/spec.md)
 - [트랜잭셔널 아웃박스 결정](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스 결정](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)

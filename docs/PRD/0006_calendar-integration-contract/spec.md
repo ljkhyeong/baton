@@ -5,7 +5,7 @@
 
 ## 1. 목적
 
-BATON이 확정한 운영 회차와 루틴 실행 마감을 BATON CAL의 읽기 전용 iCalendar 피드에 손실 없이
+BATON이 확정한 운영 회차와 반복 업무 실행 마감을 BATON CAL의 읽기 전용 iCalendar 피드에 손실 없이
 반영한다. BATON은 원본 일정과 취소 의도를 소유하고, CAL은 전달받은 전체 스냅샷을 시즌별
 `.ics` 표현으로 투영한다.
 
@@ -238,7 +238,7 @@ bash ops/tests/calendar-consumer-contract.sh
 | 마감이 없는 `RoutineExecution` | 생산하지 않음 | 사람이 읽는 `dueLabel`에서 시각을 추측하지 않음 |
 
 단일 시점에 임의 지속 시간을 붙이지 않고, 수동 회차에 자정 시각을 만들지 않는다. 자동 회차는
-시즌 시간대 식별자를 보존하며 루틴 마감은 이미 BATON이 확정한 `Instant`를 그대로 사용한다.
+시즌 시간대 식별자를 보존하며 반복 업무 마감은 이미 BATON이 확정한 `Instant`를 그대로 사용한다.
 
 ## 4. 식별자와 상태
 
@@ -311,7 +311,7 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 ## 6. 현재 검증
 
 - 고정한 일정 JSON Schema의 SHA-256을 테스트 시작 시 확인한다.
-- 수동 회차, 자동 회차와 루틴 마감의 실제 BATON 도메인 객체를 외부 요청으로 직렬화한다.
+- 수동 회차, 자동 회차와 반복 업무 마감의 실제 BATON 도메인 객체를 외부 요청으로 직렬화한다.
 - 세 요청을 Draft 2020-12 스키마에 직접 대조한다.
 - 회차 보관이 회차와 실행 스냅샷을 모두 `CANCELLED`로 만드는지 확인한다.
 - 원본 저장 경계가 회차·실행 변경을 기록하고 자동 회차 생성도 같은 기록기를 호출하는지 확인한다.
@@ -391,7 +391,7 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 
 ## 8. 관련 문서
 
-- [제품 기준선](../0001_product-baseline/spec.md)
+- [제품 명세](../0001_product-baseline/spec.md)
 - [제품 개발 우선순위](../0003_product-roadmap/spec.md)
 - [CAL 생산자 경계 결정](../../ADR/0019_calendar_snapshot_producer/adr.md)
 - [시즌 시간대와 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)

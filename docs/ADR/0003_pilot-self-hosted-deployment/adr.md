@@ -130,7 +130,7 @@ GitHub Actions 품질 관문은 풀 리퀘스트와 `main` 푸시에서 백업 �
 
 ## 관련 문서
 
-- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [제품 명세](../../PRD/0001_product-baseline/spec.md)
 - [API 계약](../../PRD/0002_api-contract/spec.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
 - [ROUND 프로덕션 런타임 통합](../0018_round-production-runtime/adr.md)

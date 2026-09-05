@@ -38,8 +38,8 @@ export default function RegistrationGate() {
     return (
       <div className="auth-result auth-result-warning" role="status">
         <span className="auth-result-mark" aria-hidden="true">!</span>
-        <h3>현재 새 자체 이메일 계정을 만들 수 없습니다.</h3>
-        <p>기존 자체 이메일 계정과 활성화된 소셜 로그인은 로그인 화면에서 계속 사용할 수 있습니다.</p>
+        <h3>현재는 이메일로 가입할 수 없습니다.</h3>
+        <p>기존 이메일 계정이나 사용 가능한 소셜 계정으로 로그인하세요.</p>
         <Link className="primary-button auth-link-button" to="/login">로그인 화면으로</Link>
       </div>
     )

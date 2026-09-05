@@ -28,7 +28,7 @@ export function NotificationPreferencesPanel({ accountId }: { accountId: string 
         <label className="notification-lead">마감 몇 시간 전부터 표시할까요?<input type="number" min={1} max={168} required value={values.deadlineLeadHours}
           onChange={event => setDraft({ ...values, deadlineLeadHours: Number(event.target.value) })} /></label>
         <label><input type="checkbox" checked={values.overdueEnabled} onChange={event => setDraft({ ...values, overdueEnabled: event.target.checked })} />기한 지남</label>
-        <label><input type="checkbox" checked={values.handoffEnabled} onChange={event => setDraft({ ...values, handoffEnabled: event.target.checked })} />바통 수락 요청</label>
+        <label><input type="checkbox" checked={values.handoffEnabled} onChange={event => setDraft({ ...values, handoffEnabled: event.target.checked })} />인수인계 수락 요청</label>
         <button type="submit">{save.isPending ? '알림 설정 저장 중…' : '알림 설정 저장'}</button>
       </fieldset>
     </form>}

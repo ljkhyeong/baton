@@ -748,7 +748,7 @@ class AuthSessionRestDocsTest {
         assertThat(session.isInvalid()).isTrue();
     }
 
-    @DisplayName("계정 보안 조회 API는 표시 이름과 연결된 로그인 수단을 반환한다")
+    @DisplayName("계정 보안 조회 API는 표시 이름과 연결된 로그인 방법을 반환한다")
     @Test
     void documentsAccountSecurity() throws Exception {
         when(accountSecurityUseCase.getAccount(ACCOUNT_ID)).thenReturn(new AccountView(
@@ -781,7 +781,7 @@ class AuthSessionRestDocsTest {
                 .andExpect(jsonPath("$.identities[1].email").value(EMAIL))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getAccountSecurity",
-                        "현재 로그인 계정의 표시 이름과 연결된 로그인 수단을 조회한다. 공급자가 이메일을 제공하지 않으면 email은 null이다.",
+                        "현재 로그인 계정의 표시 이름과 연결된 로그인 방법을 조회한다. 공급자가 이메일을 제공하지 않으면 email은 null이다.",
                         "계정 보안 정보 조회",
                         noStoreResponseHeaders(),
                         responseFields(
@@ -792,14 +792,14 @@ class AuthSessionRestDocsTest {
                                 fieldWithPath("identities")
                                         .type(JsonFieldType.ARRAY)
                                         .attributes(key("itemsType").value("OBJECT"))
-                                        .description("연결된 로그인 수단 목록"),
+                                        .description("연결된 로그인 방법 목록"),
                                 fieldWithPath("identities[].provider")
-                                        .description("로그인 수단: google, naver, local_email"),
+                                        .description("로그인 방법: google, naver, local_email"),
                                 fieldWithPath("identities[].email")
                                         .optional()
                                         .description("공급자가 제공한 이메일. 제공하지 않으면 null"),
                                 fieldWithPath("identities[].emailVerified")
-                                        .description("해당 로그인 수단에서 확인한 이메일 여부")
+                                        .description("해당 로그인 방법에서 확인한 이메일 여부")
                         )
                 ));
     }

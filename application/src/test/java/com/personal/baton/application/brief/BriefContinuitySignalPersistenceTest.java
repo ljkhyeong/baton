@@ -439,7 +439,7 @@ class BriefContinuitySignalPersistenceTest {
         }
     }
 
-    @DisplayName("바통 항목 문구와 분류 수정은 BRIEF를 재조정하지 않고 다른 역할로 이동할 때만 재조정한다")
+    @DisplayName("인수인계 항목 문구와 분류 수정은 BRIEF를 재조정하지 않고 다른 역할로 이동할 때만 재조정한다")
     @Test
     void reconcilesHandoffRoleMoveButNotContentEdit() {
         SignalSources sources = signalSources();
@@ -561,7 +561,7 @@ class BriefContinuitySignalPersistenceTest {
         }
     }
 
-    @DisplayName("바통의 실제 전달·수락·취소만 BRIEF를 재조정하고 완료한 요청의 재전송은 생략한다")
+    @DisplayName("인수인계의 실제 전달·수락·취소만 BRIEF를 재조정하고 완료한 요청의 재전송은 생략한다")
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void reconcilesHandoffTransitionsButNotReplay(boolean accept) {

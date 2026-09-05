@@ -7,7 +7,7 @@
 
 BATON의 공용 프런트 API 클라이언트는 요청 결과를 10초 안에 받지 못하면 시간 초과로 처리한다. 반면 별도 설정이 없으면 HikariCP의 커넥션 획득 대기는 30초이고 MySQL의 InnoDB 행 잠금 대기도 프런트 제한보다 길 수 있다. 이 상태에서는 브라우저가 결과를 포기한 뒤에도 서버 요청이 잠금을 기다리다가 쓰기를 확정할 수 있다.
 
-워크스페이스·콘텐츠 생성과 접근 키 변경은 멱등 기록으로 응답 유실을 복구하지만, 모든 수정 요청이 멱등하지는 않다. 특히 역할·루틴·회차·결정·바통처럼 공유 콘텐츠를 수정하는 요청은 사용자가 실패로 인식한 뒤 늦게 반영되면 현재 화면과 서버 상태가 어긋난다.
+워크스페이스·콘텐츠 생성과 접근 키 변경은 멱등 기록으로 응답 유실을 복구하지만, 모든 수정 요청이 멱등하지는 않다. 특히 역할·반복 업무·회차·결정·인수인계처럼 공유 콘텐츠를 수정하는 요청은 사용자가 실패로 인식한 뒤 늦게 반영되면 현재 화면과 서버 상태가 어긋난다.
 
 JPA의 `jakarta.persistence.lock.timeout`은 방언 지원에 따라 SQL 잠금 절로 변환된다. 현재 Hibernate 7과 MySQL 조합은 양수 제한 시간을 `WAIT n`으로 표현하지 않으므로 이 속성만으로 InnoDB의 실제 행 잠금 대기를 제한할 수 없다.
 
@@ -33,7 +33,7 @@ Spring의 기본 트랜잭션 시간 초과는 워크스페이스 생명주기·
 - 명시적 비관적 잠금 획득이나 버전이 있는 애그리게이트의 `saveAndFlush`에서 MySQL 잠금 시간이 초과되면 Spring의 `PessimisticLockingFailureException` 계열로 변환한다.
 - 새 워크스페이스 저장이나 콘텐츠 생성 멱등 예약이 같은 키의 미완료 트랜잭션을 기다리다 시간 초과되면 기존 `409 IDEMPOTENCY_KEY_CONFLICT`로 수렴해 같은 요청 재확인을 안내한다.
 - 팀 접근 키 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_ACCESS_KEY_CONFLICT`로 수렴한다.
-- 구성원·역할·역할 자료·루틴·회차·실행·결정·바통 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
+- 구성원·역할·역할 자료·반복 업무·회차·실행·결정·인수인계 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
 - 일반 쿼리 시간 초과, 트랜잭션 시간 초과와 커넥션 획득 실패는 도메인 충돌로 추측하지 않는다. 기존 `500 INTERNAL_ERROR`와 요청 ID 경계를 유지한다.
 
 새 HTTP 상태나 오류 코드는 추가하지 않는다. 실제 행 잠금 충돌의 기존 의미를 저장 시점까지 일관되게 적용하는 변경이므로 REST Docs와 생성 OpenAPI 구조도 바뀌지 않는다.
@@ -89,8 +89,8 @@ bash ops/tests/production-runtime-smoke.sh
 
 ## 관련 문서
 
-- [제품 기준선](../../PRD/0001_product-baseline/spec.md)
+- [제품 명세](../../PRD/0001_product-baseline/spec.md)
 - [API 계약](../../PRD/0002_api-contract/spec.md)
 - [테스트 전략](../0002_test-strategy/adr.md)
 - [공유 콘텐츠의 낙관적 수정 충돌](../0005_optimistic-content-updates/adr.md)
-- [운영 회차 정정과 가역 보관](../0008_revisable-round-lifecycle/adr.md)
+- [운영 회차 정정과 보관·복원](../0008_revisable-round-lifecycle/adr.md)

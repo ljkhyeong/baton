@@ -48,7 +48,7 @@ final class WorkspaceSeasonEndingCoordinator {
         boolean endingChanged = season.isEnded() != ended;
         if (ended && peopleRepository.existsOpenRoleHandoffBySeasonId(seasonId)) {
             throw new RoleHandoffStateConflictException(
-                    "준비 중이거나 수락을 기다리는 바통을 수락 또는 취소한 뒤 시즌을 종료해 주세요"
+                    "준비 중이거나 수락을 기다리는 인수인계를 수락 또는 취소한 뒤 시즌을 종료해 주세요"
             );
         }
         if (!ended) {

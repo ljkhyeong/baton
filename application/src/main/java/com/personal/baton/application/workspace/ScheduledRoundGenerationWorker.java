@@ -112,7 +112,7 @@ public class ScheduledRoundGenerationWorker {
         }
         for (Routine routine : routines) {
             if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
-                throw new IllegalStateException("자동 회차 루틴에 실제 마감 규칙이 없습니다");
+                throw new IllegalStateException("자동 회차 반복 업무에 실제 마감 규칙이 없습니다");
             }
         }
 

@@ -539,7 +539,7 @@ class RoundAuthorizationRestDocsTest {
                 .andExpect(jsonPath("$.token").doesNotExist())
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "refreshRoundParticipationGrant",
-                        "현재 계정 멤버십과 서버 권위 방 매핑을 확인하고 방 경로에 한정된 참여권 쿠키를 회전한다. 위치 힌트 본문은 선택 사항이다.",
+                        "현재 계정 멤버십과 서버에서 관리하는 방 매핑을 확인하고 방 경로에 한정된 참여권 쿠키를 회전한다. 위치 힌트 본문은 선택 사항이다.",
                         "ROUND 참여권 갱신",
                         pathParameters(
                                 parameterWithName("roomId")

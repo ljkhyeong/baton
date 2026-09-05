@@ -444,7 +444,7 @@ test('204는 명시한 no-content 계약에서만 성공한다', async ({ page }
     .resolves.toEqual(expectedError)
 })
 
-test('역할 바통 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {
+test('역할 인수인계 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {
   const response = acceptedRoleHandoffTransitionResponse()
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
@@ -472,7 +472,7 @@ test('역할 바통 전이 응답이 nextMemberId를 누락하면 invalid-respon
   })
 })
 
-test('역할 바통 응답은 서버 상태와 별개로 요청 경로의 식별자를 유지한다', async ({ page }) => {
+test('역할 인수인계 응답은 서버 상태와 별개로 요청 경로의 식별자를 유지한다', async ({ page }) => {
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
     seasonId: '88888888-8888-4888-8888-888888888888',
@@ -501,7 +501,7 @@ test('역할 바통 응답은 서버 상태와 별개로 요청 경로의 식별
 
   for (const scenario of [
     {
-      name: '역할과 바통의 roleId 불일치',
+      name: '역할과 인수인계의 roleId 불일치',
       mutate: () => {
         response.handoff.roleId = '99999999-9999-4999-8999-999999999999'
       },
@@ -556,7 +556,7 @@ test('역할 바통 응답은 서버 상태와 별개로 요청 경로의 식별
   }
 })
 
-test('루틴 완료 응답은 요청한 회차와 실행 식별자를 유지한다', async ({ page }) => {
+test('반복 업무 완료 응답은 요청한 회차와 실행 식별자를 유지한다', async ({ page }) => {
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
     seasonId: '88888888-8888-4888-8888-888888888888',

@@ -278,7 +278,7 @@ test('@webkit 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 
   })
 
   await page.goto(WORKSPACE_PATH)
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
   inspector = await openRoundResource(page, testInfo.project.name)
   await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
   page.once('dialog', async (dialog) => {
@@ -433,7 +433,7 @@ test('sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 �
   ), ROOM_ID)).toBeNull()
 
   await page.goto(WORKSPACE_PATH)
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
   inspector = await openRoundResource(page, testInfo.project.name)
   await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
 

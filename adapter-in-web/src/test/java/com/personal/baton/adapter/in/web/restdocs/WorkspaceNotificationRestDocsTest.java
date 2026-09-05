@@ -75,7 +75,7 @@ class WorkspaceNotificationRestDocsTest {
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.notifications[0].read").value(false))
                 .andDo(MockMvcRestDocumentationWrapper.document("getWorkspaceNotifications",
-                        "현재 내 역할의 마감 임박·지연 업무와 수락할 바통을 반환한다.", "내 알림함 조회",
+                        "현재 내 역할의 마감 임박·지연 업무와 수락할 인수인계를 반환한다.", "내 알림함 조회",
                         pathParameters(parameterWithName("teamId").description("팀 식별자"),
                                 parameterWithName("seasonId").description("시즌 식별자")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
@@ -118,11 +118,11 @@ class WorkspaceNotificationRestDocsTest {
                 fieldWithPath("notifications").type(JsonFieldType.ARRAY).description("현재 내 알림"),
                 fieldWithPath("notifications[].id").description("알림 식별자"),
                 new EnumFields(WorkspaceNotificationKind.class).withPath("notifications[].kind").description("알림 종류"),
-                fieldWithPath("notifications[].sourceId").description("루틴 실행 또는 역할 바통 식별자"),
+                fieldWithPath("notifications[].sourceId").description("반복 업무 실행 또는 역할 인수인계 식별자"),
                 fieldWithPath("notifications[].roleId").description("관련 역할 식별자"),
-                fieldWithPath("notifications[].roundId").description("관련 회차 식별자, 바통은 null").optional(),
+                fieldWithPath("notifications[].roundId").description("관련 회차 식별자, 인수인계는 null").optional(),
                 fieldWithPath("notifications[].title").description("업무 또는 역할 이름"),
-                fieldWithPath("notifications[].occurredAt").description("마감 또는 바통 전달 시각"),
+                fieldWithPath("notifications[].occurredAt").description("마감 또는 인수인계 전달 시각"),
                 fieldWithPath("notifications[].read").description("현재 계정의 읽음 여부"));
     }
 }

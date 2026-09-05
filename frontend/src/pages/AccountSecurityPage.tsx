@@ -14,7 +14,7 @@ export default function AccountSecurityPage() {
         <AuthPageShell
           eyebrow="MY ACCOUNT"
           title="내 계정"
-          description="연결된 로그인 수단과 계정 세션을 확인합니다."
+          description="로그인 방법과 로그인 상태를 확인합니다."
         >
           <div className="auth-loading" role="status">로그인 상태를 확인하고 있습니다.</div>
         </AuthPageShell>
@@ -29,7 +29,7 @@ export default function AccountSecurityPage() {
         <AuthPageShell
           eyebrow="MY ACCOUNT"
           title="내 계정"
-          description="연결된 로그인 수단과 계정 세션을 확인합니다."
+          description="로그인 방법과 로그인 상태를 확인합니다."
         >
           <div className="auth-result auth-result-warning" role="alert">
             <span className="auth-result-mark" aria-hidden="true">!</span>
@@ -59,7 +59,7 @@ export default function AccountSecurityPage() {
       <AuthPageShell
         eyebrow="MY ACCOUNT"
         title="내 계정"
-        description="내 캘린더 구독과 로그인 수단을 확인하고 비밀번호와 계정 세션을 관리합니다."
+        description="캘린더 구독, 로그인 방법, 비밀번호를 관리합니다."
       >
         <CalendarSubscriptionList key={`calendars:${sessionQuery.data.accountId}`} accountId={sessionQuery.data.accountId} />
         <AccountSecurityPanel key={`security:${sessionQuery.data.accountId}`} accountId={sessionQuery.data.accountId} />

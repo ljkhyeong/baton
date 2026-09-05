@@ -233,7 +233,7 @@ export function createWorkspaceContentActions({
 
   const addRoleResource = (request: RoleResourceFormRequest) => {
     if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
       return false
     }
     return commands.roleResourceCreation.submit(request, (createdResource) => {
@@ -249,7 +249,7 @@ export function createWorkspaceContentActions({
     if (!ensureFreshWorkspace() || !editingRoleResource) return false
     if (isRoleHandoffLocked(roleHandoffs, editingRoleResource.roleId)
       || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
       return false
     }
     return preserveConflictDraft(
@@ -273,7 +273,7 @@ export function createWorkspaceContentActions({
   const updateRoleResourceArchive = (resource: RoleResource, archived: boolean) => {
     if (!ensureFreshWorkspace()) return
     if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 자료를 보관하거나 복원할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 보관하거나 복원할 수 있어요.', 'error')
       return
     }
     mutations.roleResourceArchive.mutate({ id: resource.id, archived }, {
@@ -288,7 +288,7 @@ export function createWorkspaceContentActions({
   const addRoutine = (request: RoutineFormRequest) => commands.routineCreation.submit(request, () => {
     closeModal()
     setView('rhythm')
-    notify('반복 루틴을 운영 흐름에 추가했어요.')
+    notify('반복 업무를 운영 흐름에 추가했어요.')
   })
 
   const updateExistingRoutine = (request: RoutineFormRequest) => {
@@ -299,12 +299,12 @@ export function createWorkspaceContentActions({
           setEditor(null)
           closeModal()
           setView('rhythm')
-          notify('루틴 정보를 수정했어요.')
+          notify('반복 업무 정보를 수정했어요.')
         },
       }),
-      '루틴 수정',
+      '반복 업무 수정',
       [
-        ['루틴 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
+        ['반복 업무 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
         ['언제까지', request.dueLabel], ['세부 설명', request.detail],
         ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
         ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
@@ -318,13 +318,13 @@ export function createWorkspaceContentActions({
       .then((updatedRoutine) => {
         setView('rhythm')
         notify(archived
-          ? '루틴 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
-          : '루틴을 다시 운영 흐름에 꺼냈어요. 새 회차부터 포함됩니다.')
+          ? '반복 업무 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
+          : '반복 업무를 다시 운영 흐름에 꺼냈어요. 새 회차부터 포함됩니다.')
         focusRoutineArchiveResult(updatedRoutine.id, archived)
       })
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
-        notify(`루틴을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
+        notify(`반복 업무를 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endRoutineOperation(routine.id))
   }
@@ -353,7 +353,7 @@ export function createWorkspaceContentActions({
         setEditor(null)
         closeModal()
         setView('rhythm')
-        notify('회차 정보를 수정했어요. 루틴 완료 기록은 그대로 유지됩니다.')
+        notify('회차 정보를 수정했어요. 반복 업무 완료 기록은 그대로 유지됩니다.')
       })
       .catch(() => undefined)
       .finally(() => endRoundOperation(roundId))
@@ -367,7 +367,7 @@ export function createWorkspaceContentActions({
           clearSelectedRound(updatedRound.id)
           notify(round.origin === 'AUTOMATIC'
             ? '이번 회차를 건너뛰었어요. 보관함에서 복원할 수 있고 다음 반복 일정은 유지됩니다.'
-            : '회차를 보관함으로 옮겼어요. 루틴 완료 기록은 그대로 유지됩니다.')
+            : '회차를 보관함으로 옮겼어요. 반복 업무 완료 기록은 그대로 유지됩니다.')
           return
         }
         selectRound(updatedRound.id)
@@ -389,7 +389,7 @@ export function createWorkspaceContentActions({
     const completed = execution.status !== 'DONE'
     void mutations.routineExecutionCompletion
       .mutateAsync({ roundId, executionId: execution.id, completed })
-      .then(() => notify(completed ? '이번 바통을 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .then(() => notify(completed ? '이번 인수인계를 넘겼어요.' : '완료 표시를 되돌렸어요.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -428,7 +428,7 @@ export function createWorkspaceContentActions({
     if (!ensureFreshWorkspace() || mutations.decisionArchive.isPending) return
     mutations.decisionArchive.mutate({ id: decision.id, archived }, {
       onSuccess: () => notify(
-        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 다시 원장에 꺼냈어요.',
+        archived ? '결정 기록을 보관함으로 옮겼어요.' : '결정 기록을 복원했어요.',
       ),
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) return
@@ -439,7 +439,7 @@ export function createWorkspaceContentActions({
 
   const addHandoffItem = (request: CreateHandoffItemRequest) => {
     if (isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
       return false
     }
     return commands.handoffItemCreation.submit(request, (_createdItem, submittedRequest) => {
@@ -455,14 +455,14 @@ export function createWorkspaceContentActions({
     if (!ensureFreshWorkspace() || !editingHandoffItem) return false
     if (isRoleHandoffLocked(roleHandoffs, editingHandoffItem.roleId)
       || isRoleHandoffLocked(roleHandoffs, request.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
       return false
     }
     const itemId = editingHandoffItem.id
     if (!beginHandoffItemOperation(itemId)) return false
     return preserveConflictDraft(
       mutations.handoffItemUpdate.mutateAsync({ id: itemId, request }),
-      '인수인계 문서 항목 수정',
+      '인수인계 항목 수정',
       [
         ['역할', roles.find((role) => role.id === request.roleId)?.name],
         ['남길 내용', request.label], ['항목 종류', categoryCopy[request.category]],
@@ -473,7 +473,7 @@ export function createWorkspaceContentActions({
         setSelectedRoleId(updatedItem.roleId)
         setEditor(null)
         closeModal()
-        notify('인수인계 문서 항목을 수정했어요.')
+        notify('인수인계 항목을 수정했어요.')
       })
       .catch(() => undefined)
       .finally(() => endHandoffItemOperation(itemId))
@@ -482,17 +482,17 @@ export function createWorkspaceContentActions({
   const updateHandoffItemArchive = (item: HandoffItem, archived: boolean) => {
     if (!ensureFreshWorkspace()) return
     if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 항목을 바꿀 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 바꿀 수 있어요.', 'error')
       return
     }
     if (!beginHandoffItemOperation(item.id)) return
     void mutations.handoffItemArchive.mutateAsync({ id: item.id, archived })
       .then(() => notify(
-        archived ? '인수인계 문서 항목을 보관함으로 옮겼어요.' : '인수인계 문서 항목을 다시 체크리스트에 꺼냈어요.',
+        archived ? '인수인계 항목을 보관함으로 옮겼어요.' : '인수인계 항목을 다시 체크리스트에 꺼냈어요.',
       ))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
-        notify(`바통 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
+        notify(`인수인계 항목을 ${archived ? '보관' : '복원'}하지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endHandoffItemOperation(item.id))
   }
@@ -501,16 +501,16 @@ export function createWorkspaceContentActions({
     if (!ensureFreshWorkspace()) return
     const item = activeHandoffItems.find((candidate) => candidate.id === id)
     if (item && isRoleHandoffLocked(roleHandoffs, item.roleId)) {
-      notify('전달한 바통은 수락하거나 취소한 뒤 완료 상태를 바꿀 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 완료 상태를 바꿀 수 있어요.', 'error')
       return
     }
     if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
     void mutations.handoffCompletion.mutateAsync({ id, completed })
-      .then(() => notify(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
+      .then(() => notify(completed ? '인수인계 항목을 준비했어요.' : '인수인계 항목을 다시 열었어요.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
-        notify(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
+        notify(`인수인계 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
       })
       .finally(() => endHandoffItemOperation(id))
   }

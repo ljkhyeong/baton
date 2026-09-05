@@ -14,7 +14,7 @@ export const phaseCopy = {
 
 export const categoryCopy = {
   RESPONSIBILITY: '책임',
-  ROUTINE: '루틴',
+  ROUTINE: '반복 업무',
   RESOURCE: '자료',
   ADVICE: '조언',
 } satisfies Record<HandoffCategory, string>
@@ -72,11 +72,11 @@ export function mutationError(error: unknown) {
     return '다른 구성원이 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.'
   }
   if (error instanceof ApiError && error.code === 'ROLE_HANDOFF_STATE_CONFLICT') {
-    return '역할 바통 상태가 먼저 바뀌었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.'
+    return '역할 인수인계 상태가 먼저 바뀌었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.'
   }
   if (error instanceof ApiError
     && error.code === 'ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED') {
-    return '미완료 항목이나 자료 없음 경고를 확인해야 바통을 전달할 수 있어요.'
+    return '미완료 항목이나 자료 없음 경고를 확인해야 인수인계를 전달할 수 있어요.'
   }
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
     return '더 최신 접근 키 변경이 완료되어 이전 결과를 다시 받을 수 없습니다. 새 요청으로 다시 시도해 주세요.'

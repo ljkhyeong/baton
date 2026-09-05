@@ -399,7 +399,7 @@ export function RoleModal({
         </div>
         {assignmentLocked && (
           <small className="form-hint">
-            바통 준비 중에는 담당자와 담당 기간이 전달 기록에 고정됩니다.
+            인수인계 준비 중에는 담당자와 담당 기간이 전달 기록에 고정됩니다.
             역할 설명과 책임은 계속 보완할 수 있어요.
           </small>
         )}

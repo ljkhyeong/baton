@@ -33,14 +33,14 @@ export default function OnboardingForm() {
       <section className="onboarding-story" aria-labelledby="onboarding-title">
         <div className="brand onboarding-brand"><span className="brand-mark" />BATON</div>
         <div>
-          <span className="section-kicker">첫 번째 바통</span>
+          <span className="section-kicker">시작하기</span>
           <h1 id="onboarding-title">사람이 바뀌어도<br />운영은 이어지게.</h1>
-          <p>스터디의 역할, 반복 운영, 결정의 이유와 다음 담당자에게 넘길 맥락을 한곳에 남겨보세요.</p>
+          <p>담당 업무, 결정 이유, 인수인계 자료를 한곳에서 관리하세요.</p>
         </div>
         <ol className="onboarding-points">
           <li><span>01</span><strong>시즌을 열고</strong><small>함께할 기간과 구성원을 정합니다.</small></li>
-          <li><span>02</span><strong>역할을 세우고</strong><small>반복되는 책임을 사람과 분리합니다.</small></li>
-          <li><span>03</span><strong>바통을 남겨요</strong><small>다음 사람이 바로 움직일 맥락을 모읍니다.</small></li>
+          <li><span>02</span><strong>역할을 정하고</strong><small>역할별 담당 업무를 정합니다.</small></li>
+          <li><span>03</span><strong>인수인계를 정리하고</strong><small>담당 업무와 참고 자료를 남깁니다.</small></li>
         </ol>
       </section>
 
@@ -121,16 +121,16 @@ export default function OnboardingForm() {
         )}
 
         <form className="onboarding-form" onSubmit={form.submit}>
-          <label><span>시작 구성</span><select value={form.template ?? ''} disabled={creation.busy}
+          <label><span>템플릿 선택</span><select value={form.template ?? ''} disabled={creation.busy}
             onChange={event => form.setTemplate((event.target.value || undefined) as CreateWorkspaceRequest['template'])}>
-            <option value="">빈 구성 · 역할과 루틴을 직접 만들기</option>
+            <option value="">템플릿 없이 시작</option>
             {Object.entries(workspaceTemplates).map(([id, template]) => <option key={id} value={id}>{template.name}</option>)}
           </select></label>
-          {form.template && <section className="workspace-template-preview" aria-label="시작 구성 미리보기">
+          {form.template && <section className="workspace-template-preview" aria-label="템플릿 미리보기">
             <h3>{workspaceTemplates[form.template].name}</h3>
             <p>역할: {workspaceTemplates[form.template].roles.join(' · ')}</p>
-            <p>루틴: {workspaceTemplates[form.template].routines.join(' · ')}</p>
-            <small>역할 3개와 루틴 3개를 함께 만듭니다. 담당자·실제 마감·반복 일정은 만든 뒤 정해 주세요. 생성한 내용은 수정할 수 있습니다.</small>
+            <p>반복 업무: {workspaceTemplates[form.template].routines.join(' · ')}</p>
+            <small>역할 3개와 반복 업무 3개를 함께 만듭니다. 담당자·마감·반복 일정은 만든 뒤 정해 주세요. 생성한 내용은 수정할 수 있습니다.</small>
           </section>}
           <label>
             <span>팀 이름</span>

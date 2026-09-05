@@ -23,7 +23,7 @@ class RoleHandoffPolicyTest {
     private static final UUID FROM_MEMBER_ID = UUID.randomUUID();
     private static final UUID TO_MEMBER_ID = UUID.randomUUID();
 
-    @DisplayName("경고를 확인한 이전 담당자가 전달하면 다음 담당자만 바통을 수락할 수 있다")
+    @DisplayName("경고를 확인한 이전 담당자가 전달하면 다음 담당자만 인수인계를 수락할 수 있다")
     @Test
     void transfersAndAcceptsWithExplicitParticipants() {
         RoleHandoff handoff = preparedHandoff();
@@ -64,7 +64,7 @@ class RoleHandoffPolicyTest {
         assertThat(handoff.getAcceptedByMemberId()).isEqualTo(TO_MEMBER_ID);
     }
 
-    @DisplayName("바통 수락은 역할 담당자와 다음 담당 기간을 한 번에 교체한다")
+    @DisplayName("인수인계 수락은 역할 담당자와 다음 담당 기간을 한 번에 교체한다")
     @Test
     void acceptsRoleAssignmentAtomically() {
         UUID roleId = UUID.randomUUID();
@@ -98,7 +98,7 @@ class RoleHandoffPolicyTest {
         assertThat(role.getAssignmentEndDate()).isEqualTo(incomingEndDate);
     }
 
-    @DisplayName("열린 역할 바통은 이전 담당자 명의로만 취소할 수 있다")
+    @DisplayName("열린 역할 인수인계는 이전 담당자 명의로만 취소할 수 있다")
     @Test
     void cancelsOnlyWithPreviousMemberDeclaration() {
         RoleHandoff handoff = preparedHandoff();

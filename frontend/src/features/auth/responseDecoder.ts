@@ -116,7 +116,7 @@ export function decodeAccountSecurity(value: unknown): AccountSecurity {
           || !identity.email
           || identity.email.length > 320))
       || typeof identity.emailVerified !== 'boolean') {
-      throw new Error('계정 로그인 수단 응답 값이 올바르지 않습니다.')
+      throw new Error('계정 로그인 방법 응답 값이 올바르지 않습니다.')
     }
     identities.push({
       provider: identity.provider as AccountIdentityProvider,

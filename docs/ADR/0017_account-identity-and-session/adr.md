@@ -17,7 +17,7 @@ BATON의 공유 접근 키는 작은 파일럿에서 워크스페이스 전체 �
 
 ### Account와 로그인 신원을 분리한다
 
-`Account.id` 정규 형식 UUID를 BATON의 불변 내부 신원으로 사용한다. 각 로그인 수단은
+`Account.id` 정규 형식 UUID를 BATON의 불변 내부 신원으로 사용한다. 각 로그인 방법은
 `AccountIdentity(provider, providerSubject)`로 Account에 연결한다.
 
 ```text
@@ -94,7 +94,7 @@ Spring Security 로그아웃 핸들러로 현재 보안 컨텍스트·세션·`J
 ### ROUND 참여권 발급자는 BATON이다
 
 Google/Naver 토큰을 ROUND가 직접 검증하지 않는다. BATON이 현재 Account와 구성원 연결을
-판단한 뒤 자체 RSA 키로 짧은 참여권을 발급한다. 따라서 로그인 수단이 바뀌어도
+판단한 뒤 자체 RSA 키로 짧은 참여권을 발급한다. 따라서 로그인 방법이 바뀌어도
 `JWT sub = Account.id`가 유지된다.
 
 JWK는 공개 키만 공개하고 새 키 선게시 → 새 발급 → 중첩 종료 뒤 이전 키 제거 순서를

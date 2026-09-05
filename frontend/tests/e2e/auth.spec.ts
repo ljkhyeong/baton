@@ -102,7 +102,7 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
         return error(
           500,
           'AUTH_PROVIDERS_UNAVAILABLE',
-          '로그인 수단을 확인하지 못했습니다.',
+          '로그인 방법을 확인하지 못했습니다.',
         )
       }
       return json(200, {
@@ -277,7 +277,7 @@ async function installRoundRoomDocument(page: Page) {
   return () => documentRequests
 }
 
-test('@smoke 로그인한 자체 이메일 계정은 비밀번호를 바꾸고 모든 계정 세션을 종료한다', async ({ page }) => {
+test('@smoke 로그인한 이메일 계정은 비밀번호를 바꾸고 모든 계정 세션을 종료한다', async ({ page }) => {
   const api = await installAuthApi(page, { authenticated: true })
   await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
     key: `baton-access-key:${TEAM_ID}`,
@@ -349,7 +349,7 @@ test('@smoke 소셜 로그인 전용 계정은 비밀번호 양식 없이 모든
   })
   await page.goto('/account')
 
-  await expect(page.getByText('이메일을 제공하지 않은 로그인 수단')).toBeVisible()
+  await expect(page.getByText('이메일을 제공하지 않은 로그인 방법')).toBeVisible()
   await expect(page.getByLabel('현재 비밀번호')).toHaveCount(0)
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
@@ -522,13 +522,13 @@ test('공급자 조회가 지연되어도 local 로그인을 즉시 사용할 �
   })
   await page.goto('/login')
 
-  await expect(page.getByRole('status')).toContainText('소셜 로그인 수단을 확인하고 있습니다.')
+  await expect(page.getByRole('status')).toContainText('소셜 로그인 방법을 확인하고 있습니다.')
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeEnabled()
   await expect(page.getByLabel('이메일')).toBeEditable()
 
   api.releaseProviders()
   await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toBeVisible()
-  await expect(page.getByText('소셜 로그인 수단을 확인하고 있습니다.')).toHaveCount(0)
+  await expect(page.getByText('소셜 로그인 방법을 확인하고 있습니다.')).toHaveCount(0)
 })
 
 test('공급자 조회 500을 local 로그인과 격리하고 재시도한다', async ({ page }) => {
@@ -538,7 +538,7 @@ test('공급자 조회 500을 local 로그인과 격리하고 재시도한다', 
   })
   await page.goto('/login')
 
-  await expect(page.getByRole('alert')).toContainText('소셜 로그인 수단을 불러오지 못했습니다.')
+  await expect(page.getByRole('alert')).toContainText('소셜 로그인 방법을 불러오지 못했습니다.')
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeEnabled()
   await page.getByRole('button', { name: '소셜 로그인 다시 확인' }).click()
 
@@ -557,7 +557,7 @@ test('OAuth login_failed를 안내한 뒤 오류 query만 지우고 안전한 �
 
   const alert = page.getByRole('alert')
   await expect(alert).toContainText('소셜 로그인을 완료하지 못했습니다.')
-  await expect(alert).toContainText('다시 시도하거나 다른 로그인 수단을 선택해 주세요.')
+  await expect(alert).toContainText('다시 시도하거나 다른 로그인 방법을 선택해 주세요.')
   await expect.poll(() => new URL(page.url()).searchParams.has('oauthError')).toBe(false)
   const scrubbedUrl = new URL(page.url())
   expect(scrubbedUrl.searchParams.get('returnTo')).toBe(WORKSPACE_PATH)
@@ -622,14 +622,14 @@ test('local 가입이 비활성화되면 CTA를 숨기고 직접 진입한 가�
 
   await page.goto('/register')
   await expect(page.getByRole('heading', {
-    name: '현재 새 자체 이메일 계정을 만들 수 없습니다.',
+    name: '현재는 이메일로 가입할 수 없습니다.',
   })).toBeVisible()
   await expect(page.getByLabel('표시 이름')).toHaveCount(0)
   await expect(page.getByRole('link', { name: '로그인 화면으로' })).toBeVisible()
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
 })
 
-test('자체 이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', async ({ page }) => {
+test('이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto('/register')
 
@@ -639,7 +639,7 @@ test('자체 이메일 가입은 비밀번호 없이 JSON 등록 요청을 보�
 
   await expect(page.getByRole('heading', { name: '인증 메일을 확인해 주세요.' }))
     .toBeVisible()
-  await expect(page.getByRole('status')).toContainText('비밀번호를 정하면')
+  await expect(page.getByRole('status')).toContainText('비밀번호를 설정한 뒤 이메일로 로그인하세요.')
   const registration = requiredCall(
     api.calls,
     'POST',

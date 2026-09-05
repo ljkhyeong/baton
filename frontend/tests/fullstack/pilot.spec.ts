@@ -80,14 +80,14 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     .toHaveAttribute('href', 'https://docs.example.com/questions')
 
   await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
-  await page.getByRole('button', { name: '루틴 추가' }).click()
-  const routineDialog = page.getByRole('dialog', { name: '반복 루틴 만들기' })
-  await routineDialog.getByLabel('루틴 이름').fill('회고 질문 준비')
+  await page.getByRole('button', { name: '반복 업무 추가' }).click()
+  const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
+  await routineDialog.getByLabel('반복 업무 이름').fill('회고 질문 준비')
   await routineDialog.getByLabel('운영 단계').selectOption({ label: '모임 전' })
   await routineDialog.getByLabel('담당 역할').selectOption({ label: '질문 큐레이터' })
   await routineDialog.getByLabel('언제까지').fill('목요일 19:00')
   await routineDialog.getByLabel('세부 설명').fill('지난 회차에서 이어갈 질문 두 개를 고릅니다.')
-  await routineDialog.getByRole('button', { name: '루틴 만들기' }).click()
+  await routineDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
 
   await page.getByRole('button', { name: '회차 만들기' }).click()
   const roundDialog = page.getByRole('dialog', { name: '회차 만들기' })
@@ -146,9 +146,9 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(reloadedDecision.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
   await expect(reloadedDecision.getByText('김준호', { exact: true })).toBeVisible()
 
-  await page.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
+  await page.locator('.sidebar').getByRole('button', { name: /^인수인계/ }).click()
   await page.getByRole('button', { name: '항목 추가', exact: true }).click()
-  const handoffDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 추가' })
+  const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('역할').selectOption({ label: '질문 큐레이터' })
   await handoffDialog.getByLabel('남길 내용').fill('질문 분류 기준 공유')
   await handoffDialog.getByLabel('항목 종류').selectOption({ label: '조언' })
@@ -162,7 +162,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(createdHandoff).toBeChecked()
   await page.getByRole('button', { name: `${originalHandoffLabel} 수정` }).click()
 
-  const handoffEditDialog = page.getByRole('dialog', { name: '인수인계 문서 항목 수정' })
+  const handoffEditDialog = page.getByRole('dialog', { name: '인수인계 항목 수정' })
   await handoffEditDialog.getByLabel('남길 내용').fill(revisedHandoffLabel)
   await handoffEditDialog.getByLabel('항목 종류').selectOption({ label: '자료' })
   await handoffEditDialog.getByRole('button', { name: '변경 저장' }).click()
@@ -170,13 +170,13 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
   await page.getByRole('button', { name: `${revisedHandoffLabel} 보관` }).click()
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toHaveCount(0)
-  const handoffArchiveSummary = page.getByText('보관한 바통 1개', { exact: true })
+  const handoffArchiveSummary = page.getByText('보관한 인수인계 1개', { exact: true })
   await handoffArchiveSummary.click()
   await page.getByRole('button', { name: `${revisedHandoffLabel} 복원` }).click()
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
   await page.reload()
-  await page.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
+  await page.locator('.sidebar').getByRole('button', { name: /^인수인계/ }).click()
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
   await page.locator('.sidebar').getByRole('button', { name: '공유' }).click()
@@ -202,7 +202,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
     await peerPage.locator('.sidebar').getByRole('button', { name: '기록' }).click()
     await expect(peerPage.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
-    await peerPage.locator('.sidebar').getByRole('button', { name: /^바통/ }).click()
+    await peerPage.locator('.sidebar').getByRole('button', { name: /^인수인계/ }).click()
     await expect(peerPage.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
     await page.locator('.sidebar').getByRole('button', { name: '운영' }).click()
@@ -283,7 +283,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.getByRole('button', {
     name: '회고 질문 준비 완료 취소',
   })).toBeDisabled()
-  await expect(page.getByRole('button', { name: '루틴 추가' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '반복 업무 추가' })).toBeDisabled()
 
   await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
   await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
@@ -300,9 +300,9 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 })
 
 
-test('시작 템플릿으로 만든 역할과 루틴을 실제 DB에서 다시 불러온다', async ({ page }) => {
+test('시작 템플릿으로 만든 역할과 반복 업무를 실제 DB에서 다시 불러온다', async ({ page }) => {
   await page.goto('/')
-  await page.getByLabel('시작 구성').selectOption('STUDY_V1')
+  await page.getByLabel('템플릿 선택').selectOption('STUDY_V1')
   await page.getByLabel('팀 이름').fill('템플릿 풀스택 스터디')
   await page.getByLabel('시즌 이름').fill('템플릿 첫 시즌')
   await page.getByLabel('시작일').fill('2026-07-01')

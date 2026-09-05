@@ -181,7 +181,7 @@ public class BriefContinuitySignalRecorder {
 
     private static SignalIdentity identity(ContinuitySignalResult signal) {
         UUID subjectId = signal.type() == ContinuitySignalType.ROUTINE_REPEATEDLY_OVERDUE
-                ? Objects.requireNonNull(signal.routineId(), "루틴 지연 신호의 routineId는 필수입니다")
+                ? Objects.requireNonNull(signal.routineId(), "반복 업무 지연 신호의 routineId는 필수입니다")
                 : Objects.requireNonNull(signal.roleId(), "역할 연속성 신호의 roleId는 필수입니다");
         return new SignalIdentity(signal.type(), subjectId);
     }

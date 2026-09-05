@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Tag("policy")
 class HandoffItemPolicyTest {
 
-    @DisplayName("바통 수정 검증에 실패하면 기존 내용과 완료 여부를 그대로 보존한다")
+    @DisplayName("인수인계 수정 검증에 실패하면 기존 내용과 완료 여부를 그대로 보존한다")
     @Test
     void preservesExistingValuesWhenUpdateValidationFails() {
         UUID originalRoleId = UUID.randomUUID();
@@ -40,7 +40,7 @@ class HandoffItemPolicyTest {
         assertThat(item.isCompleted()).isTrue();
     }
 
-    @DisplayName("바통을 반복 보관하면 최초 보관 시각을 유지하고 복원하면 완료 상태를 보존한다")
+    @DisplayName("인수인계를 반복 보관하면 최초 보관 시각을 유지하고 복원하면 완료 상태를 보존한다")
     @Test
     void preservesFirstArchiveTimeAndCompletionUntilRestored() {
         HandoffItem item = HandoffItem.create(
@@ -59,7 +59,7 @@ class HandoffItemPolicyTest {
         assertThat(item.getArchivedAt()).isEqualTo(firstArchiveTime);
         assertThatThrownBy(() -> item.update(
                 UUID.randomUUID(),
-                "보관된 바통 수정",
+                "보관된 인수인계 수정",
                 HandoffCategory.ADVICE
         )).isInstanceOf(DomainValidationException.class);
         assertThatThrownBy(() -> item.updateCompletion(false))

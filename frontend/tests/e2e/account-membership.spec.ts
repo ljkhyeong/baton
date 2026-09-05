@@ -154,7 +154,7 @@ async function installMembershipApi(
   return { calls, restoreAuthSession: () => { authSessionFailures = 0 } }
 }
 
-test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자를 제외하고 회차와 바통으로 이동한다', async ({ page }, testInfo) => {
+test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자를 제외하고 회차와 인수인계로 이동한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.rounds[1]!.archivedAt = '2026-07-20T00:00:00Z'
   projection.roles.push({
@@ -194,7 +194,7 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
   await panel.getByRole('button', { name: /진행 담당/ }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('tabpanel', { name: /진행 담당/ })).toBeFocused()
-  await expect(page.getByRole('button', { name: '바통 수락', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '인수인계 수락', exact: true })).toBeVisible()
 })
 
 test('@operations 내 담당 업무는 활동 종료된 구성원의 업무를 표시하지 않는다', async ({ page }) => {

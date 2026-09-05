@@ -27,7 +27,7 @@ final class WorkspaceRoundSchedulePolicy {
             }
             if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
                 throw new DomainValidationException(
-                        "자동 회차를 사용하려면 모든 루틴에 실제 마감 규칙이 필요합니다"
+                        "자동 회차를 사용하려면 모든 반복 업무에 실제 마감 규칙이 필요합니다"
                 );
             }
         }
@@ -43,7 +43,7 @@ final class WorkspaceRoundSchedulePolicy {
                 && schedule.isEnabled()
                 && (deadlineDayOffset == null || deadlineTime == null)) {
             throw new DomainValidationException(
-                    "자동 회차를 사용하는 동안 루틴의 실제 마감 규칙을 제거할 수 없습니다"
+                    "자동 회차를 사용하는 동안 반복 업무의 실제 마감 규칙을 제거할 수 없습니다"
             );
         }
     }

@@ -77,13 +77,13 @@ function PreviousRoleRecordContents({
           <small>작성자: {decision.authorName}</small>
         </li>)}
       </ul> : <p>이 역할에 연결한 결정이 없습니다.</p>}
-      <h3>바통 항목</h3>
+      <h3>인수인계 항목</h3>
       {items.length ? <ul>
         {items.map((item) => <li key={item.id}>
           <strong>{item.label}</strong>
           <small>{handoffCategoryLabel[item.category]} · {item.completed ? '준비 완료' : '미완료'}{item.archivedAt ? ' · 보관' : ''}</small>
         </li>)}
-      </ul> : <p>이 역할에 남긴 바통 항목이 없습니다.</p>}
+      </ul> : <p>이 역할에 남긴 인수인계 항목이 없습니다.</p>}
     </div>
   )
 }

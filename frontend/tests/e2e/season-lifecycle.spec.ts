@@ -374,7 +374,7 @@ async function openWorkspace(page: Page) {
     window.localStorage.setItem(`baton-access-key:${teamId}`, accessKey)
   }, { teamId: TEAM_ID, accessKey: ACCESS_KEY })
   await page.goto(WORKSPACE_URL)
-  await expect(page.getByRole('heading', { name: /개의 바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
 }
 
 function seasonSwitcher(page: Page) {
@@ -407,7 +407,7 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
   await openWorkspace(page)
 
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
-  await expect(page.getByRole('heading', { name: '사람이 바뀌어도 역할은 남아요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '역할과 담당자' })).toBeVisible()
 
   const trigger = seasonSwitcher(page)
   await trigger.focus()
@@ -424,7 +424,7 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
   await trigger.click()
   await dialog.getByRole('button', { name: /2026 가을 시즌/ }).click()
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0개' })).toBeVisible()
   await expect(seasonSwitcher(page)).toHaveAccessibleName(/2026 가을 시즌/)
 })
 
@@ -446,7 +446,7 @@ test('@operations 종료된 시즌은 기록 변경 동작을 막고 조회·공
   await expect(page.getByRole('button', { name: '문제 큐레이터 역할 수정' })).toBeDisabled()
 
   await page.getByRole('button', { name: '운영', exact: true }).first().click()
-  await expect(page.getByRole('button', { name: '루틴 추가' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '반복 업무 추가' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '회차 수정' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '1회차 회차 보관' })).toBeDisabled()
 
@@ -454,7 +454,7 @@ test('@operations 종료된 시즌은 기록 변경 동작을 막고 조회·공
   await expect(page.getByRole('button', { name: '격주 회고를 진행한다 수정' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '격주 회고를 진행한다 보관' })).toBeDisabled()
 
-  await page.getByRole('button', { name: /^바통/ }).first().click()
+  await page.getByRole('button', { name: /^인수인계/ }).first().click()
   await expect(page.getByRole('button', { name: '항목 추가' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: /문제 선정 기준 공유/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: '문제 선정 기준 공유 수정' })).toBeDisabled()
@@ -522,7 +522,7 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
   await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
 
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0개' })).toBeVisible()
   expect(api.successor?.body).toEqual({
     name: '2026 가을 시즌',
     startDate: '2026-10-01',
@@ -559,7 +559,7 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
   expect(api.successorAttempts).toHaveLength(1)
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0개' })).toBeVisible()
   const cleanupBanner = page.getByRole('alert', { name: '시즌 시작 완료 기록 정리' })
   await expect(cleanupBanner).toBeVisible()
   await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
@@ -665,7 +665,7 @@ test('@operations 이전 시즌에서 늦게 도착한 종료 오류는 현재 �
 
   await page.goBack()
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0개' })).toBeVisible()
   await seasonSwitcher(page).click()
   const currentSeasonDialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
   await expect(currentSeasonDialog).toBeVisible()

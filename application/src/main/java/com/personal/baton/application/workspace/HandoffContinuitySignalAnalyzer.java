@@ -68,7 +68,7 @@ final class HandoffContinuitySignalAnalyzer {
 
             Role role = rolesById.get(handoff.getRoleId());
             if (role == null) {
-                throw new IllegalStateException("역할 바통의 역할을 찾을 수 없습니다");
+                throw new IllegalStateException("역할 인수인계의 역할을 찾을 수 없습니다");
             }
             LocalDate relevantDate = handoffRelevantDate(handoff, coverageGap);
             String reason = participantsActive
@@ -84,7 +84,7 @@ final class HandoffContinuitySignalAnalyzer {
                     : handoffParticipantReason(handoff, membersById, currentCoverageMissing);
             String recommendedAction = participantsActive
                     ? handoffAction(handoff, readiness, coverageGap, currentCoverageMissing)
-                    : "활동 종료한 구성원을 다시 활성화하거나 바통을 취소한 뒤 참여자를 다시 정하세요.";
+                    : "활동 종료한 구성원을 다시 활성화하거나 인수인계를 취소한 뒤 참여자를 다시 정하세요.";
             signals.add(new ContinuitySignalResult(
                     ContinuitySignalType.HANDOFF_INCOMPLETE,
                     participantsActive
@@ -125,11 +125,11 @@ final class HandoffContinuitySignalAnalyzer {
                             : ContinuitySignalSeverity.CRITICAL,
                     role.getId(),
                     null,
-                    role.getName() + " 바통 준비 미시작",
+                    role.getName() + " 인수인계 준비 미시작",
                     role.getName() + " 역할의 다음 담당자는 정했지만 담당 종료가 "
                             + assignmentDateDescription(assignmentEndDate, today)
-                            + " 실제 역할 바통을 시작하지 않았습니다.",
-                    "바통 화면에서 다음 담당 기간을 확인하고 역할 바통을 준비하세요.",
+                            + " 실제 역할 인수인계를 시작하지 않았습니다.",
+                    "인수인계 화면에서 다음 담당 기간을 확인하고 역할 인수인계를 준비하세요.",
                     assignmentEndDate
             ));
             signaledRoleIds.add(role.getId());
@@ -145,11 +145,11 @@ final class HandoffContinuitySignalAnalyzer {
             return new HandoffReadiness(
                     Objects.requireNonNull(
                             handoff.getSnapshotItemCount(),
-                            "전달된 바통의 항목 수 snapshot은 필수입니다"
+                            "전달된 인수인계의 항목 수 snapshot은 필수입니다"
                     ),
                     Objects.requireNonNull(
                             handoff.getSnapshotIncompleteItemCount(),
-                            "전달된 바통의 미완료 수 snapshot은 필수입니다"
+                            "전달된 인수인계의 미완료 수 snapshot은 필수입니다"
                     )
             );
         }
@@ -168,21 +168,21 @@ final class HandoffContinuitySignalAnalyzer {
             boolean currentCoverageMissing
     ) {
         if (!participantsActive) {
-            return role.getName() + " 바통 참여자 확인 필요";
+            return role.getName() + " 인수인계 참여자 확인 필요";
         }
         if (coverageGap) {
             return role.getName() + " 담당 공백 예정";
         }
         if (currentCoverageMissing) {
-            return role.getName() + " 현재 담당 공백·바통 수락 대기";
+            return role.getName() + " 현재 담당 공백·인수인계 수락 대기";
         }
         if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
-            return role.getName() + " 바통 수락 대기";
+            return role.getName() + " 인수인계 수락 대기";
         }
         if (readiness.itemCount() > 0 && readiness.incompleteItemCount() == 0) {
-            return role.getName() + " 바통 전달 대기";
+            return role.getName() + " 인수인계 전달 대기";
         }
-        return role.getName() + " 바통 준비 지연";
+        return role.getName() + " 인수인계 준비 지연";
     }
 
     private String handoffReason(
@@ -206,28 +206,28 @@ final class HandoffContinuitySignalAnalyzer {
             String formerOwner = fromMember == null
                     ? "이전 담당자 기록을 확인할 수 없어"
                     : "이전 담당자 " + fromMember.getName() + "님이 활동을 종료해";
-            return formerOwner + " 현재 담당 공백입니다. 전달된 바통은 다음 담당자가 "
+            return formerOwner + " 현재 담당 공백입니다. 전달된 인수인계는 다음 담당자가 "
                     + "즉시 수락할 수 있습니다.";
         }
         String dateReason = role.getName() + " 역할의 새 담당 시작일이 " + incomingStartDate + "입니다. ";
         if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
             if (readiness.itemCount() == 0) {
-                return dateReason + "전달 snapshot에 바통 항목이 없고 아직 수락하지 않았습니다.";
+                return dateReason + "전달 당시 기록에 인수인계 항목이 없고 아직 수락하지 않았습니다.";
             }
             if (readiness.incompleteItemCount() > 0) {
-                return dateReason + "전달 snapshot에 미완료 바통 항목이 "
+                return dateReason + "전달 당시 기록에 미완료 인수인계 항목이 "
                         + readiness.incompleteItemCount() + "개 있고 아직 수락하지 않았습니다.";
             }
-            return dateReason + "바통 전달은 끝났지만 아직 다음 담당자가 수락하지 않았습니다.";
+            return dateReason + "인수인계 전달은 끝났지만 아직 다음 담당자가 수락하지 않았습니다.";
         }
         if (readiness.itemCount() == 0) {
-            return dateReason + "준비한 활성 바통 항목이 없습니다.";
+            return dateReason + "준비한 활성 인수인계 항목이 없습니다.";
         }
         if (readiness.incompleteItemCount() > 0) {
-            return dateReason + "미완료 바통 항목이 "
+            return dateReason + "미완료 인수인계 항목이 "
                     + readiness.incompleteItemCount() + "개 남아 있습니다.";
         }
-        return dateReason + "바통 항목 준비는 끝났지만 아직 전달하지 않았습니다.";
+        return dateReason + "인수인계 항목 준비는 끝났지만 아직 전달하지 않았습니다.";
     }
 
     private String handoffAction(
@@ -237,21 +237,21 @@ final class HandoffContinuitySignalAnalyzer {
             boolean currentCoverageMissing
     ) {
         if (coverageGap) {
-            return "현재 담당자가 바통을 취소하고 담당 기간이 이어지도록 다시 준비하세요.";
+            return "현재 담당자가 인수인계를 취소하고 담당 기간이 이어지도록 다시 준비하세요.";
         }
         if (currentCoverageMissing) {
-            return "다음 담당자가 바통을 즉시 수락하거나 현재 담당자 명의로 바통을 취소하세요.";
+            return "다음 담당자가 인수인계를 즉시 수락하거나 현재 담당자 명의로 인수인계를 취소하세요.";
         }
         if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
-            return "다음 담당자가 바통을 수락하고 남은 항목을 확인하세요.";
+            return "다음 담당자가 인수인계를 수락하고 남은 항목을 확인하세요.";
         }
         if (readiness.itemCount() == 0) {
-            return "활성 바통 항목을 추가한 뒤 현재 담당자가 바통을 전달하세요.";
+            return "활성 인수인계 항목을 추가한 뒤 현재 담당자가 인수인계를 전달하세요.";
         }
         if (readiness.incompleteItemCount() == 0) {
-            return "현재 담당자가 준비된 바통을 다음 담당자에게 전달하세요.";
+            return "현재 담당자가 준비된 인수인계를 다음 담당자에게 전달하세요.";
         }
-        return "미완료 항목을 정리한 뒤 현재 담당자가 바통을 전달하세요.";
+        return "미완료 항목을 정리한 뒤 현재 담당자가 인수인계를 전달하세요.";
     }
 
     private String handoffParticipantReason(
@@ -277,7 +277,7 @@ final class HandoffContinuitySignalAnalyzer {
         String currentGap = currentCoverageMissing
                 ? " 이전 담당자의 활동 종료로 현재 담당도 비어 있습니다."
                 : "";
-        return "열린 역할 바통에서 " + String.join(" 및 ", unavailableParticipants)
+        return "진행 중인 역할 인수인계에서 " + String.join(" 및 ", unavailableParticipants)
                 + " 상태를 확인해야 전달이나 수락을 계속할 수 있습니다." + currentGap;
     }
 

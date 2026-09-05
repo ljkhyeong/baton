@@ -17,7 +17,7 @@ export default function RegistrationForm() {
         <h3>인증 메일을 확인해 주세요.</h3>
         <p>
           입력한 주소가 가입 가능한 경우 같은 안내 메일을 보냈습니다.
-          메일의 링크를 연 뒤 비밀번호를 정하면 자체 이메일 로그인을 시작할 수 있습니다.
+          메일의 링크에서 비밀번호를 설정한 뒤 이메일로 로그인하세요.
         </p>
         <Link className="primary-button auth-link-button" to="/login">로그인 화면으로</Link>
       </div>
