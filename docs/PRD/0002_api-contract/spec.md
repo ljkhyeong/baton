@@ -1312,3 +1312,17 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 `fields[]`의 `fieldName`, `beforeValue`, `afterValue`(값이 없으면 null)를 가진다.
 `changedAt`·`id` 내림차순이다. 원본 종류·팀·시즌이 맞지 않으면 기존 원본의 `404` 오류,
 권한이 없으면 `403 WORKSPACE_ACCESS_DENIED`를 반환한다.
+
+### 자료 재확인 주기
+
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications/schedule`는
+현재 읽기 권한으로 `200 OK`, `Cache-Control: no-store`와 `teamId`, `seasonId`, `resourceId`, `version`,
+`intervalDays`, `nextReviewOn`, `today`, `reviewDue`를 반환한다. 미설정은 `version=-1`이며 주기·확인일은 null이다.
+`today`와 `nextReviewOn`은 시즌 시간대의 `YYYY-MM-DD` 날짜다. 확인일 당일부터 `reviewDue=true`다.
+
+같은 경로의 `POST`는 계정 세션·동일 출처·CSRF, `expectedAccountId`, `expectedVersion`(-1 이상),
+`intervalDays`(1~365), `nextReviewOn`을 받는다. 주기와 확인일을 함께 null 또는 생략하면 해제한다.
+연결된 활성 구성원과 자료 수정 권한이 필요하며, 응답은 갱신한 일정의 `200 OK`다.
+버전 불일치·보관 자료는 `409 WORKSPACE_CONTENT_CONFLICT`, 종료 시즌은 기존 종료 오류,
+주기·날짜의 일부 누락과 범위 오류는 `400 INVALID_INPUT`다.
+일정 저장은 자료 버전을 바꾸지 않는다. `CONFIRMED` 확인 저장과 다음 확인일 갱신은 한 트랜잭션이다.

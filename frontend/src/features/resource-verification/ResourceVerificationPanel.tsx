@@ -5,7 +5,8 @@ import { useCurrentAccountMembership } from '@/features/membership/queries'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { workspaceKeys } from '@/features/workspace/queries'
 import { formatInstant } from '@/features/workspace/WorkspaceViews'
-import { getVerificationHistory, verifyResource, type VerifyResourceRequest } from './api'
+import { ResourceReviewSchedulePanel } from './ResourceReviewSchedulePanel'
+import { getVerificationHistory, verifyResource, reviewScheduleKey, type VerifyResourceRequest } from './api'
 import './resource-verification.scss'
 
 export function ResourceVerificationPanel({ scope, resourceId, disabled, onManageMembership }: {
@@ -34,7 +35,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
     mutationFn: () => verifyResource(scope, resourceId, {
       expectedAccountId: accountId, resourceVersion: history.data!.resourceVersion, status, note: note.trim() || undefined,
     }),
-    onSuccess: data => { client.setQueryData(key, data); setNote('') },
+    onSuccess: data => { client.setQueryData(key, data); setNote(''); void client.invalidateQueries({ queryKey: reviewScheduleKey(scope, resourceId) }) },
     onError: () => { void history.refetch() },
   })
   const latest = history.data?.verifications[0]
@@ -51,6 +52,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
             {row.note && <p>{row.note}</p>}
           </li>)}</ol>
         </>}
+    <ResourceReviewSchedulePanel scope={scope} resourceId={resourceId} accountId={accountId} editable={!disabled && Boolean(membership.data?.claimed)} />
     {!disabled && (membership.data?.claimed ? <form onSubmit={event => {
       event.preventDefault()
       if (!history.data || mutation.isPending || !accountId) return

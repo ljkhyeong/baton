@@ -2,10 +2,17 @@ package com.personal.baton.application.workspace.port.in;
 
 import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 public interface ResourceVerificationUseCase {
+    ReviewScheduleResult getSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey);
+    ReviewScheduleResult configureSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
+            UUID accountId, ConfigureReviewScheduleCommand command);
+    record ConfigureReviewScheduleCommand(long expectedVersion, Integer intervalDays, LocalDate nextReviewOn) {}
+    record ReviewScheduleResult(UUID teamId, UUID seasonId, UUID resourceId, long version,
+            Integer intervalDays, LocalDate nextReviewOn, LocalDate today, boolean reviewDue) {}
     VerificationHistoryResult getHistory(UUID teamId, UUID seasonId, UUID resourceId, String accessKey);
     VerificationHistoryResult verify(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
             UUID accountId, VerifyResourceCommand command);

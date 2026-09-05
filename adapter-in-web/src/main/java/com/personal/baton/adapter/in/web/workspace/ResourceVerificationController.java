@@ -26,8 +26,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ResourceVerificationController {
     public static final String PATH = "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications";
+    public static final String SCHEDULE_PATH = PATH + "/schedule";
     private final ResourceVerificationUseCase useCase;
     public ResourceVerificationController(ResourceVerificationUseCase useCase) { this.useCase = useCase; }
+
+    @GetMapping(SCHEDULE_PATH)
+    public ResponseEntity<ResourceReviewScheduleResponse> schedule(@PathVariable UUID teamId, @PathVariable UUID seasonId,
+            @PathVariable UUID resourceId, @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(ResourceReviewScheduleResponse.from(useCase.getSchedule(teamId, seasonId, resourceId, accessKey)));
+    }
+    @PostMapping(SCHEDULE_PATH)
+    public ResponseEntity<ResourceReviewScheduleResponse> configureSchedule(@PathVariable UUID teamId, @PathVariable UUID seasonId,
+            @PathVariable UUID resourceId, @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
+            @Valid @RequestBody ResourceReviewScheduleRequest request) {
+        if (!principal.accountId().equals(request.expectedAccountId())) throw new AccountMembershipConflictException("로그인 계정이 변경되었습니다. 새로고침해 주세요.");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(ResourceReviewScheduleResponse.from(
+                useCase.configureSchedule(teamId, seasonId, resourceId, accessKey, principal.accountId(),
+                        new ResourceVerificationUseCase.ConfigureReviewScheduleCommand(request.expectedVersion(), request.intervalDays(), request.nextReviewOn()))));
+    }
 
     @GetMapping(PATH)
     public ResponseEntity<ResourceVerificationHistoryResponse> history(@PathVariable UUID teamId,

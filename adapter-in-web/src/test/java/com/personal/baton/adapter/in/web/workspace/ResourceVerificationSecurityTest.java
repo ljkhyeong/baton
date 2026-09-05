@@ -48,6 +48,12 @@ class ResourceVerificationSecurityTest {
         mvc.perform(request().with(authentication(auth))).andExpect(status().isForbidden());
         mvc.perform(request().with(authentication(auth)).with(csrf()).header("Origin", "https://foreign.example"))
                 .andExpect(status().isForbidden());
+        var schedule = post(ResourceVerificationController.SCHEDULE_PATH, ID, ID, ID)
+                .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin").header("X-Baton-Access-Key", "key").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedAccountId\":\"" + ID + "\",\"expectedVersion\":-1,\"intervalDays\":30,\"nextReviewOn\":\"2026-09-05\"}");
+        mvc.perform(schedule.with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post(ResourceVerificationController.SCHEDULE_PATH, ID, ID, ID).with(authentication(auth)))
+                .andExpect(status().isForbidden());
         verifyNoInteractions(useCase);
         when(useCase.verify(any(), any(), any(), any(), any(), any()))
                 .thenReturn(new VerificationHistoryResult(ID, ID, ID, 0, List.of()));

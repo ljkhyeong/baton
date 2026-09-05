@@ -1226,6 +1226,10 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
     claimed: true, accountId, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-09-05T00:00:00Z',
   } }))
   const resource = projection.resources.find(item => item.roleId === ROLE_ID)!
+  await page.route('**/role-resources/*/verifications/schedule', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: resource.id, version: -1,
+    intervalDays: null, nextReviewOn: null, today: '2026-09-05', reviewDue: false,
+  } }))
   let version = 0
   let verified = false
   await page.route('**/role-resources/*/verifications', route => {

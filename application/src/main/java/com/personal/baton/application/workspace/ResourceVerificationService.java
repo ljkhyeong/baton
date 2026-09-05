@@ -12,6 +12,9 @@ import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.ResourceVerification;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.Clock;
+import java.time.LocalDate;
+import com.personal.baton.domain.workspace.ResourceReviewSchedule;
+import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +43,35 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     }
 
     @Override
+    public ReviewScheduleResult getSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
+        var scope = authorizer.authorizeRead(teamId, seasonId, accessKey);
+        requireResource(teamId, seasonId, resourceId);
+        return scheduleResult(teamId, seasonId, resourceId, LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
+    }
+
+    @Override
+    @Transactional
+    public ReviewScheduleResult configureSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
+            UUID accountId, ConfigureReviewScheduleCommand command) {
+        var scope = authorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        if (requireResource(teamId, seasonId, resourceId).getArchivedAt() != null) throw new WorkspaceContentConflictException();
+        requireMember(teamId, accountId);
+        var existing = verifications.findSchedule(resourceId);
+        if (existing.map(ResourceReviewSchedule::getVersion).orElse(-1L) != command.expectedVersion()) throw new WorkspaceContentConflictException();
+        var schedule = existing.orElseGet(() -> ResourceReviewSchedule.create(resourceId));
+        schedule.configure(command.intervalDays(), command.nextReviewOn());
+        verifications.saveSchedule(schedule);
+        return scheduleResult(teamId, seasonId, resourceId, LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
+    }
+
+    private ReviewScheduleResult scheduleResult(UUID teamId, UUID seasonId, UUID resourceId, LocalDate today) {
+        var schedule = verifications.findSchedule(resourceId);
+        return new ReviewScheduleResult(teamId, seasonId, resourceId, schedule.map(ResourceReviewSchedule::getVersion).orElse(-1L),
+                schedule.map(ResourceReviewSchedule::getIntervalDays).orElse(null), schedule.map(ResourceReviewSchedule::getNextReviewOn).orElse(null),
+                today, schedule.map(value -> value.isDueOn(today)).orElse(false));
+    }
+
+    @Override
     public VerificationHistoryResult getHistory(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
         authorizer.authorizeRead(teamId, seasonId, accessKey);
         return history(teamId, seasonId, requireResource(teamId, seasonId, resourceId));
@@ -49,18 +81,29 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     @Transactional
     public VerificationHistoryResult verify(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
             UUID accountId, VerifyResourceCommand command) {
-        authorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        var scope = authorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         RoleResource resource = requireResource(teamId, seasonId, resourceId);
         if (resource.getArchivedAt() != null || resource.getVersion() != command.resourceVersion()) {
             throw new WorkspaceContentConflictException();
         }
-        Member member = memberships.findMembership(accountId, teamId)
+        Member member = requireMember(teamId, accountId);
+        verifications.save(ResourceVerification.create(resource, accountId, member, command.status(),
+                command.note(), clock.instant()));
+        if (command.status() == ResourceVerificationStatus.CONFIRMED) {
+            var schedule = verifications.findSchedule(resourceId).orElse(null);
+            if (schedule != null) {
+                schedule.confirmOn(LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
+                verifications.saveSchedule(schedule);
+            }
+        }
+        return history(teamId, seasonId, resource);
+    }
+
+    private Member requireMember(UUID teamId, UUID accountId) {
+        return memberships.findMembership(accountId, teamId)
                 .flatMap(membership -> people.findMemberById(membership.getMemberId()))
                 .filter(found -> found.getTeamId().equals(teamId)).filter(Member::isActive)
                 .orElseThrow(WorkspaceAccessDeniedException::new);
-        verifications.save(ResourceVerification.create(resource, accountId, member, command.status(),
-                command.note(), clock.instant()));
-        return history(teamId, seasonId, resource);
     }
 
     private RoleResource requireResource(UUID teamId, UUID seasonId, UUID resourceId) {

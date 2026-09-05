@@ -12,6 +12,9 @@ import com.personal.baton.application.workspace.port.in.ResourceVerificationUseC
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerificationResult;
 import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import java.time.Instant;
+import java.time.LocalDate;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.ReviewScheduleResult;
+import com.personal.baton.adapter.in.web.workspace.ResourceReviewScheduleRequest;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -107,6 +110,44 @@ class ResourceVerificationRestDocsTest {
                         responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
         verify(useCase).verify(eq(TEAM), eq(SEASON), eq(RESOURCE), eq("key"), eq(ACCOUNT),
                 argThat(command -> command.resourceVersion() == 2 && command.status() == ResourceVerificationStatus.CONFIRMED));
+    }
+
+    @Test @DisplayName("자료 재확인 일정은 시즌의 오늘 날짜와 다음 확인일 및 수정 버전을 반환한다")
+    void documentsSchedule() throws Exception {
+        when(useCase.getSchedule(TEAM, SEASON, RESOURCE, "key")).thenReturn(schedule());
+        mvc.perform(get(ResourceVerificationController.SCHEDULE_PATH, TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", "key"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.today").value("2026-09-05")).andExpect(jsonPath("$.reviewDue").value(true))
+                .andDo(MockMvcRestDocumentationWrapper.document("getResourceReviewSchedule", "자료별 재확인 주기와 시즌 시간대의 확인 기한을 조회한다.", "자료 재확인 일정 조회",
+                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자"), parameterWithName("resourceId").description("자료 식별자")),
+                        requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀의 접근 키").optional()),
+                        responseHeaders(headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
+    }
+    @Test @DisplayName("연결된 구성원은 확인 일정의 버전을 확인하고 재확인 주기를 설정한다")
+    void documentsConfigureSchedule() throws Exception {
+        when(useCase.configureSchedule(any(), any(), any(), any(), any(), any())).thenReturn(schedule());
+        var fields = new ConstrainedFields(ResourceReviewScheduleRequest.class);
+        mvc.perform(post(ResourceVerificationController.SCHEDULE_PATH, TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", "key")
+                        .with(authentication(UsernamePasswordAuthenticationToken.authenticated(new TestPrincipal(ACCOUNT, 0), null, List.of())))
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"expectedAccountId":"%s","expectedVersion":-1,"intervalDays":30,"nextReviewOn":"2026-09-05"}
+                                """.formatted(ACCOUNT)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andDo(MockMvcRestDocumentationWrapper.document("configureResourceReviewSchedule", "연결된 활성 구성원이 재확인 주기와 첫 확인일을 지정하거나 함께 해제한다.", "자료 재확인 일정 설정",
+                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자"), parameterWithName("resourceId").description("자료 식별자")),
+                        requestFields(fields.withPath("expectedAccountId").description("현재 로그인 계정"), fields.withPath("expectedVersion").description("조회한 일정 버전. 미설정은 -1"),
+                                fields.withPath("intervalDays").type(JsonFieldType.NUMBER).optional().description("확인 간격 1~365일. 해제는 null"),
+                                fields.withPath("nextReviewOn").type(JsonFieldType.STRING).optional().description("시즌 달력 기준 다음 확인일. 해제는 null")),
+                        responseHeaders(headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
+    }
+    private ReviewScheduleResult schedule() { return new ReviewScheduleResult(TEAM, SEASON, RESOURCE, 0, 30,
+            LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 5), true); }
+    private ResponseFieldsSnippet scheduleFields() {
+        return responseFields(fieldWithPath("teamId").description("팀 식별자"), fieldWithPath("seasonId").description("시즌 식별자"),
+                fieldWithPath("resourceId").description("자료 식별자"), fieldWithPath("version").description("일정 버전. 미설정은 -1"),
+                fieldWithPath("intervalDays").type(JsonFieldType.NUMBER).optional().description("재확인 간격. 해제는 null"),
+                fieldWithPath("nextReviewOn").type(JsonFieldType.STRING).optional().description("다음 확인일. 해제는 null"),
+                fieldWithPath("today").description("시즌 시간대의 오늘 날짜"), fieldWithPath("reviewDue").description("다음 확인일 당일 또는 지났는지 여부"));
     }
 
     private record TestPrincipal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}

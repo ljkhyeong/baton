@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.error.WorkspaceContentConflictEx
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerifyResourceCommand;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.ConfigureReviewScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
@@ -71,7 +72,18 @@ class ResourceVerificationUseCaseTest {
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), command))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         memberships.claimMembership(new ClaimMembershipCommand(account.getId(), team, season, member.id(), key));
+        var emptySchedule = verifications.getSchedule(team, season, resource.id(), key);
+        assertThat(emptySchedule.version()).isEqualTo(-1);
+        var plan = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(-1, 30, emptySchedule.today()));
+        assertThat(plan.reviewDue()).isTrue();
+        assertThatThrownBy(() -> verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(-1, 7, emptySchedule.today()))).isInstanceOf(WorkspaceContentConflictException.class);
         var history = verifications.verify(team, season, resource.id(), key, account.getId(), command);
+        var nextPlan = verifications.getSchedule(team, season, resource.id(), key);
+        assertThat(nextPlan.nextReviewOn()).isEqualTo(plan.today().plusDays(30));
+        assertThat(nextPlan.reviewDue()).isFalse();
+        assertThat(nextPlan.version()).isGreaterThan(plan.version());
         assertThat(history.verifications()).hasSize(1);
         var confirmed = history.verifications().getFirst();
         assertThat(confirmed.memberId()).isEqualTo(member.id());
@@ -86,6 +98,10 @@ class ResourceVerificationUseCaseTest {
                 .isInstanceOf(WorkspaceContentConflictException.class);
         var current = new VerifyResourceCommand(changed.resourceVersion(), ResourceVerificationStatus.NEEDS_UPDATE, "권한 요청 필요");
         assertThat(verifications.verify(team, season, resource.id(), key, account.getId(), current).verifications()).hasSize(2);
+        assertThat(verifications.getSchedule(team, season, resource.id(), key).nextReviewOn()).isEqualTo(nextPlan.nextReviewOn());
+        var disabled = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(nextPlan.version(), null, null));
+        assertThat(disabled.nextReviewOn()).isNull(); assertThat(disabled.reviewDue()).isFalse();
         people.updateMemberDeactivation(team, season, member.id(), key, true);
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), current))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);

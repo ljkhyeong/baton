@@ -87,7 +87,9 @@ public final class AccountSessionRequestMatchers {
             pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**"), HAS_ACCOUNT_SESSION, UNSAFE);
     private static final RequestMatcher NOTIFICATION_READ = pathPattern(HttpMethod.POST, WorkspaceNotificationController.READ_PATH);
     private static final RequestMatcher NOTIFICATION_INBOX = pathPattern(HttpMethod.GET, WorkspaceNotificationController.PATH);
-    private static final RequestMatcher RESOURCE_VERIFICATION = pathPattern(HttpMethod.POST, ResourceVerificationController.PATH);
+    private static final RequestMatcher RESOURCE_VERIFICATION = new OrRequestMatcher(
+            pathPattern(HttpMethod.POST, ResourceVerificationController.PATH),
+            pathPattern(HttpMethod.POST, ResourceVerificationController.SCHEDULE_PATH));
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
             WORKSPACE_ACCOUNT_MUTATION,

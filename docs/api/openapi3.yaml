@@ -3032,7 +3032,7 @@ paths:
               examples:
                 getDecisionChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"b4b827f7-4c28-40d5-9e46-56481ab14d12","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"f9b465e3-8e1b-46a5-a5f0-7d47d5f79314","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -4636,7 +4636,7 @@ paths:
               examples:
                 getRoleResourceChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"d19e298f-114b-4417-b2e7-27231176fdd6","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"81a32141-5c05-4b0e-8244-4c02f160947a","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -4999,6 +4999,112 @@ paths:
               schema:
                 type: string
       summary: 자료 확인 기록
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications/schedule:
+    get:
+      description: 자료별 재확인 주기와 시즌 시간대의 확인 기한을 조회한다.
+      operationId: getResourceReviewSchedule
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 식별자
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 자료 식별자
+          in: path
+          name: resourceId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 공유 키 팀의 접근 키
+          example: key
+          in: header
+          name: X-Baton-Access-Key
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getResourceReviewSchedule:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","resourceId":"00000000-0000-4000-8000-000000000003","version":0,"intervalDays":30,"nextReviewOn":"2026-09-05","today":"2026-09-05","reviewDue":true}
+              schema:
+                $ref: '#/components/schemas/Schema_2cd4e4ec23232964'
+          headers:
+            Cache-Control:
+              description: 일정 캐시 금지
+              schema:
+                type: string
+      summary: 자료 재확인 일정 조회
+      tags:
+        - api
+    post:
+      description: 연결된 활성 구성원이 재확인 주기와 첫 확인일을 지정하거나 함께 해제한다.
+      operationId: configureResourceReviewSchedule
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 식별자
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 자료 식별자
+          in: path
+          name: resourceId
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              configureResourceReviewSchedule:
+                value: >
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","expectedVersion":-1,"intervalDays":30,"nextReviewOn":"2026-09-05"}
+            schema:
+              $ref: '#/components/schemas/Schema_970b7022a56df951'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                configureResourceReviewSchedule:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","resourceId":"00000000-0000-4000-8000-000000000003","version":0,"intervalDays":30,"nextReviewOn":"2026-09-05","today":"2026-09-05","reviewDue":true}
+              schema:
+                $ref: '#/components/schemas/Schema_2cd4e4ec23232964'
+          headers:
+            Cache-Control:
+              description: 일정 캐시 금지
+              schema:
+                type: string
+      summary: 자료 재확인 일정 설정
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/roles:
@@ -8645,6 +8751,47 @@ components:
       required:
         - verificationRequired
       type: object
+    Schema_2cd4e4ec23232964:
+      properties:
+        version:
+          description: 일정 버전. 미설정은 -1
+          type: number
+        intervalDays:
+          description: 재확인 간격. 해제는 null
+          nullable: true
+          type: number
+        nextReviewOn:
+          description: 다음 확인일. 해제는 null
+          nullable: true
+          type: string
+        resourceId:
+          description: 자료 식별자
+          format: uuid
+          type: string
+        reviewDue:
+          description: 다음 확인일 당일 또는 지났는지 여부
+          type: boolean
+        seasonId:
+          description: 시즌 식별자
+          format: uuid
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+        today:
+          description: 시즌 시간대의 오늘 날짜
+          type: string
+      required:
+        - intervalDays
+        - nextReviewOn
+        - resourceId
+        - reviewDue
+        - seasonId
+        - teamId
+        - today
+        - version
+      type: object
     Schema_316d1fabcd9119c2:
       properties:
         ended:
@@ -9879,6 +10026,30 @@ components:
         - id
         - label
         - roleId
+      type: object
+    Schema_970b7022a56df951:
+      properties:
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        expectedVersion:
+          description: 조회한 일정 버전. 미설정은 -1
+          minimum: -1
+          type: integer
+        intervalDays:
+          description: 확인 간격 1~365일. 해제는 null
+          maximum: 365
+          minimum: 1
+          nullable: true
+          type: integer
+        nextReviewOn:
+          description: 시즌 달력 기준 다음 확인일. 해제는 null
+          nullable: true
+          type: string
+      required:
+        - expectedAccountId
+        - expectedVersion
       type: object
     Schema_974296610da1dd74:
       properties:

@@ -1120,6 +1120,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 자료 재확인 일정 조회
+         * @description 자료별 재확인 주기와 시즌 시간대의 확인 기한을 조회한다.
+         */
+        get: operations["getResourceReviewSchedule"];
+        put?: never;
+        /**
+         * 자료 재확인 일정 설정
+         * @description 연결된 활성 구성원이 재확인 주기와 첫 확인일을 지정하거나 함께 해제한다.
+         */
+        post: operations["configureResourceReviewSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/roles": {
         parameters: {
             query?: never;
@@ -1532,6 +1556,33 @@ export interface components {
         Schema_2a4f2da12175b82c: {
             /** @description 이메일 검증이 필요한 일반화된 등록 결과 */
             verificationRequired: boolean;
+        };
+        Schema_2cd4e4ec23232964: {
+            /** @description 재확인 간격. 해제는 null */
+            intervalDays: number | null;
+            /** @description 다음 확인일. 해제는 null */
+            nextReviewOn: string | null;
+            /**
+             * Format: uuid
+             * @description 자료 식별자
+             */
+            resourceId: string;
+            /** @description 다음 확인일 당일 또는 지났는지 여부 */
+            reviewDue: boolean;
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 시즌 시간대의 오늘 날짜 */
+            today: string;
+            /** @description 일정 버전. 미설정은 -1 */
+            version: number;
         };
         Schema_3a4a0e7a2f90e51f: {
             /** @description 가입한 이메일 */
@@ -2331,6 +2382,19 @@ export interface components {
              * @description 수락을 확인했다고 선언한 다음 담당자 UUID
              */
             confirmedByMemberId: string;
+        };
+        Schema_970b7022a56df951: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 조회한 일정 버전. 미설정은 -1 */
+            expectedVersion: number;
+            /** @description 확인 간격 1~365일. 해제는 null */
+            intervalDays?: number | null;
+            /** @description 시즌 달력 기준 다음 확인일. 해제는 null */
+            nextReviewOn?: string | null;
         };
         Schema_5411bd92352a352b: {
             /** @description 완료 여부 */
@@ -6829,6 +6893,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_3b8b9e297849dc60"];
+                };
+            };
+        };
+    };
+    getResourceReviewSchedule: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 키 팀의 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 자료 식별자 */
+                resourceId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 일정 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_2cd4e4ec23232964"];
+                };
+            };
+        };
+    };
+    configureResourceReviewSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 자료 식별자 */
+                resourceId: string;
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_970b7022a56df951"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 일정 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_2cd4e4ec23232964"];
                 };
             };
         };
