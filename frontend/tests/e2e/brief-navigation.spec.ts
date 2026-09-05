@@ -1,3 +1,4 @@
+import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
@@ -34,6 +35,7 @@ test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @sm
     const request = route.request(); const url = new URL(request.url()); const path = url.pathname
     expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
     expect(request.headers().authorization).toBeUndefined()
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
@@ -92,6 +94,7 @@ test('전달 대기와 실패를 미리 표시하고 준비 완료 때만 생성
   let state = 'DELIVERY_PENDING'; let calls = 0
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: state, pendingCount: state === 'DELIVERY_PENDING' ? 2 : 0,
@@ -119,6 +122,7 @@ test('현재 관심 항목에서 보관된 원본 루틴으로 이동한다 @smo
   await installApi(page, projection); await login(page)
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 1, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: [{ eventType: 'ROUTINE_REPEATEDLY_OVERDUE', sourceReference: SOURCE,
       target: { title: routine.title, roleId: routine.ownerRoleId, routineId: ROUTINE_ID, archived: true } }] } })
@@ -138,6 +142,7 @@ test('선택한 브리프의 추가 전달 상태를 구분하고 잘못된 대�
   let mode = 'ADDITIONAL_DELIVERIES'
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
@@ -174,4 +179,69 @@ test('선택한 브리프의 추가 전달 상태를 구분하고 잘못된 대�
   await expect(panel.getByRole('alert')).toContainText('활동 중인 팀 구성원')
   await expect(delivery).toHaveCount(0)
   await expect(panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })).toHaveCount(0)
+})
+
+
+test('이번 주 해소와 지난주 비교에서 결과·없음·장애·권한 거부를 구분한다 @smoke', async ({ page }) => {
+  await installApi(page); await login(page)
+  let previousStatus = 200
+  let resolutionStatus = 200
+  let resolvedCount = 2
+  const previousTargets: string[] = []
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const url = new URL(route.request().url()); const path = url.pathname
+    if (path.endsWith('/resolutions')) return route.fulfill(resolutionStatus === 200
+      ? { json: { ...weeklyResolutions, resolvedCount } }
+      : { status: resolutionStatus, json: { code: resolutionStatus === 403 ? 'BRIEF_ACCESS_DENIED' : 'BRIEF_UNAVAILABLE', message: '해소 조회 확인이 필요합니다.' } })
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source, target: null })) } })
+    if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [summaries[0]], nextBeforeGeneration: null } })
+    if (path.endsWith('/previous-week')) {
+      previousTargets.push(path.split('/').at(-2)!)
+      return route.fulfill(previousStatus === 200 ? { json: edition(MIDDLE) }
+        : { status: previousStatus, json: { code: previousStatus === 404 ? 'BRIEF_EDITION_NOT_FOUND' : previousStatus === 403 ? 'BRIEF_ACCESS_DENIED' : 'BRIEF_UNAVAILABLE', message: '지난주 조회 확인이 필요합니다.' } })
+    }
+    if (path.endsWith('/changes')) {
+      expect(url.searchParams.get('fromEditionId')).toBe(MIDDLE)
+      expect(path).toContain(LATEST)
+      return route.fulfill({ json: { from: summaries[1], to: summaries[0], added: [], removed: [], changed: [] } })
+    }
+    return route.fulfill({ json: edition(LATEST) })
+  })
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention')
+  await panel.locator('summary').click()
+  const resolutions = panel.getByRole('region', { name: '이번 주 해소 요약' })
+  await expect(resolutions).toContainText('이번 주 해소 2건')
+  resolutionStatus = 503
+  await panel.getByRole('button', { name: '첫 페이지부터 새로고침' }).click()
+  await expect(resolutions).toContainText('이번 주 해소 확인 실패')
+  await expect(resolutions).not.toContainText('이번 주 해소 0건')
+  resolutionStatus = 200; resolvedCount = 0
+  await resolutions.getByRole('button', { name: '해소 요약 다시 조회' }).click()
+  await expect(resolutions).toContainText('이번 주 해소 0건')
+  await panel.getByText('저장된 브리프', { exact: true }).click()
+  await expect(panel.getByText('2026-08-31 시작 주 · 생성 순번 3')).toBeVisible()
+  const button = panel.getByRole('button', { name: '지난주와 바로 비교' })
+  await button.click()
+  await expect(panel.getByRole('region', { name: '브리프 비교 결과' })).toContainText('기준: 2026-08-24 · 생성 2')
+  expect(previousTargets).toEqual([LATEST])
+  previousStatus = 404
+  await button.click()
+  await expect(panel.getByText('선택한 브리프와 같은 시간대의 지난주 브리프가 없습니다.')).toBeVisible()
+  await expect(panel.getByRole('region', { name: '브리프 비교 결과' })).toHaveCount(0)
+  previousStatus = 503
+  await button.click()
+  await expect(panel.getByText('지난주 브리프를 불러오지 못했습니다. 다시 비교해 주세요.')).toBeVisible()
+  previousStatus = 403
+  await button.click()
+  await expect(panel.getByRole('button', { name: '브리프 조회 권한 다시 확인' })).toBeVisible()
+  await expect(panel.getByText('2026-08-31 시작 주 · 생성 순번 3')).toHaveCount(0)
+  resolutionStatus = 403
+  await panel.getByRole('button', { name: '첫 페이지부터 새로고침' }).click()
+  await expect(panel.getByRole('button', { name: '권한 다시 확인', exact: true })).toBeVisible()
+  await expect(resolutions).toHaveCount(0)
 })

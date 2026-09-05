@@ -113,6 +113,44 @@ class BriefApplicationServiceTest {
     }
 
     @Test
+    @DisplayName("해소 요약의 이번 주는 시즌 시간대에서 정하고 권한 거부 전에 외부를 조회하지 않는다")
+    void resolvesCurrentWeekInSeasonZone() {
+        var scope = new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
+        var season = mock(Season.class);
+        when(season.getZoneId()).thenReturn(ZoneId.of("America/Los_Angeles"));
+        when(workspaceAccess.verifyRead(TEAM_ID, SEASON_ID, "workspace-access-key")).thenReturn(season);
+        var boundaryService = new BriefApplicationService(workspaceAccess, workspaceRepository, roundRepository,
+                client, executionPort, Clock.fixed(Instant.parse("2026-08-31T01:00:00Z"), ZoneOffset.UTC), signalStore, true);
+        boundaryService.summarizeWeeklyResolutions(scope);
+        verify(client).summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), season.getZoneId());
+        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
+        org.mockito.Mockito.clearInvocations(client);
+        assertThatThrownBy(() -> boundaryService.summarizeWeeklyResolutions(scope)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key"), EDITION_ID))
+                .isInstanceOf(BriefAccessDeniedException.class);
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    @DisplayName("지난주 조회는 선택한 브리프의 주차와 시간대를 유지하고 잘못된 결과나 없는 주차를 구분한다")
+    void findsPreviousWeekFromSavedEdition() {
+        var scope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
+        var selected = snapshot(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-09"), ZoneId.of("America/New_York"));
+        var previous = snapshot(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), selected.zoneId());
+        when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(selected, "selected", false));
+        when(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, previous.weekStart(), selected.zoneId()))
+                .thenReturn(Result.completed(previous, "previous", false));
+        assertThat(service.findPreviousWeekEdition(scope, EDITION_ID).edition()).isEqualTo(previous);
+        when(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, previous.weekStart(), selected.zoneId()))
+                .thenReturn(Result.completed(selected, "wrong-week", false));
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(scope, EDITION_ID)).isInstanceOf(BriefIntegrationConfigurationException.class);
+        when(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, previous.weekStart(), selected.zoneId()))
+                .thenReturn(Result.failure(BriefServiceClient.Outcome.NOT_FOUND, "missing"));
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(scope, EDITION_ID)).isInstanceOf(BriefEditionNotFoundException.class);
+        verify(client, never()).findLatestEdition(any(), any());
+    }
+
+    @Test
     @DisplayName("식별자를 아는 다른 팀 브리프는 조회와 비교에서 감추고 비교 호출을 막는다")
     void rejectsForeignEditionBeforeComparison() {
         var scope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
@@ -123,6 +161,9 @@ class BriefApplicationServiceTest {
                 .isInstanceOf(BriefEditionNotFoundException.class);
         assertThatThrownBy(() -> service.findEditionDeliveryStatus(scope, EDITION_ID))
                 .isInstanceOf(BriefEditionNotFoundException.class);
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(scope, EDITION_ID))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        verify(client, never()).findLatestEditionForWeek(any(), any(), any(), any());
         verifyNoInteractions(executionPort);
         verify(client, never()).compareEditions(any(), any());
         when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));

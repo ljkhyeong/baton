@@ -120,6 +120,22 @@ class BriefEditionRestDocsTest {
                 .build();
     }
 
+    @Test
+    @DisplayName("선택한 브리프의 지난주 마지막 에디션과 ETag를 반환한다")
+    void documentsPreviousWeekEdition() throws Exception {
+        when(briefEditionUseCase.findPreviousWeekEdition(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
+                .thenReturn(new LatestEditionResult(edition(), ETAG));
+        mockMvc.perform(RestDocumentationRequestBuilders.get(BriefEditionController.PREVIOUS_WEEK_PATH, TEAM_ID, SEASON_ID, EDITION_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY).with(authentication(accountAuthentication())))
+                .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.ETAG, ETAG))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(MockMvcRestDocumentationWrapper.document("getPreviousWeekBriefEdition",
+                        "선택한 브리프와 같은 시간대의 정확한 지난주 마지막 에디션을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.", "BRIEF 지난주 에디션 조회",
+                        pathParameters(parameterWithName("teamId").description("팀 UUID"), parameterWithName("seasonId").description("시즌 UUID"),
+                                parameterWithName("editionId").description("비교 대상 브리프 UUID")),
+                        readHeaders(), editionResponseHeaders(), editionResponseFields()));
+    }
+
     @DisplayName("BRIEF 최신 에디션 API는 권한 범위의 불변 에디션과 ETag를 반환한다")
     @Test
     void documentsLatestEdition() throws Exception {

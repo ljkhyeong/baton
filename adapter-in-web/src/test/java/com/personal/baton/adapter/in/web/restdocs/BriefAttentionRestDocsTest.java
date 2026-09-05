@@ -76,6 +76,27 @@ class BriefAttentionRestDocsTest {
     }
 
     @Test
+    @DisplayName("이번 주 해소 요약은 기간과 확인 가능한 해소 건수를 반환한다")
+    void documentsWeeklyResolutions() throws Exception {
+        when(useCase.summarizeWeeklyResolutions(SCOPE)).thenReturn(new com.personal.baton.application.brief.BriefWeeklyResolutions(
+                java.time.LocalDate.parse("2026-08-31"), java.time.ZoneId.of("Asia/Seoul"),
+                Instant.parse("2026-08-30T15:00:00Z"), Instant.parse("2026-09-06T15:00:00Z"), Instant.parse("2026-09-05T00:00:00Z"), 2L));
+        mvc.perform(get(BriefAttentionController.RESOLUTIONS_PATH, TEAM, SEASON)
+                        .header("X-Baton-Access-Key", "access-key").with(authentication(account())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.resolvedCount").value(2))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefWeeklyResolutions",
+                        "시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수를 중계한다.", "BRIEF 이번 주 해소 요약",
+                        paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키")), headers(),
+                        responseFields(fieldWithPath("weekStart").description("시즌 시간대의 이번 주 월요일"),
+                                fieldWithPath("zoneId").description("시즌 IANA 시간대"),
+                                fieldWithPath("windowStart").description("주간 시작 시각 이상"),
+                                fieldWithPath("windowEnd").description("다음 주 시작 시각 미만"),
+                                fieldWithPath("evaluatedAt").description("BRIEF 집계 확인 시각"),
+                                fieldWithPath("resolvedCount").description("확인 가능한 현재 해소 항목 수. 누락 증거가 있는 항목 제외"))));
+    }
+
+    @Test
     @DisplayName("활성 관심 항목 요약과 조회 실패는 서로 다른 HTTP 결과로 반환한다")
     void documentsSummaryAndUnavailable() throws Exception {
         when(useCase.summarizeAttention(SCOPE)).thenReturn(new BriefAttentionSummary(2L, 3L, 1L));

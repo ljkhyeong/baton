@@ -1,3 +1,4 @@
+import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
 import { installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
 
@@ -24,6 +25,7 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
     if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (request.method() === 'POST') {
@@ -95,6 +97,7 @@ test('종료 시즌은 저장된 브리프만 조회하고 생성을 막는다 @
     if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: 'UNKNOWN', checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
+    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     return route.fulfill({ json: { editionId: EDITION, workspaceId: TEAM_ID, seasonId: SEASON_ID, generation: 1,

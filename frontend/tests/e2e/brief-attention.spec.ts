@@ -1,3 +1,4 @@
+import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
 import { installApi, openSharedWorkspace, TEAM_ID, MEMBER_ONE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
 
@@ -27,6 +28,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
         state: older ? 'RESOLVED' : 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', detectedRevisionGap: older, sourceSeverity: older ? 'CRITICAL' : 'WARNING' }],
       nextBeforeAggregateRevision: older ? null : 3 } })
     }
+    if (url.pathname.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (url.pathname.endsWith('/summary')) {
       return unavailable
         ? route.fulfill({ status: 503, json: { code: 'BRIEF_UNAVAILABLE', message: 'BRIEF에 연결할 수 없습니다.' } })

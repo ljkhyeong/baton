@@ -58,6 +58,25 @@ class RestClientBriefServiceClientTest {
     }
 
     @Test
+    @DisplayName("주간 해소는 요청 기간을 보존하고 다른 기간의 요약을 거부한다")
+    void validatesWeeklyResolutionWindow() {
+        String body = """
+                {"weekStart":"2026-03-02","zoneId":"America/New_York","windowStart":"2026-03-02T05:00:00Z",
+                 "windowEnd":"2026-03-09T04:00:00Z","evaluatedAt":"2026-03-08T12:00:00Z","resolvedCount":2}
+                """;
+        server.expect(request -> {
+                    assertThat(request.getURI().getPath()).endsWith("/attention-items/resolutions");
+                    assertThat(request.getURI().getQuery()).isEqualTo("weekStart=2026-03-02&zoneId=America/New_York");
+                }).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                .body(body.replace("2026-03-09T04:00:00Z", "2026-03-09T05:00:00Z")));
+        assertThat(client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York")).resolvedCount()).isEqualTo(2);
+        assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York")))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("관심 항목 필터의 false 값과 특수 문자가 있는 커서를 그대로 전달한다")
     void preservesAttentionFiltersAndEncodedCursor() {
         server.expect(request -> {

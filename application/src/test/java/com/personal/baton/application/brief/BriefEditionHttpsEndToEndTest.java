@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -173,8 +174,14 @@ class BriefEditionHttpsEndToEndTest {
                         );
                         insertAccount(batonDatabase);
                         session.attention(firstWorkspace, "/summary", 401);
+                        session.attention(firstWorkspace, "/resolutions", 401);
+                        session.send("GET", firstWorkspace.generationPath() + "/" + UUID.randomUUID() + "/previous-week",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 401);
                         session.login();
                         session.attention(firstWorkspace, "/summary", 403);
+                        session.attention(firstWorkspace, "/resolutions", 403);
+                        session.send("GET", firstWorkspace.generationPath() + "/" + UUID.randomUUID() + "/previous-week",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 403);
                         session.claimMembership(firstWorkspace);
                         assertThat(json(session.attention(firstWorkspace, "/summary", 200)).path("highCount").asLong()).isZero();
 
@@ -275,6 +282,18 @@ class BriefEditionHttpsEndToEndTest {
                         assertThat(olderTransitions.path("transitions").get(0).path("aggregateRevision").asLong()).isEqualTo(1);
                         assertThat(olderTransitions.path("transitions").get(0).path("detectedRevisionGap").asBoolean()).isFalse();
                         assertThat(olderTransitions.path("nextBeforeAggregateRevision").isNull()).isTrue();
+                        var resolvedAt = Instant.parse(json(latest).path("windowStart").asText()).atOffset(ZoneOffset.UTC);
+                        briefDatabase.update("""
+                                INSERT INTO source_event_receipt (event_id, event_type, event_version, workspace_id,
+                                    season_id, source_reference, aggregate_revision, occurred_at, event_state,
+                                    payload_fingerprint, processing_outcome, received_at, source_severity)
+                                VALUES (?, 'ROLE_UNASSIGNED', 2, ?, ?, 'role:c+& 한글', 4, ?, 'RESOLVED', ?, 'APPLIED', ?, 'WARNING')
+                                """, UUID.randomUUID(), firstWorkspace.teamId(), firstWorkspace.seasonId(), resolvedAt, "0".repeat(64), resolvedAt);
+                        briefDatabase.update("UPDATE attention_item SET item_status = 'RESOLVED', last_revision = 4 WHERE workspace_id = ? AND season_id = ? AND source_reference = 'role:c+& 한글'",
+                                firstWorkspace.teamId(), firstWorkspace.seasonId());
+                        JsonNode resolutions = json(session.attention(firstWorkspace, "/resolutions", 200));
+                        assertThat(resolutions.path("resolvedCount").asLong()).isOne();
+                        assertThat(resolutions.path("weekStart").asText()).isEqualTo(json(latest).path("weekStart").asText());
                         session.attention(new Workspace(firstWorkspace.teamId(), UUID.randomUUID(),
                                 firstWorkspace.memberId(), firstWorkspace.accessKey()), "/summary", 404);
                         session.attention(new Workspace(firstWorkspace.teamId(), firstWorkspace.seasonId(),
@@ -416,6 +435,27 @@ class BriefEditionHttpsEndToEndTest {
                         assertThat(reused.path("editionId").asText()).isEqualTo(changedGeneration.path("editionId").asText());
                         assertThat(reused.path("created").asBoolean()).isFalse();
                         assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
+                        currentSession.send("GET", changedPath + "/previous-week", secondHeaders, null, false, 404);
+                        currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId + "/previous-week",
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
+                        // 지난주 저장 자료를 준비해 정확한 시간대·최대 생성 순번 선택을 실제 내부 HTTPS에서 확인한다.
+                        var previousWeek = LocalDate.parse(secondEdition.path("weekStart").asText()).minusWeeks(1);
+                        UUID previousEditionId = UUID.randomUUID();
+                        for (int index = 3; index <= 5; index++) {
+                            var zone = ZoneId.of(index == 5 ? "America/New_York" : secondEdition.path("zoneId").asText());
+                            briefDatabase.update("""
+                                    INSERT INTO brief_edition (edition_id, workspace_id, season_id, generation, week_start, zone_id,
+                                        window_start, window_end, rule_version, source_cursor, state_fingerprint, generated_at)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
+                                    """, index == 4 ? previousEditionId : UUID.randomUUID(), secondWorkspace.teamId(), secondWorkspace.seasonId(),
+                                    index, previousWeek, zone.getId(), previousWeek.atStartOfDay(zone).toOffsetDateTime(),
+                                    previousWeek.plusWeeks(1).atStartOfDay(zone).toOffsetDateTime(), Integer.toString(index).repeat(64),
+                                    Instant.now().atOffset(ZoneOffset.UTC));
+                        }
+                        var previousResponse = currentSession.send("GET", changedPath + "/previous-week", secondHeaders, null, false, 200);
+                        assertThat(json(previousResponse).path("editionId").asText()).isEqualTo(previousEditionId.toString());
+                        assertThat(json(previousResponse).path("ruleVersion").asInt()).isEqualTo(1);
+                        assertThat(requiredHeader(previousResponse, "ETag")).contains(previousEditionId.toString());
                         assertSecretsAbsent(
                                 batonWithCurrentToken.getLogs(),
                                 caddy.getLogs(),
