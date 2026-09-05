@@ -1,6 +1,9 @@
 package com.personal.baton.application.roundauth;
 
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
+import com.personal.baton.application.identity.port.out.IdentityRepository;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
+import com.personal.baton.domain.identity.Account;
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
@@ -37,6 +40,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
     private final VerifyWorkspaceAccessUseCase workspaceAccess;
     private final RoundRoomIdGenerator roomIdGenerator;
     private final ActiveAccountTeamMembershipVerifier membershipVerifier;
+    private final IdentityRepository identities;
     private final Clock clock;
 
     public RoundAdministrationService(
@@ -46,7 +50,8 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
             VerifyWorkspaceAccessUseCase workspaceAccess,
             RoundRoomIdGenerator roomIdGenerator,
             ActiveAccountTeamMembershipVerifier membershipVerifier,
-            Clock clock
+            Clock clock,
+            IdentityRepository identities
     ) {
         this.roundRepository = roundRepository;
         this.peopleRepository = peopleRepository;
@@ -55,6 +60,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
         this.roomIdGenerator = roomIdGenerator;
         this.membershipVerifier = membershipVerifier;
         this.clock = clock;
+        this.identities = identities;
     }
 
     @Override
@@ -84,6 +90,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
                 command.seasonId(),
                 command.workspaceAccessKey()
         );
+        identities.findAccountById(command.accountId()).filter(Account::isActive).orElseThrow(AccountDeactivatedException::new);
         Member member = peopleRepository.findMemberById(command.memberId())
                 .filter(found -> found.getTeamId().equals(command.teamId()))
                 .filter(Member::isActive)

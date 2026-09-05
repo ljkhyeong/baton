@@ -62,7 +62,7 @@ export default function AccountSecurityPage() {
         description="내 캘린더 구독과 로그인 수단을 확인하고 비밀번호와 계정 세션을 관리합니다."
       >
         <CalendarSubscriptionList key={sessionQuery.data.accountId} accountId={sessionQuery.data.accountId} />
-        <AccountSecurityPanel accountId={sessionQuery.data.accountId} />
+        <AccountSecurityPanel key={sessionQuery.data.accountId} accountId={sessionQuery.data.accountId} />
       </AuthPageShell>
     </>
   )

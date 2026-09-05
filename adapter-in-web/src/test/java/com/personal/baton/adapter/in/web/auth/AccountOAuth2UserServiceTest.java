@@ -1,11 +1,15 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.application.identity.AccountView;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.List;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -276,6 +280,26 @@ class AccountOAuth2UserServiceTest {
 
         assertThatThrownBy(() -> service.loadOAuth2User(userRequest))
                 .isSameAs(failure);
+    }
+
+    @Test @DisplayName("비활성 계정의 OAuth 로그인은 계정 상태 안내로 리디렉션한다")
+    @SuppressWarnings("unchecked")
+    void rejectsDeactivatedOAuthAccount() throws Exception {
+        var resolve = mock(ResolveExternalLoginUseCase.class);
+        OAuth2UserService<OidcUserRequest, OidcUser> oidc = mock(OAuth2UserService.class);
+        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth = mock(OAuth2UserService.class);
+        var request = mock(OidcUserRequest.class);
+        var user = mock(OidcUser.class);
+        when(request.getClientRegistration()).thenReturn(googleRegistration());
+        when(user.getSubject()).thenReturn("disabled-google-subject");
+        when(oidc.loadUser(request)).thenReturn(user);
+        when(resolve.resolveExternalLogin(any())).thenThrow(new AccountDeactivatedException());
+        var service = service(resolve, oidc, oauth);
+        var failure = assertThrows(OAuth2AuthenticationException.class, () -> service.loadOidcUser(request));
+        assertThat(failure.getError().getErrorCode()).isEqualTo("account_deactivated");
+        var response = new MockHttpServletResponse();
+        new OAuthBrowserAuthenticationFailureHandler().onAuthenticationFailure(new MockHttpServletRequest(), response, failure);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/login?accountNotice=account_deactivated");
     }
 
     private AccountOAuth2UserService service(

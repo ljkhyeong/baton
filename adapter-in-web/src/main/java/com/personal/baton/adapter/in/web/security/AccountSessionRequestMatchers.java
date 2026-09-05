@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.security;
 
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.auth.AccountDeactivationController;
 import com.personal.baton.adapter.in.web.auth.CurrentAuthenticatedAccount;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
 import com.personal.baton.adapter.in.web.workspace.NotificationPreferencesController;
@@ -106,6 +107,7 @@ public final class AccountSessionRequestMatchers {
             CALENDAR_MUTATION
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
+            pathPattern(HttpMethod.POST, AccountDeactivationController.PATH),
             ACCOUNT_SECURITY_READ,
             NOTIFICATION_PREFERENCES,
             TEAM_ACCESS,

@@ -15,6 +15,7 @@ public interface CalendarSubscriptionStore {
     Claim claim(Owner owner, boolean create, boolean revoking, Instant now);
     boolean release(Claim claim, boolean revoked);
     void requestRevocation(Owner owner);
+    void requestAccountRevocation(UUID accountId);
     void requestMemberRevocation(UUID teamId, UUID memberId);
     void requestUnauthorizedRevocations(UUID teamId);
     List<Owner> pendingRevocations(Instant now);

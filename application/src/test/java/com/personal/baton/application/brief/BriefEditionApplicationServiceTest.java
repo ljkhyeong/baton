@@ -29,6 +29,8 @@ import com.personal.baton.domain.workspace.Team;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
+import com.personal.baton.application.identity.port.out.IdentityRepository;
+import com.personal.baton.domain.identity.Account;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -84,8 +86,11 @@ class BriefEditionApplicationServiceTest {
 
     @BeforeEach
     void setUp() {
+        var identities = mock(IdentityRepository.class);
+        var account = Account.create(ACCOUNT_ID, "검증 계정", NOW);
+        when(identities.findAccountById(ACCOUNT_ID)).thenReturn(Optional.of(account));
         ActiveAccountTeamMembershipVerifier membershipVerifier =
-                new ActiveAccountTeamMembershipVerifier(roundRepository, workspaceRepository, sharedKeyTeams());
+                new ActiveAccountTeamMembershipVerifier(roundRepository, workspaceRepository, sharedKeyTeams(), identities);
         service = new BriefEditionApplicationService(
                 workspaceAccess,
                 membershipVerifier,

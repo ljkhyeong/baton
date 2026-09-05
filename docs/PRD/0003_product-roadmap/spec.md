@@ -377,3 +377,5 @@ AI는 조직 결정을 대신하지 않고 검색, 요약과 누락 후보 제�
 - [WATCH 트랜잭셔널 아웃박스와 수렴형 동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
 - [BATON CAL 일정 스냅샷 생산자 경계](../../ADR/0019_calendar_snapshot_producer/adr.md)
+
+계정 정리의 현재 범위는 비활성화다. 모든 세션 만료·재로그인 거부·팀 권한 회수·마지막 관리자 보호·개인 CAL 구독 해지 예약을 제공하며 조직 기록과 로그인 정보는 보존한다. 완전 탈퇴와 재활성화는 별도 요구를 확정한 뒤 진행한다.

@@ -40,6 +40,7 @@ const oauthCallbackErrorMessages = {
 
 const accountSecurityNotices = {
   password_changed: '비밀번호를 변경하고 모든 기존 계정 세션을 종료했습니다. 새 비밀번호로 로그인해 주세요.',
+  account_deactivated: '비활성화된 계정입니다. 이 계정으로 다시 로그인할 수 없으며 팀 기록과 로그인 정보는 보존됩니다.',
   sessions_revoked: '모든 기기의 기존 계정 세션을 종료했습니다. 계속하려면 다시 로그인해 주세요.',
 } as const
 
@@ -56,7 +57,7 @@ function oauthCallbackErrorMessage(search: string) {
 
 function accountSecurityNotice(search: string) {
   const notice = new URLSearchParams(search).get('accountNotice')
-  return notice === 'password_changed' || notice === 'sessions_revoked'
+  return notice === 'password_changed' || notice === 'sessions_revoked' || notice === 'account_deactivated'
     ? accountSecurityNotices[notice]
     : null
 }

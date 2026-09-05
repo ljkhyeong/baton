@@ -688,10 +688,15 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - ROUND 프로덕션 런타임 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
 - BATON CAL 일정 스냅샷 생산자 경계: [ADR-0019](docs/ADR/0019_calendar_snapshot_producer/adr.md)
 - 결정·자료 수정 이력: [ADR-0023](docs/ADR/0023_content-change-history/adr.md)
+- 기록을 보존하는 계정 비활성화: [ADR-0024](docs/ADR/0024_account-deactivation/adr.md)
 - 개인 캘린더 구독 소유권과 폐기: [ADR-0022](docs/ADR/0022_calendar-subscription-owner-and-recovery/adr.md)
 - BRIEF 조회·생성 애플리케이션 경계: [ADR-0020](docs/ADR/0020_brief-query-generation-boundary/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
+
+## 계정 비활성화
+
+계정 비활성화는 내 계정 화면에서 실행한다. 마지막 팀 관리자는 후임 관리자를 먼저 지정해야 하며, 비활성화 후 로그인과 새 계정 권한 접근을 중지한다. 팀 기록·로그인 정보·구성원 활동 상태는 보존하고 개인 CAL 구독은 해지를 예약한다. 공유 키는 별도로 관리한다. 직접 재활성화와 로그인 정보 삭제를 포함한 완전 탈퇴는 제공하지 않는다.
 
 ## 팀 초대와 계정 권한
 

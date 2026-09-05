@@ -1188,3 +1188,34 @@ test('@responsive 모바일 로그인은 가로 넘침 없이 키보드 focus와
   expect(contrastRatio(naverColors.foreground, naverColors.background))
     .toBeGreaterThanOrEqual(4.5)
 })
+
+test('@smoke @responsive 계정 비활성화는 기록 보존을 확인하고 마지막 관리자 오류를 안내한 뒤 로그아웃한다', async ({ page }) => {
+  const sessionState = { authenticated: true }
+  await installAuthApi(page, { sessionState })
+  let blocked = true
+  let submitted = 0
+  await page.route('**/api/v1/auth/account-deactivations', route => {
+    expect(route.request().method()).toBe('POST')
+    expect(route.request().headers()['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(route.request().postDataJSON()).toEqual({ expectedAccountId: ACCOUNT_ID })
+    submitted++
+    if (blocked) return route.fulfill({ status: 409, json: { code: 'ACCOUNT_DEACTIVATION_BLOCKED', message: '운영 팀에서 다른 활성 관리자를 지정한 뒤 계정을 비활성화해 주세요' } })
+    sessionState.authenticated = false
+    return route.fulfill({ status: 204 })
+  })
+  await page.goto('/account')
+  const section = page.getByRole('region', { name: '계정 비활성화', exact: true })
+  await expect(section).toContainText('팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다.')
+  await expect(section.getByRole('button', { name: '이 계정 비활성화' })).toBeDisabled()
+  expect(submitted).toBe(0)
+  await section.getByRole('checkbox', { name: '기록 보존과 로그인 중지를 확인했습니다.' }).check()
+  await section.getByRole('button', { name: '이 계정 비활성화' }).click()
+  await expect(section.getByRole('alert')).toContainText('운영 팀에서 다른 활성 관리자를 지정')
+  await expect(page).toHaveURL(/\/account$/)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  blocked = false
+  await section.getByRole('button', { name: '이 계정 비활성화' }).click()
+  await expect(page.getByText('비활성화된 계정입니다. 이 계정으로 다시 로그인할 수 없으며 팀 기록과 로그인 정보는 보존됩니다.')).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
+  expect(submitted).toBe(2)
+})

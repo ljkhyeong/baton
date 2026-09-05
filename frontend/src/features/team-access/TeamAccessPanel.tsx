@@ -93,7 +93,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         {!invite.acceptedAt && !invite.revokedAt && <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ kind: 'revoke', id: invite.id })}>초대 취소</button>}
       </li>)}</ul>
       <details><summary>최근 권한 변경 이력</summary><ul>{access.audit.map(item => <li key={item.id}><span>
-        {access.members.find(member => member.memberId === item.memberId)?.memberName} · {({ ADMIN_RECOVERY: '관리자 지정·복구', INVITED: '초대 생성', INVITATION_REVOKED: '초대 취소', INVITATION_ACCEPTED: '초대 수락', PERMISSION_CHANGED: '권한 변경' } as Record<string, string>)[item.action] ?? '접근 설정 변경'}
+        {access.members.find(member => member.memberId === item.memberId)?.memberName} · {({ ADMIN_RECOVERY: '관리자 지정·복구', INVITED: '초대 생성', INVITATION_REVOKED: '초대 취소', INVITATION_ACCEPTED: '초대 수락', PERMISSION_CHANGED: '권한 변경', ACCOUNT_DEACTIVATED: '계정 비활성화' } as Record<string, string>)[item.action] ?? '접근 설정 변경'}
         <small>변경한 사람: {access.members.find(member => member.accountId === item.actorAccountId)?.memberName ?? '연결된 구성원 없음'}</small>
         <small>{item.previousPermission ? permissionNames[item.previousPermission] : '접근 없음'} → {item.permission ? permissionNames[item.permission] : '접근 없음'} · {formatInstant(item.changedAt)}</small>
       </span></li>)}</ul></details>

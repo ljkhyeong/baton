@@ -10,6 +10,8 @@ import java.util.UUID;
 
 public interface TeamAccessRepository {
     List<MyTeamResult> findAccountTeams(UUID accountId);
+    List<UUID> findAccountMembershipTeamIds(UUID accountId);
+    List<AccountTeamMembership> lockAccountMemberships(UUID accountId);
     List<AccountTeamMembership> findMemberships(UUID teamId);
     AccountTeamMembership saveMembership(AccountTeamMembership membership);
     Optional<UUID> findInvitationTeamId(String tokenHash);

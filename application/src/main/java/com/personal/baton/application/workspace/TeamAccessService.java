@@ -3,6 +3,9 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
 import com.personal.baton.application.identity.port.out.CurrentAccountProvider;
+import com.personal.baton.application.identity.port.out.IdentityRepository;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
+import com.personal.baton.domain.identity.Account;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -44,12 +47,13 @@ public class TeamAccessService implements TeamAccessUseCase {
     private final WorkspaceAccessControl secrets;
     private final TeamAccountAccessPolicy policy;
     private final CurrentAccountProvider accounts;
+    private final IdentityRepository identities;
     private final Clock clock;
     private final CalendarSubscriptionStore calendarSubscriptions;
     private final SecureRandom random = new SecureRandom();
     public TeamAccessService(WorkspaceAccessRepository teams, WorkspacePeopleRepository people,
             WorkspaceSeasonRepository seasons, RoundAuthorizationRepository memberships, TeamAccessRepository access,
-            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions) {
+            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities) {
         this.teams = teams;
         this.people = people;
         this.seasons = seasons;
@@ -59,6 +63,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         this.policy = policy;
         this.accounts = accounts;
         this.clock = clock;
+        this.identities = identities;
         this.calendarSubscriptions = calendarSubscriptions;
     }
     @Override
@@ -80,6 +85,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         requireActor(accountId);
         secrets.verifyWorkspaceRecoveryPermission(recoveryKey);
         Team team = lockTeam(teamId);
+        requireActiveAccount(accountId);
         requireActiveMember(teamId, memberId);
         AccountTeamMembership membership = memberships.findMembership(accountId, teamId)
                 .filter(value -> value.getMemberId().equals(memberId)).orElseThrow(WorkspaceAccessDeniedException::new);
@@ -131,7 +137,10 @@ public class TeamAccessService implements TeamAccessUseCase {
         Team team = requireAdministrator(teamId);
         var membership = access.findMemberships(teamId).stream().filter(value -> value.getMemberId().equals(memberId))
                 .findFirst().orElseThrow(() -> new WorkspaceNotFoundException("MEMBERSHIP_NOT_FOUND", "연결된 계정을 찾을 수 없습니다"));
-        if (permission != null) requireActiveMember(teamId, memberId);
+        if (permission != null) {
+            requireActiveMember(teamId, memberId);
+            requireActiveAccount(membership.getAccountId());
+        }
         if (permission != TeamPermission.ADMIN) policy.requireOtherAdministrator(team, memberId);
         TeamPermission previous = membership.getPermission();
         membership.changePermission(permission);
@@ -166,6 +175,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         String hash = tokenHash(token);
         UUID teamId = access.findInvitationTeamId(hash).orElseThrow(this::invitationNotFound);
         Team team = lockTeam(teamId);
+        requireActiveAccount(accountId);
         if (!team.isAccountAccessEnabled()) throw invitationNotFound();
         TeamInvitation invitation = access.lockInvitation(hash).orElseThrow(this::invitationNotFound);
         Member member = requireActiveMember(teamId, invitation.getMemberId());
@@ -203,6 +213,9 @@ public class TeamAccessService implements TeamAccessUseCase {
         policy.requireAdministrator(team); return team;
     }
     private Team lockTeam(UUID teamId) { return teams.findTeamByIdForUpdate(teamId).orElseThrow(this::teamNotFound); }
+    private void requireActiveAccount(UUID accountId) {
+        identities.findAccountByIdForUpdate(accountId).filter(Account::isActive).orElseThrow(AccountDeactivatedException::new);
+    }
     private void requireActor(UUID accountId) {
         if (accountId == null || accounts.currentAccountId().filter(accountId::equals).isEmpty()) throw new WorkspaceAccessDeniedException();
     }

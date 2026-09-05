@@ -14,6 +14,7 @@ import type {
   LocalRegistrationResponse,
   AccountSecurity,
   LocalPasswordChangeRequest,
+  AccountDeactivationRequest,
 } from '@/features/auth/types'
 import { apiRequest } from '@/shared/api/client'
 
@@ -123,5 +124,11 @@ export async function revokeAccountSessions(): Promise<void> {
     method: 'POST',
     headers: await mutationHeaders(),
     responseType: 'no-content',
+  })
+}
+
+export async function deactivateAccount(request: AccountDeactivationRequest): Promise<void> {
+  await apiRequest(`${AUTH_ROOT}/account-deactivations`, {
+    method: 'POST', body: request, headers: await mutationHeaders(), responseType: 'no-content',
   })
 }

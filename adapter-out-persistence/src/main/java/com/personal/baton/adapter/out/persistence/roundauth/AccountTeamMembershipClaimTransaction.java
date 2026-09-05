@@ -1,6 +1,9 @@
 package com.personal.baton.adapter.out.persistence.roundauth;
 
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
+import com.personal.baton.domain.identity.Account;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
+import com.personal.baton.adapter.out.persistence.identity.AccountJpaRepository;
 import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,18 +15,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccountTeamMembershipClaimTransaction {
 
     private final EntityManager entityManager;
+    private final AccountJpaRepository accounts;
     private final AccountTeamMembershipJpaRepository membershipRepository;
 
     public AccountTeamMembershipClaimTransaction(
             EntityManager entityManager,
-            AccountTeamMembershipJpaRepository membershipRepository
+            AccountTeamMembershipJpaRepository membershipRepository,
+            AccountJpaRepository accounts
     ) {
         this.entityManager = entityManager;
+        this.accounts = accounts;
         this.membershipRepository = membershipRepository;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AccountTeamMembership create(AccountTeamMembership membership) {
+        accounts.findForUpdateById(membership.getAccountId()).filter(Account::isActive).orElseThrow(AccountDeactivatedException::new);
         try {
             entityManager.persist(membership);
             entityManager.flush();

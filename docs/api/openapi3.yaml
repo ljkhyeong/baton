@@ -240,6 +240,67 @@ paths:
       summary: 계정 보안 정보 조회
       tags:
         - api
+  /api/v1/auth/account-deactivations:
+    post:
+      description: 현재 계정을 비활성화하고 모든 세션과 계정 권한 접근을 중지한다. 조직 기록은 보존하며 마지막 관리자는 먼저 후임 관리자를 지정해야 한다.
+      operationId: deactivateAccount
+      parameters:
+        - description: BATON 동일 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: same-origin
+          example: same-origin
+          in: header
+          name: Sec-Fetch-Site
+          required: true
+          schema:
+            type: string
+        - description: 세션 CSRF 토큰
+          example: csrf
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              deactivateAccount:
+                value: '{"expectedAccountId":"00000000-0000-4000-8000-000000000004"}'
+              deactivateAccountLastAdministrator:
+                value: '{"expectedAccountId":"00000000-0000-4000-8000-000000000004"}'
+            schema:
+              $ref: '#/components/schemas/Schema_c22d40e7f42d4109'
+        required: true
+      responses:
+        '204':
+          description: '204'
+          headers:
+            Cache-Control:
+              description: 캐시 금지
+              schema:
+                type: string
+            Set-Cookie:
+              description: 현재 JSESSIONID 제거
+              schema:
+                type: string
+        '409':
+          description: '409'
+          content:
+            application/json:
+              examples:
+                deactivateAccountLastAdministrator:
+                  value: '{"code":"ACCOUNT_DEACTIVATION_BLOCKED","message":"운영 팀 팀에서 다른 활성 관리자를 지정한 뒤 계정을 비활성화해 주세요"}'
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: 계정 비활성화
+      tags:
+        - api
   /api/v1/auth/csrf:
     get:
       description: 로그인·가입 등 쿠키 인증 변경 전에 사용할 CSRF 토큰을 준비한다.
@@ -1756,6 +1817,8 @@ paths:
             examples:
               changeTeamPermission:
                 value: '{"expectedAccountId":"00000000-0000-4000-8000-000000000004","permission":"VIEWER"}'
+              changeTeamPermissionDeactivatedAccount:
+                value: '{"expectedAccountId":"00000000-0000-4000-8000-000000000004","permission":"VIEWER"}'
             schema:
               $ref: '#/components/schemas/Schema_8ff7ee21dc10031e'
         required: true
@@ -1775,6 +1838,15 @@ paths:
               description: 비공개 응답 캐시 금지
               schema:
                 type: string
+        '403':
+          description: '403'
+          content:
+            application/json:
+              examples:
+                changeTeamPermissionDeactivatedAccount:
+                  value: '{"code":"ACCOUNT_DEACTIVATED","message":"비활성화한 계정은 사용할 수 없습니다"}'
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: 팀 구성원 권한 변경
       tags:
         - api
@@ -3121,7 +3193,7 @@ paths:
               examples:
                 getDecisionChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"7e100c12-b540-491d-a971-b2008df69ea9","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"DECISION","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"00000000-0000-4000-8000-000000000004","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}
@@ -4725,7 +4797,7 @@ paths:
               examples:
                 getRoleResourceChanges:
                   value: >-
-                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"9169ec5b-6a9c-4b18-824e-497b3271b184","actorAccountId":null,"actorName":"공유
+                    {"teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","recordKind":"ROLE_RESOURCE","recordId":"00000000-0000-4000-8000-000000000003","changes":[{"id":"00000000-0000-4000-8000-000000000004","actorAccountId":null,"actorName":"공유
                     키
                     사용자","changedAt":"2026-09-05T03:00:00Z","fields":[{"fieldName":"제목","beforeValue":"운영안","afterValue":"수정한
                     운영안"}]}]}

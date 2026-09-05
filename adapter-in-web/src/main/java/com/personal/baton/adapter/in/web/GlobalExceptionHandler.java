@@ -1,6 +1,8 @@
 package com.personal.baton.adapter.in.web;
 
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
+import com.personal.baton.application.identity.error.AccountDeactivationBlockedException;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.watch.error.WatchHealthEventConflictException;
 import com.personal.baton.application.watch.error.WatchHealthEventChangedAtOutOfRangeException;
 import com.personal.baton.application.watch.error.WatchHealthEventIdMismatchException;
@@ -45,6 +47,16 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    @ExceptionHandler(AccountDeactivationBlockedException.class)
+    public ResponseEntity<ErrorResponse> accountDeactivationBlocked(AccountDeactivationBlockedException exception, HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "ACCOUNT_DEACTIVATION_BLOCKED", exception.getMessage(), exception, request);
+    }
+
+    @ExceptionHandler(AccountDeactivatedException.class)
+    public ResponseEntity<ErrorResponse> accountDeactivated(AccountDeactivatedException exception, HttpServletRequest request) {
+        return error(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", exception.getMessage(), exception, request);
+    }
 
     @ExceptionHandler(AccountMembershipConflictException.class)
     public ResponseEntity<ErrorResponse> handleAccountMembershipConflict(

@@ -122,7 +122,8 @@ public class AccountSecurityService implements
                 .orElse(null);
         AccountIdentity identity = repository.findIdentityByIdForUpdate(discoveredIdentity.getId())
                 .orElseThrow(AccountNotFoundException::new);
-        if (!identity.isEmailVerified()
+        if (repository.findAccountById(identity.getAccountId()).filter(Account::isActive).isEmpty()
+                || !identity.isEmailVerified()
                 || repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()).isEmpty()) {
             return;
         }
@@ -183,7 +184,7 @@ public class AccountSecurityService implements
             throw new PasswordResetException();
         }
         Account account = repository.findAccountByIdForUpdate(identity.getAccountId())
-                .orElseThrow(AccountNotFoundException::new);
+                .filter(Account::isActive).orElseThrow(PasswordResetException::new);
         credential.replacePasswordHash(passwordEncoder.encode(command.rawPassword()), now);
         account.invalidateSessions(now);
         repository.saveLocalCredential(credential);

@@ -12,6 +12,7 @@ import com.personal.baton.adapter.in.web.workspace.TeamAccessRequests.ChangeTeam
 import com.personal.baton.adapter.in.web.workspace.TeamAccessRequests.ExpectedAccountRequest;
 import com.personal.baton.adapter.in.web.workspace.TeamAccessRequests.TeamInvitationTokenRequest;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.*;
 import com.personal.baton.domain.workspace.TeamPermission;
 import java.time.Instant;
@@ -159,6 +160,16 @@ class TeamAccessRestDocsTest {
                         accountMutationHeaders(), requestFields(new ConstrainedFields(ChangeTeamPermissionRequest.class).withPath("expectedAccountId").description("현재 로그인 계정"),
                                 new EnumFields(TeamPermission.class).withPath("permission").optional().description("새 권한, null은 접근 취소")),
                         responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")), settingsFields()));
+    }
+    @Test @DisplayName("비활성 계정에 새 팀 권한을 부여하면 안정적인 오류 코드를 반환한다")
+    void documentsDeactivatedAccountPermission() throws Exception {
+        when(useCase.changePermission(any(), any(), any(), any())).thenThrow(new AccountDeactivatedException());
+        mvc.perform(put(TeamAccessController.PATH + "/members/{memberId}/permission", TEAM, RESOURCE).with(authentication(auth()))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\",\"permission\":\"VIEWER\"}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_DEACTIVATED"))
+                .andDo(MockMvcRestDocumentationWrapper.document("changeTeamPermissionDeactivatedAccount", "구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.", "팀 구성원 권한 변경",
+                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("memberId").description("구성원 식별자")),
+                        responseFields(fieldWithPath("code").description("ACCOUNT_DEACTIVATED"), fieldWithPath("message").description("비활성 계정 안내"))));
     }
     @Test @DisplayName("초대 수락 전 팀과 구성원 및 권한을 확인한다")
     void documentsPreview() throws Exception {

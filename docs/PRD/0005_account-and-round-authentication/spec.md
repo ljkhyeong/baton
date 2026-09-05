@@ -375,7 +375,7 @@ ROUND 시작 요청 뒤 해당 화면을 떠나면 늦은 응답으로 입장 �
 - 공급자 토큰을 이용한 Google/Naver 추가 API 호출
 - 다중 인스턴스 세션과 키 관리 서비스
 - `host` 참여권과 강제 퇴장 권한
-- 계정 비활성화·탈퇴, 관리자에 의한 세션 강제 만료와 발급된 참여권의 조기 폐기
+- 완전 탈퇴·재활성화, 관리자에 의한 세션 강제 만료와 발급된 참여권의 조기 폐기
 
 격리된 `e2e:fullstack`은 테스트 전용 검증 자체 이메일 계정과 실제 브라우저 세션을 사용해
 로컬 로그인, `AccountMembership` 연결, 권위 있는 방 매핑,
@@ -425,3 +425,7 @@ BATON 공개 상태와 ROUND 컨테이너 준비 상태는 이 중계 성공을 
 - [제품 로드맵](../0003_product-roadmap/spec.md)
 - [계정 신원과 세션 결정](../../ADR/0017_account-identity-and-session/adr.md)
 - [BATON GO 교차 서비스 링크 계약](../../../../short-url/docs/PRD/0003_cross-service-link-contract/spec.md)
+
+## 계정 비활성화
+
+현재 비활성화 계약은 [제품 기준](../0001_product-baseline/spec.md#계정-비활성화)과 [ADR-0024](../../ADR/0024_account-deactivation/adr.md)를 따른다. 계정 세션 조회·로컬 로그인·기존 외부 신원 로그인에서 비활성 계정을 거부하며 비밀번호 재설정은 계정을 복구하지 않는다. 새 멤버십·권한 부여와 ROUND·BRIEF·CAL의 활성 멤버십 검사에도 같은 상태를 적용한다. 개인 CAL 구독은 비동기 해지하며 기존 ROUND 참여권의 짧은 수명은 바꾸지 않는다.

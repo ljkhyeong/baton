@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.Optional;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.DefaultRedirectStrategy;
 import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
@@ -35,6 +36,9 @@ public final class OAuthBrowserAuthenticationFailureHandler
         if (infrastructureFailure.isPresent()) {
             HttpObservationErrors.mark(request, infrastructureFailure.get());
             redirect = TEMPORARILY_UNAVAILABLE_REDIRECT;
+        }
+        if (exception instanceof OAuth2AuthenticationException oauth && "account_deactivated".equals(oauth.getError().getErrorCode())) {
+            redirect = "/login?accountNotice=account_deactivated";
         }
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
         response.setHeader(REFERRER_POLICY_HEADER, "no-referrer");

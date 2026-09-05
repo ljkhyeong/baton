@@ -1339,3 +1339,11 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 같은 경로의 `POST`는 `expectedAccountId`, `expectedVersion`(-1 이상), 세 가지 필수 Boolean과 `deadlineLeadHours`(1~168 정수)를 받는다. 동일 출처·CSRF와 계정 일치를 검증하고 저장한 설정을 반환한다. 성공은 `200 OK`, `Cache-Control: no-store`이며 다른 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 오래된 버전은 `409 WORKSPACE_CONTENT_CONFLICT`, 잘못된 입력은 `400 INVALID_INPUT`이다.
 
 설정은 계정 전체에 적용한다. 알림함에서 꺼진 종류를 제외하며 사전 알림 시간의 경계부터 마감 임박을 포함한다. 읽음 기록과 알림 식별자는 설정 변경으로 삭제하거나 재발급하지 않는다. 외부 전송 설정은 포함하지 않는다.
+
+## 계정 비활성화 API
+
+`POST /api/v1/auth/account-deactivations`는 로그인 세션·동일 출처·Fetch Metadata·CSRF와 필수 UUID `expectedAccountId`의 세션 일치를 확인한다. 성공은 본문 없는 `204 No Content`, `Cache-Control: no-store`, 현재 `JSESSIONID` 삭제 쿠키다. 계정 비활성 시각과 세션 버전 증가, 승인된 팀 권한 회수·`ACCOUNT_DEACTIVATED` 감사 이력과 개인 CAL 구독 해지 예약을 같은 트랜잭션에서 처리한다.
+
+마지막 활성 관리자인 팀이 있으면 팀 이름을 포함한 `409 ACCOUNT_DEACTIVATION_BLOCKED`로 전체 요청을 거부한다. 다른 화면 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 처리 중 새 팀 연결이 발견되면 `409 WORKSPACE_CONTENT_CONFLICT`, 세션 없음·비활성 계정의 기존 세션은 `401 AUTHENTICATION_REQUIRED`다.
+
+비활성 계정에 새 팀 권한을 부여하거나 구성원 연결을 만들면 `403 ACCOUNT_DEACTIVATED`다. 로컬 로그인은 기존 자격 증명 불일치 계약으로 거부하고 OAuth 콜백은 `/login?accountNotice=account_deactivated`로 안내한다. 비밀번호 재설정은 비활성 계정을 복구하지 않는다. 조직 기록·로그인 정보의 삭제나 공유 키 폐기는 포함하지 않는다.

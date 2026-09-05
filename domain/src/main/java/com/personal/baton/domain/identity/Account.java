@@ -29,6 +29,9 @@ public class Account {
     @Column(name = "session_version", nullable = false)
     private long sessionVersion;
 
+    @Column(name = "deactivated_at")
+    private Instant deactivatedAt;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -57,6 +60,14 @@ public class Account {
 
     public long getSessionVersion() {
         return sessionVersion;
+    }
+
+    public boolean isActive() { return deactivatedAt == null; }
+
+    public void deactivate(Instant changedAt) {
+        if (deactivatedAt != null) return;
+        invalidateSessions(changedAt);
+        deactivatedAt = changedAt;
     }
 
     public void invalidateSessions(Instant changedAt) {

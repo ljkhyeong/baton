@@ -3126,3 +3126,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
     transition-duration: .01ms !important;
   }
 }
+
+.auth-form .account-deactivation-confirm { flex-direction: row; align-items: center; gap: 10px; font-size: 12px; }
+.auth-form .account-deactivation-confirm input { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--baton-dark); }

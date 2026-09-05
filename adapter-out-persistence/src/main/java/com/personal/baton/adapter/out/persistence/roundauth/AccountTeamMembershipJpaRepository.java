@@ -2,6 +2,8 @@ package com.personal.baton.adapter.out.persistence.roundauth;
 
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import com.personal.baton.domain.workspace.TeamPermission;
 import org.springframework.data.jpa.repository.Query;
 import java.util.List;
@@ -38,6 +40,12 @@ public interface AccountTeamMembershipJpaRepository
     }
 
     List<AccountTeamMembership> findAllByTeamId(UUID teamId);
+    @Query("select membership.teamId from AccountTeamMembership membership where membership.accountId = :accountId")
+    List<UUID> findTeamIdsByAccountId(UUID accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select membership from AccountTeamMembership membership where membership.accountId = :accountId")
+    List<AccountTeamMembership> lockByAccountId(UUID accountId);
 
     Optional<AccountTeamMembership> findByAccountIdAndTeamId(UUID accountId, UUID teamId);
 

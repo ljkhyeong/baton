@@ -31,6 +31,7 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
             SELECT 1 FROM account_team_memberships membership
             JOIN members member ON member.id=membership.member_id AND member.team_id=membership.team_id
             JOIN teams team ON team.id=membership.team_id
+            JOIN accounts account ON account.id=membership.account_id AND account.deactivated_at IS NULL
             WHERE membership.account_id=calendar_subscriptions.account_id
               AND membership.team_id=calendar_subscriptions.team_id AND member.deactivated_at IS NULL
               AND (team.account_access_enabled=FALSE OR membership.permission IS NOT NULL)
@@ -123,6 +124,12 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
     public void requestRevocation(Owner owner) {
         jdbc.update("UPDATE calendar_subscriptions SET revocation_pending=TRUE" + OWNER,
                 args(owner));
+    }
+
+    @Override
+    public void requestAccountRevocation(UUID accountId) {
+        jdbc.update("UPDATE calendar_subscriptions SET revocation_pending=TRUE WHERE account_id=UUID_TO_BIN(?) AND revoked=FALSE",
+                accountId.toString());
     }
 
     @Override

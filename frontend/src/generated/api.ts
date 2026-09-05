@@ -84,6 +84,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/account-deactivations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 계정 비활성화
+         * @description 현재 계정을 비활성화하고 모든 세션과 계정 권한 접근을 중지한다. 조직 기록은 보존하며 마지막 관리자는 먼저 후임 관리자를 지정해야 한다.
+         */
+        post: operations["deactivateAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/csrf": {
         parameters: {
             query?: never;
@@ -4225,6 +4245,57 @@ export interface operations {
             };
         };
     };
+    deactivateAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON 동일 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description same-origin
+                 * @example same-origin
+                 */
+                "Sec-Fetch-Site": string;
+                /**
+                 * @description 세션 CSRF 토큰
+                 * @example csrf
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_c22d40e7f42d4109"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    /** @description 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 현재 JSESSIONID 제거 */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getAuthCsrf: {
         parameters: {
             query?: never;
@@ -5236,6 +5307,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

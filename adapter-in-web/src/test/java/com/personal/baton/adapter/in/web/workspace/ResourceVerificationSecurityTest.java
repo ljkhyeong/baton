@@ -1,6 +1,8 @@
 package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountDeactivationController;
+import com.personal.baton.application.identity.port.in.DeactivateAccountUseCase;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
@@ -31,7 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 
-@WebMvcTest({ResourceVerificationController.class, WorkspaceNotificationController.class, NotificationPreferencesController.class})
+@WebMvcTest({ResourceVerificationController.class, WorkspaceNotificationController.class, NotificationPreferencesController.class, AccountDeactivationController.class})
 @Import({SecurityConfig.class, WebFilterConfig.class, ResourceVerificationSecurityTest.PasswordConfig.class})
 class ResourceVerificationSecurityTest {
     private static final UUID ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
@@ -40,6 +42,7 @@ class ResourceVerificationSecurityTest {
     @MockitoBean WorkspaceNotificationUseCase notifications;
     @MockitoBean NotificationPreferencesUseCase preferences;
     @MockitoBean ValidateAccountSessionUseCase sessions;
+    @MockitoBean DeactivateAccountUseCase deactivation;
 
     @Test
     @DisplayName("자료 확인은 공유 키만으로 기록할 수 없고 계정 세션과 CSRF 및 동일 출처를 모두 요구한다")
@@ -82,6 +85,23 @@ class ResourceVerificationSecurityTest {
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isConflict());
         verifyNoInteractions(notifications, preferences);
+    }
+
+    @Test @DisplayName("계정 비활성화는 인증·동일 출처·CSRF와 화면 계정을 대조한다")
+    void protectsAccountDeactivation() throws Exception {
+        when(sessions.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
+        var auth = UsernamePasswordAuthenticationToken.authenticated(new Principal(ID, 0), null, List.of());
+        mvc.perform(post(AccountDeactivationController.PATH).with(csrf()).header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post(AccountDeactivationController.PATH).with(authentication(auth))).andExpect(status().isForbidden());
+        mvc.perform(post(AccountDeactivationController.PATH).with(authentication(auth)).with(csrf())
+                        .header("Origin", "https://foreign.example").header("Sec-Fetch-Site", "cross-site"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(AccountDeactivationController.PATH).with(authentication(auth)).with(csrf())
+                        .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedAccountId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isConflict());
+        verifyNoInteractions(deactivation);
     }
 
     private MockHttpServletRequestBuilder request() {

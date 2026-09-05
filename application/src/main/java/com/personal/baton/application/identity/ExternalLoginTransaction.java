@@ -1,6 +1,6 @@
 package com.personal.baton.application.identity;
 
-import com.personal.baton.application.identity.error.AccountNotFoundException;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
@@ -61,8 +61,8 @@ public class ExternalLoginTransaction {
                     now
             );
             repository.saveIdentity(existing);
-            Account account = repository.findAccountById(existing.getAccountId())
-                    .orElseThrow(AccountNotFoundException::new);
+            Account account = repository.findAccountByIdForUpdate(existing.getAccountId())
+                    .filter(Account::isActive).orElseThrow(AccountDeactivatedException::new);
             return new ExternalLoginResult(AccountView.from(
                     account,
                     repository.findIdentitiesByAccountId(account.getId())

@@ -43,6 +43,8 @@ import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
+import com.personal.baton.application.identity.port.out.IdentityRepository;
+import com.personal.baton.domain.identity.Account;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -85,6 +87,9 @@ class RoundAuthorizationServicesTest {
 
     @BeforeEach
     void setUp() {
+        var identities = mock(IdentityRepository.class);
+        var account = Account.create(ACCOUNT_ID, "검증 계정", NOW);
+        when(identities.findAccountById(ACCOUNT_ID)).thenReturn(Optional.of(account));
         roundRepository = mock(RoundAuthorizationRepository.class);
         peopleRepository = mock(WorkspacePeopleRepository.class);
         recordsRepository = mock(WorkspaceRecordsRepository.class);
@@ -98,7 +103,7 @@ class RoundAuthorizationServicesTest {
                 new ActiveAccountTeamMembershipVerifier(
                         roundRepository,
                         peopleRepository,
-                        sharedKeyTeams()
+                        sharedKeyTeams(), identities
                 );
         administrationService = new RoundAdministrationService(
                 roundRepository,
@@ -107,7 +112,7 @@ class RoundAuthorizationServicesTest {
                 workspaceAccess,
                 roomIdGenerator,
                 membershipVerifier,
-                clock
+                clock, identities
         );
         participationService = new RoundParticipationService(
                 roundRepository,

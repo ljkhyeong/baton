@@ -35,6 +35,7 @@ public interface AccountIdentityJpaRepository extends JpaRepository<AccountIdent
             join LocalCredential credential on credential.identityId = identity.id
             join Account account on account.id = identity.accountId
             where identity.provider = :provider and identity.providerSubject = :email
+              and account.deactivatedAt is null
             """)
     Optional<LocalLoginCredential> findLoginCredential(IdentityProvider provider, String email);
 

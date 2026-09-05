@@ -12,6 +12,6 @@ public interface AccountJpaRepository extends JpaRepository<Account, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Account> findForUpdateById(UUID id);
 
-    @Query("select account.sessionVersion from Account account where account.id = :id")
+    @Query("select account.sessionVersion from Account account where account.id = :id and account.deactivatedAt is null")
     Optional<Long> findSessionVersionById(UUID id);
 }

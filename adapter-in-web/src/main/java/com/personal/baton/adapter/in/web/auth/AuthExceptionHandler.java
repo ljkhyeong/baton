@@ -29,7 +29,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = {
         AuthController.class,
-        AccountSecurityController.class
+        AccountSecurityController.class,
+        AccountDeactivationController.class
 })
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AuthExceptionHandler {

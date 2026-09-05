@@ -2,6 +2,7 @@ package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.AccountView;
+import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
 import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.Map;
@@ -98,6 +99,8 @@ public final class AccountOAuth2UserService {
                     emailVerified,
                     displayName
             )).account();
+        } catch (AccountDeactivatedException exception) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("account_deactivated"), exception.getMessage(), exception);
         } catch (RuntimeException exception) {
             if (IdentityInfrastructureFailures.find(exception).isEmpty()) {
                 throw exception;

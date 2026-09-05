@@ -41,3 +41,6 @@ export type AccountSecurity = Omit<GeneratedAccountSecurity, 'identities'> & {
 
 export type LocalPasswordChangeRequest =
   LocalPasswordChangeOperation['requestBody']['content']['application/json']
+
+export type AccountDeactivationRequest =
+  operations['deactivateAccount']['requestBody']['content']['application/json']

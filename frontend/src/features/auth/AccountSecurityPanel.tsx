@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   changeLocalPassword,
+  deactivateAccount,
   revokeAccountSessions,
 } from '@/features/auth/api'
 import { useAccountSecurity } from '@/features/auth/useAccountSecurity'
@@ -21,12 +22,13 @@ function errorMessage(error: unknown) {
 
 export default function AccountSecurityPanel({ accountId }: { accountId: string }) {
   const accountQuery = useAccountSecurity(accountId)
+  const [deactivationConfirmed, setDeactivationConfirmed] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
   const [validationError, setValidationError] = useState('')
 
-  const finishAccountSession = (notice: 'password_changed' | 'sessions_revoked') => {
+  const finishAccountSession = (notice: 'password_changed' | 'sessions_revoked' | 'account_deactivated') => {
     window.location.replace(`/login?${new URLSearchParams({ accountNotice: notice })}`)
   }
 
@@ -41,6 +43,11 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
   const sessionRevocationMutation = useMutation({
     mutationFn: revokeAccountSessions,
     onSuccess: () => finishAccountSession('sessions_revoked'),
+  })
+
+  const deactivationMutation = useMutation({
+    mutationFn: () => deactivateAccount({ expectedAccountId: accountId }),
+    onSuccess: () => finishAccountSession('account_deactivated'),
   })
 
   if (accountQuery.isPending) {
@@ -73,6 +80,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
   )
   const mutationPending = passwordMutation.isPending
     || sessionRevocationMutation.isPending
+    || deactivationMutation.isPending
 
   return (
     <div className="account-security-stack">
@@ -196,6 +204,25 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
             ? '모든 세션 종료 중'
             : '모든 기기에서 로그아웃'}
         </button>
+      </section>
+
+      <section className="account-security-card" aria-labelledby="account-deactivation-title">
+        <header><h3 id="account-deactivation-title">계정 비활성화</h3>
+          <p>로그인과 계정 권한으로 팀에 접근하는 것을 중지하고 모든 기기에서 로그아웃합니다. 다시 로그인하거나 직접 활성화할 수 없습니다.</p>
+        </header>
+        <p className="account-security-note">팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다. 구성원의 활동 상태와 팀 공유 접근 키는 별도로 관리합니다. 개인 캘린더 구독은 해지를 요청하며 외부 서비스의 처리가 끝날 때까지 기존 일정이 보일 수 있습니다.</p>
+        <p>팀의 마지막 관리자라면 <Link to="/my-teams">내 팀</Link>에서 다른 활성 관리자를 먼저 지정해 주세요.</p>
+        <form className="auth-form" onSubmit={event => {
+          event.preventDefault()
+          if (deactivationConfirmed && !mutationPending && !accountQuery.isFetching) deactivationMutation.mutate()
+        }}>
+          <label className="account-deactivation-confirm"><input type="checkbox" required checked={deactivationConfirmed}
+            disabled={mutationPending} onChange={event => setDeactivationConfirmed(event.target.checked)} />기록 보존과 로그인 중지를 확인했습니다.</label>
+          {deactivationMutation.isError && <p role="alert" className="form-error">{errorMessage(deactivationMutation.error)}</p>}
+          <button type="submit" className="danger-button" disabled={!deactivationConfirmed || mutationPending || accountQuery.isFetching}>
+            {deactivationMutation.isPending ? '계정 비활성화 중…' : '이 계정 비활성화'}
+          </button>
+        </form>
       </section>
 
       <Link className="auth-secondary-link account-back-link" to="/">시작 화면으로 돌아가기</Link>

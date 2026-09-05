@@ -50,7 +50,7 @@ class ContentChangeRestDocsTest {
     void documentsResourceChanges() throws Exception { document(ContentRecordKind.ROLE_RESOURCE, ContentChangeController.RESOURCE_PATH, "getRoleResourceChanges"); }
     private void document(ContentRecordKind kind, String path, String operation) throws Exception {
         when(useCase.getHistory(team, season, kind, record, "key")).thenReturn(new ContentHistoryResult(team, season, kind, record,
-                List.of(new ContentChangeResult(UUID.randomUUID(), null, "공유 키 사용자", Instant.parse("2026-09-05T03:00:00Z"),
+                List.of(new ContentChangeResult(UUID.fromString("00000000-0000-4000-8000-000000000004"), null, "공유 키 사용자", Instant.parse("2026-09-05T03:00:00Z"),
                         List.of(new FieldChangeResult("제목", "운영안", "수정한 운영안"))))));
         mvc.perform(get(path, team, season, record).header("X-Baton-Access-Key", "key"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
