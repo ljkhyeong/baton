@@ -56,7 +56,8 @@ public final class BriefEditionResponses {
             Instant observedAt,
             int ruleVersion,
             Long aggregateRevision,
-            Boolean revisionGap
+            Boolean revisionGap,
+            BriefEditionSnapshot.Section section
     ) {
 
         private static BriefEditionItemResponse from(BriefEditionSnapshot.Item item) {
@@ -68,7 +69,8 @@ public final class BriefEditionResponses {
                     item.observedAt(),
                     item.ruleVersion(),
                     item.aggregateRevision(),
-                    item.revisionGap()
+                    item.revisionGap(),
+                    item.section()
             );
         }
     }

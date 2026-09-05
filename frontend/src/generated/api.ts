@@ -1145,76 +1145,6 @@ export interface components {
             /** @description 서비스 식별자 */
             service: string;
         };
-        Schema_0e97a74e5203f209: {
-            /**
-             * Format: uuid
-             * @description 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * Format: date-time
-             * @description 에디션 생성 UTC 시각
-             */
-            generatedAt: string;
-            /** @description 작업공간·시즌 범위 에디션 세대 */
-            generation: number;
-            /** @description 불변 에디션 항목 목록 */
-            items: {
-                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
-                aggregateRevision: number | null;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
-                revisionGap: boolean | null;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description BRIEF 선정 규칙 버전 */
-            ruleVersion: number;
-            /**
-             * Format: uuid
-             * @description BATON 시즌 UUID
-             */
-            seasonId: string;
-            /** @description BRIEF 로컬 수신 순서 cursor */
-            sourceCursor: number;
-            /**
-             * Format: date
-             * @description 시즌 시간대 기준 월요일
-             */
-            weekStart: string;
-            /**
-             * Format: date-time
-             * @description 주간 구간 종료 UTC 시각
-             */
-            windowEnd: string;
-            /**
-             * Format: date-time
-             * @description 주간 구간 시작 UTC 시각
-             */
-            windowStart: string;
-            /**
-             * Format: uuid
-             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
-             */
-            workspaceId: string;
-            /**
-             * Format: uuid
-             * @description 생성 당시 IANA 시간대
-             */
-            zoneId: string;
-        };
         Schema_1ffbbe40834589a9: {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
@@ -1686,6 +1616,43 @@ export interface components {
             /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
             csrfToken: string;
         };
+        Schema_190aeb236e459d98: {
+            /**
+             * Format: int64
+             * @description 다음 과거 페이지 커서, 마지막은 null
+             */
+            nextBeforeAggregateRevision: number | null;
+            /** @description 실제 적용 전이 목록 */
+            transitions: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /** @description 이 전이에서 새로 공백을 발견했는지 여부 */
+                detectedRevisionGap: boolean;
+                /**
+                 * Format: uuid
+                 * @description 전이를 만든 원본 이벤트 UUID
+                 */
+                eventId: string;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 전이에 저장된 원본 심각도. v1은 null
+                 * @enum {string|null}
+                 */
+                sourceSeverity: "CRITICAL" | "WARNING" | null;
+                /**
+                 * @description 전이의 원본 상태
+                 * @enum {string}
+                 */
+                state: "ACTIVE" | "RESOLVED";
+            }[];
+        };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
             ended: boolean;
@@ -1748,38 +1715,6 @@ export interface components {
         Schema_721ee5b24f3a4ef0: {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
-        };
-        Schema_786bf5cc3e6a43bf: {
-            /**
-             * Format: int64
-             * @description 다음 과거 페이지 커서, 마지막은 null
-             */
-            nextBeforeAggregateRevision: number | null;
-            /** @description 실제 적용 전이 목록 */
-            transitions: {
-                /**
-                 * Format: int64
-                 * @description 적용한 원본 리비전
-                 */
-                aggregateRevision: number;
-                /** @description 이 전이에서 새로 공백을 발견했는지 여부 */
-                detectedRevisionGap: boolean;
-                /**
-                 * Format: uuid
-                 * @description 전이를 만든 원본 이벤트 UUID
-                 */
-                eventId: string;
-                /**
-                 * Format: date-time
-                 * @description 원본 관측 UTC 시각
-                 */
-                observedAt: string;
-                /**
-                 * @description 전이의 원본 상태
-                 * @enum {string}
-                 */
-                state: "ACTIVE" | "RESOLVED";
-            }[];
         };
         Schema_892abbd42867bf81: {
             /**
@@ -2887,6 +2822,81 @@ export interface components {
             responsibilities: string[];
             /** @description 위험 신호 */
             risk: string | null;
+        };
+        Schema_d11ea1dcc29eeab5: {
+            /**
+             * Format: uuid
+             * @description 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * Format: date-time
+             * @description 에디션 생성 UTC 시각
+             */
+            generatedAt: string;
+            /** @description 작업공간·시즌 범위 에디션 세대 */
+            generation: number;
+            /** @description 불변 에디션 항목 목록 */
+            items: {
+                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description BRIEF 선정 규칙 버전 */
+            ruleVersion: number;
+            /**
+             * Format: uuid
+             * @description BATON 시즌 UUID
+             */
+            seasonId: string;
+            /** @description BRIEF 로컬 수신 순서 cursor */
+            sourceCursor: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대 기준 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 종료 UTC 시각
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 시작 UTC 시각
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
+             */
+            workspaceId: string;
+            /**
+             * Format: uuid
+             * @description 생성 당시 IANA 시간대
+             */
+            zoneId: string;
         };
         Schema_d34570898d3cdf09: {
             /**
@@ -4007,7 +4017,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_786bf5cc3e6a43bf"];
+                    "application/json": components["schemas"]["Schema_190aeb236e459d98"];
                 };
             };
         };
@@ -4098,7 +4108,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_0e97a74e5203f209"];
+                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
                 };
             };
         };

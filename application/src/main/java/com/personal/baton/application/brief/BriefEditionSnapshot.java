@@ -21,6 +21,8 @@ public record BriefEditionSnapshot(
         List<Item> items
 ) {
 
+    public enum Section { CURRENT_WEEK, CARRY_OVER }
+
     public record Item(
             String sourceReference,
             String reasonCode,
@@ -29,7 +31,8 @@ public record BriefEditionSnapshot(
             Instant observedAt,
             int ruleVersion,
             Long aggregateRevision,
-            Boolean revisionGap
+            Boolean revisionGap,
+            Section section
     ) {
     }
 }

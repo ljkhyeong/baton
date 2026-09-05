@@ -271,6 +271,7 @@ Object.assign(briefTransitionsSchema.properties.nextBeforeAggregateRevision,
 const briefTransitionSchema = resolveSchema(briefTransitionsSchema.properties.transitions.items)
 briefTransitionSchema.properties.eventId.format = 'uuid'
 briefTransitionSchema.properties.observedAt.format = 'date-time'
+briefTransitionSchema.properties.sourceSeverity.nullable = true
 Object.assign(briefTransitionSchema.properties.aggregateRevision, { type: 'integer', format: 'int64', minimum: 1 })
 for (const parameter of briefTransitionsOperation.parameters ?? []) {
   if (parameter.in !== 'query') continue
@@ -288,6 +289,7 @@ briefEditionSchema.properties.windowEnd.format = 'date-time'
 const briefEditionItemSchema = resolveSchema(briefEditionSchema.properties.items.items)
 briefEditionItemSchema.properties.aggregateRevision.nullable = true
 briefEditionItemSchema.properties.revisionGap.nullable = true
+briefEditionItemSchema.properties.section.nullable = true
 
 function makeNullableResponseFieldsRequired(schema, visited = new Set()) {
   const resolvedSchema = resolveSchema(schema)

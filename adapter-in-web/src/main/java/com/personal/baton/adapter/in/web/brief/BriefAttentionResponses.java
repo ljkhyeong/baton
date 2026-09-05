@@ -39,11 +39,12 @@ public final class BriefAttentionResponses {
     }
 
     public record TransitionResponse(
-            UUID eventId, long aggregateRevision, Status state, Instant observedAt, boolean detectedRevisionGap
+            UUID eventId, long aggregateRevision, Status state, Instant observedAt, boolean detectedRevisionGap,
+            BriefAttentionTransitions.SourceSeverity sourceSeverity
     ) {
         public static TransitionResponse from(BriefAttentionTransitions.Transition transition) {
             return new TransitionResponse(transition.eventId(), transition.aggregateRevision(), transition.state(),
-                    transition.observedAt(), transition.detectedRevisionGap());
+                    transition.observedAt(), transition.detectedRevisionGap(), transition.sourceSeverity());
         }
     }
 

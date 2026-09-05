@@ -48,14 +48,24 @@ function BriefEditionResults({ scope, readOnly }: { scope: BriefScope; readOnly:
       <p className="brief-note">집계 구간: {time.format(new Date(edition.windowStart))} 이상 ~ {time.format(new Date(edition.windowEnd))} 미만
         {' '}· 수신 커서 {edition.sourceCursor} · 규칙 {edition.ruleVersion}</p>
       {edition.items.length === 0 ? <p>이 브리프에 선정된 관심 항목이 없습니다.</p>
-        : <ul className="brief-items">{edition.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
-          <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
-            <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}</span></div>
-          <small>원본 참조 <code>{item.sourceReference}</code></small>
-          <small>관측 {time.format(new Date(item.observedAt))} ({edition.zoneId})</small>
-          <small>{item.aggregateRevision === null ? '이전 브리프: 리비전·공백 근거 미기록'
-            : `리비전 ${item.aggregateRevision} · ${item.revisionGap ? '누적 공백 기록 있음' : '누적 공백 기록 없음'}`}</small>
-        </li>)}</ul>}
+        : [
+          { value: 'CURRENT_WEEK', label: '이번 주 변경' },
+          { value: 'CARRY_OVER', label: '이전부터 미해소' },
+          { value: null, label: '이전 브리프 · 분류 미기록' },
+        ].map((section) => {
+          const items = edition.items.filter((item) => item.section === section.value)
+          return items.length > 0 && <section key={section.value ?? 'legacy'} aria-label={section.label}>
+            <h4>{section.label} · {items.length}건</h4>
+            <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
+                <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
+                  <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '활성' : '해소'}</span></div>
+                <small>원본 참조 <code>{item.sourceReference}</code></small>
+                <small>관측 {time.format(new Date(item.observedAt))} ({edition.zoneId})</small>
+                <small>{item.aggregateRevision === null ? '이전 브리프: 리비전·공백 근거 미기록'
+                  : `리비전 ${item.aggregateRevision} · ${item.revisionGap ? '누적 공백 기록 있음' : '누적 공백 기록 없음'}`}</small>
+              </li>)}</ul>
+          </section>
+        })}
     </>}
   </section>
 }

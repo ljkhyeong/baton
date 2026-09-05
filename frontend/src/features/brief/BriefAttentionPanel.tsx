@@ -115,6 +115,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly }: { scope: BriefScop
         : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
           <strong>리비전 {entry.aggregateRevision} · {entry.state === 'ACTIVE' ? '활성' : '해소'}</strong>
           <span>{formatTime.format(new Date(entry.observedAt))} ({timeZone})</span>
+          <span>원본 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
           <span>{entry.detectedRevisionGap ? '이 전이에서 공백 발견' : '이 전이에서 새 공백 발견 없음'}</span>
         </li>)}</ol>)}
       <div className="brief-pagination">

@@ -69,9 +69,10 @@ function decodeTransitions(value: unknown): AttentionTransitions {
     transitions: value.transitions.map((entry) => {
       if (!isJsonObject(entry) || !isUuid(entry.eventId) || !isPositiveInteger(entry.aggregateRevision)
         || (entry.state !== 'ACTIVE' && entry.state !== 'RESOLVED') || !isInstant(entry.observedAt)
-        || typeof entry.detectedRevisionGap !== 'boolean') throw new Error('상태 변화 기록을 확인할 수 없습니다.')
+        || typeof entry.detectedRevisionGap !== 'boolean'
+        || (entry.sourceSeverity != null && entry.sourceSeverity !== 'CRITICAL' && entry.sourceSeverity !== 'WARNING')) throw new Error('상태 변화 기록을 확인할 수 없습니다.')
       return { eventId: entry.eventId, aggregateRevision: entry.aggregateRevision, state: entry.state,
-        observedAt: entry.observedAt, detectedRevisionGap: entry.detectedRevisionGap }
+        observedAt: entry.observedAt, detectedRevisionGap: entry.detectedRevisionGap, sourceSeverity: entry.sourceSeverity ?? null }
     }) }
 }
 
@@ -100,19 +101,20 @@ function decodeEdition(value: unknown, scope: BriefScope): BriefEdition {
     throw new Error('저장된 브리프 응답을 확인할 수 없습니다.')
   }
   new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
-  const items = value.items.map((item) => {
+  const items = value.items.map<BriefEdition['items'][number]>((item) => {
     if (!isJsonObject(item) || !isReason(item.reasonCode)
       || (item.severity !== 'HIGH' && item.severity !== 'MEDIUM')
       || (item.status !== 'ACTIVE' && item.status !== 'RESOLVED')
       || typeof item.sourceReference !== 'string' || !item.sourceReference.length
       || !isInstant(item.observedAt) || !isPositiveInteger(item.ruleVersion)
+      || (item.section != null && item.section !== 'CURRENT_WEEK' && item.section !== 'CARRY_OVER')
       || !((item.aggregateRevision === null && item.revisionGap === null)
         || (isPositiveInteger(item.aggregateRevision) && typeof item.revisionGap === 'boolean'))) {
       throw new Error('저장된 브리프 항목을 확인할 수 없습니다.')
     }
     return { reasonCode: item.reasonCode, severity: item.severity, status: item.status, sourceReference: item.sourceReference,
       observedAt: item.observedAt, ruleVersion: item.ruleVersion, aggregateRevision: item.aggregateRevision,
-      revisionGap: item.revisionGap }
+      revisionGap: item.revisionGap, section: item.section ?? null }
   })
   return { editionId: value.editionId, workspaceId: value.workspaceId, seasonId: value.seasonId,
     generation: value.generation, ruleVersion: value.ruleVersion, sourceCursor: value.sourceCursor,
