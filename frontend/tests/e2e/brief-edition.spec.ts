@@ -16,6 +16,7 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
   } }))
   let generations = 0
   let latestCalls = 0
+  const relatedReads = { summary: 0, items: 0, resolutions: 0 }
   let denied = false
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const request = route.request()
@@ -25,9 +26,9 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
     if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
-    if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
-    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
-    if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (path.endsWith('/resolutions')) { relatedReads.resolutions += 1; return route.fulfill({ json: weeklyResolutions }) }
+    if (path.endsWith('/summary')) { relatedReads.summary += 1; return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } }) }
+    if (path.endsWith('/attention-items')) { relatedReads.items += 1; return route.fulfill({ json: { items: [], nextCursor: null } }) }
     if (request.method() === 'POST') {
       generations += 1
       expect(request.postData()).toBeNull()
@@ -57,11 +58,14 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
   const edition = panel.getByRole('region', { name: '최신 불변 브리프' })
   await expect(edition.getByText('아직 저장된 브리프가 없습니다.')).toBeVisible()
   const generate = edition.getByRole('button', { name: '이번 주 브리프 생성', exact: true })
+  const initialReads = { ...relatedReads }
   await generate.click()
   await expect(edition.getByRole('alert')).toContainText('원본 이벤트 전달이 끝난 뒤')
   expect(generations).toBe(1)
+  expect(relatedReads).toEqual(initialReads)
   await generate.click()
   await expect(edition.getByRole('status')).toContainText('새 브리프를 생성했습니다.')
+  await expect.poll(() => Object.values(relatedReads)).toEqual(Object.values(initialReads).map((count) => count + 1))
   await expect(edition.getByText('2026-08-24 시작 주 · 생성 순번 1')).toBeVisible()
   await expect(edition.getByRole('region', { name: '저장 이후 변경 확인' })).toContainText('새 변경이 전달됐습니다.')
   await expect(edition).toContainText('America/New_York')
@@ -73,6 +77,7 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
   await generate.click()
   await expect(edition.getByRole('status')).toContainText('기존 브리프를 재사용했습니다.')
   expect(generations).toBe(3)
+  await expect.poll(() => Object.values(relatedReads)).toEqual(Object.values(initialReads).map((count) => count + 2))
   await expect(edition.getByRole('region', { name: '저장 이후 변경 확인' })).toContainText('추가 전달 기록이 없습니다.')
   denied = true
   await edition.getByRole('button', { name: '최신 브리프 조회' }).click()

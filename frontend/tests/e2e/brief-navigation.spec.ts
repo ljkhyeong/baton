@@ -1,7 +1,7 @@
 import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
+import { installApi, makeProjection, navigation, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
 
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const OLD = '8e448211-66ae-44ab-9888-c4960648c221'
@@ -191,7 +191,7 @@ test('이번 주 해소와 지난주 비교에서 결과·없음·장애·권한
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const url = new URL(route.request().url()); const path = url.pathname
     if (path.endsWith('/resolutions')) return route.fulfill(resolutionStatus === 200
-      ? { json: { ...weeklyResolutions, resolvedCount } }
+      ? { json: { ...weeklyResolutions, resolvedCount, items: resolvedCount === 0 ? [] : weeklyResolutions.items } }
       : { status: resolutionStatus, json: { code: resolutionStatus === 403 ? 'BRIEF_ACCESS_DENIED' : 'BRIEF_UNAVAILABLE', message: '해소 조회 확인이 필요합니다.' } })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
@@ -244,4 +244,94 @@ test('이번 주 해소와 지난주 비교에서 결과·없음·장애·권한
   await panel.getByRole('button', { name: '첫 페이지부터 새로고침' }).click()
   await expect(panel.getByRole('button', { name: '권한 다시 확인', exact: true })).toBeVisible()
   await expect(resolutions).toHaveCount(0)
+})
+
+test('해소 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 주간 변경을 처리한다 @smoke', async ({ page }, testInfo) => {
+  test.setTimeout(60_000)
+  const projection = makeProjection()
+  await installApi(page, projection); await login(page)
+  const first = { ...weeklyResolutions.items[0], sourceReference: SOURCE }
+  const second = { ...weeklyResolutions.items[1], sourceReference: 'role:+& 한글' }
+  const next = { eventType: first.reasonCode, sourceReference: first.sourceReference }
+  let generated = false
+  let nextWeek = false
+  let denied = false
+  const itemQueries: { after: string | null; severity: string | null }[] = []
+  const resolutionCursors: (string | null)[] = []
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const request = route.request(); const url = new URL(request.url()); const path = url.pathname
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: generated ? 1 : 2, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/resolutions')) {
+      resolutionCursors.push(url.searchParams.get('afterSourceReference'))
+      if (denied) return route.fulfill({ status: 403, json: { code: 'BRIEF_ACCESS_DENIED', message: '활동 중인 팀 구성원만 조회할 수 있습니다.' } })
+      if (nextWeek) return route.fulfill({ json: { ...weeklyResolutions, weekStart: '2026-09-07', windowStart: '2026-09-06T15:00:00Z',
+        windowEnd: '2026-09-13T15:00:00Z', evaluatedAt: '2026-09-07T00:00:00Z', resolvedCount: 0, items: [], nextCursor: null } })
+      return route.fulfill({ json: { ...weeklyResolutions, items: url.searchParams.has('afterSourceReference') ? [second] : [first],
+        nextCursor: url.searchParams.has('afterSourceReference') ? null : next } })
+    }
+    if (path.endsWith('/attention-items')) {
+      itemQueries.push({ after: url.searchParams.get('afterSourceReference'), severity: url.searchParams.get('severity') })
+      const after = url.searchParams.has('afterSourceReference')
+      return route.fulfill({ json: { items: [{ ...currentItem, sourceReference: after ? 'role:second' : SOURCE }], nextCursor: after ? null : next } })
+    }
+    if (path.endsWith('/transitions')) return route.fulfill({ json: { transitions: [], nextBeforeAggregateRevision: null } })
+    if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: request.postDataJSON().sources.map((source: object) => ({ ...source,
+      target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: LATEST, status: 'NO_ADDITIONAL_DELIVERIES', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/editions') && request.method() === 'POST') {
+      generated = true
+      return route.fulfill({ status: 201, json: { executionId: ACCOUNT, editionId: LATEST, generation: 3, deliveryWatermark: 3, sourceCursor: 3, created: true } })
+    }
+    if (path.endsWith('/editions')) return route.fulfill({ json: { editions: summaries, nextBeforeGeneration: null } })
+    return route.fulfill({ json: edition(LATEST) })
+  })
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention')
+  await panel.locator('summary').click()
+  const resolved = panel.getByRole('region', { name: '이번 주 해소 요약' })
+  await resolved.getByRole('button', { name: '이번 주 해소 2건' }).click()
+  await expect(resolved).toContainText(/해소 (?:20)?26\. 9\. 4\. 오전 9:00 \(Asia\/Seoul\)/)
+  await expect(resolved.getByText('해소 리비전 2')).not.toBeVisible()
+  await resolved.getByText('해소 근거 보기').click()
+  await expect(resolved.getByText('해소 리비전 2')).toBeVisible()
+  await resolved.getByRole('button', { name: '현재 업무 보기' }).click()
+  await expect(page.locator('.role-row.selected')).toContainText(projection.roles.find((role) => role.id === ROLE_ID)!.name)
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '상세 닫기' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘', exact: true }).click()
+  await panel.locator('summary').click()
+  await resolved.getByRole('button', { name: '이번 주 해소 2건' }).click()
+  expect(await resolved.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await resolved.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('brief-resolution-details.png'), fullPage: true })
+  await resolved.getByRole('button', { name: '해소 다음 페이지' }).click()
+  await expect.poll(() => resolutionCursors.at(-1)).toBe(SOURCE)
+  await expect(resolved.getByRole('button', { name: '해소 다음 페이지' })).toBeDisabled()
+  await resolved.getByText('해소 근거 보기').click()
+  await expect(resolved.locator('code')).toHaveText('role:+& 한글')
+  await panel.getByRole('button', { name: '높은 심각도 2건' }).click()
+  await panel.getByRole('button', { name: '다음 페이지', exact: true }).click()
+  await expect.poll(() => itemQueries.at(-1)?.after).toBe(SOURCE)
+  await panel.getByRole('button', { name: '상태 변화 보기', exact: true }).click()
+  await expect(panel.getByRole('region', { name: '관심 항목 상태 변화' })).toBeVisible()
+  await panel.getByText('저장된 브리프', { exact: true }).click()
+  await panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true }).click()
+  await expect(panel.getByText('새 브리프를 생성했습니다. 생성 순번 3')).toBeVisible()
+  await expect(panel.getByRole('button', { name: '높은 심각도 1건' })).toBeVisible()
+  await expect.poll(() => itemQueries.at(-1)).toEqual({ after: null, severity: 'HIGH' })
+  await expect.poll(() => resolutionCursors.at(-1)).toBeNull()
+  await expect(panel.getByRole('region', { name: '관심 항목 상태 변화' })).toHaveCount(0)
+  await expect(resolved.getByRole('button', { name: '해소 다음 페이지' })).toBeEnabled()
+  nextWeek = true
+  await resolved.getByRole('button', { name: '해소 다음 페이지' }).click()
+  await expect(resolved).toContainText('조회 주간이 바뀌었습니다.')
+  await expect(resolved.locator('.brief-items')).toHaveCount(0)
+  await expect(resolved.getByRole('button', { name: '해소 다음 페이지' })).toBeDisabled()
+  await resolved.getByRole('button', { name: '해소 첫 페이지부터 새로고침' }).click()
+  await expect(resolved).toContainText('이번 주에 해소 시점을 확인한 항목이 없습니다.')
+  await expect(resolved).not.toContainText('조회 주간이 바뀌었습니다.')
+  denied = true
+  await resolved.getByRole('button', { name: '해소 첫 페이지부터 새로고침' }).click()
+  await expect(panel.getByRole('button', { name: '권한 다시 확인' })).toBeVisible()
+  await expect(panel.getByRole('region', { name: '이번 주 해소 요약' })).toHaveCount(0)
 })

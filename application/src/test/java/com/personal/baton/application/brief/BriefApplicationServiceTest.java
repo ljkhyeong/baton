@@ -121,11 +121,11 @@ class BriefApplicationServiceTest {
         when(workspaceAccess.verifyRead(TEAM_ID, SEASON_ID, "workspace-access-key")).thenReturn(season);
         var boundaryService = new BriefApplicationService(workspaceAccess, workspaceRepository, roundRepository,
                 client, executionPort, Clock.fixed(Instant.parse("2026-08-31T01:00:00Z"), ZoneOffset.UTC), signalStore, true);
-        boundaryService.summarizeWeeklyResolutions(scope);
-        verify(client).summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), season.getZoneId());
+        boundaryService.summarizeWeeklyResolutions(scope, null, 20);
+        verify(client).summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), season.getZoneId(), null, 20);
         when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(Optional.empty());
         org.mockito.Mockito.clearInvocations(client);
-        assertThatThrownBy(() -> boundaryService.summarizeWeeklyResolutions(scope)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> boundaryService.summarizeWeeklyResolutions(scope, null, 20)).isInstanceOf(BriefAccessDeniedException.class);
         assertThatThrownBy(() -> service.findPreviousWeekEdition(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key"), EDITION_ID))
                 .isInstanceOf(BriefAccessDeniedException.class);
         verifyNoInteractions(client);

@@ -293,6 +293,13 @@ class BriefEditionHttpsEndToEndTest {
                                 firstWorkspace.teamId(), firstWorkspace.seasonId());
                         JsonNode resolutions = json(session.attention(firstWorkspace, "/resolutions", 200));
                         assertThat(resolutions.path("resolvedCount").asLong()).isOne();
+                        assertThat(resolutions.path("items").get(0).path("sourceReference").asText()).isEqualTo("role:c+& 한글");
+                        assertThat(resolutions.path("items").get(0).path("resolvedAt").asText()).isEqualTo(resolvedAt.toInstant().toString());
+                        assertThat(resolutions.path("items").get(0).path("resolvedRevision").asLong()).isEqualTo(4);
+                        JsonNode resolutionEnd = json(session.attention(firstWorkspace, "/resolutions?limit=1&afterEventType=ROLE_UNASSIGNED&afterSourceReference="
+                                + URLEncoder.encode("role:c+& 한글", StandardCharsets.UTF_8), 200));
+                        assertThat(resolutionEnd.path("items").size()).isZero();
+                        assertThat(resolutionEnd.path("resolvedCount").asLong()).isOne();
                         assertThat(resolutions.path("weekStart").asText()).isEqualTo(json(latest).path("weekStart").asText());
                         session.attention(new Workspace(firstWorkspace.teamId(), UUID.randomUUID(),
                                 firstWorkspace.memberId(), firstWorkspace.accessKey()), "/summary", 404);

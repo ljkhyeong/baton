@@ -27,6 +27,9 @@ import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedExc
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import com.personal.baton.application.brief.port.in.BriefAttentionUseCase;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -78,22 +81,37 @@ class BriefAttentionRestDocsTest {
     @Test
     @DisplayName("이번 주 해소 요약은 기간과 확인 가능한 해소 건수를 반환한다")
     void documentsWeeklyResolutions() throws Exception {
-        when(useCase.summarizeWeeklyResolutions(SCOPE)).thenReturn(new com.personal.baton.application.brief.BriefWeeklyResolutions(
-                java.time.LocalDate.parse("2026-08-31"), java.time.ZoneId.of("Asia/Seoul"),
-                Instant.parse("2026-08-30T15:00:00Z"), Instant.parse("2026-09-06T15:00:00Z"), Instant.parse("2026-09-05T00:00:00Z"), 2L));
+        when(useCase.summarizeWeeklyResolutions(SCOPE, new Cursor(EventType.HANDOFF_BLOCKED, "handoff:a"), 1)).thenReturn(new BriefWeeklyResolutions(
+                LocalDate.parse("2026-08-31"), ZoneId.of("Asia/Seoul"),
+                Instant.parse("2026-08-30T15:00:00Z"), Instant.parse("2026-09-06T15:00:00Z"), Instant.parse("2026-09-05T00:00:00Z"), 2L,
+                List.of(new BriefWeeklyResolutions.Item(EventType.ROLE_UNASSIGNED, "role:a", Instant.parse("2026-09-04T00:00:00Z"), 2L)),
+                new Cursor(EventType.ROLE_UNASSIGNED, "role:a")));
         mvc.perform(get(BriefAttentionController.RESOLUTIONS_PATH, TEAM, SEASON)
+                        .param("afterEventType", "HANDOFF_BLOCKED").param("afterSourceReference", "handoff:a").param("limit", "1")
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.resolvedCount").value(2))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefWeeklyResolutions",
-                        "시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수를 중계한다.", "BRIEF 이번 주 해소 요약",
+                        "시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수와 상세 목록을 중계한다.", "BRIEF 이번 주 해소 요약",
                         paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키")), headers(),
+                        queryParameters(parameterWithName("afterEventType").optional().description("다음 페이지 커서 이벤트 타입. afterSourceReference와 함께 사용")
+                                        .attributes(key("enumValues").value(Arrays.stream(EventType.values()).map(Enum::name).toList())),
+                                parameterWithName("afterSourceReference").optional().description("다음 페이지 커서 원본 참조"),
+                                parameterWithName("limit").optional().description("조회 크기 1~100, 기본 20")),
                         responseFields(fieldWithPath("weekStart").description("시즌 시간대의 이번 주 월요일"),
                                 fieldWithPath("zoneId").description("시즌 IANA 시간대"),
                                 fieldWithPath("windowStart").description("주간 시작 시각 이상"),
                                 fieldWithPath("windowEnd").description("다음 주 시작 시각 미만"),
                                 fieldWithPath("evaluatedAt").description("BRIEF 집계 확인 시각"),
-                                fieldWithPath("resolvedCount").description("확인 가능한 현재 해소 항목 수. 누락 증거가 있는 항목 제외"))));
+                                fieldWithPath("resolvedCount").description("커서와 무관한 현재 전체 해소 항목 수. 누락 증거가 있는 항목 제외"),
+                                fieldWithPath("items").description("복합 정체성 오름차순 해소 목록").attributes(key("itemsType").value("object")),
+                                new EnumFields(EventType.class).withPath("items[].reasonCode").description("해소한 관심 항목 종류"),
+                                fieldWithPath("items[].sourceReference").description("원본 참조"),
+                                fieldWithPath("items[].resolvedAt").description("활성 다음 리비전에서 해소로 바뀐 원본 시각"),
+                                fieldWithPath("items[].resolvedRevision").description("해소로 바뀐 원본 리비전"),
+                                fieldWithPath("nextCursor").optional().description("다음 페이지 배타 커서. 끝이면 null"),
+                                new EnumFields(EventType.class).withPath("nextCursor.eventType").description("커서 이벤트 타입"),
+                                fieldWithPath("nextCursor.sourceReference").description("커서 원본 참조"))));
     }
 
     @Test

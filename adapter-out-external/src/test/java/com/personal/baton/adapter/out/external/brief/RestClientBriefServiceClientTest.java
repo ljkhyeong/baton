@@ -62,16 +62,23 @@ class RestClientBriefServiceClientTest {
     void validatesWeeklyResolutionWindow() {
         String body = """
                 {"weekStart":"2026-03-02","zoneId":"America/New_York","windowStart":"2026-03-02T05:00:00Z",
-                 "windowEnd":"2026-03-09T04:00:00Z","evaluatedAt":"2026-03-08T12:00:00Z","resolvedCount":2}
+                 "windowEnd":"2026-03-09T04:00:00Z","evaluatedAt":"2026-03-08T12:00:00Z","resolvedCount":2,"items":[{"reasonCode":"ROLE_UNASSIGNED","sourceReference":"role:b",
+                 "resolvedAt":"2026-03-08T00:00:00Z","resolvedRevision":2}],"nextCursor":{"eventType":"ROLE_UNASSIGNED","sourceReference":"role:b"}}
                 """;
         server.expect(request -> {
                     assertThat(request.getURI().getPath()).endsWith("/attention-items/resolutions");
-                    assertThat(request.getURI().getQuery()).isEqualTo("weekStart=2026-03-02&zoneId=America/New_York");
+                    assertThat(request.getURI().getRawQuery()).isEqualTo("weekStart=2026-03-02&zoneId=America/New_York&limit=1"
+                            + "&afterEventType=ROLE_UNASSIGNED&afterSourceReference=role%3A%2B%26%20%ED%95%9C%EA%B8%80");
                 }).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
         server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
                 .body(body.replace("2026-03-09T04:00:00Z", "2026-03-09T05:00:00Z")));
-        assertThat(client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York")).resolvedCount()).isEqualTo(2);
-        assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York")))
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                .body(body.replace("\"items\"", "\"missingItems\"")));
+        assertThat(client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"),
+                new BriefAttentionPage.Cursor(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:+& 한글"), 1).resolvedCount()).isEqualTo(2);
+        assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"), null, 20))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"), null, 20))
                 .isInstanceOf(BriefIntegrationConfigurationException.class);
         server.verify();
     }
