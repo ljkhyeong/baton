@@ -1,0 +1,128 @@
+import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
+
+const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
+const OLD = '8e448211-66ae-44ab-9888-c4960648c221'
+const MIDDLE = '8e448211-66ae-44ab-9888-c4960648c222'
+const LATEST = '8e448211-66ae-44ab-9888-c4960648c223'
+const SOURCE = 'baton-continuity:8e448211-66ae-44ab-9888-c4960648c224'
+const currentItem = { reasonCode: 'ROLE_UNASSIGNED', sourceReference: SOURCE, severity: 'HIGH', status: 'ACTIVE',
+  observedAt: '2026-08-25T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }
+const oldItem = { ...currentItem, section: 'CURRENT_WEEK' }
+const summaries = [LATEST, MIDDLE, OLD].map((editionId, index) => ({ editionId, generation: 3 - index,
+  weekStart: index === 0 ? '2026-08-31' : '2026-08-24', zoneId: 'Asia/Seoul', generatedAt: '2026-09-05T00:00:00Z', sourceCursor: 3 - index, ruleVersion: 2, itemCount: 1 }))
+function edition(id: string) {
+  const summary = summaries.find((entry) => entry.editionId === id)!
+  return { ...summary, workspaceId: TEAM_ID, seasonId: SEASON_ID,
+    windowStart: summary.weekStart === '2026-08-31' ? '2026-08-30T15:00:00Z' : '2026-08-23T15:00:00Z',
+    windowEnd: summary.weekStart === '2026-08-31' ? '2026-09-06T15:00:00Z' : '2026-08-30T15:00:00Z', items: [id === OLD ? oldItem : currentItem] }
+}
+async function login(page: Page) {
+  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token' } }))
+  await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token' } }))
+  await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: { claimed: true, accountId: ACCOUNT, teamId: TEAM_ID,
+    memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z' } }))
+}
+
+test('지난 브리프를 탐색·비교하고 현재 업무로 이동한다 @smoke', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  await installApi(page, projection); await login(page)
+  const historyCursors: (string | null)[] = []
+  let malformed = false
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const request = route.request(); const url = new URL(request.url()); const path = url.pathname
+    expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
+    expect(request.headers().authorization).toBeUndefined()
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/sources/query')) {
+      expect(request.headers()['x-csrf-token']).toBe('test-token')
+      const sources = request.postDataJSON().sources as { eventType: string; sourceReference: string }[]
+      expect(sources).toHaveLength(1)
+      return route.fulfill({ json: { sources: sources.map((source) => ({ ...source,
+        target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
+    }
+    if (path.endsWith('/editions')) {
+      historyCursors.push(url.searchParams.get('beforeGeneration'))
+      return route.fulfill({ json: url.searchParams.has('beforeGeneration') ? { editions: [summaries[2]], nextBeforeGeneration: null }
+        : { editions: summaries.slice(0, 2), nextBeforeGeneration: 2 } })
+    }
+    if (path.endsWith('/changes')) {
+      expect(url.searchParams.get('fromEditionId')).toBe(OLD)
+      expect(path).toContain(MIDDLE)
+      return route.fulfill({ json: { from: summaries[2], to: malformed ? summaries[0] : summaries[1], added: [], removed: [], changed: [{ before: oldItem, after: currentItem }] } })
+    }
+    return route.fulfill({ json: edition(path.endsWith('/latest') ? LATEST : path.split('/').at(-1)!) })
+  })
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention')
+  await panel.locator('summary').click(); await panel.getByText('저장된 브리프', { exact: true }).click()
+  await expect(panel.getByText('2026-08-31 시작 주 · 세대 3')).toBeVisible()
+  await panel.getByRole('button', { name: '이전 브리프 더보기' }).click()
+  await expect.poll(() => historyCursors.at(-1)).toBe('2')
+  await panel.getByRole('combobox', { name: '조회할 브리프' }).selectOption(MIDDLE)
+  await expect(panel.getByText('2026-08-24 시작 주 · 세대 2')).toBeVisible()
+  await panel.getByRole('combobox', { name: '비교 기준 브리프' }).selectOption(OLD)
+  const comparison = panel.getByRole('region', { name: '브리프 비교 결과' })
+  await expect(comparison).toContainText('분류 변경: 이번 주 변경 → 이전부터 미해소')
+  await expect(comparison).toContainText('추가 0건 · 제외 0건 · 변경 1건')
+  await expect(comparison).toContainText('업무가 해소됐다는 판정은 아닙니다.')
+  await expect(comparison.getByRole('button', { name: '업무로 이동' }).first()).toBeVisible()
+  expect(await comparison.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await comparison.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('brief-history-comparison.png'), fullPage: true })
+  malformed = true
+  await panel.getByRole('combobox', { name: '비교 기준 브리프' }).selectOption('')
+  await panel.getByRole('combobox', { name: '비교 기준 브리프' }).selectOption(OLD)
+  await expect(comparison.getByRole('alert')).toContainText('비교 결과를 불러오지 못했습니다.')
+  await expect(comparison.getByText('추가 0건 · 제외 0건 · 변경 1건')).toHaveCount(0)
+  await panel.getByRole('region', { name: '이전부터 미해소' }).getByRole('button', { name: '업무로 이동' }).click()
+  await expect(page.locator('.role-row.selected')).toContainText(projection.roles.find((role) => role.id === ROLE_ID)!.name)
+})
+
+test('전달 대기와 실패를 미리 표시하고 준비 완료 때만 생성을 요청한다 @smoke', async ({ page }) => {
+  await installApi(page); await login(page)
+  let state = 'DELIVERY_PENDING'; let calls = 0
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: state, pendingCount: state === 'DELIVERY_PENDING' ? 2 : 0,
+      failedCount: state === 'DELIVERY_FAILED' ? 1 : 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
+    if (route.request().method() === 'POST') { calls++; state = 'DELIVERY_PENDING'; return route.fulfill({ status: 409,
+      json: { code: 'BRIEF_DELIVERY_INCOMPLETE', message: '새 변경사항의 전달이 끝난 뒤 다시 생성해 주세요.' } }) }
+    if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
+    return route.fulfill({ status: 404, json: { code: 'BRIEF_EDITION_NOT_FOUND', message: '아직 생성하지 않았습니다.' } })
+  })
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention'); await panel.locator('summary').click(); await panel.getByText('저장된 브리프', { exact: true }).click()
+  const generate = panel.getByRole('button', { name: '이번 주 브리프 생성', exact: true })
+  await expect(generate).toBeDisabled(); await expect(panel).toContainText('전달 대기 2건')
+  state = 'DELIVERY_FAILED'; await panel.getByRole('button', { name: '전달 상태 새로고침' }).click()
+  await expect(panel).toContainText('변경사항 전달 실패 · 운영자 확인 필요'); await expect(generate).toBeDisabled()
+  state = 'READY'; await panel.getByRole('button', { name: '전달 상태 새로고침' }).click()
+  await expect(generate).toBeEnabled(); await generate.click()
+  await expect(panel.getByRole('alert')).toContainText('새 변경사항의 전달이 끝난 뒤')
+  await expect(generate).toBeDisabled(); expect(calls).toBe(1)
+})
+
+test('현재 관심 항목에서 보관된 원본 루틴으로 이동한다 @smoke', async ({ page }) => {
+  const projection = makeProjection(); const routine = projection.routines.find((entry) => entry.id === ROUTINE_ID)!
+  routine.archivedAt = '2026-09-01T00:00:00Z'
+  await installApi(page, projection); await login(page)
+  await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 1, mediumCount: 0, revisionGapCount: 0 } })
+    if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: [{ eventType: 'ROUTINE_REPEATEDLY_OVERDUE', sourceReference: SOURCE,
+      target: { title: routine.title, roleId: routine.ownerRoleId, routineId: ROUTINE_ID, archived: true } }] } })
+    return route.fulfill({ json: { items: [{ ...currentItem, reasonCode: 'ROUTINE_REPEATEDLY_OVERDUE' }], nextCursor: null } })
+  })
+  await openSharedWorkspace(page)
+  const panel = page.locator('.brief-attention'); await panel.locator('summary').click()
+  await expect(panel).toContainText('보관됨')
+  await panel.getByRole('button', { name: '업무로 이동' }).click()
+  await expect(page.locator(`.routine-archive-shelf [data-archived-routine-id="${ROUTINE_ID}"]`)).toBeVisible()
+  await expect(page.getByRole('button', { name: `${routine.title} 루틴 복원` })).toBeFocused()
+})

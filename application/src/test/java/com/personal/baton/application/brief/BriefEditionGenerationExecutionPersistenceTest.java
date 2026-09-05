@@ -110,6 +110,10 @@ class BriefEditionGenerationExecutionPersistenceTest {
                 NOW,
                 Duration.ofMinutes(1)
         );
+        assertThat(executionPort.findExecutionState(target)).hasValueSatisfying(state -> {
+            assertThat(state.status()).isEqualTo("PROCESSING");
+            assertThat(state.leaseExpiresAt()).isEqualTo(NOW.plusSeconds(60));
+        });
         assertThat(executionPort.claim(
                 target,
                 true,
@@ -183,6 +187,23 @@ class BriefEditionGenerationExecutionPersistenceTest {
                 "SELECT execution_status FROM brief_edition_generation_execution",
                 String.class
         )).isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("전달 집계는 같은 팀·시즌의 대기와 실패를 구분하고 성공 시각만 반환한다")
+    void readsDeliveryCountsAndSuccessTime() {
+        insertPendingOutbox();
+        var pending = executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID);
+        assertThat(pending.pendingCount()).isEqualTo(1); assertThat(pending.failedCount()).isZero();
+        assertThat(pending.lastDeliveredAt()).isNull();
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET delivery_status = 'FAILED', completed_at = ?", utc(NOW));
+        var failed = executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID);
+        assertThat(failed.pendingCount()).isZero(); assertThat(failed.failedCount()).isEqualTo(1);
+        assertThat(failed.complete()).isFalse(); assertThat(failed.lastDeliveredAt()).isNull();
+        jdbcTemplate.update("UPDATE brief_continuity_outbox SET delivery_status = 'DELIVERED', completed_at = ?", utc(NOW.plusSeconds(2)));
+        assertThat(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID).lastDeliveredAt()).isEqualTo(NOW.plusSeconds(2));
+        assertThat(executionPort.findDeliveryBoundary(TEAM_ID, UUID.randomUUID()).watermark()).isZero();
+        assertThat(executionPort.findDeliveryBoundary(UUID.randomUUID(), SEASON_ID).lastDeliveredAt()).isNull();
     }
 
     private void insertPendingOutbox() {

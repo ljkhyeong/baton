@@ -362,6 +362,46 @@ class BriefEditionHttpsEndToEndTest {
                                 secondWorkspace.teamId(),
                                 secondWorkspace.seasonId()
                         )).isOne();
+                        Map<String, String> secondHeaders = Map.of("X-Baton-Access-Key", secondWorkspace.accessKey());
+                        String secondId = secondEdition.path("editionId").asText();
+                        String secondPath = secondWorkspace.generationPath() + "/" + secondId;
+                        JsonNode history = json(currentSession.send("GET", secondWorkspace.generationPath(), secondHeaders, null, false, 200));
+                        assertThat(history.path("editions").get(0).path("editionId").asText()).isEqualTo(secondId);
+                        assertThat(json(currentSession.send("GET", secondPath, secondHeaders, null, false, 200)).path("editionId").asText()).isEqualTo(secondId);
+                        currentSession.send("GET", firstWorkspace.generationPath() + "/" + secondId,
+                                Map.of("X-Baton-Access-Key", firstWorkspace.accessKey()), null, false, 404);
+                        currentSession.send("GET", secondPath + "/changes?fromEditionId=" + firstEditionId,
+                                secondHeaders, null, false, 404);
+                        briefDatabase.update("UPDATE attention_item SET severity = 'MEDIUM', last_revision = 2 WHERE workspace_id = ? AND season_id = ?",
+                                secondWorkspace.teamId(), secondWorkspace.seasonId());
+                        simulateGenerationResponseLoss(batonDatabase, UUID.fromString(json(secondGeneration).path("executionId").asText()));
+                        JsonNode changedGeneration = json(currentSession.generate(secondWorkspace, 201));
+                        String changedPath = secondWorkspace.generationPath() + "/" + changedGeneration.path("editionId").asText();
+                        JsonNode comparison = json(currentSession.send("GET", changedPath + "/changes?fromEditionId=" + secondId,
+                                secondHeaders, null, false, 200));
+                        assertThat(comparison.path("changed").size()).isEqualTo(1);
+                        assertThat(comparison.path("changed").get(0).path("before").path("severity").asText()).isEqualTo("HIGH");
+                        assertThat(comparison.path("changed").get(0).path("after").path("severity").asText()).isEqualTo("MEDIUM");
+                        JsonNode older = json(currentSession.send("GET", secondWorkspace.generationPath() + "?beforeGeneration=2&limit=1", secondHeaders, null, false, 200));
+                        assertThat(older.path("editions").get(0).path("editionId").asText()).isEqualTo(secondId);
+                        String contextBase = secondWorkspace.generationPath().replace("/editions", "");
+                        assertThat(json(currentSession.send("GET", contextBase + "/generation-readiness", secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("READY");
+
+                        // BATON 원본 API로 만든 신호의 현재 업무 연결과 미전달 상태를 확인한다.
+                        JsonNode role = json(currentSession.send("POST", "/api/v1/teams/" + secondWorkspace.teamId() + "/seasons/" + secondWorkspace.seasonId() + "/roles",
+                                Map.of("X-Baton-Access-Key", secondWorkspace.accessKey(), "Content-Type", "application/json", "Idempotency-Key", UUID.randomUUID().toString()),
+                                """
+                                {"name":"브리프 업무 연결","purpose":"업무 이름과 이동 대상 확인","currentMemberId":null,"nextMemberId":null,
+                                 "assignmentStartDate":null,"assignmentEndDate":null,"responsibilities":["주간 확인"],"risk":null}
+                                """, true, 201));
+                        String signalId = batonDatabase.queryForObject("SELECT BIN_TO_UUID(signal_id) FROM brief_continuity_signal WHERE team_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?) AND subject_id = UUID_TO_BIN(?) AND signal_type = 'ROLE_UNASSIGNED'",
+                                String.class, secondWorkspace.teamId().toString(), secondWorkspace.seasonId().toString(), role.path("id").asText());
+                        JsonNode contexts = json(currentSession.send("POST", contextBase + "/sources/query",
+                                Map.of("X-Baton-Access-Key", secondWorkspace.accessKey(), "Content-Type", "application/json"),
+                                "{\"sources\":[{\"eventType\":\"ROLE_UNASSIGNED\",\"sourceReference\":\"baton-continuity:" + signalId + "\"}]}", true, 200));
+                        assertThat(contexts.path("sources").get(0).path("target").path("title").asText()).isEqualTo("브리프 업무 연결");
+                        assertThat(contexts.path("sources").get(0).path("target").path("roleId").asText()).isEqualTo(role.path("id").asText());
+                        assertThat(json(currentSession.send("GET", contextBase + "/generation-readiness", secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("DELIVERY_PENDING");
                         assertSecretsAbsent(
                                 batonWithCurrentToken.getLogs(),
                                 caddy.getLogs(),

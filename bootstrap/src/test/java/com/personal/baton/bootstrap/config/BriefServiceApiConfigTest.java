@@ -10,6 +10,7 @@ import com.personal.baton.adapter.out.external.brief.RestClientBriefServiceClien
 import com.personal.baton.application.brief.port.in.BriefEditionUseCase;
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
 import com.personal.baton.application.brief.port.out.BriefServiceClient;
+import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.out.WorkspaceRepository;
@@ -31,6 +32,7 @@ class BriefServiceApiConfigTest {
             .withBean(WorkspaceRepository.class, () -> mock(WorkspaceRepository.class))
             .withBean(RoundAuthorizationRepository.class, () -> mock(RoundAuthorizationRepository.class))
             .withBean(BriefEditionGenerationExecutionPort.class, () -> mock(BriefEditionGenerationExecutionPort.class))
+            .withBean(BriefContinuitySignalStorePort.class, () -> mock(BriefContinuitySignalStorePort.class))
             .withBean(BriefRestClientFactory.class, () -> clientFactory)
             .withBean(Clock.class, Clock::systemUTC)
             .withUserConfiguration(BriefServiceApiConfig.class);

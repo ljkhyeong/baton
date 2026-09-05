@@ -1,16 +1,9 @@
 package com.personal.baton.application.brief;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.groups.Tuple.tuple;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.brief.port.in.ReconcileBriefContinuitySignalsUseCase;
+import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
-import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.ConfirmRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateHandoffItemCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.CreateMemberCommand;
@@ -31,6 +24,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateR
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceUseCase.UpdateSeasonRoundCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceUseCase;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import java.time.Clock;
@@ -67,6 +61,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+
+
 
 @Tag("usecase")
 @Testcontainers(disabledWithoutDocker = true)
@@ -91,6 +93,9 @@ class BriefContinuitySignalPersistenceTest {
             .withDatabaseName("baton_brief_continuity")
             .withUsername("baton")
             .withPassword("password");
+
+    @Autowired
+    private BriefContinuitySignalStorePort signalStore;
 
     @Autowired
     private WorkspaceUseCase workspaceUseCase;
@@ -305,6 +310,12 @@ class BriefContinuitySignalPersistenceTest {
         assertThat(events)
                 .extracting(event -> event.get("SOURCE_REFERENCE"))
                 .containsOnly("baton-continuity:" + events.getFirst().get("SIGNAL_ID"));
+
+        UUID signalId = UUID.fromString(events.getFirst().get("SIGNAL_ID").toString());
+        assertThat(signalStore.findByIds(workspace.teamId(), workspace.seasonId(), List.of(signalId))).hasSize(1);
+        assertThat(signalStore.findByIds(UUID.randomUUID(), workspace.seasonId(), List.of(signalId))).isEmpty();
+        assertThat(signalStore.findByIds(workspace.teamId(), UUID.randomUUID(), List.of(signalId))).isEmpty();
+        assertThat(signalStore.findByIds(workspace.teamId(), workspace.seasonId(), List.of(UUID.randomUUID()))).isEmpty();
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
             workspaceUseCase.updateRole(

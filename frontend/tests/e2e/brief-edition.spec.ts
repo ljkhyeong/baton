@@ -21,6 +21,8 @@ test('최신 브리프 없음과 전달 대기 뒤 생성·재사용·권한 거
     const path = new URL(request.url()).pathname
     expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
     expect(request.headers().authorization).toBeUndefined()
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (request.method() === 'POST') {
@@ -87,6 +89,8 @@ test('종료 시즌은 저장된 브리프만 조회하고 생성을 막는다 @
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     expect(route.request().method()).toBe('GET')
+    if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     return route.fulfill({ json: { editionId: EDITION, workspaceId: TEAM_ID, seasonId: SEASON_ID, generation: 1,
