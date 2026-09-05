@@ -62,8 +62,16 @@ export function useRecordDraft(scope: WorkspaceScope | null, kind: RecordDraftKi
   useEffect(() => {
     if (!key || serialized === ignored.current) return
     try {
+      if (serialized === initial.current) {
+        sessionStorage.removeItem(key)
+        ignored.current = serialized
+        setSaved(null); setAvailable(false)
+        setMessage('처음 내용으로 되돌려 저장된 초안을 지웠습니다.')
+        return
+      }
       const value: StoredDraft = { version: 1, savedAt: Date.now(), base: initial.current, fields: JSON.parse(serialized) as Fields }
       sessionStorage.setItem(key, JSON.stringify(value))
+      ignored.current = serialized
       setSaved(value)
       setAvailable(false)
       setMessage('현재 탭에 초안을 저장했습니다.')

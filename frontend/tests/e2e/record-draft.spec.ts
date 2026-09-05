@@ -11,6 +11,13 @@ test('@memory @responsive 새로고침 뒤 결정 초안을 불러오고 저장 
   }
   await open()
   const dialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
+  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('지운 내용은 초안에 남지 않아야 한다')
+  await expect(dialog.getByText('현재 탭에 초안을 저장했습니다.')).toBeVisible()
+  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('')
+  await expect(dialog.getByText('처음 내용으로 되돌려 저장된 초안을 지웠습니다.')).toBeVisible()
+  await page.reload()
+  await open()
+  await expect(dialog.getByRole('button', { name: '초안 불러오기' })).toHaveCount(0)
   await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('미리 회고 질문을 준비한다')
   await dialog.getByLabel('왜 이 선택을 했나요?').fill('모임 중 질문을 생각하느라 회고가 늦어지기 때문입니다.')
   await expect(dialog.getByText('현재 탭에 초안을 저장했습니다.')).toBeVisible()
