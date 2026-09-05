@@ -17,6 +17,7 @@ export type WorkspaceEditor =
   | { type: 'member'; value: Member }
   | { type: 'role'; value: Role }
   | { type: 'roleResource'; value: RoleResource }
+  | { type: 'roleResourceCopy'; value: RoleResource }
   | { type: 'routine'; value: Routine }
   | { type: 'round'; value: SeasonRound }
   | { type: 'decision'; value: Decision }
@@ -147,7 +148,8 @@ export function createWorkspaceEditorActions({
     openModal('role')
   }
 
-  const openRoleResource = () => {
+  const prepareRoleResource = (source?: RoleResource) => {
+    if (!ensureFreshWorkspace()) return
     if (!roles.length) {
       setView('roles')
       notify('자료를 연결할 역할부터 만들어 주세요.', 'error')
@@ -158,10 +160,13 @@ export function createWorkspaceEditorActions({
       notify('전달한 바통은 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
       return
     }
-    setEditor(null)
+    setEditor(source ? { type: 'roleResourceCopy', value: source } : null)
     commands.roleResourceCreation.reset()
     openModal('roleResource')
   }
+
+  const openRoleResource = () => prepareRoleResource()
+  const openRoleResourceCopy = (source: RoleResource) => prepareRoleResource(source)
 
   const openRoleResourceEdit = (resource: RoleResource) => {
     if (!ensureFreshWorkspace()) return
@@ -254,6 +259,7 @@ export function createWorkspaceEditorActions({
     openRole,
     openRoleEdit,
     openRoleResource,
+    openRoleResourceCopy,
     openRoleResourceEdit,
     openRound,
     openRoundEdit,

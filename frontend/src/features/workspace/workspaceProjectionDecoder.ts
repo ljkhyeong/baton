@@ -227,6 +227,8 @@ function isRole(value: unknown): value is Role {
   return hasStringFields(value, ['name', 'purpose'])
     && isUuid(value.id)
     && hasNullableUuidFields(value, ['currentMemberId', 'nextMemberId'])
+    && isNullableUuid(value.previousRoleId)
+    && (value.previousRoleId === null || !isSameUuid(value.previousRoleId, value.id))
     && isNullableCalendarDate(value.assignmentStartDate)
     && isNullableCalendarDate(value.assignmentEndDate)
     && isNullableString(value.risk)
@@ -525,6 +527,12 @@ export function decodeWorkspaceProjectionForScope(
   }
   if (!hasValidContinuitySignalTargets(projection)) {
     throw new TypeError('Workspace projection contains an invalid continuity signal target.')
+  }
+  if (projection.roles.some((role) => role.previousRoleId)
+    && projection.season.previousSeasonId
+    && (isSameUuid(projection.season.previousSeasonId, projection.season.id)
+      || !projection.seasons.some((season) => isSameUuid(season.id, projection.season.previousSeasonId)))) {
+    throw new TypeError('Workspace projection contains a role without its previous season.')
   }
 
   return projection

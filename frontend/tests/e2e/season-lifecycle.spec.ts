@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
 import type {
   CreateNextSeasonRequest,
+  CreateRoleResourceRequest,
+  RoleResource,
   Role,
   Routine,
   SeasonSummary,
@@ -60,6 +62,7 @@ const role = (id = ROLE_ID): Role => ({
   name: '문제 큐레이터',
   purpose: '이번 주 학습 목표에 맞는 문제를 고릅니다.',
   currentMemberId: id === ROLE_ID ? MEMBER_ID : null,
+  previousRoleId: id === COPIED_ROLE_ID ? ROLE_ID : null,
   nextMemberId: null,
   assignmentStartDate: id === ROLE_ID ? '2026-07-01' : null,
   assignmentEndDate: id === ROLE_ID ? '2026-09-30' : null,
@@ -690,4 +693,65 @@ test('@operations 서버가 시즌 종료를 알리면 열려 있던 편집기�
   await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
   await expect(page.getByText('다른 구성원이 시즌을 종료했어요.')).toBeVisible()
+})
+
+
+test('@handoff @responsive 이전 시즌 기록을 필요할 때 조회하고 선택한 자료만 현재 역할에 연결한다', async ({ page }, testInfo) => {
+  await attachSeasonApi(page, ENDED_AT)
+  const target = projection(nextSeason(), [sourceSeason(ENDED_AT), nextSeason()])
+  const previous = projection(sourceSeason(ENDED_AT), target.seasons)
+  const targetScope = `/api/v1/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`
+  let previousRequests = 0
+  let denyPrevious = true
+  const copies: CreateRoleResourceRequest[] = []
+  await page.route(`**${targetScope}/workspace`, (route) => fulfillJson(route, target))
+  await page.route(`**${SOURCE_SCOPE}/workspace`, async (route) => {
+    previousRequests += 1
+    expect(route.request().headers()['x-baton-access-key']).toBe(ACCESS_KEY)
+    await fulfillJson(route, denyPrevious
+      ? { code: 'WORKSPACE_ACCESS_DENIED', message: '이전 시즌 접근을 확인해 주세요.' }
+      : previous, denyPrevious ? 403 : 200)
+  })
+  await page.route(`**${targetScope}/role-resources`, async (route) => {
+    expect(route.request().method()).toBe('POST')
+    expect(route.request().headers()['x-baton-access-key']).toBe(ACCESS_KEY)
+    expect(route.request().headers()['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
+    const input = route.request().postDataJSON() as CreateRoleResourceRequest
+    copies.push(input)
+    const resource: RoleResource = {
+      ...input, description: input.description ?? null, id: fixtureUuid(72), createdAt: '2026-10-01T00:00:00Z', archivedAt: null,
+    }
+    target.resources.push(resource)
+    await fulfillJson(route, resource, 201)
+  })
+  await page.goto(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}#accessKey=${ACCESS_KEY}`)
+  await page.getByRole('button', { name: '역할', exact: true }).first().click()
+  await page.getByRole('button', { name: /문제 큐레이터 역할 상세 열기/ }).click()
+  const records = page.locator('.previous-role-records')
+  await expect(records.getByText('이전 시즌 기록 보기', { exact: true })).toBeVisible()
+  expect(previousRequests).toBe(0)
+  await records.getByText('이전 시즌 기록 보기', { exact: true }).click()
+  await expect(records).toContainText('이전 시즌 기록을 불러오지 못했습니다.')
+  await expect(records.getByRole('link', { name: '문제 목록', exact: true })).toHaveCount(0)
+  denyPrevious = false
+  await records.getByRole('button', { name: '다시 불러오기' }).click()
+  await expect(records).toContainText('2026 여름 시즌 · 문제 큐레이터')
+  await expect(records).toContainText('운영 문제를 일찍 발견하기 위해서입니다.')
+  await expect(records).toContainText('문제 선정 기준 공유')
+  await expect(page).toHaveURL(new RegExp(`/seasons/${NEXT_SEASON_ID}`))
+  await records.getByRole('heading', { name: '참고 자료', exact: true }).scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('previous-role-records.png') })
+  await records.getByRole('button', { name: '문제 목록 자료를 현재 시즌에 연결' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  await expect(dialog.getByRole('combobox', { name: '역할', exact: true })).toHaveValue(COPIED_ROLE_ID)
+  await expect(dialog.getByLabel('자료 이름')).toHaveValue('문제 목록')
+  await expect(dialog.getByLabel('링크', { exact: true })).toHaveValue('https://example.com/problems')
+  await dialog.getByRole('button', { name: '자료 연결' }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(copies).toEqual([{ roleId: COPIED_ROLE_ID, title: '문제 목록', url: 'https://example.com/problems', description: null }])
+  expect(previous.resources[0]?.roleId).toBe(ROLE_ID)
+  await page.reload()
+  await page.getByRole('button', { name: '역할', exact: true }).first().click()
+  await page.getByRole('button', { name: /문제 큐레이터 역할 상세 열기/ }).click()
+  await expect(page.getByRole('link', { name: '문제 목록 새 창에서 열기' })).toBeVisible()
 })

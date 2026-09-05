@@ -633,6 +633,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     openRole: openRoleModal,
     openRoleEdit: openRoleEditModal,
     openRoleResource: openRoleResourceModal,
+    openRoleResourceCopy,
     openRoleResourceEdit: openRoleResourceEditModal,
     openRound: openRoundModal,
     openRoundEdit: openRoundEditModal,
@@ -969,6 +970,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onUpdateResourceArchive={updateRoleResourceArchive}
             onManageMembership={openMemberManagementModal}
             roundRoomScope={scope}
+            previousSeasonId={workspace.season.previousSeasonId ?? null}
+            onCopyPreviousResource={openRoleResourceCopy}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
             onOpenHandoff={() => {
               setView('handoff')
@@ -1085,6 +1088,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}
           resource={editingRoleResource ?? undefined}
+          initialResource={editor?.type === 'roleResourceCopy' ? editor.value : undefined}
           pending={editingRoleResource
             ? updateRoleResourceMutation.isPending
             : roleResourceCreationCommand.isPending}

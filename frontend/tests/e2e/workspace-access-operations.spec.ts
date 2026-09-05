@@ -728,6 +728,7 @@ test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 re
 test('@smoke @responsive @continuity 조직 연속성 레이더는 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({
+    previousRoleId: null,
     id: SECOND_ROLE_ID,
     name: '기록자',
     purpose: '결정과 근거를 다음 회차에 이어 줍니다.',

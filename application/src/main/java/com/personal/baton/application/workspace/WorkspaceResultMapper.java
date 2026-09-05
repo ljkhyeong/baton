@@ -96,7 +96,8 @@ final class WorkspaceResultMapper {
                 role.getAssignmentStartDate(),
                 role.getAssignmentEndDate(),
                 List.copyOf(role.getResponsibilities()),
-                role.getRisk()
+                role.getRisk(),
+                role.getPreviousRoleId()
         );
     }
 

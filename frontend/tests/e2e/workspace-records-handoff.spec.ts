@@ -215,6 +215,7 @@ test('@memory 결정 생성 연결이 끊겨도 같은 요청으로 안전하게
 test('@records 결정·바통·자료를 한 흐름에서 검색하고 원본 기록으로 돌아간다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
   initialProjection.roles.push({
+    previousRoleId: null,
     id: SECOND_ROLE_ID,
     name: '회고 진행자',
     purpose: '회고 질문을 정리하고 다음 행동을 확정합니다.',
@@ -486,6 +487,7 @@ test('@handoff 역할 바통을 준비하고 경고 확인 후 전달·수락해
 test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연결한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({
+    previousRoleId: null,
     id: SECOND_ROLE_ID,
     name: '질문 큐레이터',
     purpose: '구성원이 막힌 지점을 다음 모임의 질문으로 정리합니다.',

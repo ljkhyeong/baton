@@ -156,11 +156,14 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
   "assignmentStartDate": "2026-07-20",
   "assignmentEndDate": "2026-09-17",
   "responsibilities": ["문제 선정", "난이도 균형 확인"],
-  "risk": "선정 기준이 개인 메모에만 있다"
+  "risk": "선정 기준이 개인 메모에만 있다",
+  "previousRoleId": null
 }
 ```
 
 구성원의 `deactivatedAt`은 활동 중이면 `null`, 활동 종료 상태이면 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 기존 역할·결정 참조를 표시할 수 있도록 두 상태의 구성원을 모두 반환한다. 시즌의 `endedAt`은 운영 중이면 `null`, 운영자가 명시적으로 종료했으면 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. `endDate`가 지났다는 이유만으로 자동 종료하지 않는다. `previousSeasonId`는 최초 시즌이면 `null`, 다음 시즌이면 원본 시즌 UUID다. `timeZone`은 최대 64자의 유효한 IANA 식별자이고 기존·최초 시즌의 기본값은 `Asia/Seoul`이다. 시즌 목록은 시작일과 UUID 내림차순으로 정렬한다.
+
+역할의 `previousRoleId`는 서버가 보존한 원본 역할 UUID이며 새로 만든 역할은 `null`이다. 다음 시즌으로 복사한 역할은 `season.previousSeasonId`의 원본 역할을 가리킨다. 클라이언트는 이전 시즌 워크스페이스를 같은 팀·접근 키로 별도 조회하고 해당 UUID의 역할에 연결된 자료·결정·바통 항목을 읽는다. V11 이관 역할은 원본 역할 UUID가 있어도 `previousSeasonId`가 없을 수 있으므로 이 값만으로 이전 시즌을 추정하지 않는다. 선택한 자료를 이어받을 때는 현재 시즌의 기존 역할 자료 생성 API에 현재 역할 UUID와 제목·링크·설명을 제출한다. 원본 자료 식별자·보관 시각·생성 시각은 복사하지 않으며 이전 시즌 기록은 바꾸지 않는다.
 
 `roundSchedule`이 설정되지 않았으면 `null`이다. 설정된 일정은 `firstMeetingDate`, 시즌 시간대 기준 `meetingTime`, `WEEKLY` 또는 `BIWEEKLY`인 `recurrence`, `0..30`의 `generationLeadDays`, `enabled`, 서버가 다음에 처리할 `nextOccurrenceDate`를 가진다.
 
@@ -437,7 +440,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 - `currentMemberId`와 `nextMemberId`는 해당 팀의 활동 중 구성원이어야 한다.
 - 두 담당 날짜가 모두 있으면 시작일은 종료일보다 늦을 수 없다.
 
-요청은 역할 응답에서 `id`를 제외한 `name`, `purpose`, 선택적 담당자·기간, `responsibilities`, 선택적 `risk`를 사용한다. `name`은 최대 100자, `purpose`는 최대 1000자다. `responsibilities`는 필수 목록이며 최대 100개까지 받고 각 책임은 공백만으로 구성될 수 없으며 최대 500자다. 선택적 `risk`는 최대 1000자다. 응답은 생성된 역할이다.
+요청은 역할 응답에서 `id`와 `previousRoleId`를 제외한 `name`, `purpose`, 선택적 담당자·기간, `responsibilities`, 선택적 `risk`를 사용한다. `name`은 최대 100자, `purpose`는 최대 1000자다. `responsibilities`는 필수 목록이며 최대 100개까지 받고 각 책임은 공백만으로 구성될 수 없으며 최대 500자다. 선택적 `risk`는 최대 1000자다. 응답은 생성된 역할이다.
 
 수정:
 

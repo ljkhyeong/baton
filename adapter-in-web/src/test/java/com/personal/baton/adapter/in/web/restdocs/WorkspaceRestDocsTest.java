@@ -1548,6 +1548,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(ROLE_ID.toString()))
                 .andExpect(jsonPath("$.name").value("회고 큐레이터"))
+                .andExpect(jsonPath("$.previousRoleId").value("44444444-4444-4444-4444-000000000001"))
                 .andExpect(jsonPath("$.currentMemberId").value(NEXT_MEMBER_ID.toString()))
                 .andExpect(jsonPath("$.responsibilities.length()").value(2))
                 .andDo(document(
@@ -4342,7 +4343,8 @@ class WorkspaceRestDocsTest {
                 LocalDate.of(2026, 7, 20),
                 LocalDate.of(2026, 9, 17),
                 List.of("질문 수집", "공통 막힘 정리"),
-                "질문이 개인 메모에만 남을 수 있습니다"
+                "질문이 개인 메모에만 남을 수 있습니다",
+                null
         );
     }
 
@@ -4356,7 +4358,8 @@ class WorkspaceRestDocsTest {
                 LocalDate.of(2026, 7, 27),
                 LocalDate.of(2026, 9, 17),
                 List.of("회고 수집", "다음 실험 정리"),
-                "회고가 실행 항목으로 이어지지 않을 수 있습니다"
+                "회고가 실행 항목으로 이어지지 않을 수 있습니다",
+                UUID.fromString("44444444-4444-4444-4444-000000000001")
         );
     }
 
@@ -4373,7 +4376,8 @@ class WorkspaceRestDocsTest {
                     LocalDate.of(2026, 8, 1),
                     LocalDate.of(2026, 9, 17),
                     List.of("질문 수집", "공통 막힘 정리"),
-                    "질문이 개인 메모에만 남을 수 있습니다"
+                    "질문이 개인 메모에만 남을 수 있습니다",
+                    null
             );
             case CANCELLED -> new RoleResult(
                     ROLE_ID,
@@ -4384,7 +4388,8 @@ class WorkspaceRestDocsTest {
                     LocalDate.of(2026, 7, 20),
                     LocalDate.of(2026, 9, 17),
                     List.of("질문 수집", "공통 막힘 정리"),
-                    "질문이 개인 메모에만 남을 수 있습니다"
+                    "질문이 개인 메모에만 남을 수 있습니다",
+                    null
             );
             default -> roleResult();
         };
@@ -4820,6 +4825,8 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roles[].assignmentStartDate").optional().description("배정 시작일"),
                 fieldWithPath("roles[].assignmentEndDate").optional().description("배정 종료일"),
                 stringArrayField("roles[].responsibilities[]", "역할 책임 목록"),
+                fieldWithPath("roles[].previousRoleId").type(JsonFieldType.STRING).optional()
+                        .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
                 fieldWithPath("roles[].risk").optional().description("위험 신호"),
                 fieldWithPath("routines").type(JsonFieldType.ARRAY).description("루틴 목록"),
                 fieldWithPath("routines[].id").description("루틴 UUID"),
@@ -5144,6 +5151,8 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("assignmentEndDate").type(JsonFieldType.STRING).optional()
                         .description("배정 종료일"),
                 stringArrayField("responsibilities[]", "역할 책임 목록"),
+                fieldWithPath("previousRoleId").type(JsonFieldType.STRING).optional()
+                        .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
                 fieldWithPath("risk").type(JsonFieldType.STRING).optional().description("위험 신호")
         };
     }
@@ -5163,6 +5172,8 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("role.assignmentEndDate").type(JsonFieldType.STRING).optional()
                         .description("배정 종료일"),
                 stringArrayField("role.responsibilities[]", "역할 책임 목록"),
+                fieldWithPath("role.previousRoleId").type(JsonFieldType.STRING).optional()
+                        .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
                 fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("위험 신호"),
                 fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 바통"),
                 fieldWithPath("handoff.id").description("역할 바통 UUID"),

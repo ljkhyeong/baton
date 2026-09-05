@@ -199,7 +199,8 @@ public final class WorkspaceResponses {
             LocalDate assignmentStartDate,
             LocalDate assignmentEndDate,
             List<String> responsibilities,
-            String risk
+            String risk,
+            UUID previousRoleId
     ) {
 
         public static RoleResponse from(WorkspaceContract.RoleResult result) {
@@ -212,7 +213,8 @@ public final class WorkspaceResponses {
                     result.assignmentStartDate(),
                     result.assignmentEndDate(),
                     result.responsibilities(),
-                    result.risk()
+                    result.risk(),
+                    result.previousRoleId()
             );
         }
     }

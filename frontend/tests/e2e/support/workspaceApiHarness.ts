@@ -264,6 +264,7 @@ export function makeProjection(): WorkspaceProjection {
         id: ROLE_ID,
         name: '문제 큐레이터',
         purpose: '이번 주 학습 목표에 맞는 문제를 선정합니다.',
+        previousRoleId: null,
         currentMemberId: MEMBER_ONE_ID,
         nextMemberId: MEMBER_TWO_ID,
         assignmentStartDate: '2026-07-02',
@@ -750,7 +751,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
 
     if (method === 'POST' && path === `${SCOPE_PATH}/roles`) {
       const input = body as CreateRoleRequest
-      const created: Role = { id: CREATED_ROLE_ID, ...input }
+      const created: Role = { id: CREATED_ROLE_ID, previousRoleId: null, ...input }
       projection.roles.push(created)
       return finishContentCreation('role', created)
     }
@@ -767,7 +768,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         nextRoleConflict = null
         return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 사용자가 먼저 내용을 변경했습니다.')
       }
-      const updated: Role = { id: roleUpdate[1]!, ...(body as UpdateRoleRequest) }
+      const updated: Role = { ...projection.roles[roleIndex]!, ...(body as UpdateRoleRequest) }
       projection.roles[roleIndex] = updated
       return json(200, updated)
     }

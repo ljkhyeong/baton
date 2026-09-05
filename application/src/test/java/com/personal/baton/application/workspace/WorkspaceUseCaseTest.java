@@ -5896,6 +5896,7 @@ class WorkspaceUseCaseTest {
         assertThat(target.seasons()).hasSize(2);
         assertThat(target.roles()).singleElement().satisfies(copied -> {
             assertThat(copied.name()).isEqualTo(role.name());
+            assertThat(copied.previousRoleId()).isEqualTo(role.id());
             assertThat(copied.currentMemberId()).isNull();
             assertThat(copied.nextMemberId()).isNull();
             assertThat(copied.assignmentStartDate()).isNull();

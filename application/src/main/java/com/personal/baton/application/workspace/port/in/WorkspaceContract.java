@@ -105,7 +105,8 @@ public final class WorkspaceContract {
             LocalDate assignmentStartDate,
             LocalDate assignmentEndDate,
             List<String> responsibilities,
-            String risk
+            String risk,
+            UUID previousRoleId
     ) {
     }
 

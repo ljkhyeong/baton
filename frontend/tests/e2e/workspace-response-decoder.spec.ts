@@ -129,6 +129,7 @@ function domainInconsistentRoleHandoffResponse(): RoleHandoffTransitionResponse 
       id: '11111111-1111-4111-8111-111111111111',
       name: '문제 큐레이터',
       purpose: '문제 선정 기준을 유지합니다.',
+      previousRoleId: null,
       currentMemberId: '22222222-2222-4222-8222-222222222222',
       nextMemberId: null,
       assignmentStartDate: '2026-09-17',
@@ -314,7 +315,19 @@ test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scop
     })
   }
 
+  await test.step('시즌 연결 없이 이관한 기존 원본 역할', async () => {
+    response = scopedProjection({ teamId: scope.teamId, seasonId: scope.seasonId })
+    response.roles[0]!.previousRoleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({ ok: true, value: response })
+  })
+
   for (const scenario of [
+    {
+      name: '자기 자신을 원본으로 연결한 역할',
+      mutate: (projection: WorkspaceProjection) => {
+        projection.roles[0]!.previousRoleId = projection.roles[0]!.id
+      },
+    },
     {
       name: '현재 시즌 목록 누락',
       mutate: (projection: WorkspaceProjection) => {

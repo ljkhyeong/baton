@@ -189,6 +189,7 @@ export function RoleResourceModal({
   lockedRoleIds = new Set<string>(),
   selectedRoleId,
   resource,
+  initialResource,
   pending,
   error,
   storageError,
@@ -200,6 +201,7 @@ export function RoleResourceModal({
   lockedRoleIds?: ReadonlySet<string>
   selectedRoleId: string
   resource?: RoleResource
+  initialResource?: Pick<RoleResource, 'title' | 'url' | 'description'>
   onClose: () => void
   onSave: (request: RoleResourceFormRequest) => SaveResult
 }) {
@@ -212,9 +214,9 @@ export function RoleResourceModal({
       || roles.find((role) => !lockedRoleIds.has(role.id))?.id
       || '',
   )
-  const [title, setTitle] = useState(resource?.title ?? '')
-  const [url, setUrl] = useState(resource?.url ?? '')
-  const [description, setDescription] = useState(resource?.description ?? '')
+  const [title, setTitle] = useState(resource?.title ?? initialResource?.title ?? '')
+  const [url, setUrl] = useState(resource?.url ?? initialResource?.url ?? '')
+  const [description, setDescription] = useState(resource?.description ?? initialResource?.description ?? '')
   const [titleValidationMessage, setTitleValidationMessage] = useState('')
   const [urlValidationMessage, setUrlValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
@@ -247,7 +249,9 @@ export function RoleResourceModal({
   return (
     <ModalShell
       title={editing ? '참고 자료 수정' : '역할에 참고 자료 연결'}
-      description="문서나 외부 링크를 역할에 연결해, 담당자가 바뀌어도 같은 자료를 바로 찾게 합니다."
+      description={initialResource
+        ? '이전 시즌 자료를 현재 역할에 새로 연결합니다. 제목과 링크를 확인해 저장해 주세요. 이전 시즌 기록은 유지됩니다.'
+        : '문서나 외부 링크를 역할에 연결해, 담당자가 바뀌어도 같은 자료를 바로 찾게 합니다.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       initialFocusRef={titleInputRef}

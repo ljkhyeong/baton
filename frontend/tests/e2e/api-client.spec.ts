@@ -290,6 +290,7 @@ function acceptedRoleHandoffTransitionResponse() {
       id: '11111111-1111-4111-8111-111111111111',
       name: '문제 큐레이터',
       purpose: '문제 선정 기준을 유지합니다.',
+      previousRoleId: null,
       currentMemberId: '22222222-2222-4222-8222-222222222222',
       nextMemberId: null as string | null,
       assignmentStartDate: '2026-09-17',

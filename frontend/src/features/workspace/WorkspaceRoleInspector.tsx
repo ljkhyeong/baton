@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { RoundRoomResourceActions } from '@/features/round/RoundRoomResourceActions'
 import { Icon } from '@/shared/ui/Icon'
+import { PreviousRoleRecords } from './PreviousRoleRecords'
 import type { WorkspaceScope } from './api'
 import { formatDateRange, formatInstant } from './WorkspaceViews'
 import { getMember, memberDisplayName } from './workspacePresentation'
@@ -32,6 +33,8 @@ export function RoleInspector({
   onUpdateResourceArchive,
   onManageMembership,
   roundRoomScope,
+  previousSeasonId,
+  onCopyPreviousResource,
   changesDisabled = false,
 }: {
   role: Role
@@ -51,6 +54,8 @@ export function RoleInspector({
   onUpdateResourceArchive: (resource: RoleResource, archived: boolean) => void
   onManageMembership: () => void
   roundRoomScope: WorkspaceScope
+  previousSeasonId: string | null
+  onCopyPreviousResource: (resource: RoleResource) => void
   changesDisabled?: boolean
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -131,6 +136,16 @@ export function RoleInspector({
       </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
+      {previousSeasonId && role.previousRoleId && (
+        <PreviousRoleRecords
+          key={`${roundRoomScope.teamId}:${roundRoomScope.seasonId}:${role.id}`}
+          scope={roundRoomScope}
+          previousSeasonId={previousSeasonId}
+          previousRoleId={role.previousRoleId}
+          changesDisabled={changesDisabled}
+          onCopyResource={onCopyPreviousResource}
+        />
+      )}
       <div className="inspector-handoff"><div><span className="block-label">{handoff?.status === 'TRANSFERRED' ? '바통 수락 대기' : '바통 준비도'}</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 또는 취소 전까지 역할과 바통북을 수정할 수 없어요.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
     </>
   )
