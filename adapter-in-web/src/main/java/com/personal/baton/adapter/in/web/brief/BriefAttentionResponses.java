@@ -4,6 +4,7 @@ import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionPage.EventType;
 import com.personal.baton.application.brief.BriefAttentionPage.Severity;
 import com.personal.baton.application.brief.BriefAttentionPage.Status;
+import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import java.time.Instant;
@@ -12,6 +13,16 @@ import java.util.UUID;
 
 public final class BriefAttentionResponses {
     private BriefAttentionResponses() {
+    }
+
+    public record ResolutionsResponse(
+            java.time.LocalDate weekStart, java.time.ZoneId zoneId, Instant windowStart, Instant windowEnd,
+            Instant evaluatedAt, long resolvedCount
+    ) {
+        public static ResolutionsResponse from(BriefWeeklyResolutions summary) {
+            return new ResolutionsResponse(summary.weekStart(), summary.zoneId(), summary.windowStart(), summary.windowEnd(),
+                    summary.evaluatedAt(), summary.resolvedCount());
+        }
     }
 
     public record SummaryResponse(long highCount, long mediumCount, long revisionGapCount) {

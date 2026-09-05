@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.brief;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
@@ -33,6 +34,29 @@ public final class RestClientBriefServiceClient
 
     public RestClientBriefServiceClient(RestClient restClient) {
         this.restClient = restClient;
+    }
+
+    @Override
+    public BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
+        var summary = readQuery(() -> restClient.get().uri(builder -> builder
+                .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
+                .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).build(workspaceId, seasonId))
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefWeeklyResolutions.class), false);
+        if (!weekStart.equals(summary.weekStart()) || !zoneId.equals(summary.zoneId())
+                || !weekStart.atStartOfDay(zoneId).toInstant().equals(summary.windowStart())
+                || !weekStart.plusWeeks(1).atStartOfDay(zoneId).toInstant().equals(summary.windowEnd())
+                || summary.evaluatedAt() == null || summary.resolvedCount() == null || summary.resolvedCount() < 0) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return summary;
+    }
+
+    @Override
+    public Result findLatestEditionForWeek(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
+        return readEdition(() -> restClient.get().uri(builder -> builder
+                .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
+                .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).build(workspaceId, seasonId))
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class));
     }
 
     @Override

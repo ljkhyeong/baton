@@ -2,6 +2,7 @@ package com.personal.baton.application.brief.port.out;
 
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.BriefEditionHistory;
@@ -11,6 +12,8 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 public interface BriefServiceClient {
+
+    BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId);
 
     BriefAttentionSummary summarizeAttention(UUID workspaceId, UUID seasonId);
 
@@ -57,6 +60,8 @@ public interface BriefServiceClient {
     BriefEditionHistory findEditionHistory(UUID workspaceId, UUID seasonId, BriefEditionHistory.Query query);
 
     BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId);
+
+    Result findLatestEditionForWeek(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId);
 
     Result findLatestEdition(UUID workspaceId, UUID seasonId);
 

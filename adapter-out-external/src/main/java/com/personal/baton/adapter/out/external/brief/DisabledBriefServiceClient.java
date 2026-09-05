@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.brief;
 
 import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import com.personal.baton.application.brief.BriefAttentionPage;
+import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
@@ -18,6 +19,16 @@ public final class DisabledBriefServiceClient
             new DisabledBriefServiceClient();
 
     private DisabledBriefServiceClient() {
+    }
+
+    @Override
+    public BriefWeeklyResolutions summarizeWeeklyResolutions(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
+        throw new BriefIntegrationUnavailableException();
+    }
+
+    @Override
+    public Result findLatestEditionForWeek(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
+        return disabled();
     }
 
     @Override

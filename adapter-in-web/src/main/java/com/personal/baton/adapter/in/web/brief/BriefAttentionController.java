@@ -24,12 +24,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class BriefAttentionController {
     public static final String LIST_PATH = "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items";
     public static final String SUMMARY_PATH = LIST_PATH + "/summary";
+    public static final String RESOLUTIONS_PATH = LIST_PATH + "/resolutions";
     public static final String TRANSITIONS_PATH = LIST_PATH + "/transitions";
 
     private final BriefAttentionUseCase useCase;
 
     public BriefAttentionController(BriefAttentionUseCase useCase) {
         this.useCase = useCase;
+    }
+
+    @GetMapping(RESOLUTIONS_PATH)
+    public ResponseEntity<BriefAttentionResponses.ResolutionsResponse> resolutions(
+            @PathVariable UUID teamId, @PathVariable UUID seasonId,
+            @RequestHeader("X-Baton-Access-Key") String accessKey,
+            @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
+    ) {
+        var summary = useCase.summarizeWeeklyResolutions(new BriefAttentionUseCase.Scope(
+                principal.accountId(), teamId, seasonId, accessKey));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(BriefAttentionResponses.ResolutionsResponse.from(summary));
     }
 
     @GetMapping(SUMMARY_PATH)

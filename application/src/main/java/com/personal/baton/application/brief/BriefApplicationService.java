@@ -140,6 +140,16 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     }
 
     @Override
+    public BriefWeeklyResolutions summarizeWeeklyResolutions(Scope scope) {
+        Season season = workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
+        requireActiveMembership(scope.accountId(), scope.teamId());
+        ZoneId zone = season.getZoneId();
+        LocalDate weekStart = clock.instant().atZone(zone).toLocalDate()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        return client.summarizeWeeklyResolutions(scope.teamId(), scope.seasonId(), weekStart, zone);
+    }
+
+    @Override
     public BriefAttentionSummary summarizeAttention(Scope scope) {
         verifyAttentionAccess(scope);
         return client.summarizeAttention(scope.teamId(), scope.seasonId());
@@ -177,6 +187,20 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     public LatestEditionResult findEdition(LatestEditionQuery scope, UUID editionId) {
         verifyEditionAccess(scope);
         return readScopedEdition(scope, editionId);
+    }
+
+    @Override
+    public LatestEditionResult findPreviousWeekEdition(LatestEditionQuery scope, UUID editionId) {
+        verifyEditionAccess(scope);
+        var selected = readScopedEdition(scope, editionId).edition();
+        LocalDate previousWeek = selected.weekStart().minusWeeks(1);
+        if (previousWeek.getYear() < 0) throw new BriefEditionNotFoundException();
+        var previous = editionResult(scope, client.findLatestEditionForWeek(
+                scope.teamId(), scope.seasonId(), previousWeek, selected.zoneId()));
+        if (!previousWeek.equals(previous.edition().weekStart()) || !selected.zoneId().equals(previous.edition().zoneId())) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return previous;
     }
 
     @Override

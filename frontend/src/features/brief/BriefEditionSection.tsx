@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
-import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition } from './api'
+import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
 import { attentionReasons } from './types'
 import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
@@ -30,6 +30,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState('')
   const [baseId, setBaseId] = useState('')
+  const [previousTargetId, setPreviousTargetId] = useState('')
   const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
   const latest = useQuery({ queryKey: [...scopeKey, 'latest-edition'], queryFn: ({ signal }) => getLatestEdition(scope, signal), retry: false, staleTime: 0 })
   const history = useInfiniteQuery({ queryKey: [...scopeKey, 'edition-history'], initialPageParam: null as number | null,
@@ -43,19 +44,23 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
   const edition = shown.isError ? undefined : shown.data
   const delivery = useQuery({ queryKey: [...scopeKey, 'edition-delivery-status', edition?.editionId], enabled: Boolean(edition),
     queryFn: ({ signal }) => getEditionDeliveryStatus(scope, edition!.editionId, signal), retry: false, staleTime: 0 })
-  const comparison = useQuery({ queryKey: [...scopeKey, 'edition-comparison', baseId, edition?.editionId], enabled: Boolean(baseId && edition),
-    queryFn: ({ signal }) => compareEditions(scope, baseId, edition!.editionId, signal), retry: false, staleTime: 0 })
+  const previousMode = Boolean(edition && previousTargetId === edition.editionId)
+  const previous = useQuery({ queryKey: [...scopeKey, 'previous-week-edition', edition?.editionId], enabled: previousMode,
+    queryFn: ({ signal }) => getPreviousWeekEdition(scope, edition!.editionId, signal), retry: false, staleTime: 0 })
+  const effectiveBaseId = previousMode ? (previous.isError ? '' : previous.data?.editionId ?? '') : baseId
+  const comparison = useQuery({ queryKey: [...scopeKey, 'edition-comparison', effectiveBaseId, edition?.editionId], enabled: Boolean(effectiveBaseId && edition),
+    queryFn: ({ signal }) => compareEditions(scope, effectiveBaseId, edition!.editionId, signal), retry: false, staleTime: 0 })
   const generation = useMutation({ mutationFn: () => generateEdition(scope), retry: false,
     onSuccess: async () => {
-      setSelectedId(''); setBaseId('')
+      setSelectedId(''); setBaseId(''); setPreviousTargetId('')
       await Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'latest-edition'] }),
         queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-history'] })])
     }, onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'generation-readiness'] }),
       queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-delivery-status'] })]) })
-  const accessError = [latest.error, history.error, selected.error, comparison.error, readiness.error, delivery.error, generation.error]
+  const accessError = [latest.error, history.error, selected.error, comparison.error, readiness.error, delivery.error, generation.error, previousMode ? previous.error : null]
     .find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
   const refresh = () => {
-    setSelectedId(''); setBaseId(''); generation.reset()
+    setSelectedId(''); setBaseId(''); setPreviousTargetId(''); generation.reset()
     void queryClient.resetQueries({ queryKey: scopeKey })
   }
   if (accessError) return <p role="alert">{accessError.message}{' '}
@@ -89,16 +94,26 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
     {generation.isError && <p role="alert">{generation.error.message} 전달 상태와 최신 브리프를 확인한 뒤 다시 요청해 주세요.</p>}
     {generation.isSuccess && <p role="status">{generation.data.created ? '새 브리프를 생성했습니다.' : '기존 브리프를 재사용했습니다.'} 생성 순번 {generation.data.generation}</p>}
     <div className="brief-filters">
-      <label>조회할 브리프<select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setBaseId('') }}>
+      <label>조회할 브리프<select value={selectedId} onChange={(event) => { setSelectedId(event.target.value); setBaseId(''); setPreviousTargetId('') }}>
         <option value="">최신 브리프</option>
         {entries.map((entry) => <option key={entry.editionId} value={entry.editionId}>{entry.weekStart} 시작 주 · 생성 {entry.generation} · {entry.itemCount}건</option>)}
       </select></label>
-      <label>비교 기준 브리프<select value={baseId} disabled={!edition} onChange={(event) => setBaseId(event.target.value)}>
+      <label>비교 기준 브리프<select value={previousMode ? 'previous-week' : baseId} disabled={!edition} onChange={(event) => { setBaseId(event.target.value); setPreviousTargetId('') }}>
         <option value="">비교하지 않음</option>
+        {previousMode && <option value="previous-week">선택한 브리프의 지난주</option>}
         {entries.filter((entry) => entry.editionId !== edition?.editionId).map((entry) => <option key={entry.editionId} value={entry.editionId}>
           {entry.weekStart} 시작 주 · 생성 {entry.generation}</option>)}
       </select></label>
     </div>
+    <button type="button" disabled={!edition || (previousMode && previous.isFetching)} onClick={() => {
+      setPreviousTargetId(edition!.editionId); setBaseId(''); if (previousMode) void previous.refetch()
+    }}>지난주와 바로 비교</button>
+    {previousMode && <div>
+      {previous.isPending && <p role="status">선택한 브리프의 지난주 마지막 브리프를 찾고 있습니다.</p>}
+      {previous.isError && <p role={previous.error instanceof ApiError && previous.error.code === 'BRIEF_EDITION_NOT_FOUND' ? 'status' : 'alert'}>
+        {previous.error instanceof ApiError && previous.error.code === 'BRIEF_EDITION_NOT_FOUND'
+          ? '선택한 브리프와 같은 시간대의 지난주 브리프가 없습니다.' : '지난주 브리프를 불러오지 못했습니다. 다시 비교해 주세요.'}</p>}
+    </div>}
     {history.isError && <p role="alert">지난 브리프 목록을 불러오지 못했습니다. <button type="button" onClick={() => void history.refetch()}>이력 다시 조회</button></p>}
     {history.hasNextPage && <button type="button" disabled={history.isFetching} onClick={() => void history.fetchNextPage()}>이전 브리프 더보기</button>}
     {shown.isPending && <p role="status">저장된 브리프를 불러오고 있습니다.</p>}
@@ -123,7 +138,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, onOpenSource }: Props)
       <details className="brief-evidence"><summary>집계 기준 보기</summary>
         <p className="brief-note">집계 구간: {time.format(new Date(edition.windowStart))} 이상 ~ {time.format(new Date(edition.windowEnd))} 미만
           {' '}· 수신 커서 {edition.sourceCursor} · 규칙 {edition.ruleVersion}</p></details>
-      {baseId && <section className="brief-comparison" aria-label="브리프 비교 결과">
+      {effectiveBaseId && <section className="brief-comparison" aria-label="브리프 비교 결과">
         <h4>선택한 두 브리프의 차이</h4>
         <p className="brief-note">‘제외’는 비교 대상에 포함되지 않았다는 뜻입니다. 업무가 해소됐다는 판정은 아닙니다.</p>
         {comparison.isPending && <p role="status">브리프 차이를 불러오고 있습니다.</p>}

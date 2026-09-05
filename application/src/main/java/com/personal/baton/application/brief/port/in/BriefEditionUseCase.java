@@ -40,6 +40,8 @@ public interface BriefEditionUseCase {
 
     BriefEditionHistory findEditionHistory(LatestEditionQuery scope, BriefEditionHistory.Query query);
 
+    LatestEditionResult findPreviousWeekEdition(LatestEditionQuery scope, UUID editionId);
+
     LatestEditionResult findEdition(LatestEditionQuery scope, UUID editionId);
 
     BriefEditionDeliveryStatus findEditionDeliveryStatus(LatestEditionQuery scope, UUID editionId);

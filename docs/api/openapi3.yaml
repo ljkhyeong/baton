@@ -1462,6 +1462,55 @@ paths:
       summary: BRIEF 관심 항목 목록
       tags:
         - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions:
+    get:
+      description: 시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수를 중계한다.
+      operationId: getBriefWeeklyResolutions
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 워크스페이스 접근 키
+          example: access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getBriefWeeklyResolutions:
+                  value: >-
+                    {"weekStart":"2026-08-31","zoneId":"Asia/Seoul","windowStart":"2026-08-30T15:00:00Z","windowEnd":"2026-09-06T15:00:00Z","evaluatedAt":"2026-09-05T00:00:00Z","resolvedCount":2}
+              schema:
+                $ref: '#/components/schemas/Schema_74cefd547f0003e0'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 요청 진단 식별자
+              schema:
+                type: string
+      summary: BRIEF 이번 주 해소 요약
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary:
     get:
       description: 권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.
@@ -2031,6 +2080,99 @@ paths:
               schema:
                 $ref: '#/components/schemas/Schema_6569daaafc6922c9'
       summary: BRIEF 추가 전달 확인
+      tags:
+        - api
+  /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/previous-week:
+    get:
+      description: 선택한 브리프와 같은 시간대의 정확한 지난주 마지막 에디션을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.
+      operationId: getPreviousWeekBriefEdition
+      parameters:
+        - description: 팀 UUID
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 시즌 UUID
+          in: path
+          name: seasonId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 비교 대상 브리프 UUID
+          in: path
+          name: editionId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 대상 워크스페이스 접근 키
+          example: workspace-access-key
+          in: header
+          name: X-Baton-Access-Key
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getPreviousWeekBriefEdition:
+                  value: |-
+                    {
+                      "editionId" : "00000000-0000-0000-0000-000000002645",
+                      "workspaceId" : "00000000-0000-0000-0000-000000002642",
+                      "seasonId" : "00000000-0000-0000-0000-000000002643",
+                      "generation" : 3,
+                      "weekStart" : "2026-08-24",
+                      "zoneId" : "Asia/Seoul",
+                      "windowStart" : "2026-08-23T15:00:00Z",
+                      "windowEnd" : "2026-08-30T15:00:00Z",
+                      "sourceCursor" : 17,
+                      "generatedAt" : "2026-08-29T03:00:00Z",
+                      "ruleVersion" : 2,
+                      "items" : [ {
+                        "sourceReference" : "baton-continuity:00000000-0000-0000-0000-000000002646",
+                        "reasonCode" : "ROLE_UNASSIGNED",
+                        "severity" : "MEDIUM",
+                        "status" : "ACTIVE",
+                        "observedAt" : "2026-08-28T03:00:00Z",
+                        "ruleVersion" : 1,
+                        "aggregateRevision" : 2,
+                        "revisionGap" : false,
+                        "section" : "CURRENT_WEEK"
+                      }, {
+                        "sourceReference" : "routine:carry-over",
+                        "reasonCode" : "ROUTINE_MISSED",
+                        "severity" : "MEDIUM",
+                        "status" : "ACTIVE",
+                        "observedAt" : "2026-08-21T03:00:00Z",
+                        "ruleVersion" : 1,
+                        "aggregateRevision" : 1,
+                        "revisionGap" : false,
+                        "section" : "CARRY_OVER"
+                      } ]
+                    }
+              schema:
+                $ref: '#/components/schemas/Schema_d11ea1dcc29eeab5'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            ETag:
+              description: BRIEF 불변 에디션 검증자
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 불투명 요청 진단 식별자
+              schema:
+                type: string
+      summary: BRIEF 지난주 에디션 조회
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest:
@@ -7958,6 +8100,36 @@ components:
           type: string
       required:
         - accessKey
+      type: object
+    Schema_74cefd547f0003e0:
+      properties:
+        evaluatedAt:
+          description: BRIEF 집계 확인 시각
+          format: date-time
+          type: string
+        resolvedCount:
+          description: 확인 가능한 현재 해소 항목 수. 누락 증거가 있는 항목 제외
+          type: number
+        weekStart:
+          description: 시즌 시간대의 이번 주 월요일
+          type: string
+        windowEnd:
+          description: 다음 주 시작 시각 미만
+          type: string
+        windowStart:
+          description: 주간 시작 시각 이상
+          type: string
+        zoneId:
+          description: 시즌 IANA 시간대
+          format: uuid
+          type: string
+      required:
+        - evaluatedAt
+        - resolvedCount
+        - weekStart
+        - windowEnd
+        - windowStart
+        - zoneId
       type: object
     Schema_7a4c4a67e8a20167:
       properties:

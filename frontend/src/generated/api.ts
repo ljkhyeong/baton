@@ -368,6 +368,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 이번 주 해소 요약
+         * @description 시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수를 중계한다.
+         */
+        get: operations["getBriefWeeklyResolutions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary": {
         parameters: {
             query?: never;
@@ -484,6 +504,26 @@ export interface paths {
          * @description 선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
          */
         get: operations["getBriefEditionDeliveryStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/previous-week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BRIEF 지난주 에디션 조회
+         * @description 선택한 브리프와 같은 시간대의 정확한 지난주 마지막 에디션을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.
+         */
+        get: operations["getPreviousWeekBriefEdition"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1778,6 +1818,26 @@ export interface components {
             meetingDate: string;
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
+        };
+        Schema_74cefd547f0003e0: {
+            /**
+             * Format: date-time
+             * @description BRIEF 집계 확인 시각
+             */
+            evaluatedAt: string;
+            /** @description 확인 가능한 현재 해소 항목 수. 누락 증거가 있는 항목 제외 */
+            resolvedCount: number;
+            /** @description 시즌 시간대의 이번 주 월요일 */
+            weekStart: string;
+            /** @description 다음 주 시작 시각 미만 */
+            windowEnd: string;
+            /** @description 주간 시작 시각 이상 */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description 시즌 IANA 시간대
+             */
+            zoneId: string;
         };
         Schema_89a67e6a4a2dd84e: {
             /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
@@ -4314,6 +4374,41 @@ export interface operations {
             };
         };
     };
+    getBriefWeeklyResolutions: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 워크스페이스 접근 키
+                 * @example access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_74cefd547f0003e0"];
+                };
+            };
+        };
+    };
     getBriefAttentionSummary: {
         parameters: {
             query?: never;
@@ -4600,6 +4695,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_6569daaafc6922c9"];
+                };
+            };
+        };
+    };
+    getPreviousWeekBriefEdition: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 대상 워크스페이스 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 비교 대상 브리프 UUID */
+                editionId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description BRIEF 불변 에디션 검증자 */
+                    ETag?: string;
+                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
                 };
             };
         };

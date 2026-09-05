@@ -4,7 +4,7 @@ import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { getCsrfToken } from '@/features/auth/api'
 import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, AttentionItem, AttentionPage, AttentionSummary, AttentionTransitions,
-  BriefEdition, BriefGeneration, BriefScope, BriefEditionHistory, BriefComparison, BriefSources, BriefReadiness, BriefDeliveryStatus } from './types'
+  BriefEdition, BriefGeneration, BriefScope, BriefEditionHistory, BriefComparison, BriefSources, BriefReadiness, BriefDeliveryStatus, WeeklyResolutions } from './types'
 
 function isReason(value: unknown): value is AttentionItem['reasonCode'] {
   return typeof value === 'string' && Object.hasOwn(attentionReasons, value)
@@ -44,6 +44,27 @@ function decodeSummary(value: unknown): AttentionSummary {
     throw new Error('관심 항목 개수를 확인할 수 없습니다.')
   }
   return { highCount, mediumCount, revisionGapCount }
+}
+
+export function getWeeklyResolutions(scope: BriefScope, signal: AbortSignal) {
+  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/attention-items/resolutions`, {
+    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value): WeeklyResolutions => {
+      if (!isJsonObject(value) || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
+        || !isInstant(value.windowStart) || !isInstant(value.windowEnd) || !isInstant(value.evaluatedAt)
+        || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !isNonNegativeInteger(value.resolvedCount)) {
+        throw new Error('이번 주 해소 요약을 확인할 수 없습니다.')
+      }
+      new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
+      return { weekStart: value.weekStart, zoneId: value.zoneId, windowStart: value.windowStart,
+        windowEnd: value.windowEnd, evaluatedAt: value.evaluatedAt, resolvedCount: value.resolvedCount }
+    },
+  })
+}
+
+export function getPreviousWeekEdition(scope: BriefScope, editionId: string, signal: AbortSignal) {
+  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${editionId}/previous-week`, {
+    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value) => decodeEdition(value, scope),
+  })
 }
 
 export function getAttentionSummary(scope: BriefScope, signal: AbortSignal) {

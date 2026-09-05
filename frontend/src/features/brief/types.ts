@@ -1,5 +1,6 @@
 import type { operations } from '@/generated/api'
 
+export type WeeklyResolutions = operations['getBriefWeeklyResolutions']['responses'][200]['content']['application/json']
 export type AttentionSummary = operations['getBriefAttentionSummary']['responses'][200]['content']['application/json']
 export type AttentionPage = operations['getBriefAttentionItems']['responses'][200]['content']['application/json']
 export type AttentionItem = AttentionPage['items'][number]
