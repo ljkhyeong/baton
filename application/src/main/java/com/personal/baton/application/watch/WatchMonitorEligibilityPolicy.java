@@ -4,7 +4,7 @@ import java.net.URI;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-final class WatchMonitorEligibilityPolicy {
+public final class WatchMonitorEligibilityPolicy {
 
     private static final Pattern NUMERIC_ADDRESS_COMPONENT = Pattern.compile(
             "(?:0[xX][0-9A-Fa-f]+|[0-9]+)"
@@ -14,7 +14,7 @@ final class WatchMonitorEligibilityPolicy {
                     + "[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     );
 
-    boolean isEligible(String targetUrl) {
+    public boolean isEligible(String targetUrl) {
         if (targetUrl == null || targetUrl.length() > 2_048 || containsUnsafeCharacter(targetUrl)) {
             return false;
         }

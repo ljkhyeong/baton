@@ -69,8 +69,10 @@ class ResourceHealthRestDocsTest {
         var health = availability == Availability.AVAILABLE ? WatchResourceHealth.BROKEN : WatchResourceHealth.UNKNOWN;
         var outcome = availability == Availability.AVAILABLE ? WatchCheckOutcome.DNS_FAILURE : null;
         Integer failures = availability == Availability.AVAILABLE ? 3 : null;
+        var reason = availability == Availability.NOT_MONITORED ? MonitoringReason.SEASON_ENDED
+                : availability == Availability.PENDING ? MonitoringReason.SYNC_PENDING : null;
         when(useCase.inspect(TEAM, SEASON, RESOURCE, KEY))
-                .thenReturn(new Result(RESOURCE, health, availability, checked, checked != null, outcome, failures));
+                .thenReturn(new Result(RESOURCE, health, availability, checked, checked != null, outcome, failures, reason));
         mvc.perform(get(PATH + "/health", TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", KEY))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.resourceId").value(RESOURCE.toString()))
@@ -80,6 +82,7 @@ class ResourceHealthRestDocsTest {
                 .andExpect(jsonPath("$.lastCheckedAt").value(checked == null ? null : checked.toString()))
                 .andExpect(jsonPath("$.lastOutcome").value(outcome == null ? null : outcome.name()))
                 .andExpect(jsonPath("$.consecutiveFailures").value(failures))
+                .andExpect(jsonPath("$.monitoringReason").value(reason == null ? null : reason.name()))
                 .andDo(MockMvcRestDocumentationWrapper.document("inspectResourceHealth", READ_DESCRIPTION, "자료 연결 상태 조회",
                         pathParameters(parameterWithName("teamId").description("팀 UUID"), parameterWithName("seasonId").description("시즌 UUID"), parameterWithName("resourceId").description("자료 UUID")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("팀 공유 접근 키")),
@@ -87,6 +90,7 @@ class ResourceHealthRestDocsTest {
                         responseFields(fieldWithPath("resourceId").description("요청한 자료 UUID"),
                                 new EnumFields(WatchResourceHealth.class).withPath("health").description("WATCH 도달 가능성 상태"),
                                 new EnumFields(Availability.class).withPath("availability").description("조회 결과의 최신성 및 감시 여부"),
+                                new EnumFields(MonitoringReason.class).withPath("monitoringReason").optional().description("자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null"),
                                 fieldWithPath("lastCheckedAt").type(JsonFieldType.STRING).optional().description("최근 점검 UTC 시각. 결과가 없으면 null"),
                                 new EnumFields(WatchCheckOutcome.class).withPath("lastOutcome").optional().description("최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null"),
                                 fieldWithPath("consecutiveFailures").type(JsonFieldType.NUMBER).optional().description("연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null"),

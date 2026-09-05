@@ -30,38 +30,45 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
 
     @Override
     public Result inspect(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
-        var snapshot = access.authorize(teamId, seasonId, resourceId, accessKey);
-        if (snapshot.isEmpty()) return unknown(resourceId, Availability.NOT_MONITORED);
+        var authorized = access.authorize(teamId, seasonId, resourceId, accessKey);
+        if (authorized.reason() != null) return unavailableMonitoring(resourceId, authorized.reason());
+        var snapshot = authorized.snapshot();
 
-        var remote = watch.inspect(snapshot.get().resourceReference());
+        var remote = watch.inspect(snapshot.resourceReference());
         // 원격 조회 중 URL·시즌·공유 키가 바뀌면 이전 자료의 결과를 표시하지 않는다.
-        if (!snapshot.equals(access.authorize(teamId, seasonId, resourceId, accessKey))) {
-            return unknown(resourceId, Availability.PENDING);
+        var current = access.authorize(teamId, seasonId, resourceId, accessKey);
+        if (current.reason() != null) return unavailableMonitoring(resourceId, current.reason());
+        if (!snapshot.equals(current.snapshot())) {
+            return unavailableMonitoring(resourceId, MonitoringReason.SYNC_PENDING);
         }
         if (remote.status() == LookupStatus.UNAVAILABLE) {
             return unknown(resourceId, Availability.UNAVAILABLE);
         }
         if (remote.status() == LookupStatus.MISSING
-                || remote.sourceRevision() != snapshot.get().sourceRevision()
+                || remote.sourceRevision() != snapshot.sourceRevision()
                 || remote.monitoringState() != WatchMonitoringState.ACTIVE) {
-            return unknown(resourceId, Availability.PENDING);
+            return unavailableMonitoring(resourceId, MonitoringReason.SYNC_PENDING);
         }
         Instant now = clock.instant();
         Instant checked = remote.lastCheckedAt();
         if (checked == null) {
-            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.PENDING, null, true, null, null);
+            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.PENDING, null, true, null, null, null);
         }
         if (checked.isAfter(now) || !checked.isAfter(now.minus(MAX_AGE))) {
-            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.STALE, checked, true, null, null);
+            return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.STALE, checked, true, null, null, null);
         }
         return new Result(resourceId, remote.health(), Availability.AVAILABLE, checked, true,
-                remote.lastOutcome(), remote.consecutiveFailures());
+                remote.lastOutcome(), remote.consecutiveFailures(), null);
     }
 
     @Override
     public CheckResult requestCheck(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
-        WatchMonitorSnapshot snapshot = access.authorize(teamId, seasonId, resourceId, accessKey)
-                .orElseThrow(() -> new ResourceCheckRequestException(Reason.INACTIVE, null));
+        var authorized = access.authorize(teamId, seasonId, resourceId, accessKey);
+        if (authorized.reason() != null) {
+            throw new ResourceCheckRequestException(authorized.reason() == MonitoringReason.SYNC_PENDING
+                    ? Reason.UNAVAILABLE : Reason.INACTIVE, null);
+        }
+        WatchMonitorSnapshot snapshot = authorized.snapshot();
         var remote = watch.inspect(snapshot.resourceReference());
         if (remote.status() == LookupStatus.MISSING
                 || (remote.status() == LookupStatus.FOUND
@@ -69,7 +76,7 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
             throw new ResourceCheckRequestException(Reason.INACTIVE, null);
         }
         if (remote.status() != LookupStatus.FOUND || remote.sourceRevision() != snapshot.sourceRevision()
-                || access.authorize(teamId, seasonId, resourceId, accessKey).filter(snapshot::equals).isEmpty()) {
+                || !snapshot.equals(access.authorize(teamId, seasonId, resourceId, accessKey).snapshot())) {
             throw new ResourceCheckRequestException(Reason.UNAVAILABLE, null);
         }
         var result = watch.requestCheck(snapshot.resourceReference());
@@ -84,6 +91,12 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
     }
 
     private Result unknown(UUID resourceId, Availability availability) {
-        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false, null, null);
+        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false, null, null, null);
+    }
+
+    private Result unavailableMonitoring(UUID resourceId, MonitoringReason reason) {
+        return new Result(resourceId, WatchResourceHealth.UNKNOWN,
+                reason == MonitoringReason.SYNC_PENDING ? Availability.PENDING : Availability.NOT_MONITORED,
+                null, false, null, null, reason);
     }
 }

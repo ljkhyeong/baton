@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { skipToken, useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { getResourceHealth, requestResourceCheck } from './api'
 import type { ResourceHealthScope } from './api'
 import { outcomeLabels } from './outcomeLabels'
+import { monitoringReasonLabels } from './monitoringReasonLabels'
 import { formatInstant } from '@/features/workspace/WorkspaceViews'
 import { ApiError } from '@/shared/api/ApiError'
 import './resource-health.scss'
@@ -18,26 +19,32 @@ const availabilityLabels = {
 export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, title, ...scope }:
   ResourceHealthScope & { enabled: boolean; changesDisabled: boolean; targetUrl: string; title: string }) {
   const queryClient = useQueryClient()
-  const [retryAt, setRetryAt] = useState(0)
+  const key = useMemo(() => ['teams', scope.teamId, 'seasons', scope.seasonId, 'resource-health', scope.resourceId,
+    { accessKey: scope.accessKey, targetUrl }] as const,
+  [scope.teamId, scope.seasonId, scope.resourceId, scope.accessKey, targetUrl])
+  const cooldownKey = useMemo(() => [...key, 'check-cooldown'] as const, [key])
+  const mutationKey = [...key, 'check-request'] as const
+  // 서버가 알려 준 재요청 시각을 자료별로 보존해 역할 이동 후에도 같은 대기시간을 적용한다.
+  const { data: retryAt = 0, dataUpdatedAt: cooldownUpdatedAt } = useQuery({ queryKey: cooldownKey, queryFn: skipToken,
+    initialData: 0, gcTime: 3_600_000 })
+  const checkPending = useIsMutating({ mutationKey, exact: true }) > 0
   const [now, setNow] = useState(Date.now)
-  const remainingSeconds = Math.max(0, Math.ceil((retryAt - now) / 1_000))
+  const remainingSeconds = Math.max(0, Math.ceil((retryAt - Math.max(now, cooldownUpdatedAt)) / 1_000))
   function beginCooldown(seconds: number) {
     const startedAt = Date.now()
     setNow(startedAt)
-    setRetryAt(startedAt + seconds * 1_000)
+    queryClient.setQueryData<number>(cooldownKey, (previous) => Math.max(previous ?? 0, startedAt + seconds * 1_000))
   }
   useEffect(() => {
     if (!retryAt) return
     const timer = setInterval(() => {
       const current = Date.now()
       setNow(current)
-      if (current >= retryAt) setRetryAt(0)
+      if (current >= retryAt) queryClient.setQueryData<number>(cooldownKey, (previous) =>
+        previous != null && previous > current ? previous : 0)
     }, 1_000)
     return () => clearInterval(timer)
-  }, [retryAt])
-  const key = useMemo(() => ['teams', scope.teamId, 'seasons', scope.seasonId, 'resource-health', scope.resourceId,
-    { accessKey: scope.accessKey, targetUrl }] as const,
-  [scope.teamId, scope.seasonId, scope.resourceId, scope.accessKey, targetUrl])
+  }, [retryAt, cooldownKey, queryClient])
   const query = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => getResourceHealth(scope, signal),
@@ -51,6 +58,7 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
     if (!enabled) void queryClient.cancelQueries({ queryKey: key, exact: true })
   }, [enabled, key, queryClient])
   const mutation = useMutation({
+    mutationKey,
     mutationFn: (_previousCheckedAt: string | null) => requestResourceCheck(scope),
     onSuccess: () => {
       beginCooldown(30)
@@ -65,6 +73,7 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
     && query.dataUpdatedAt >= mutation.submittedAt
     && (mutation.variables == null || Date.parse(result.lastCheckedAt) > Date.parse(mutation.variables))
   const label = query.isPending ? '연결 상태 확인 중'
+      : result?.availability === 'PENDING' && result.monitoringReason === 'SYNC_PENDING' ? '점검 서비스 동기화 대기'
       : result ? availabilityLabels[result.availability] || healthLabels[result.health]
         : '연결 상태 확인 불가'
 
@@ -73,6 +82,9 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       <small className={`resource-health-label health-${result ? result.health.toLowerCase() : 'unknown'}`}>
         {label}
       </small>
+      {result?.monitoringReason && (result.availability === 'NOT_MONITORED' || result.availability === 'PENDING') && (
+        <small>{monitoringReasonLabels[result.monitoringReason]}</small>
+      )}
       {result?.lastCheckedAt && (
         <small>최근 점검 {formatInstant(result.lastCheckedAt)}</small>
       )}
@@ -84,10 +96,10 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       )}
       <small>공개 URL 연결 상태이며 로그인 후 접근 권한은 확인하지 않습니다.</small>
       {!changesDisabled && result?.checkRequestAllowed && (
-        <button type="button" disabled={mutation.isPending || remainingSeconds > 0}
+        <button type="button" disabled={checkPending || remainingSeconds > 0}
           onClick={() => mutation.mutate(result.lastCheckedAt)}
           aria-label={`${title} 다시 점검`}>
-          {mutation.isPending ? '점검 요청 중' : remainingSeconds > 0 ? `다시 점검 (${remainingSeconds}초)` : '다시 점검'}
+          {checkPending ? '점검 요청 중' : remainingSeconds > 0 ? `다시 점검 (${remainingSeconds}초)` : '다시 점검'}
         </button>
       )}
       {mutation.isSuccess && <small role="status">{hasNewResult ? '새 점검 결과를 확인했습니다.' : mutation.data.status === 'IN_PROGRESS'

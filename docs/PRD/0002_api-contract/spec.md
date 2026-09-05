@@ -40,7 +40,11 @@
 조회 응답은 `resourceId`, `health`(`UNKNOWN/HEALTHY/DEGRADED/BROKEN`),
 `availability`(`AVAILABLE/PENDING/STALE/UNAVAILABLE/NOT_MONITORED`),
 nullable `lastCheckedAt`, boolean `checkRequestAllowed`, nullable `lastOutcome`와
-nullable `consecutiveFailures`다. 모든 필드는 응답에 포함한다. `lastOutcome`의 열거형은
+nullable `consecutiveFailures`, nullable `monitoringReason`이다. 모든 필드는 응답에 포함한다.
+`monitoringReason`은 `INTEGRATION_DISABLED/MONITORING_PAUSED/SEASON_ENDED/RESOURCE_ARCHIVED/URL_NOT_ELIGIBLE/MONITOR_INACTIVE/SYNC_PENDING` 중 하나다.
+`SYNC_PENDING`은 `PENDING`과 함께 반환하고 나머지 사유는 `NOT_MONITORED`와 함께 반환한다.
+점검 결과만 대기하거나 최근 결과·오래된 결과·통신 장애인 경우에는 사유가 `null`이다.
+`lastOutcome`의 열거형은
 [WATCH 연동 계약의 결과 코드](../0004_watch-integration-contract/spec.md#621-최근-점검-결과)에
 따른다. 실패 횟수는 0~2147483647의 정수이며 `AVAILABLE`일 때만 최근 결과 값을 반환한다.
 나머지 가용 상태에서는 원인과 횟수를 모두 `null`로 반환한다. 원격 장애는 HTTP 200의
@@ -48,7 +52,8 @@ nullable `consecutiveFailures`다. 모든 필드는 응답에 포함한다. `las
 
 접수 응답은 `resourceId`와 `status`(`SCHEDULED/ALREADY_SCHEDULED/IN_PROGRESS`)다.
 자료 자체는 바꾸지 않으며 접수만으로 점검 완료를 뜻하지 않는다. 감시 중지·모니터 없음은
-409 `WATCH_CHECK_INACTIVE`, WATCH의 간격 제한은 429 `WATCH_CHECK_RATE_LIMITED`와
+409 `WATCH_CHECK_INACTIVE`, BATON 등록 정보가 아직 없거나 현재 주소와 일치하지 않으면
+503 `WATCH_CHECK_UNAVAILABLE`로 접수를 보류한다. WATCH의 간격 제한은 429 `WATCH_CHECK_RATE_LIMITED`와
 `Retry-After`, 통신·계약 오류 또는 동시성 한도는 503 `WATCH_CHECK_UNAVAILABLE`다.
 이 세 오류 응답에도 `Cache-Control: no-store`를 적용한다.
 프런트 공용 오류 모델은 `Retry-After`의 양의 정수 초를 보존하며 최대 3600초로 제한한다.
