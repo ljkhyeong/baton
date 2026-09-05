@@ -96,7 +96,7 @@ export function RoleHandoffModal({
   const activeResources = resources.filter((resource) => resource.roleId === role.id)
   const incompleteItemCount = activeItems.filter((item) => !item.completed).length
   const warnings = [
-    activeItems.length === 0 ? '활성 바통 항목이 없습니다.' : '',
+    activeItems.length === 0 ? '체크리스트 항목이 없습니다.' : '',
     incompleteItemCount > 0 ? `미완료 바통 항목이 ${incompleteItemCount}개 있습니다.` : '',
     activeResources.length === 0 ? '연결한 참고 자료가 없습니다.' : '',
   ].filter(Boolean)
@@ -142,7 +142,7 @@ export function RoleHandoffModal({
     },
     transfer: {
       title: '바통 전달 전 확인',
-      description: '현재 바통북의 준비도를 확인하고 다음 담당자에게 전달합니다.',
+      description: '체크리스트와 참고 자료를 확인하고 다음 담당자에게 전달합니다.',
       submit: '바통 전달하기',
       pending: '바통 전달하는 중…',
     },
@@ -220,14 +220,14 @@ export function RoleHandoffModal({
             </div>
             {mode === 'transfer' && (
               <>
-                <dl className="handoff-snapshot-grid" aria-label="전달 전 바통북 준비도">
-                  <div><dt>활성 항목</dt><dd>{activeItems.length}</dd></div>
+                <dl className="handoff-snapshot-grid" aria-label="전달 전 체크리스트와 자료 현황">
+                  <div><dt>체크리스트 항목</dt><dd>{activeItems.length}</dd></div>
                   <div><dt>미완료</dt><dd>{incompleteItemCount}</dd></div>
                   <div><dt>참고 자료</dt><dd>{activeResources.length}</dd></div>
                 </dl>
                 {warnings.length > 0 && (
                   <div className="handoff-warning-box">
-                    <strong>준비도 경고</strong>
+                    <strong>전달 전 확인사항</strong>
                     <ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
                     <label>
                       <input
@@ -235,7 +235,7 @@ export function RoleHandoffModal({
                         checked={warningAcknowledged}
                         onChange={(event) => setWarningAcknowledged(event.target.checked)}
                       />
-                      <span>준비도 경고를 확인했습니다</span>
+                      <span>위 내용을 확인했습니다</span>
                     </label>
                   </div>
                 )}
@@ -309,7 +309,7 @@ export function HandoffPreview({
     >
       <div className="book-preview">
         <div className="book-progress">
-          <span>준비도</span>
+          <span>체크리스트 완료율</span>
           <strong>{progress}%</strong>
         </div>
         <section>

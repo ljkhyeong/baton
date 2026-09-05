@@ -42,7 +42,7 @@ export function WorkspaceAccessKeyRecovery({
         <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
         {cleanupRetryAvailable && (
           <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-            완료 기록 정리 다시 확인
+            임시 요청 기록 삭제 재시도
           </button>
         )}
       </div>
@@ -57,7 +57,7 @@ export function WorkspaceAccessKeyRecovery({
         <p>작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.</p>
         {cleanupRetryAvailable && (
           <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-            완료 기록 정리 다시 확인
+            임시 요청 기록 삭제 재시도
           </button>
         )}
       </div>
@@ -77,7 +77,7 @@ export function WorkspaceAccessKeyRecovery({
         disabled={pending}
         onClick={onRecover}
       >
-        {pending ? '변경 결과 확인하는 중…' : '접근 키 변경 완료 확인/복구'}
+        {pending ? '변경 결과 확인하는 중…' : '접근 키 변경 결과 확인'}
       </button>
     </div>
   )

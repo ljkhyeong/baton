@@ -121,7 +121,7 @@ export function DecisionModal({
       title={editing ? '결정 기록 수정' : '결정과 이유 남기기'}
       description={editing
         ? '잘못 적은 내용과 작성자, 관련 역할을 바로잡습니다. 처음 기록한 시각은 그대로 남아요.'
-        : '나중에 ‘왜 이렇게 했지?’라는 질문에 답할 수 있도록 맥락을 함께 적어주세요.'}
+        : '결정 내용과 이유를 입력하세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -837,8 +837,8 @@ export function RoutineModal({
     <ModalShell
       title={editing ? '루틴 수정' : '반복 루틴 만들기'}
       description={editing
-        ? '운영 단계와 담당 역할, 기한 문구를 현재 반복 방식에 맞게 고쳐주세요.'
-        : '모임 전·중·후에 누가 무엇을 넘길지 운영 리듬에 추가합니다.'}
+        ? '운영 단계와 담당 역할, 기한을 수정하세요.'
+        : '반복할 업무와 담당 역할, 기한을 입력하세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -878,7 +878,7 @@ export function RoutineModal({
           </label>
         </div>
         <label>
-          <span>언제까지</span>
+          <span>기한 설명</span>
           <input
             required
             value={dueLabel}
@@ -888,7 +888,7 @@ export function RoutineModal({
         </label>
         <div className="form-grid">
           <label>
-            <span>실제 마감일</span>
+            <span>마감 기준일</span>
             <select
               value={deadlineDayOffset}
               onChange={(event) => setDeadlineDayOffset(event.target.value)}
@@ -906,7 +906,7 @@ export function RoutineModal({
             </select>
           </label>
           <label>
-            <span>실제 마감 시각</span>
+            <span>마감 시각</span>
             <input
               type="time"
               required={deadlineDayOffset !== ''}
@@ -917,7 +917,7 @@ export function RoutineModal({
           </label>
         </div>
         <p className="form-hint">
-          실제 마감은 시즌 시간대로 계산하며, 기한 문구는 팀이 읽기 쉬운 설명으로 함께 남습니다.
+          기한 설명은 안내용입니다. 지연 여부는 마감 기준일과 시각을 시즌 시간대로 계산해 판단합니다.
         </p>
         <label>
           <span>세부 설명</span>

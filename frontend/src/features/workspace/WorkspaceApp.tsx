@@ -403,7 +403,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const retry = contentCreationCleanupCommand.retryCleanup()
     if (!retry) return
     void retry.then((completed) => {
-      if (completed) showToast('이전 콘텐츠 생성의 완료 기록을 정리했어요.')
+      if (completed) showToast('브라우저의 임시 요청 기록을 삭제했습니다.')
     })
   }
   const roleHandoffFlow = useWorkspaceRoleHandoffFlow({
@@ -1127,7 +1127,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       },
     }), '루틴 수정', [
       ['루틴 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
-      ['언제까지', request.dueLabel], ['세부 설명', request.detail],
+      ['기한 설명', request.dueLabel], ['세부 설명', request.detail],
       ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
       ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
     ])
@@ -1332,7 +1332,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
     void handoffCompletionMutation.mutateAsync({ id, completed })
-      .then(() => showToast(completed ? '바통 항목을 준비했어요.' : '바통 항목을 다시 열었어요.'))
+      .then(() => showToast(completed ? '인수인계 항목을 완료했습니다.' : '완료 표시를 취소했습니다.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         showToast(`바통 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')

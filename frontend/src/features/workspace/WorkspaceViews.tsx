@@ -291,12 +291,12 @@ export function ContentCreationCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="콘텐츠 생성 완료 기록 정리"
+      aria-label="임시 요청 기록 삭제"
     >
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>이전 콘텐츠 생성 요청의 완료 기록을 정리해야 합니다.</strong>
+          <strong>브라우저의 임시 요청 기록을 삭제해야 합니다.</strong>
           <small>{message}</small>
         </span>
       </div>
@@ -307,7 +307,7 @@ export function ContentCreationCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '완료 기록 정리하는 중…' : '완료 기록 정리 다시 확인'}
+          {pending ? '임시 요청 기록 삭제 중…' : '임시 요청 기록 삭제 재시도'}
         </button>
       </div>
     </section>
@@ -759,7 +759,7 @@ export function RhythmView({
           <p>
             {season.roundSchedule
               ? `${season.timeZone} · ${roundScheduleWaitingForRoutine
-                ? '활성 루틴 대기 중'
+                ? '자동 생성할 루틴이 없습니다'
                 : season.roundSchedule.enabled ? '자동 생성 중' : '일시중지'}`
               : `${season.timeZone} 기준 반복 일정을 설정해 보세요.`}
             {season.roundSchedule?.nextOccurrenceDate
@@ -1263,8 +1263,8 @@ export function HandoffView({
                   <span className="handoff-state-label">수락 대기</span>
                   <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있어요</strong>
                   <p>전달한 바통북은 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
-                  <dl className="handoff-transfer-snapshot" aria-label="전달 시점 바통북 준비도">
-                    <div><dt>활성 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
+                  <dl className="handoff-transfer-snapshot" aria-label="전달 당시 체크리스트와 자료 현황">
+                    <div><dt>체크리스트 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
                     <div><dt>미완료</dt><dd>{selectedHandoff.incompleteItemCount ?? 0}</dd></div>
                     <div><dt>참고 자료</dt><dd>{selectedHandoff.resourceCount ?? 0}</dd></div>
                   </dl>
@@ -1487,7 +1487,7 @@ export function RoleInspector({
       </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 루틴</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
-      <div className="inspector-handoff"><div><span className="block-label">{handoff?.status === 'TRANSFERRED' ? '바통 수락 대기' : '바통 준비도'}</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 또는 취소 전까지 역할과 바통북을 수정할 수 없어요.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
+      <div className="inspector-handoff"><div><span className="block-label">체크리스트 완료율</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 대기 중입니다. 수락 또는 취소 전까지 역할과 바통북을 수정할 수 없습니다.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '바통 수락 확인하기' : '바통 정리하기'} <Icon name="arrow" size={15} /></button></div>
     </aside>
   )
   return overlay ? createPortal(inspector, document.body) : inspector
