@@ -67,23 +67,35 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
   const [copied, setCopied] = useState('')
   const [confirmation, setConfirmation] = useState<'rotate' | 'revoke' | null>(null)
   const actionLock = useRef(false)
-  const pollUntil = useRef<number | null>(null)
+  const [pollUntil, setPollUntil] = useState<number | null>(null)
+  const [pollExpired, setPollExpired] = useState(false)
   const subscription = useQuery({ queryKey, queryFn: ({ signal }) => getCalendarSubscription(scope, signal),
     retry: false, gcTime: 0, staleTime: 0, refetchOnWindowFocus: 'always', refetchIntervalInBackground: false,
     refetchInterval: (query) => {
-      if (!['IN_PROGRESS', 'REVOCATION_PENDING'].includes(query.state.data?.status ?? '')) {
-        pollUntil.current = null
-        return false
-      }
-      if (query.state.status === 'error' || actionLock.current) return false
-      pollUntil.current ??= Date.now() + 90_000
-      return Date.now() < pollUntil.current ? 3_000 : false
+      if (!['IN_PROGRESS', 'REVOCATION_PENDING'].includes(query.state.data?.status ?? '')) return false
+      if (query.state.status === 'error' || actionLock.current || pollExpired) return false
+      return pollUntil === null || Date.now() < pollUntil ? 3_000 : false
     } })
   useEffect(() => {
     if (subscription.isSuccess && subscription.data) {
       onStatusChecked?.({ ...subscription.data, checkedAt: subscription.dataUpdatedAt })
     }
   }, [subscription.isSuccess, subscription.data, subscription.dataUpdatedAt, onStatusChecked])
+  useEffect(() => {
+    if (subscription.isSuccess && subscription.data?.status === 'REVOKED') {
+      void cache.invalidateQueries({ queryKey: ['calendar-subscriptions', accountId] })
+    }
+  }, [cache, accountId, subscription.isSuccess, subscription.data?.status])
+  const processing = ['IN_PROGRESS', 'REVOCATION_PENDING'].includes(subscription.data?.status ?? '')
+  useEffect(() => {
+    setPollUntil(current => processing ? current ?? Date.now() + 90_000 : null)
+  }, [processing])
+  useEffect(() => {
+    setPollExpired(false)
+    if (pollUntil === null) return
+    const timeout = window.setTimeout(() => setPollExpired(true), Math.max(0, pollUntil - Date.now()))
+    return () => window.clearTimeout(timeout)
+  }, [pollUntil])
   const operation = useMutation({
     mutationFn: async (action: 'create' | 'rotate' | 'revoke') => {
       setCredential(null)
@@ -129,8 +141,10 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     <p>BATON의 회차 일정과 마감이 있는 루틴을 읽기 전용으로 구독합니다. 일정 수정은 BATON에서 해 주세요.</p>
     {subscription.isPending && <p role="status">구독 상태를 확인하고 있습니다.</p>}
     {status && <p role="status">{labels[status]}</p>}
-    {status && ['IN_PROGRESS', 'REVOCATION_PENDING'].includes(status) && <p className="calendar-polling-note">
-      이 항목을 열어 둔 동안 최대 90초간 자동으로 확인합니다. 오래 걸리거나 조회에 실패하면 ‘상태 다시 확인’을 눌러 주세요.
+    {processing && <p className="calendar-polling-note" role="status">
+      {subscription.isError ? '조회에 실패해 자동 확인을 멈췄습니다. ‘상태 다시 확인’을 눌러 주세요.'
+        : pollExpired ? '90초가 지나 자동 확인을 종료했습니다. ‘상태 다시 확인’을 누르면 다시 시작합니다.'
+        : '이 항목을 열어 둔 동안 최대 90초간 자동으로 확인합니다.'}
     </p>}
     {ended && <p>종료된 시즌은 새 주소를 발급할 수 없습니다. 기존 구독의 상태 확인과 해제는 가능합니다.</p>}
     {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'} 주소가 표시되지 않으면 상태를 확인한 뒤 필요한 작업을 선택해 주세요.</p>}
@@ -138,7 +152,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
       {!managementOnly && status && ['NOT_CREATED', 'REVOKED'].includes(status) && <button type="button" className="primary-button" disabled={!ready || !canIssue} onClick={() => request('create')}>구독 주소 발급</button>}
       {!managementOnly && status && ['ACTIVE', 'REISSUE_REQUIRED'].includes(status) && <button type="button" className="secondary-button" disabled={!ready || !canIssue} onClick={() => setConfirmation('rotate')}>새 주소 발급</button>}
       {status && ['ACTIVE', 'REISSUE_REQUIRED', 'REVOCATION_PENDING'].includes(status) && <button type="button" className="secondary-button" disabled={!ready} onClick={() => setConfirmation('revoke')}>구독 해제</button>}
-      <button type="button" className="secondary-button" disabled={busy} onClick={() => { pollUntil.current = null; setCredential(null); operation.reset(); void subscription.refetch() }}>상태 다시 확인</button>
+      <button type="button" className="secondary-button" disabled={busy} onClick={() => { setPollUntil(processing ? Date.now() + 90_000 : null); setCredential(null); operation.reset(); void subscription.refetch() }}>상태 다시 확인</button>
     </div>
     {confirmation && <div className="calendar-confirm" role="group" aria-label={confirmation === 'rotate' ? '새 주소 발급 확인' : '구독 해제 확인'}>
       <p>{confirmation === 'rotate' ? '새 주소를 발급하면 기존 주소는 사용할 수 없습니다. 캘린더 앱에서도 이전 구독을 지우고 새 주소를 등록해 주세요.' : '구독을 해제하면 기존 주소로 일정을 가져올 수 없습니다. 캘린더 앱에 이미 저장된 일정은 앱에서 직접 제거해 주세요.'}</p>
