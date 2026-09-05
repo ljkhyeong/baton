@@ -1056,6 +1056,7 @@ CSRF 없이 조회한다.
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 에디션 전체 표현 또는 일치하는 `304` |
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions` | 같은 헤더, 함께 쓰는 선택적 `afterEventType`·`afterSourceReference`, `limit` 1~100(기본 20) | `200 {weekStart, zoneId, windowStart, windowEnd, evaluatedAt, resolvedCount, items, nextCursor}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {highCount, mediumCount, revisionGapCount}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items` | 같은 헤더, 선택적 `status`, `severity`, `revisionGap`, `afterEventType`, `afterSourceReference`, `limit` | `200 {items, nextCursor}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/transitions` | 같은 헤더, 필수 `eventType`, `sourceReference`, 선택적 `beforeAggregateRevision`, `limit` | `200 {transitions, nextBeforeAggregateRevision}` |
@@ -1067,6 +1068,7 @@ CSRF 없이 조회한다.
 | --- | --- | --- | --- |
 | `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
 | `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
+| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 브리프와 같은 시간대의 지난주 마지막 불변 본문·ETag |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
 | `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
 | `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
@@ -1091,6 +1093,10 @@ DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면
 `revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
 첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
 현재 조회에는 `ETag`가 없고, BRIEF 장애를 빈 결과로 바꾸지 않는다.
+이번 주 해소는 BATON이 시즌 시간대와 현재 주차를 정한다. 항목은 `reasonCode`,
+`sourceReference`, `resolvedAt`, `resolvedRevision`이며 개수와 동일한 조건의 현재 해소만
+반환한다. 전체 개수는 커서와 무관하며 마지막 커서는 null이다. 페이지 사이 주차·시간대가
+바뀌면 화면은 첫 페이지에서 다시 조회한다. 상세 기준과 배포 순서는 PRD-0009를 따른다.
 상태 전이는 실제 적용 리비전 내림차순이며 `beforeAggregateRevision`은 양의 64비트 배타 커서다.
 전이별 `detectedRevisionGap`은 현재 누적 공백과 다르다. 전이 목록·마지막 커서 `null`과 공통
 권한·오류 계약은 PRD-0009를 따르며 수신 원문·미적용 증거를 노출하지 않는다.
