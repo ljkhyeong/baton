@@ -37,6 +37,8 @@ import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
 import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Team;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
@@ -95,7 +97,8 @@ class RoundAuthorizationServicesTest {
         ActiveAccountTeamMembershipVerifier membershipVerifier =
                 new ActiveAccountTeamMembershipVerifier(
                         roundRepository,
-                        peopleRepository
+                        peopleRepository,
+                        sharedKeyTeams()
                 );
         administrationService = new RoundAdministrationService(
                 roundRepository,
@@ -243,7 +246,7 @@ class RoundAuthorizationServicesTest {
                 "workspace-access-key"
         ));
 
-        verify(workspaceAccess).verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key");
+        verify(workspaceAccess).verifyMembershipClaim(TEAM_ID, SEASON_ID, "workspace-access-key");
         assertThat(result.accountId()).isEqualTo(ACCOUNT_ID);
         assertThat(result.teamId()).isEqualTo(TEAM_ID);
         assertThat(result.memberId()).isEqualTo(MEMBER_ID);
@@ -560,4 +563,10 @@ class RoundAuthorizationServicesTest {
                 NOW.minusSeconds(60)
         );
     }
+    private WorkspaceAccessRepository sharedKeyTeams() {
+        WorkspaceAccessRepository result = mock(WorkspaceAccessRepository.class);
+        when(result.findTeamById(TEAM_ID)).thenReturn(Optional.of(mock(Team.class)));
+        return result;
+    }
+
 }

@@ -18,6 +18,7 @@ type ToastTone = 'success' | 'error'
 type WorkspaceAccessKeyFlowOptions = {
   scope: WorkspaceScope
   currentAccessKey: string
+  accountAccessEnabled?: boolean
   onAccessKeyChange: (accessKey: string) => void
   onCloseModal: () => void
   onOpenShareLink: () => void
@@ -51,6 +52,7 @@ function replaceAccessKeyFragment(accessKey?: string) {
 export function useWorkspaceAccessKeyFlow({
   scope,
   currentAccessKey,
+  accountAccessEnabled = false,
   onAccessKeyChange,
   onCloseModal,
   onOpenShareLink,
@@ -63,7 +65,7 @@ export function useWorkspaceAccessKeyFlow({
   const [rotationLockPending, setRotationLockPending] = useState(false)
   const rotationRequestInFlightRef = useRef(false)
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
-  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}#accessKey=${encodeURIComponent(currentAccessKey)}`
+  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(currentAccessKey)}`}`
 
   const clearRotationJournal = (idempotencyKey: string) => {
     const cleanupResult = clearPendingAccessKeyRotation(teamId, idempotencyKey)

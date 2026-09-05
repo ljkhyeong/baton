@@ -25,6 +25,8 @@ import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUse
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Team;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
@@ -83,7 +85,7 @@ class BriefEditionApplicationServiceTest {
     @BeforeEach
     void setUp() {
         ActiveAccountTeamMembershipVerifier membershipVerifier =
-                new ActiveAccountTeamMembershipVerifier(roundRepository, workspaceRepository);
+                new ActiveAccountTeamMembershipVerifier(roundRepository, workspaceRepository, sharedKeyTeams());
         service = new BriefEditionApplicationService(
                 workspaceAccess,
                 membershipVerifier,
@@ -298,4 +300,10 @@ class BriefEditionApplicationServiceTest {
                 List.of()
         );
     }
+    private WorkspaceAccessRepository sharedKeyTeams() {
+        WorkspaceAccessRepository result = mock(WorkspaceAccessRepository.class);
+        when(result.findTeamById(TEAM_ID)).thenReturn(Optional.of(mock(Team.class)));
+        return result;
+    }
+
 }

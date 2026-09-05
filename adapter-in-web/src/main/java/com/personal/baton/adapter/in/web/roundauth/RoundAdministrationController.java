@@ -51,7 +51,7 @@ public class RoundAdministrationController {
     @GetMapping(CURRENT_MEMBERSHIP_PATH)
     public ResponseEntity<CurrentMembershipResponse> getCurrentMembership(
             @RequestParam UUID teamId,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -66,7 +66,7 @@ public class RoundAdministrationController {
     @PostMapping(MEMBERSHIP_CLAIMS_PATH)
     public ResponseEntity<MembershipClaimResponse> claimMembership(
             @Valid @RequestBody MembershipClaimRequest request,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -92,7 +92,7 @@ public class RoundAdministrationController {
     @PostMapping(ROOM_MAPPINGS_PATH)
     public ResponseEntity<RoomMappingResponse> createRoomMapping(
             @Valid @RequestBody CreateRoomMappingRequest request,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -114,7 +114,7 @@ public class RoundAdministrationController {
     public ResponseEntity<CurrentRoomMappingsResponse> getCurrentRoomMappings(
             @RequestParam UUID teamId,
             @RequestParam UUID seasonId,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -134,7 +134,7 @@ public class RoundAdministrationController {
     @DeleteMapping(ROOM_MAPPING_PATH_PATTERN)
     public ResponseEntity<RoomMappingResponse> endRoomMapping(
             @PathVariable String roomId,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {

@@ -1,5 +1,7 @@
 package com.personal.baton.application.workspace;
 
+import static org.mockito.Mockito.mock;
+
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
@@ -51,7 +53,8 @@ final class WorkspaceServiceTestFactory {
         WorkspaceScopeAuthorizer scopeAuthorizer = new WorkspaceScopeAuthorizer(
                 accessRepository,
                 seasonRepository,
-                accessControl
+                accessControl,
+                mock(TeamAccountAccessPolicy.class)
         );
         WorkspaceAccessKeyCoordinator accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
                 accessRepository,

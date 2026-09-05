@@ -66,6 +66,7 @@ import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateHandoffItemCommand;
 import com.personal.baton.domain.workspace.HandoffCategory;
 import com.personal.baton.domain.workspace.DecisionTextFormat;
+import com.personal.baton.domain.workspace.TeamPermission;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundOrigin;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
@@ -3395,7 +3396,7 @@ class WorkspaceRestDocsTest {
         mockMvc.perform(get("/api/v1/teams/{teamId}/seasons/{seasonId}/workspace", TEAM_ID, SEASON_ID))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"))
-                .andExpect(jsonPath("$.message").value("작업 공간 접근 키가 올바르지 않습니다"))
+                .andExpect(jsonPath("$.message").value("작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"))
                 .andDo(document(
                         "getWorkspaceAccessDenied",
                         GET_WORKSPACE,
@@ -4711,14 +4712,22 @@ class WorkspaceRestDocsTest {
     }
 
     private Snippet accessKeyHeader() {
-        return requestHeaders(headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키"));
+        return requestHeaders(
+                headerWithName("X-Baton-Access-Key").description("공유 키 팀에서 필요한 접근 키").optional(),
+                headerWithName("X-Baton-Account-Id").description("로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID").optional(),
+                headerWithName("X-CSRF-TOKEN").description("로그인한 계정의 변경 요청에 필요한 CSRF 토큰").optional(),
+                headerWithName("Origin").description("로그인한 계정의 변경 요청에 필요한 동일 출처").optional()
+        );
     }
 
     private Snippet contentCreationHeaders() {
         return requestHeaders(
                 headerWithName("Idempotency-Key")
                         .description("같은 생성 요청을 안전하게 재시도할 32~200자의 URL 안전 멱등 키"),
-                headerWithName("X-Baton-Access-Key").description("워크스페이스 접근 키")
+                headerWithName("X-Baton-Access-Key").description("공유 키 팀에서 필요한 접근 키").optional(),
+                headerWithName("X-Baton-Account-Id").description("로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID").optional(),
+                headerWithName("X-CSRF-TOKEN").description("로그인한 계정의 변경 요청에 필요한 CSRF 토큰").optional(),
+                headerWithName("Origin").description("로그인한 계정의 변경 요청에 필요한 동일 출처").optional()
         );
     }
 
@@ -4746,6 +4755,8 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("team").type(JsonFieldType.OBJECT).description("팀 정보"),
                 fieldWithPath("team.id").description("팀 UUID"),
                 fieldWithPath("team.name").description("팀 이름"),
+                fieldWithPath("team.accountAccessEnabled").description("계정 권한 전환 여부"),
+                enumField(TeamPermission.class, "team.permission", "현재 계정 권한").optional(),
                 fieldWithPath("season").type(JsonFieldType.OBJECT).description("현재 시즌 정보"),
                 fieldWithPath("season.id").description("시즌 UUID"),
                 fieldWithPath("season.name").description("시즌 이름"),

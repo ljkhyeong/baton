@@ -10,6 +10,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
+import { TeamAccessPanel } from '@/features/team-access/TeamAccessPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
 import {
@@ -171,9 +172,10 @@ function relevantSeasonRound(rounds: SeasonRound[]) {
 
 export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
-  const scope = { teamId, seasonId, accessKey: currentAccessKey }
-  const workspaceQuery = useWorkspaceQuery(scope)
   const sessionQuery = useAuthSession()
+  const scope = { teamId, seasonId, accessKey: currentAccessKey,
+    accountId: sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous' }
+  const workspaceQuery = useWorkspaceQuery(scope)
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
     teamId, seasonId, currentAccessKey,
     sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
@@ -281,6 +283,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   } = useWorkspaceAccessKeyFlow({
     scope,
     currentAccessKey,
+    accountAccessEnabled: workspaceQuery.data?.team.accountAccessEnabled,
     onAccessKeyChange: setCurrentAccessKey,
     onCloseModal: closeModal,
     onOpenShareLink: () => openModal('shareLink'),
@@ -433,7 +436,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   } = workspace
   const seasons = workspace.seasons
   const seasonEnded = Boolean(workspace.season.endedAt)
+  const accountAccessEnabled = workspace?.team.accountAccessEnabled ?? false
+  const canAdminister = !accountAccessEnabled || workspace?.team.permission === 'ADMIN'
   const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
+    || (accountAccessEnabled && workspace?.team.permission === 'VIEWER')
   const activeRoutines = routines.filter((routine) => !routine.archivedAt)
   const archivedRoutines = [...routines]
     .filter((routine) => routine.archivedAt)
@@ -747,10 +753,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => openModal('accessKey')} />
+          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
         <div className="page-stage" key={view}>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
@@ -785,6 +791,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onRetry={seasonLifecycleFlow.actions.retrySuccessorCleanup}
             />
           )}
+          {accountAccessEnabled && <p className="workspace-permission-note">계정 권한: {workspace.team.permission === 'ADMIN' ? '관리자' : workspace.team.permission === 'MEMBER' ? '구성원' : '열람자 · 기록 조회만 가능'}</p>}
           <SeasonEndedBanner
             season={workspace.season}
             onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher}
@@ -1006,6 +1013,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <MemberManagementModal
           members={members}
           accountMembershipPanel={(
+            <>
             <AccountMembershipPanel
               teamId={teamId}
               seasonId={seasonId}
@@ -1014,10 +1022,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               changesDisabled={contentChangesDisabled}
               seasonEnded={seasonEnded}
             />
+            <TeamAccessPanel scope={scope} />
+            </>
           )}
           pendingMemberId={pendingMemberDeactivationId}
           error={updateMemberDeactivationMutation.error}
-          changesDisabled={contentChangesDisabled}
+          changesDisabled={contentChangesDisabled || !canAdminister}
           onAdd={openMemberModal}
           onEdit={openMemberEditModal}
           onToggleDeactivation={toggleMemberDeactivation}
@@ -1139,6 +1149,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       )}
       {modal === 'roleHandoff' && roleHandoffFlow.action && roleHandoffFlow.actionRole && (
         <RoleHandoffModal
+          accountAccessEnabled={accountAccessEnabled}
           key={`${roleHandoffFlow.action.mode}:${roleHandoffFlow.actionRole.id}:${roleHandoffFlow.actionTarget?.id ?? 'new'}`}
           mode={roleHandoffFlow.action.mode}
           role={roleHandoffFlow.actionRole}

@@ -136,7 +136,7 @@ class WorkspaceScopeAuthorizerTest {
                 seasonRepository,
                 team,
                 season,
-                new WorkspaceScopeAuthorizer(accessRepository, seasonRepository, accessControl)
+                new WorkspaceScopeAuthorizer(accessRepository, seasonRepository, accessControl, mock(TeamAccountAccessPolicy.class))
         );
     }
 

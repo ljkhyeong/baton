@@ -55,7 +55,7 @@ final class WorkspaceProjectionReader {
                 .collect(Collectors.groupingBy(RoutineExecution::getSeasonRoundId));
         Clock projectionClock = Clock.fixed(clock.instant(), clock.getZone());
         return new WorkspaceResult(
-                new TeamResult(scope.team().getId(), scope.team().getName()),
+                new TeamResult(scope.team().getId(), scope.team().getName(), scope.team().isAccountAccessEnabled(), scope.permission()),
                 resultMapper.toSeasonResult(scope.season()),
                 seasons.stream().map(resultMapper::toSeasonSummaryResult).toList(),
                 snapshot.members().stream().map(resultMapper::toMemberResult).toList(),

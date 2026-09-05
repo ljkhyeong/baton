@@ -38,7 +38,7 @@ public class BriefEditionController {
     public ResponseEntity<BriefEditionResponse> findLatestEdition(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -60,7 +60,7 @@ public class BriefEditionController {
     public ResponseEntity<BriefEditionGenerationResponse> generateEdition(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(ACCESS_KEY_HEADER) String accessKey,
+            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {

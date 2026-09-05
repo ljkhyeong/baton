@@ -73,7 +73,7 @@
 - `docs/api/openapi3.yaml`과 `frontend/src/generated/api.ts`는 생성 파일이다. 직접 수정하지 않고 `./gradlew --no-daemon generateApiContract`로 갱신하며, API 변경 뒤 `checkApiContract`로 드리프트를 확인한다.
 - WATCH 상태 변경 이벤트 수신은 워크스페이스 공유 키나 외부 전송용 WATCH 토큰과 분리한 전용 Bearer 토큰으로 보호한다. `Idempotency-Key`는 본문 `eventId`와 같아야 하며, 같은 이벤트 ID의 동일 재전송만 허용하고 다른 봉투 재사용은 `409`로 거부한다.
 - WATCH 이벤트의 `resourceReference`는 설정된 소스 이름공간과 정규 형식 UUID를 검증하되 `RoleResource` 존재 조회나 FK로 수신을 결합하지 않는다. `sourceRevision`이나 도착 순서를 상태 순서로 해석하지 않고 고유 이벤트를 모두 보존한다.
-- 최종 사용자 인증 방식은 미결정이다. 현재 파일럿 공유 키와 WATCH 이벤트 전용 Bearer를 최종 계정·권한 계약으로 확대 해석하거나 그 위에 새 제품 흐름을 고정하지 않는다.
+- 사용자 신원은 Account와 동일 출처 세션, 팀 접근은 PRD-0009의 선택적 계정 전환과 ADMIN·MEMBER·VIEWER 권한을 따른다. 전환된 팀의 공유 키·직접 구성원 연결을 허용하거나 기존 연결을 자동 승인하지 않는다. WATCH 이벤트 전용 Bearer는 사용자 권한과 분리한다.
 
 ## DB와 설정
 

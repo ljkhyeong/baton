@@ -48,7 +48,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             String accessKey,
             CreateMemberCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
         WorkspaceIdempotencyKeyPolicy.requireValid(idempotencyKey);
         return memberCoordinator.create(teamId, seasonId, idempotencyKey, command);
     }
@@ -62,7 +62,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             String accessKey,
             UpdateMemberCommand command
     ) {
-        scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
+        scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
         return memberCoordinator.update(teamId, memberId, command);
     }
 
@@ -75,7 +75,8 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             String accessKey,
             boolean deactivated
     ) {
-        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
+        if (deactivated) scopeAuthorizer.requireMemberDeactivation(scope.team(), memberId);
         return memberCoordinator.updateDeactivation(teamId, seasonId, memberId, deactivated);
     }
 
@@ -139,7 +140,8 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             String accessKey,
             TransferRoleHandoffCommand command
     ) {
-        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        scopeAuthorizer.requireConfirmedMember(scope.team(), command.confirmedByMemberId());
         return roleHandoffCoordinator.transfer(teamId, seasonId, roleId, handoffId, command);
     }
 
@@ -154,6 +156,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             ConfirmRoleHandoffCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        scopeAuthorizer.requireConfirmedMember(scope.team(), command.confirmedByMemberId());
         return roleHandoffCoordinator.accept(teamId, scope.season(), roleId, handoffId, command);
     }
 
@@ -167,7 +170,8 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             String accessKey,
             ConfirmRoleHandoffCommand command
     ) {
-        scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        scopeAuthorizer.requireConfirmedMember(scope.team(), command.confirmedByMemberId());
         return roleHandoffCoordinator.cancel(teamId, seasonId, roleId, handoffId, command);
     }
 }

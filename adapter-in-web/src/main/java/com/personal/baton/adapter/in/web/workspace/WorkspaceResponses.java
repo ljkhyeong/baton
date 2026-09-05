@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import com.personal.baton.domain.workspace.DecisionTextFormat;
+import com.personal.baton.domain.workspace.TeamPermission;
 
 public final class WorkspaceResponses {
 
@@ -89,10 +90,10 @@ public final class WorkspaceResponses {
         }
     }
 
-    public record TeamResponse(UUID id, String name) {
+    public record TeamResponse(UUID id, String name, boolean accountAccessEnabled, TeamPermission permission) {
 
         static TeamResponse from(WorkspaceContract.TeamResult result) {
-            return new TeamResponse(result.id(), result.name());
+            return new TeamResponse(result.id(), result.name(), result.accountAccessEnabled(), result.permission());
         }
     }
 

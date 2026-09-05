@@ -186,3 +186,7 @@ BATON은 범용 OAuth 권한 부여 서버가 아니라 자신의 세션으로 �
 - [계정 인증과 ROUND 참여권 PRD](../../PRD/0005_account-and-round-authentication/spec.md)
 - [헥사고날 아키텍처](../0001_hexagonal-architecture/adr.md)
 - [파일럿 자체 호스팅](../0003_pilot-self-hosted-deployment/adr.md)
+
+## 후속 팀 권한 결정
+
+[ADR-0021](../0021_team-account-access/adr.md)은 기존 계정·세션과 계정·구성원 연결을 사용해 팀별 초대·접근 권한을 도입한다. 계정 전환 팀에서는 공유 키를 거부하며 승인된 권한과 구성원 활동 상태를 추가 확인한다. 로그인과 신원 연결 규칙은 이 문서를 유지한다.

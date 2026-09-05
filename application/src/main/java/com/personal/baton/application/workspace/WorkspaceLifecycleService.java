@@ -101,7 +101,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             String accessKey,
             UpdateSeasonCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
         Season season = scope.season();
         boolean periodChanged = !season.getStartDate().equals(command.startDate())
                 || !season.getEndDate().equals(command.endDate());
@@ -130,7 +130,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             String accessKey,
             UpdateRoundScheduleCommand command
     ) {
-        WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
+        WorkspaceScope scope = scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
         String previousTimeZone = scope.season().getTimeZone();
         SeasonResult result = seasonSettingsCoordinator.updateRoundSchedule(scope.season(), command);
         return previousTimeZone.equals(result.timeZone())

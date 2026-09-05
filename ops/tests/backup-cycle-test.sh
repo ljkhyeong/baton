@@ -149,6 +149,10 @@ if [[ "${FAKE_DOCKER_MODE:-valid}" == "restore" ]]; then
     printf '%s\n' '3'
     exit 0
   fi
+  if [[ "$docker_arguments" == *"baton_account_access_check"* ]]; then
+    printf '%s\n' "${FAKE_RESTORE_ACCOUNT_TEAMS:-0}"
+    exit 0
+  fi
   if [[ "$docker_arguments" == *"information_schema.columns"* ]]; then
     printf '%s\n' "${FAKE_RESTORE_TEAM_REVISION_COLUMNS:-2}"
     exit 0
@@ -473,6 +477,18 @@ restore_security_output="$(
   FAKE_RESTORE_SQL_LOG="$restore_security_root/revocation.sql" \
   "$fixture_restore_script" "$restore_security_backup"
 )"
+if PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
+  BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
+  BATON_BACKUP_STATE_DIR="$restore_security_root/account-state" \
+  FAKE_DOCKER_MODE=restore \
+  FAKE_RESTORE_ACCOUNT_TEAMS=1 \
+  FAKE_RESTORE_SQL_LOG="$restore_security_root/account-revocation.sql" \
+  "$fixture_restore_script" "$restore_security_backup" >/dev/null 2>&1; then
+  fail '계정 권한 팀의 복원이 권한 재확인 없이 완료되었습니다'
+fi
+assert_no_file "$restore_security_root/account-revocation.sql"
+assert_no_file "$restore_security_root/account-state/last-restore-recovery-targets.tsv"
 [[ "$restore_security_output" == *'Invalidated workspace access keys: 2'* ]] \
   || fail 'restore did not report invalidated workspace access keys'
 [[ "$restore_security_output" == *'Old shared links cannot be reused'* ]] \

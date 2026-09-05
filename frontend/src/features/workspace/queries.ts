@@ -87,8 +87,8 @@ type RoleHandoffTransitionCommand<TRequest> = {
 export const workspaceKeys = {
   all: ['teams'] as const,
   team: (teamId: string) => [...workspaceKeys.all, teamId] as const,
-  detail: (teamId: string, seasonId: string, accessKey: string) =>
-    ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey }] as const,
+  detail: (teamId: string, seasonId: string, accessKey: string, accountId = 'anonymous') =>
+    ['teams', teamId, 'seasons', seasonId, 'workspace', { accessKey, accountId }] as const,
 }
 
 const WORKSPACE_MUTATION_KEY_PREFIX = 'workspace-mutation'
@@ -139,9 +139,9 @@ function canAutomaticallyRefetchWorkspace(query: { state: { error: unknown } }) 
 
 export function useWorkspaceQuery(scope: WorkspaceScope) {
   return useQuery({
-    queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey),
+    queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId),
     queryFn: ({ signal }) => getWorkspace(scope, signal),
-    enabled: Boolean(scope.teamId && scope.seasonId && scope.accessKey),
+    enabled: Boolean(scope.teamId && scope.seasonId),
     retry: (failureCount, error) => !isWorkspaceAccessDeniedError(error)
       && failureCount < 1,
     refetchInterval: (query) => !canAutomaticallyRefetchWorkspace(query)
@@ -155,7 +155,7 @@ export function useWorkspaceQuery(scope: WorkspaceScope) {
 
 function useInvalidateWorkspace(scope: WorkspaceScope) {
   const queryClient = useQueryClient()
-  const queryKey = workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey)
+  const queryKey = workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId)
 
   return {
     queryClient,

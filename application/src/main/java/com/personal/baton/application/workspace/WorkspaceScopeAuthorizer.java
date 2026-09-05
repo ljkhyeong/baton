@@ -7,6 +7,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceAccessReposito
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
+import com.personal.baton.domain.workspace.TeamPermission;
 import java.util.UUID;
 
 @Component
@@ -15,19 +16,26 @@ final class WorkspaceScopeAuthorizer {
     private final WorkspaceAccessRepository accessRepository;
     private final WorkspaceSeasonRepository seasonRepository;
     private final WorkspaceAccessControl accessControl;
+    private final TeamAccountAccessPolicy accountAccess;
 
     WorkspaceScopeAuthorizer(
             WorkspaceAccessRepository accessRepository,
             WorkspaceSeasonRepository seasonRepository,
-            WorkspaceAccessControl accessControl
+            WorkspaceAccessControl accessControl,
+            TeamAccountAccessPolicy accountAccess
     ) {
         this.accessRepository = accessRepository;
         this.seasonRepository = seasonRepository;
         this.accessControl = accessControl;
+        this.accountAccess = accountAccess;
     }
 
     WorkspaceScope authorizeRead(UUID teamId, UUID seasonId, String accessKey) {
         WorkspaceScope scope = requireScope(teamId, seasonId);
+        if (scope.team().isAccountAccessEnabled()) {
+            TeamPermission permission = accountAccess.requireMembership(scope.team()).getPermission();
+            return new WorkspaceScope(scope.team(), scope.season(), permission);
+        }
         accessControl.verifyAccessKey(scope.team(), accessKey);
         return scope;
     }
@@ -35,7 +43,8 @@ final class WorkspaceScopeAuthorizer {
     Team authorizeTeamRead(UUID teamId, String accessKey) {
         Team team = accessRepository.findTeamById(teamId)
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
-        accessControl.verifyAccessKey(team, accessKey);
+        if (team.isAccountAccessEnabled()) accountAccess.requireRead(team);
+        else accessControl.verifyAccessKey(team, accessKey);
         return team;
     }
 
@@ -44,7 +53,7 @@ final class WorkspaceScopeAuthorizer {
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = seasonRepository.findSeasonByTeamIdAndIdWithSharedLock(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        accessControl.verifyAccessKey(team, accessKey);
+        verifyWrite(team, accessKey);
         requireOpenSeason(season);
         return new WorkspaceScope(team, season);
     }
@@ -55,7 +64,7 @@ final class WorkspaceScopeAuthorizer {
             String accessKey
     ) {
         WorkspaceScope scope = requireSeasonForUpdate(teamId, seasonId);
-        accessControl.verifyAccessKey(scope.team(), accessKey);
+        verifyWrite(scope.team(), accessKey);
         requireOpenSeason(scope.season());
         return scope;
     }
@@ -77,8 +86,23 @@ final class WorkspaceScopeAuthorizer {
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        accessControl.verifyAccessKey(team, accessKey);
+        verifyWrite(team, accessKey);
+        accountAccess.requireAdministrator(team);
         return new WorkspaceScope(team, season);
+    }
+
+    WorkspaceScope authorizeAdministratorMutation(UUID teamId, UUID seasonId, String accessKey) {
+        WorkspaceScope scope = authorizeSeasonLifecycle(teamId, seasonId, accessKey);
+        requireOpenSeason(scope.season());
+        return scope;
+    }
+
+    void requireMemberDeactivation(Team team, UUID memberId) { accountAccess.requireOtherAdministrator(team, memberId); }
+    void requireConfirmedMember(Team team, UUID memberId) { accountAccess.requireConfirmedMember(team, memberId); }
+
+    private void verifyWrite(Team team, String accessKey) {
+        if (team.isAccountAccessEnabled()) accountAccess.requireWrite(team);
+        else accessControl.verifyAccessKey(team, accessKey);
     }
 
     WorkspaceScope requireScope(UUID teamId, UUID seasonId) {
@@ -104,5 +128,6 @@ final class WorkspaceScopeAuthorizer {
     }
 }
 
-record WorkspaceScope(Team team, Season season) {
+record WorkspaceScope(Team team, Season season, TeamPermission permission) {
+    WorkspaceScope(Team team, Season season) { this(team, season, null); }
 }

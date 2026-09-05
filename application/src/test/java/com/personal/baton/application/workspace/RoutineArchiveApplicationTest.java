@@ -326,6 +326,7 @@ class RoutineArchiveApplicationTest {
             Season season
     ) {
         when(accessRepository.findTeamByIdWithSharedLock(team.getId())).thenReturn(Optional.of(team));
+        when(accessRepository.findTeamByIdForUpdate(team.getId())).thenReturn(Optional.of(team));
         when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(team.getId(), season.getId()))
                 .thenReturn(Optional.of(season));
     }

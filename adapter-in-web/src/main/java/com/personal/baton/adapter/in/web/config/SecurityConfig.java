@@ -6,6 +6,7 @@ import com.personal.baton.adapter.in.web.auth.AccountAuthenticationFailureHandle
 import com.personal.baton.adapter.in.web.auth.AccountSessionSecurityContextRepository;
 import com.personal.baton.adapter.in.web.auth.AccountSessionVersionFilter;
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.auth.WorkspaceAccountMutationFilter;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AvailableClientAuthorizationRequestResolver;
 import com.personal.baton.adapter.in.web.auth.DiscardingOAuth2AuthorizedClientRepository;
@@ -134,6 +135,8 @@ public class SecurityConfig {
                 socialLoginProviderCatalog == null
                         ? null
                         : socialLoginProviderCatalog.registrations();
+
+        http.addFilterAfter(new WorkspaceAccountMutationFilter(errorResponseWriter), CsrfFilter.class);
 
         http
                 .csrf(csrf -> csrf

@@ -388,6 +388,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/team-access/{teamId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 팀 접근 설정 조회
+         * @description 팀의 접근 방식과 현재 계정의 권한을 조회한다.
+         */
+        get: operations["getTeamAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-access/{teamId}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 팀 계정 권한 전환 및 관리자 복구
+         * @description 운영 복구 키로 현재 계정의 구성원을 관리자로 지정하고 공유 키 접근을 닫는다.
+         */
+        post: operations["activateTeamAccountAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-access/{teamId}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 팀 초대 생성
+         * @description 관리자가 기존 구성원의 7일 유효 초대를 만들고 원문 토큰은 이 응답에서만 제공한다.
+         */
+        post: operations["createTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-access/{teamId}/invitations/{invitationId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 팀 초대 취소
+         * @description 미수락 초대를 취소한다.
+         */
+        post: operations["revokeTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-access/{teamId}/members/{memberId}/permission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 팀 구성원 권한 변경
+         * @description 구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.
+         */
+        put: operations["changeTeamPermission"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 팀 초대 수락
+         * @description 같은 초대는 같은 계정만 다시 확인할 수 있고 재수락으로 폐기된 권한을 복원하지 않는다.
+         */
+        post: operations["acceptTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 팀 초대 확인
+         * @description 로그인한 계정이 초대의 팀·구성원·권한과 만료 시각을 확인한다.
+         */
+        post: operations["previewTeamInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}": {
         parameters: {
             query?: never;
@@ -1462,6 +1602,30 @@ export interface components {
             /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
             url: string;
         };
+        Schema_8ff7ee21dc10031e: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /**
+             * @description 새 권한, null은 접근 취소
+             * @enum {string|null}
+             */
+            permission?: "ADMIN" | "MEMBER" | "VIEWER" | null;
+        };
+        Schema_9d7a993539b49e9e: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /**
+             * Format: uuid
+             * @description 현재 계정과 연결된 구성원
+             */
+            memberId: string;
+        };
         Schema_9d26cd80bf5240ea: {
             /**
              * Format: date
@@ -1491,6 +1655,47 @@ export interface components {
             responsibilities: string[];
             /** @description 인수인계 위험 신호 */
             risk?: string | null;
+        };
+        Schema_27a7f932602250ee: {
+            invitation?: {
+                /**
+                 * Format: date-time
+                 * @description 수락 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: date-time
+                 * @description 생성 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 만료 시각
+                 */
+                expiresAt: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 초대할 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 초대 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /**
+                 * Format: date-time
+                 * @description 취소 시각
+                 */
+                revokedAt: string | null;
+            };
+            /** @description 43자 일회용 초대 토큰 */
+            token: string;
         };
         Schema_43f45d42746b4260: {
             /** @description 복사한 역할 식별자 대응 */
@@ -1686,6 +1891,15 @@ export interface components {
             csrfHeaderName: string;
             /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
             csrfToken: string;
+        };
+        Schema_94be7d47165b11ba: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 43자 초대 토큰 */
+            token: string;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -1884,6 +2098,32 @@ export interface components {
             /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
         };
+        Schema_809bfac6c8a82eaa: {
+            /**
+             * Format: date-time
+             * @description 만료 시각
+             */
+            expiresAt: string;
+            /**
+             * Format: uuid
+             * @description 구성원 식별자
+             */
+            memberId: string;
+            /** @description 구성원 이름 */
+            memberName: string;
+            /**
+             * @description 초대 권한
+             * @enum {string}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER";
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 팀 이름 */
+            teamName: string;
+        };
         Schema_892abbd42867bf81: {
             /**
              * Format: uuid
@@ -1991,6 +2231,125 @@ export interface components {
              */
             teamId: string;
         };
+        Schema_59121c6eafa63b3f: {
+            /** @description 계정 권한 전환 여부 */
+            accountAccessEnabled: boolean;
+            /**
+             * Format: uuid
+             * @description 현재 계정
+             */
+            accountId: string;
+            /** @description 최근 접근 변경 50건, 관리자에게만 제공 */
+            audit: {
+                /** @description 변경 종류 */
+                action: string;
+                /**
+                 * Format: uuid
+                 * @description 변경 계정
+                 */
+                actorAccountId: string;
+                /**
+                 * Format: date-time
+                 * @description 변경 시각
+                 */
+                changedAt: string;
+                /**
+                 * Format: uuid
+                 * @description 변경 이력 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 대상 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 변경 뒤 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+                /**
+                 * @description 이전 권한
+                 * @enum {string|null}
+                 */
+                previousPermission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            }[];
+            /** @description 초대 목록, 관리자에게만 제공 */
+            invitations: {
+                /**
+                 * Format: date-time
+                 * @description 수락 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: date-time
+                 * @description 생성 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 만료 시각
+                 */
+                expiresAt: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 초대 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /**
+                 * Format: date-time
+                 * @description 취소 시각
+                 */
+                revokedAt: string | null;
+            }[];
+            /**
+             * Format: uuid
+             * @description 내 연결 구성원
+             */
+            memberId: string | null;
+            /** @description 관리 가능한 구성원 */
+            members: {
+                /**
+                 * Format: uuid
+                 * @description 연결 계정
+                 */
+                accountId: string | null;
+                /** @description 활동 여부 */
+                active: boolean;
+                /**
+                 * Format: uuid
+                 * @description 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 구성원 이름 */
+                memberName: string;
+                /**
+                 * @description 승인된 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            }[];
+            /**
+             * @description 내 권한
+             * @enum {string|null}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+        };
         Schema_8722349937f63e53: {
             /** @description 새 비밀번호 */
             password: string;
@@ -2043,6 +2402,50 @@ export interface components {
              * @enum {string}
              */
             status: "CONFIRMED" | "NEEDS_UPDATE";
+        };
+        Schema_a264e25c9464e03b: {
+            /**
+             * Format: uuid
+             * @description 수락 계정
+             */
+            accountId: string;
+            /**
+             * Format: uuid
+             * @description 연결된 구성원
+             */
+            memberId: string;
+            /**
+             * @description 현재 권한
+             * @enum {string}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER";
+            /**
+             * Format: uuid
+             * @description 이동할 최신 시즌
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+        };
+        Schema_a4653d8ff21a5a6a: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /**
+             * Format: uuid
+             * @description 초대할 기존 구성원
+             */
+            memberId: string;
+            /**
+             * @description 초대 권한
+             * @enum {string}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER";
         };
         Schema_afc5d14f14716d19: {
             /**
@@ -2120,7 +2523,7 @@ export interface components {
             /** @description 루틴 제목 */
             title: string;
         };
-        Schema_b4b50f65c41250e2: {
+        Schema_b59fcccea6bb2ea5: {
             /** @description 설명 가능한 규칙으로 계산한 조직 연속성 위험 신호 */
             continuitySignals: {
                 /** @description 현재 기록에서 이 신호가 발생한 이유 */
@@ -2641,6 +3044,8 @@ export interface components {
             }[];
             /** @description 팀 정보 */
             team: {
+                /** @description 계정 권한 전환 여부 */
+                accountAccessEnabled: boolean;
                 /**
                  * Format: uuid
                  * @description 팀 UUID
@@ -2648,6 +3053,11 @@ export interface components {
                 id: string;
                 /** @description 팀 이름 */
                 name: string;
+                /**
+                 * @description 현재 계정 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
             };
         };
         Schema_baf1712ab0d6d81b: {
@@ -2972,6 +3382,13 @@ export interface components {
             textFormat: "PLAIN_TEXT" | "MARKDOWN";
             /** @description 결정 제목 */
             title: string;
+        };
+        Schema_e04bc4e3cb634fd5: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
         };
         Schema_e9b6d0efe91dd2e3: {
             /** @description 팀 안에서 유일한 새 표시 이름 */
@@ -3301,7 +3718,7 @@ export interface operations {
                  * @description 연결 또는 매핑 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
@@ -3351,12 +3768,12 @@ export interface operations {
                 /** @description 연결 상태를 확인할 팀 UUID */
                 teamId: string;
             };
-            header: {
+            header?: {
                 /**
                  * @description 연결 상태를 확인할 팀의 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
             };
             path?: never;
             cookie?: never;
@@ -3972,12 +4389,12 @@ export interface operations {
                 /** @description 매핑 팀 UUID */
                 teamId: string;
             };
-            header: {
+            header?: {
                 /**
                  * @description ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
             };
             path?: never;
             cookie?: never;
@@ -4017,7 +4434,7 @@ export interface operations {
                  * @description 연결 또는 매핑 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
@@ -4066,7 +4483,7 @@ export interface operations {
                  * @description 연결 또는 매핑 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
@@ -4118,15 +4535,295 @@ export interface operations {
             };
         };
     };
-    updateSeason: {
+    getTeamAccess: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description 공유 키 팀에서 필요한 접근 키
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                };
+            };
+        };
+    };
+    activateTeamAccountAccess: {
         parameters: {
             query?: never;
             header: {
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description BATON과 동일한 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 운영자 복구 키
+                 * @example operator-recovery-key
+                 */
+                "X-Baton-Recovery-Key": string;
+                /**
+                 * @description 현재 세션의 CSRF 토큰
+                 * @example csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_9d7a993539b49e9e"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                };
+            };
+        };
+    };
+    createTeamInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON과 동일한 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 현재 세션의 CSRF 토큰
+                 * @example csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_a4653d8ff21a5a6a"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 초대 토큰 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_27a7f932602250ee"];
+                };
+            };
+        };
+    };
+    revokeTeamInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON과 동일한 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 현재 세션의 CSRF 토큰
+                 * @example csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 초대 식별자 */
+                invitationId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_e04bc4e3cb634fd5"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                };
+            };
+        };
+    };
+    changeTeamPermission: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON과 동일한 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 현재 세션의 CSRF 토큰
+                 * @example csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path: {
+                /** @description 구성원 식별자 */
+                memberId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_8ff7ee21dc10031e"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                };
+            };
+        };
+    };
+    acceptTeamInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON과 동일한 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 현재 세션의 CSRF 토큰
+                 * @example csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_94be7d47165b11ba"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_a264e25c9464e03b"];
+                };
+            };
+        };
+    };
+    previewTeamInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description BATON과 동일한 출처
+                 * @example https://baton.example
+                 */
+                Origin: string;
+                /**
+                 * @description 현재 세션의 CSRF 토큰
+                 * @example csrf-token
+                 */
+                "X-CSRF-TOKEN": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_94be7d47165b11ba"];
+            };
+        };
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 비공개 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_809bfac6c8a82eaa"];
+                };
+            };
+        };
+    };
+    updateSeason: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
+                /**
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4319,7 +5016,7 @@ export interface operations {
                  * @description 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰
                  * @example opaque-csrf-token
@@ -4358,12 +5055,12 @@ export interface operations {
     getLatestBriefEdition: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
                 /**
                  * @description 대상 워크스페이스 접근 키
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
             };
             path: {
                 /** @description BATON 시즌 UUID */
@@ -4401,11 +5098,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4437,12 +5140,18 @@ export interface operations {
     updateDecision: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 결정 UUID */
@@ -4498,12 +5207,18 @@ export interface operations {
     updateDecisionArchive: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 결정 UUID */
@@ -4559,12 +5274,18 @@ export interface operations {
     updateSeasonEnding: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4646,11 +5367,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4682,12 +5409,18 @@ export interface operations {
     updateHandoffItem: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 인수인계 항목 UUID */
@@ -4743,12 +5476,18 @@ export interface operations {
     updateHandoffItemArchive: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 인수인계 항목 UUID */
@@ -4804,12 +5543,18 @@ export interface operations {
     updateHandoffItemCompletion: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 인수인계 항목 UUID */
@@ -4871,11 +5616,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -4951,12 +5702,18 @@ export interface operations {
     updateMember: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 구성원 UUID */
@@ -5012,12 +5769,18 @@ export interface operations {
     updateMemberDeactivation: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 구성원 UUID */
@@ -5232,11 +5995,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5279,12 +6048,18 @@ export interface operations {
     updateRoleResource: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 자료 UUID */
@@ -5340,12 +6115,18 @@ export interface operations {
     updateRoleResourceArchive: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 자료 UUID */
@@ -5459,11 +6240,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5506,12 +6293,18 @@ export interface operations {
     updateRole: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 UUID */
@@ -5573,11 +6366,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 UUID */
@@ -5624,12 +6423,18 @@ export interface operations {
     acceptRoleHandoff: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 바통 UUID */
@@ -5687,12 +6492,18 @@ export interface operations {
     cancelRoleHandoff: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 바통 UUID */
@@ -5750,12 +6561,18 @@ export interface operations {
     transferRoleHandoff: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 역할 바통 UUID */
@@ -5813,12 +6630,18 @@ export interface operations {
     updateRoundSchedule: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5900,11 +6723,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -5958,12 +6787,18 @@ export interface operations {
     updateSeasonRound: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 회차 UUID */
@@ -6041,12 +6876,18 @@ export interface operations {
     updateSeasonRoundArchive: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 회차 UUID */
@@ -6124,12 +6965,18 @@ export interface operations {
     updateRoutineExecutionCompletion: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 회차 루틴 실행 UUID */
@@ -6193,11 +7040,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -6251,12 +7104,18 @@ export interface operations {
     updateRoutine: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 루틴 UUID */
@@ -6312,12 +7171,18 @@ export interface operations {
     updateRoutineArchive: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 루틴 UUID */
@@ -6401,11 +7266,17 @@ export interface operations {
                  * @example content-idempotency-restdocs-000001
                  */
                 "Idempotency-Key": string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -6483,12 +7354,18 @@ export interface operations {
     getWorkspace: {
         parameters: {
             query?: never;
-            header: {
+            header?: {
+                /** @description 로그인한 계정의 변경 요청에 필요한 동일 출처 */
+                Origin?: string;
                 /**
-                 * @description 워크스페이스 접근 키
+                 * @description 공유 키 팀에서 필요한 접근 키
                  * @example baton-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
+                /** @description 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID */
+                "X-Baton-Account-Id"?: string;
+                /** @description 로그인한 계정의 변경 요청에 필요한 CSRF 토큰 */
+                "X-CSRF-TOKEN"?: string;
             };
             path: {
                 /** @description 시즌 UUID */
@@ -6510,7 +7387,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_b4b50f65c41250e2"];
+                    "application/json": components["schemas"]["Schema_b59fcccea6bb2ea5"];
                 };
             };
             /** @description 403 */

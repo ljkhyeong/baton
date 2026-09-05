@@ -214,6 +214,28 @@ fi
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
   export MYSQL_PWD
   exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
+    SET @baton_account_access_check = IF(
+      EXISTS(SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = '\''teams'\''
+          AND column_name = '\''account_access_enabled'\''),
+      '\''SELECT COUNT(*) FROM teams WHERE account_access_enabled = TRUE'\'',
+      '\''SELECT 0'\''
+    );
+    PREPARE baton_account_access_check FROM @baton_account_access_check;
+    EXECUTE baton_account_access_check;
+    DEALLOCATE PREPARE baton_account_access_check;
+  "
+' > "$compose_output_path"
+account_access_team_count="$(< "$compose_output_path")"
+if [[ "$account_access_team_count" != "0" ]]; then
+  printf '계정 권한을 사용하는 팀이 있어 복원 완료 처리를 중단합니다. 서버를 공개하지 말고 격리된 환경에서 권한·초대 이력을 확인하세요. 데이터와 계정 권한은 자동 폐기하지 않았습니다.\n' >&2
+  exit 1
+fi
+
+"${compose[@]}" exec -T mysql sh -ec '
+  MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
+  export MYSQL_PWD
+  exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
     SELECT COUNT(*)
     FROM information_schema.columns
     WHERE table_schema = DATABASE()

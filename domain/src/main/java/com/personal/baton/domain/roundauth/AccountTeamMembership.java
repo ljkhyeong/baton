@@ -1,5 +1,8 @@
 package com.personal.baton.domain.roundauth;
 
+import com.personal.baton.domain.workspace.TeamPermission;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -40,6 +43,13 @@ public class AccountTeamMembership {
 
     @Column(name = "claimed_at", nullable = false)
     private Instant claimedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "permission", length = 16)
+    private TeamPermission permission;
+
+    public TeamPermission getPermission() { return permission; }
+    public void changePermission(TeamPermission permission) { this.permission = permission; }
 
     protected AccountTeamMembership() {
     }

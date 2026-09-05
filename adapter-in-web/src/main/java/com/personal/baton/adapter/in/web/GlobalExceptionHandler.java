@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web;
 
+import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.watch.error.WatchHealthEventConflictException;
 import com.personal.baton.application.watch.error.WatchHealthEventChangedAtOutOfRangeException;
 import com.personal.baton.application.watch.error.WatchHealthEventIdMismatchException;
@@ -44,6 +45,14 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    @ExceptionHandler(AccountMembershipConflictException.class)
+    public ResponseEntity<ErrorResponse> handleAccountMembershipConflict(
+            AccountMembershipConflictException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, "ACCOUNT_MEMBERSHIP_CONFLICT", exception.getMessage(), exception, request);
+    }
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final ErrorResponse INTERNAL_ERROR = new ErrorResponse(

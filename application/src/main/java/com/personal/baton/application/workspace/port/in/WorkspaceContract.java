@@ -14,6 +14,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 import com.personal.baton.domain.workspace.DecisionTextFormat;
+import com.personal.baton.domain.workspace.TeamPermission;
 
 public final class WorkspaceContract {
 
@@ -42,7 +43,8 @@ public final class WorkspaceContract {
     ) {
     }
 
-    public record TeamResult(UUID id, String name) {
+    public record TeamResult(UUID id, String name, boolean accountAccessEnabled, TeamPermission permission) {
+        public TeamResult(UUID id, String name) { this(id, name, false, null); }
     }
 
     public record SeasonResult(

@@ -25,3 +25,20 @@ export const queryClient = new QueryClient({
     },
   },
 })
+
+
+let observedAccount: string | undefined
+queryClient.getQueryCache().subscribe(event => {
+  if (event.type !== 'updated' || event.action.type !== 'success'
+    || event.query.queryKey.length !== 2 || event.query.queryKey[0] !== 'auth' || event.query.queryKey[1] !== 'session') return
+  const data = event.query.state.data as { authenticated?: boolean; accountId?: string } | undefined
+  if (typeof data?.authenticated !== 'boolean') return
+  const account = data.authenticated ? data.accountId : 'anonymous'
+  if (!account) return
+  const previous = observedAccount
+  observedAccount = account
+  if (previous !== undefined && previous !== account) {
+    void queryClient.cancelQueries({ queryKey: ['teams'] })
+    queryClient.removeQueries({ queryKey: ['teams'] })
+  }
+})

@@ -233,7 +233,7 @@ type ApiHarness = {
 
 export function makeProjection(): WorkspaceProjection {
   return {
-    team: { id: TEAM_ID, name: '알고리즘 한 바퀴' },
+    team: { id: TEAM_ID, name: '알고리즘 한 바퀴' , accountAccessEnabled: false, permission: null },
     season: {
       id: SEASON_ID,
       name: '2026 여름 시즌',
@@ -417,7 +417,7 @@ export function makeProjection(): WorkspaceProjection {
 
 function projectionFromOnboarding(request: CreateWorkspaceRequest): WorkspaceProjection {
   return {
-    team: { id: TEAM_ID, name: request.teamName },
+    team: { id: TEAM_ID, name: request.teamName , accountAccessEnabled: false, permission: null },
     season: {
       id: SEASON_ID,
       name: request.seasonName,
@@ -588,7 +588,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       const committedResult = accessKeyRotationResults.get(rotationIdempotencyKey)
       if (committedResult) return json(200, { accessKey: committedResult })
     }
-    if (headers['x-baton-access-key'] !== activeAccessKey) return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
+    if (!projection.team.accountAccessEnabled && headers['x-baton-access-key'] !== activeAccessKey) return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
 
     const contentIdempotencyKey = contentOperation ? headers['idempotency-key'] : undefined
     const contentResultKey = contentOperation && contentIdempotencyKey

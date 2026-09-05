@@ -16,7 +16,7 @@ type BaseRequestOptions = Omit<RequestInit, 'body'> & {
   timeoutMs?: number
 }
 
-type ContentRequestOptions<T> = BaseRequestOptions & {
+export type ContentRequestOptions<T> = BaseRequestOptions & {
   decode: ResponseDecoder<T>
   responseType?: 'json'
 }

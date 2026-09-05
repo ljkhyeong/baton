@@ -102,7 +102,7 @@ function projection(
       ]
 
   return {
-    team: { id: TEAM_ID, name: '알고리즘 한 바퀴' },
+    team: { id: TEAM_ID, name: '알고리즘 한 바퀴' , accountAccessEnabled: false, permission: null },
     season,
     seasons,
     members: [{

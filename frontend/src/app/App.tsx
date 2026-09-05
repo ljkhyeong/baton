@@ -11,6 +11,7 @@ const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'))
 const RegistrationPage = lazy(() => import('@/pages/RegistrationPage'))
+const TeamInvitationPage = lazy(() => import('@/pages/TeamInvitationPage'))
 const WorkspacePage = lazy(() => import('@/pages/WorkspacePage'))
 
 function RouteFallback() {
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/account" element={<AccountSecurityPage />} />
+              <Route path="/join" element={<TeamInvitationPage />} />
               <Route path="/teams/:teamId/seasons/:seasonId" element={<WorkspacePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -51,7 +51,7 @@ final class WorkspaceAccessControl {
     }
 
     void verifyAccessKey(Team team, String accessKey) {
-        if (accessKey == null || accessKey.isBlank() || !matchesAccessKey(team, accessKey)) {
+        if (team.isAccountAccessEnabled() || accessKey == null || accessKey.isBlank() || !matchesAccessKey(team, accessKey)) {
             throw new WorkspaceAccessDeniedException();
         }
     }

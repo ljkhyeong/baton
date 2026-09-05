@@ -3,7 +3,6 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 
 import com.personal.baton.BatonApplication;
-import com.personal.baton.application.workspace.error.WorkspaceAccessKeyConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
@@ -156,7 +155,7 @@ class WorkspaceRequestBudgetTest {
                 });
     }
 
-    @DisplayName("팀 행의 배타 잠금이 유지되면 구성원 생성은 제한 시간 안에 접근 키 충돌로 실패하고 생성을 롤백한다")
+    @DisplayName("팀 행의 배타 잠금이 유지되면 구성원 생성은 제한 시간 안에 내용 충돌로 실패하고 생성을 롤백한다")
     @Test
     void failsMemberCreationWithinBudgetAndRollsBackCreation() throws Exception {
         CreatedWorkspaceResult created = createWorkspace(
@@ -179,7 +178,7 @@ class WorkspaceRequestBudgetTest {
                     created.accessKey(),
                     new CreateMemberCommand("박민서")
             )).isInstanceOfSatisfying(
-                    WorkspaceAccessKeyConflictException.class,
+                    WorkspaceContentConflictException.class,
                     exception -> assertThat(exception.getCause())
                             .isInstanceOf(PessimisticLockingFailureException.class)
             );

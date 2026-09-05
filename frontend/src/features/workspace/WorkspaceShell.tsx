@@ -111,7 +111,7 @@ export function Sidebar({
           <span><strong>{activeMemberCount}명 활동 중</strong><small>{workspace.season.name}</small></span>
           <span className="profile-actions">
             <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
-            <button type="button" onClick={onManageAccess}>키 관리</button>
+            <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '키 관리'}</button>
           </span>
         </div>
       </div>
@@ -120,12 +120,14 @@ export function Sidebar({
 }
 
 export function MobileTopbar({
+  accountAccessEnabled = false,
   teamName,
   seasonName,
   onSwitchSeason,
   onShare,
   onManageAccess,
 }: {
+  accountAccessEnabled?: boolean
   teamName: string
   seasonName: string
   onSwitchSeason: () => void
@@ -146,7 +148,7 @@ export function MobileTopbar({
       </button>
       <span className="mobile-workspace-actions">
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
-        <button type="button" className="mobile-share" onClick={onManageAccess}>키 관리</button>
+        <button type="button" className="mobile-share" onClick={onManageAccess}>{accountAccessEnabled ? '권한 관리' : '키 관리'}</button>
       </span>
     </header>
   )

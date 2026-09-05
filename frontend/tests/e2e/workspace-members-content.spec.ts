@@ -454,6 +454,7 @@ test('@operations @webkit 역할과 루틴 수정 충돌은 입력만 보존하�
 test('@operations @webkit 충돌 초안은 세션 조회 실패와 같은 계정으로 복구한 뒤에도 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   let sessionFails = false
+  await page.route('**/api/v1/auth/csrf', route => route.fulfill({ json: { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'draft-test-csrf' } }))
   await page.route('**/api/v1/auth/session', (route) => route.fulfill(sessionFails
     ? { status: 503, json: { code: 'SERVICE_UNAVAILABLE', message: '로그인 상태를 잠시 확인할 수 없습니다.' } }
     : { json: {
@@ -486,6 +487,7 @@ for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
     const api = await installApi(page)
     let accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
     let sessionReads = 0
+    await page.route('**/api/v1/auth/csrf', route => route.fulfill({ json: { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'draft-test-csrf' } }))
     await page.route('**/api/v1/auth/session', async (route) => {
       sessionReads += 1
       await route.fulfill({ json: {

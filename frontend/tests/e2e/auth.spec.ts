@@ -1061,6 +1061,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
 })
 
 test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
+  await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
   await page.getByLabel('이메일').fill(EMAIL)
@@ -1068,7 +1069,7 @@ test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경�
   await page.getByRole('button', { name: '이메일로 로그인' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(page.getByText('접근 키 필요')).toBeVisible()
+  await expect(page.getByText('팀 초대 또는 공유 링크로 접속해 주세요.')).toBeVisible()
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
@@ -1109,6 +1110,7 @@ test('외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동�
 })
 
 test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로를 이어 간다', async ({ page }) => {
+  await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await page.addInitScript(({ key, returnTo }) => {
     window.sessionStorage.setItem(key, returnTo)
   }, {
@@ -1119,7 +1121,7 @@ test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로
   await page.goto('/login')
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(page.getByText('접근 키 필요')).toBeVisible()
+  await expect(page.getByText('팀 초대 또는 공유 링크로 접속해 주세요.')).toBeVisible()
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 

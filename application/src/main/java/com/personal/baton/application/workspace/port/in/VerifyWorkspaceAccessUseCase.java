@@ -9,5 +9,7 @@ public interface VerifyWorkspaceAccessUseCase {
 
     Season verifyRead(UUID teamId, UUID seasonId, String accessKey);
 
+    void verifyMembershipClaim(UUID teamId, UUID seasonId, String accessKey);
+
     Season verifyMutation(UUID teamId, UUID seasonId, String accessKey);
 }

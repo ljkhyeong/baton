@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
+import { useAuthSession } from '@/features/auth/useAuthSession'
 import { workspaceKeys } from '@/features/workspace/queries'
 import {
   readAccessKey,
@@ -14,6 +15,7 @@ import {
 import type { WorkspaceProjection } from '@/features/workspace/types'
 
 export default function WorkspacePage() {
+  const session = useAuthSession()
   const { teamId = '', seasonId = '' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -123,7 +125,7 @@ export default function WorkspacePage() {
     )
   }
 
-  if (!accessKey) {
+  if (!accessKey && !session.data?.authenticated) {
     return (
       <>
         <title>{workspaceTitle}</title>
@@ -131,7 +133,8 @@ export default function WorkspacePage() {
           <section className="remote-state" role="alert">
             <span className="section-kicker">접근 키 필요</span>
             <strong>이 작업 공간을 열 수 없어요.</strong>
-            <p>팀에서 받은 공유 링크로 다시 접속해 주세요.</p>
+            <p>{session.isPending ? '로그인 상태를 확인하고 있습니다.' : '팀의 초대를 수락한 계정으로 로그인하거나 공유 링크로 다시 접속해 주세요.'}</p>
+            <Link to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} className="primary-button">로그인</Link>
             <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
           </section>
         </main>
@@ -152,7 +155,7 @@ export default function WorkspacePage() {
     <>
       <title>{workspaceTitle}</title>
       <WorkspaceApp
-        key={`${teamId}:${seasonId}:${accessKey}`}
+        key={`${teamId}:${seasonId}:${accessKey}:${session.data?.authenticated ? session.data.accountId : 'anonymous'}`}
         teamId={teamId}
         seasonId={seasonId}
         accessKey={accessKey}

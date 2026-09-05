@@ -34,6 +34,9 @@ public class Team {
     @Column(name = "last_access_key_change_idempotency_hash", length = 64, columnDefinition = "char(64)")
     private String lastAccessKeyChangeIdempotencyHash;
 
+    @Column(name = "account_access_enabled", nullable = false)
+    private boolean accountAccessEnabled;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -53,6 +56,10 @@ public class Team {
     public static Team create(UUID id, String name, String accessKeyHash) {
         return new Team(id, name, accessKeyHash);
     }
+
+    public boolean isAccountAccessEnabled() { return accountAccessEnabled; }
+
+    public void enableAccountAccess() { accountAccessEnabled = true; }
 
     public UUID getId() {
         return id;

@@ -64,19 +64,30 @@ export function useWorkspaceSeasonLifecycleFlow({
     onOpenModal('seasonSwitcher')
   }
 
+  const requireAdministrator = () => {
+    if (workspace?.team.accountAccessEnabled && workspace.team.permission !== 'ADMIN') {
+      notify('시즌 설정·종료와 다음 시즌 생성은 관리자만 할 수 있습니다.', 'error')
+      return false
+    }
+    return true
+  }
+
   const openEdit = () => {
+    if (!requireAdministrator()) return
     if (!workspace || workspace.season.endedAt) return
     updateSeasonMutation.reset()
     onOpenModal('seasonEdit')
   }
 
   const openRoundSchedule = () => {
+    if (!requireAdministrator()) return
     if (!workspace || workspace.season.endedAt) return
     updateRoundScheduleMutation.reset()
     onOpenModal('roundSchedule')
   }
 
   const openSuccessor = () => {
+    if (!requireAdministrator()) return
     if (!workspace) return
     const hasSuccessor = workspace.seasons.some((season) =>
       season.previousSeasonId === workspace.season.id)
@@ -123,6 +134,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   }
 
   const toggleEnding = () => {
+    if (!requireAdministrator()) return
     if (!workspace || updateSeasonEndingMutation.isPending) return
     const ending = !workspace.season.endedAt
     const confirmed = window.confirm(ending

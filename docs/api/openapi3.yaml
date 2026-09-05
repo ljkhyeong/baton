@@ -51,7 +51,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처
@@ -164,7 +164,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
       responses:
@@ -1153,7 +1153,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
       responses:
@@ -1196,7 +1196,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처
@@ -1283,7 +1283,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처
@@ -1363,6 +1363,380 @@ paths:
       summary: 시스템 상태 조회
       tags:
         - api
+  /api/v1/team-access/{teamId}:
+    get:
+      description: 팀의 접근 방식과 현재 계정의 권한을 조회한다.
+      operationId: getTeamAccess
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 공유 키 팀에서 필요한 접근 키
+          example: key
+          in: header
+          name: X-Baton-Access-Key
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getTeamAccess:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
+              schema:
+                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+          headers:
+            Cache-Control:
+              description: 비공개 응답 캐시 금지
+              schema:
+                type: string
+      summary: 팀 접근 설정 조회
+      tags:
+        - api
+  /api/v1/team-access/{teamId}/activate:
+    post:
+      description: 운영 복구 키로 현재 계정의 구성원을 관리자로 지정하고 공유 키 접근을 닫는다.
+      operationId: activateTeamAccountAccess
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 운영자 복구 키
+          example: operator-recovery-key
+          in: header
+          name: X-Baton-Recovery-Key
+          required: true
+          schema:
+            type: string
+        - description: BATON과 동일한 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 현재 세션의 CSRF 토큰
+          example: csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              activateTeamAccountAccess:
+                value: >-
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003"}
+            schema:
+              $ref: '#/components/schemas/Schema_9d7a993539b49e9e'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                activateTeamAccountAccess:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
+              schema:
+                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+          headers:
+            Cache-Control:
+              description: 비공개 응답 캐시 금지
+              schema:
+                type: string
+      summary: 팀 계정 권한 전환 및 관리자 복구
+      tags:
+        - api
+  /api/v1/team-access/{teamId}/invitations:
+    post:
+      description: 관리자가 기존 구성원의 7일 유효 초대를 만들고 원문 토큰은 이 응답에서만 제공한다.
+      operationId: createTeamInvitation
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON과 동일한 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 현재 세션의 CSRF 토큰
+          example: csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              createTeamInvitation:
+                value: >-
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER"}
+            schema:
+              $ref: '#/components/schemas/Schema_a4653d8ff21a5a6a'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                createTeamInvitation:
+                  value: >-
+                    {"invitation":{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null},"token":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+              schema:
+                $ref: '#/components/schemas/Schema_27a7f932602250ee'
+          headers:
+            Cache-Control:
+              description: 초대 토큰 캐시 금지
+              schema:
+                type: string
+      summary: 팀 초대 생성
+      tags:
+        - api
+  /api/v1/team-access/{teamId}/invitations/{invitationId}/revoke:
+    post:
+      description: 미수락 초대를 취소한다.
+      operationId: revokeTeamInvitation
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 초대 식별자
+          in: path
+          name: invitationId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON과 동일한 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 현재 세션의 CSRF 토큰
+          example: csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              revokeTeamInvitation:
+                value: '{"expectedAccountId":"00000000-0000-4000-8000-000000000004"}'
+            schema:
+              $ref: '#/components/schemas/Schema_e04bc4e3cb634fd5'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                revokeTeamInvitation:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
+              schema:
+                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+          headers:
+            Cache-Control:
+              description: 비공개 응답 캐시 금지
+              schema:
+                type: string
+      summary: 팀 초대 취소
+      tags:
+        - api
+  /api/v1/team-access/{teamId}/members/{memberId}/permission:
+    put:
+      description: 구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.
+      operationId: changeTeamPermission
+      parameters:
+        - description: 팀 식별자
+          in: path
+          name: teamId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: 구성원 식별자
+          in: path
+          name: memberId
+          required: true
+          schema:
+            format: uuid
+            type: string
+        - description: BATON과 동일한 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 현재 세션의 CSRF 토큰
+          example: csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              changeTeamPermission:
+                value: '{"expectedAccountId":"00000000-0000-4000-8000-000000000004","permission":"VIEWER"}'
+            schema:
+              $ref: '#/components/schemas/Schema_8ff7ee21dc10031e'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                changeTeamPermission:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
+              schema:
+                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+          headers:
+            Cache-Control:
+              description: 비공개 응답 캐시 금지
+              schema:
+                type: string
+      summary: 팀 구성원 권한 변경
+      tags:
+        - api
+  /api/v1/team-invitations/accept:
+    post:
+      description: 같은 초대는 같은 계정만 다시 확인할 수 있고 재수락으로 폐기된 권한을 복원하지 않는다.
+      operationId: acceptTeamInvitation
+      parameters:
+        - description: BATON과 동일한 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 현재 세션의 CSRF 토큰
+          example: csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              acceptTeamInvitation:
+                value: >-
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","token":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+            schema:
+              $ref: '#/components/schemas/Schema_94be7d47165b11ba'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                acceptTeamInvitation:
+                  value: >-
+                    {"accountId":"00000000-0000-4000-8000-000000000004","teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER"}
+              schema:
+                $ref: '#/components/schemas/Schema_a264e25c9464e03b'
+          headers:
+            Cache-Control:
+              description: 비공개 응답 캐시 금지
+              schema:
+                type: string
+      summary: 팀 초대 수락
+      tags:
+        - api
+  /api/v1/team-invitations/preview:
+    post:
+      description: 로그인한 계정이 초대의 팀·구성원·권한과 만료 시각을 확인한다.
+      operationId: previewTeamInvitation
+      parameters:
+        - description: BATON과 동일한 출처
+          example: https://baton.example
+          in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+        - description: 현재 세션의 CSRF 토큰
+          example: csrf-token
+          in: header
+          name: X-CSRF-TOKEN
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            examples:
+              previewTeamInvitation:
+                value: >-
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","token":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+            schema:
+              $ref: '#/components/schemas/Schema_94be7d47165b11ba'
+        required: true
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                previewTeamInvitation:
+                  value: >-
+                    {"teamId":"00000000-0000-4000-8000-000000000001","teamName":"운영
+                    팀","memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","permission":"VIEWER","expiresAt":"2026-09-12T03:00:00Z"}
+              schema:
+                $ref: '#/components/schemas/Schema_809bfac6c8a82eaa'
+          headers:
+            Cache-Control:
+              description: 비공개 응답 캐시 금지
+              schema:
+                type: string
+      summary: 팀 초대 확인
+      tags:
+        - api
   /api/v1/teams/{teamId}/seasons/{seasonId}:
     put:
       description: 종료되지 않은 시즌의 이름과 운영 기간을 기존 기록 경계 안에서 수정한다.
@@ -1382,11 +1756,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -1490,7 +1882,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -1725,7 +2117,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처
@@ -1810,7 +2202,7 @@ paths:
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
       responses:
@@ -1891,11 +2283,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -1971,11 +2381,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2104,11 +2532,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2218,11 +2664,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2316,7 +2780,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -2393,11 +2857,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2467,11 +2949,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2591,11 +3091,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2709,11 +3227,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2830,11 +3366,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -2918,7 +3472,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -2992,11 +3546,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -3119,11 +3691,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -3511,11 +4101,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -3612,11 +4220,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -3739,11 +4365,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -3930,11 +4574,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4055,11 +4717,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4225,11 +4905,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4362,11 +5060,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4514,11 +5230,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4666,11 +5400,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4807,11 +5559,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -4930,7 +5700,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -5007,11 +5777,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -5142,11 +5930,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -5257,7 +6063,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -5337,11 +6143,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -5471,7 +6295,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -5552,11 +6376,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -5688,11 +6530,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -5841,11 +6701,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -5979,11 +6857,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -6071,7 +6967,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -6148,11 +7044,29 @@ paths:
             minLength: 32
             pattern: ^[A-Za-z0-9._~-]+$
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       requestBody:
@@ -6290,7 +7204,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -6357,11 +7271,29 @@ paths:
           schema:
             format: uuid
             type: string
-        - description: 워크스페이스 접근 키
+        - description: 공유 키 팀에서 필요한 접근 키
           example: baton-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에서 화면이 확인한 계정 UUID
+          in: header
+          name: X-Baton-Account-Id
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 CSRF 토큰
+          in: header
+          name: X-CSRF-TOKEN
+          required: false
+          schema:
+            type: string
+        - description: 로그인한 계정의 변경 요청에 필요한 동일 출처
+          in: header
+          name: Origin
+          required: false
           schema:
             type: string
       responses:
@@ -6375,7 +7307,9 @@ paths:
                     {
                       "team" : {
                         "id" : "11111111-1111-1111-1111-111111111111",
-                        "name" : "알고리즘 한 바퀴"
+                        "name" : "알고리즘 한 바퀴",
+                        "accountAccessEnabled" : false,
+                        "permission" : null
                       },
                       "season" : {
                         "id" : "22222222-2222-2222-2222-222222222222",
@@ -6534,7 +7468,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_b4b50f65c41250e2'
+                $ref: '#/components/schemas/Schema_b59fcccea6bb2ea5'
           headers:
             Cache-Control:
               description: 민감한 응답을 저장하지 않도록 하는 no-store 지시자
@@ -6553,7 +7487,7 @@ paths:
                   value: |-
                     {
                       "code" : "WORKSPACE_ACCESS_DENIED",
-                      "message" : "작업 공간 접근 키가 올바르지 않습니다"
+                      "message" : "작업 공간에 접근할 권한이 없습니다. 계정의 초대·권한 또는 공유 링크를 확인해 주세요"
                     }
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
@@ -7063,6 +7997,58 @@ components:
           type: string
       required:
         - accessKey
+      type: object
+    Schema_27a7f932602250ee:
+      properties:
+        invitation:
+          properties:
+            acceptedAt:
+              description: 수락 시각
+              format: date-time
+              nullable: true
+              type: string
+            createdAt:
+              description: 생성 시각
+              format: date-time
+              type: string
+            expiresAt:
+              description: 만료 시각
+              format: date-time
+              type: string
+            id:
+              description: 초대 식별자
+              format: uuid
+              type: string
+            memberId:
+              description: 초대할 구성원
+              format: uuid
+              type: string
+            permission:
+              description: 초대 권한
+              enum:
+                - ADMIN
+                - MEMBER
+                - VIEWER
+              type: string
+            revokedAt:
+              description: 취소 시각
+              format: date-time
+              nullable: true
+              type: string
+          required:
+            - acceptedAt
+            - createdAt
+            - expiresAt
+            - id
+            - memberId
+            - permission
+            - revokedAt
+          type: object
+        token:
+          description: 43자 일회용 초대 토큰
+          type: string
+      required:
+        - token
       type: object
     Schema_2a4f2da12175b82c:
       properties:
@@ -7652,6 +8638,173 @@ components:
         - acceptedAt
         - eventId
       type: object
+    Schema_59121c6eafa63b3f:
+      properties:
+        accountAccessEnabled:
+          description: 계정 권한 전환 여부
+          type: boolean
+        accountId:
+          description: 현재 계정
+          format: uuid
+          type: string
+        audit:
+          description: 최근 접근 변경 50건, 관리자에게만 제공
+          items:
+            properties:
+              action:
+                description: 변경 종류
+                type: string
+              actorAccountId:
+                description: 변경 계정
+                format: uuid
+                type: string
+              changedAt:
+                description: 변경 시각
+                format: date-time
+                type: string
+              id:
+                description: 변경 이력 식별자
+                format: uuid
+                type: string
+              memberId:
+                description: 대상 구성원
+                format: uuid
+                type: string
+              permission:
+                description: 변경 뒤 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                nullable: true
+                type: string
+              previousPermission:
+                description: 이전 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                nullable: true
+                type: string
+            required:
+              - action
+              - actorAccountId
+              - changedAt
+              - id
+              - memberId
+              - permission
+              - previousPermission
+            type: object
+          type: array
+        invitations:
+          description: 초대 목록, 관리자에게만 제공
+          items:
+            properties:
+              acceptedAt:
+                description: 수락 시각
+                format: date-time
+                nullable: true
+                type: string
+              createdAt:
+                description: 생성 시각
+                format: date-time
+                type: string
+              expiresAt:
+                description: 만료 시각
+                format: date-time
+                type: string
+              id:
+                description: 초대 식별자
+                format: uuid
+                type: string
+              memberId:
+                description: 초대 구성원
+                format: uuid
+                type: string
+              permission:
+                description: 초대 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                type: string
+              revokedAt:
+                description: 취소 시각
+                format: date-time
+                nullable: true
+                type: string
+            required:
+              - acceptedAt
+              - createdAt
+              - expiresAt
+              - id
+              - memberId
+              - permission
+              - revokedAt
+            type: object
+          type: array
+        memberId:
+          description: 내 연결 구성원
+          format: uuid
+          nullable: true
+          type: string
+        members:
+          description: 관리 가능한 구성원
+          items:
+            properties:
+              accountId:
+                description: 연결 계정
+                format: uuid
+                nullable: true
+                type: string
+              active:
+                description: 활동 여부
+                type: boolean
+              memberId:
+                description: 구성원 식별자
+                format: uuid
+                type: string
+              memberName:
+                description: 구성원 이름
+                type: string
+              permission:
+                description: 승인된 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                nullable: true
+                type: string
+            required:
+              - accountId
+              - active
+              - memberId
+              - memberName
+              - permission
+            type: object
+          type: array
+        permission:
+          description: 내 권한
+          enum:
+            - ADMIN
+            - MEMBER
+            - VIEWER
+          nullable: true
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+      required:
+        - accountAccessEnabled
+        - accountId
+        - audit
+        - invitations
+        - memberId
+        - members
+        - permission
+        - teamId
+      type: object
     Schema_5baa3f1a60a86ba9:
       properties:
         endDate:
@@ -7894,6 +9047,41 @@ components:
         - startDate
         - teamName
       type: object
+    Schema_809bfac6c8a82eaa:
+      properties:
+        expiresAt:
+          description: 만료 시각
+          format: date-time
+          type: string
+        memberId:
+          description: 구성원 식별자
+          format: uuid
+          type: string
+        memberName:
+          description: 구성원 이름
+          type: string
+        permission:
+          description: 초대 권한
+          enum:
+            - ADMIN
+            - MEMBER
+            - VIEWER
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+        teamName:
+          description: 팀 이름
+          type: string
+      required:
+        - expiresAt
+        - memberId
+        - memberName
+        - permission
+        - teamId
+        - teamName
+      type: object
     Schema_8722349937f63e53:
       properties:
         password:
@@ -7973,6 +9161,23 @@ components:
         - title
         - url
       type: object
+    Schema_8ff7ee21dc10031e:
+      properties:
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        permission:
+          description: 새 권한, null은 접근 취소
+          enum:
+            - ADMIN
+            - MEMBER
+            - VIEWER
+          nullable: true
+          type: string
+      required:
+        - expectedAccountId
+      type: object
     Schema_910a28d176d2ff82:
       properties:
         confirmedByMemberId:
@@ -7981,6 +9186,20 @@ components:
           type: string
       required:
         - confirmedByMemberId
+      type: object
+    Schema_94be7d47165b11ba:
+      properties:
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        token:
+          description: 43자 초대 토큰
+          pattern: '[A-Za-z0-9_-]{43}'
+          type: string
+      required:
+        - expectedAccountId
+        - token
       type: object
     Schema_9615d143264cd2dc:
       properties:
@@ -8106,6 +9325,74 @@ components:
         - name
         - purpose
         - responsibilities
+      type: object
+    Schema_9d7a993539b49e9e:
+      properties:
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        memberId:
+          description: 현재 계정과 연결된 구성원
+          format: uuid
+          type: string
+      required:
+        - expectedAccountId
+        - memberId
+      type: object
+    Schema_a264e25c9464e03b:
+      properties:
+        accountId:
+          description: 수락 계정
+          format: uuid
+          type: string
+        memberId:
+          description: 연결된 구성원
+          format: uuid
+          type: string
+        permission:
+          description: 현재 권한
+          enum:
+            - ADMIN
+            - MEMBER
+            - VIEWER
+          type: string
+        seasonId:
+          description: 이동할 최신 시즌
+          format: uuid
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+      required:
+        - accountId
+        - memberId
+        - permission
+        - seasonId
+        - teamId
+      type: object
+    Schema_a4653d8ff21a5a6a:
+      properties:
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        memberId:
+          description: 초대할 기존 구성원
+          format: uuid
+          type: string
+        permission:
+          description: 초대 권한
+          enum:
+            - ADMIN
+            - MEMBER
+            - VIEWER
+          type: string
+      required:
+        - expectedAccountId
+        - memberId
+        - permission
       type: object
     Schema_a79acdcbe8205845:
       properties:
@@ -8245,7 +9532,7 @@ components:
         - phase
         - title
       type: object
-    Schema_b4b50f65c41250e2:
+    Schema_b59fcccea6bb2ea5:
       properties:
         continuitySignals:
           description: 설명 가능한 규칙으로 계산한 조직 연속성 위험 신호
@@ -8992,6 +10279,9 @@ components:
         team:
           description: 팀 정보
           properties:
+            accountAccessEnabled:
+              description: 계정 권한 전환 여부
+              type: boolean
             id:
               description: 팀 UUID
               format: uuid
@@ -8999,9 +10289,19 @@ components:
             name:
               description: 팀 이름
               type: string
+            permission:
+              description: 현재 계정 권한
+              enum:
+                - ADMIN
+                - MEMBER
+                - VIEWER
+              nullable: true
+              type: string
           required:
+            - accountAccessEnabled
             - id
             - name
+            - permission
           type: object
       required:
         - continuitySignals
@@ -9447,6 +10747,15 @@ components:
         - roomId
         - seasonId
         - teamId
+      type: object
+    Schema_e04bc4e3cb634fd5:
+      properties:
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+      required:
+        - expectedAccountId
       type: object
     Schema_e249d91938b2aea4:
       oneOf:

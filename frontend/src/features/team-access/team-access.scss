@@ -1,0 +1,15 @@
+.team-access-panel {
+  padding: 14px 0;
+  border-top: 1px solid var(--rule);
+  summary { cursor: pointer; font-weight: 700; }
+  form, label { display: grid; gap: 6px; }
+  form { margin: 12px 0; }
+  input, select { min-width: 0; width: 100%; padding: 8px; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); }
+  .team-access-confirm { display: flex; align-items: flex-start; }
+  input[type="checkbox"] { width: auto; margin-top: 4px; }
+  button { min-height: 40px; }
+  ul { padding: 0; list-style: none; }
+  li { display: flex; align-items: center; gap: 10px; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 8px 0; }
+  li select { width: auto; }
+  small { display: block; color: var(--muted); }
+}

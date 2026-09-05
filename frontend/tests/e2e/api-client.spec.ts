@@ -336,7 +336,7 @@ function workspaceProjection(scope: { teamId: string; seasonId: string }) {
   }
 
   return {
-    team: { id: scope.teamId, name: 'BATON 스터디' },
+    team: { id: scope.teamId, name: 'BATON 스터디', accountAccessEnabled: false, permission: null },
     season,
     seasons: [season],
     continuitySignals: [],

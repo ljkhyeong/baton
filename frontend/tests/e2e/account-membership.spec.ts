@@ -277,7 +277,8 @@ test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동
   page.once('dialog', async (confirmation) => confirmation.accept())
   await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
 
-  await expect(dialog.getByRole('link', { name: /로그인하고 연결하기/ })).toBeVisible()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('region', { name: '내 담당 업무' }).getByRole('link', { name: '로그인', exact: true })).toBeVisible()
   expect(membershipApi.calls.filter((call) => (
     call.method === 'POST' && call.path === '/api/v1/account-membership-claims'
   ))).toHaveLength(1)
@@ -375,6 +376,8 @@ test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시�
   await expect(dialog.getByRole('link', { name: '로그인하고 연결하기' })).toHaveCount(0)
   membershipApi.restoreAuthSession()
   await dialog.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
+  await expect(dialog).toBeHidden()
+  await page.getByRole('region', { name: '내 담당 업무' }).getByRole('button', { name: '구성원 연결하기' }).click()
   await expect(dialog.getByLabel('연결할 구성원')).toBeVisible()
 })
 

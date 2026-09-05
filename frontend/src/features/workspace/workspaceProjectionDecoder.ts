@@ -128,6 +128,10 @@ function isTeamSummary(value: unknown) {
   return isRecord(value)
     && isUuid(value.id)
     && typeof value.name === 'string'
+    && typeof value.accountAccessEnabled === 'boolean'
+    && (value.accountAccessEnabled
+      ? ['ADMIN', 'MEMBER', 'VIEWER'].includes(String(value.permission))
+      : value.permission === null)
 }
 
 function isContinuitySignal(value: unknown) {

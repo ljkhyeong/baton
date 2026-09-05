@@ -1,12 +1,14 @@
 package com.personal.baton.adapter.in.web.security;
 
 import com.personal.baton.adapter.in.web.auth.AuthController;
+import com.personal.baton.adapter.in.web.auth.CurrentAuthenticatedAccount;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
+import java.util.Set;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
@@ -69,11 +71,18 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             AccountSecurityController.SESSION_REVOCATIONS_PATH
     );
+    private static final RequestMatcher TEAM_ACCESS = new OrRequestMatcher(pathPattern("/api/v1/team-access/**"), pathPattern("/api/v1/team-invitations/**"));
+    private static final RequestMatcher HAS_ACCOUNT_SESSION = request -> CurrentAuthenticatedAccount.accountId().isPresent();
+    private static final RequestMatcher UNSAFE = request -> !Set.of("GET", "HEAD", "OPTIONS", "TRACE").contains(request.getMethod());
+    private static final RequestMatcher WORKSPACE_ACCOUNT_MUTATION = new AndRequestMatcher(
+            pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**"), HAS_ACCOUNT_SESSION, UNSAFE);
     private static final RequestMatcher NOTIFICATION_READ = pathPattern(HttpMethod.POST, WorkspaceNotificationController.READ_PATH);
     private static final RequestMatcher NOTIFICATION_INBOX = pathPattern(HttpMethod.GET, WorkspaceNotificationController.PATH);
     private static final RequestMatcher RESOURCE_VERIFICATION = pathPattern(HttpMethod.POST, ResourceVerificationController.PATH);
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
+            WORKSPACE_ACCOUNT_MUTATION,
+            new AndRequestMatcher(TEAM_ACCESS, UNSAFE),
             NOTIFICATION_READ,
             RESOURCE_VERIFICATION,
             ROUND_MEMBERSHIP_CLAIM,
@@ -83,6 +92,7 @@ public final class AccountSessionRequestMatchers {
     );
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
             ACCOUNT_SECURITY_READ,
+            TEAM_ACCESS,
             NOTIFICATION_READ,
             NOTIFICATION_INBOX,
             RESOURCE_VERIFICATION,
@@ -102,10 +112,15 @@ public final class AccountSessionRequestMatchers {
                     pathPattern(
                             "/api/v1/teams/{teamId}/seasons/{seasonId}/**"
                     ),
-                    new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED)
+                    new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED),
+                    new NegatedRequestMatcher(HAS_ACCOUNT_SESSION)
             );
 
     private AccountSessionRequestMatchers() {
+    }
+
+    public static RequestMatcher workspaceAccountMutation() {
+        return new AndRequestMatcher(WORKSPACE_ACCOUNT_MUTATION, new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED));
     }
 
     public static RequestMatcher localLogin() {

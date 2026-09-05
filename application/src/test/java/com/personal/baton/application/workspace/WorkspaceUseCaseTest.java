@@ -1622,9 +1622,9 @@ class WorkspaceUseCaseTest {
         CountDownLatch memberUpdateFlushed = new CountDownLatch(1);
         CountDownLatch assignmentLockRequested = new CountDownLatch(1);
         CountDownLatch allowDeactivationCommit = new CountDownLatch(1);
-        WorkspaceSeasonRepository coordinatedSeasonRepository = mock(
-                WorkspaceSeasonRepository.class,
-                delegatesTo(seasonRepository)
+        WorkspaceAccessRepository coordinatedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         WorkspacePeopleRepository coordinatedPeopleRepository = mock(
                 WorkspacePeopleRepository.class,
@@ -1642,17 +1642,11 @@ class WorkspaceUseCaseTest {
             if (memberUpdateFlushed.getCount() == 0) {
                 assignmentLockRequested.countDown();
             }
-            return seasonRepository.findSeasonByTeamIdAndIdForUpdate(
-                    invocation.getArgument(0),
-                    invocation.getArgument(1)
-            );
-        }).when(coordinatedSeasonRepository).findSeasonByTeamIdAndIdForUpdate(
-                any(UUID.class),
-                any(UUID.class)
-        );
+            return accessRepository.findTeamByIdWithSharedLock(invocation.getArgument(0));
+        }).when(coordinatedAccessRepository).findTeamByIdWithSharedLock(any(UUID.class));
         WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
-                accessRepository,
-                coordinatedSeasonRepository,
+                coordinatedAccessRepository,
+                seasonRepository,
                 coordinatedPeopleRepository,
                 operationsRepository,
                 recordsRepository,
@@ -3476,19 +3470,19 @@ class WorkspaceUseCaseTest {
         String firstIdempotencyKey = contentIdempotencyKey("concurrent-member-first");
         String secondIdempotencyKey = contentIdempotencyKey("concurrent-member-second");
         CreateMemberCommand command = new CreateMemberCommand("김준호");
-        CyclicBarrier bothRequestsReadyToSaveMember = new CyclicBarrier(2);
-        WorkspacePeopleRepository synchronizedPeopleRepository = mock(
-                WorkspacePeopleRepository.class,
-                delegatesTo(peopleRepository)
+        CyclicBarrier bothRequestsReadyToLockTeam = new CyclicBarrier(2);
+        WorkspaceAccessRepository synchronizedAccessRepository = mock(
+                WorkspaceAccessRepository.class,
+                delegatesTo(accessRepository)
         );
         doAnswer(invocation -> {
-            bothRequestsReadyToSaveMember.await(10, TimeUnit.SECONDS);
-            return peopleRepository.saveMember(invocation.getArgument(0));
-        }).when(synchronizedPeopleRepository).saveMember(any(Member.class));
+            bothRequestsReadyToLockTeam.await(10, TimeUnit.SECONDS);
+            return accessRepository.findTeamByIdForUpdate(invocation.getArgument(0));
+        }).when(synchronizedAccessRepository).findTeamByIdForUpdate(any(UUID.class));
         WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
-                accessRepository,
+                synchronizedAccessRepository,
                 seasonRepository,
-                synchronizedPeopleRepository,
+                peopleRepository,
                 operationsRepository,
                 recordsRepository,
                 Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),

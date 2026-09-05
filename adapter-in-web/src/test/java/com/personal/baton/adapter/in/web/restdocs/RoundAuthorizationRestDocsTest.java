@@ -648,7 +648,7 @@ class RoundAuthorizationRestDocsTest {
     private Snippet administrationMutationHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("연결 또는 매핑 대상 워크스페이스 접근 키"),
+                        .description("연결 또는 매핑 대상 워크스페이스 접근 키").optional(),
                 headerWithName(HttpHeaders.ORIGIN)
                         .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")
@@ -661,14 +661,14 @@ class RoundAuthorizationRestDocsTest {
     private Snippet membershipReadHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("연결 상태를 확인할 팀의 워크스페이스 접근 키")
+                        .description("연결 상태를 확인할 팀의 워크스페이스 접근 키").optional()
         );
     }
 
     private Snippet roomMappingReadHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키")
+                        .description("ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키").optional()
         );
     }
 

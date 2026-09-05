@@ -35,12 +35,14 @@ import type {
   TransferRoleHandoffRequest,
 } from './types'
 
-function roleHandoffIdentityCopy(member: Member | undefined, action: string) {
+function roleHandoffIdentityCopy(member: Member | undefined, action: string, accountAccessEnabled: boolean) {
   const memberName = member ? memberDisplayName(member) : '지정된 구성원'
+  if (accountAccessEnabled) return `${memberName} 구성원과 연결된 계정으로만 ${action}할 수 있습니다.`
   return `공유 링크는 사람을 인증하지 않습니다. 이 작업은 ${memberName} 명의로 ${action}했다고 기록됩니다.`
 }
 
 export function RoleHandoffModal({
+  accountAccessEnabled = false,
   mode,
   role,
   handoff,
@@ -58,6 +60,7 @@ export function RoleHandoffModal({
   onAccept,
   onCancel,
 }: {
+  accountAccessEnabled?: boolean
   mode: RoleHandoffModalMode
   role: Role
   handoff?: RoleHandoff
@@ -245,6 +248,7 @@ export function RoleHandoffModal({
               {roleHandoffIdentityCopy(
                 mode === 'accept' ? toMember : fromMember,
                 mode === 'accept' ? '수락' : mode === 'transfer' ? '전달' : '취소',
+                accountAccessEnabled,
               )}
             </p>
           </>

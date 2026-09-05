@@ -36,7 +36,7 @@ export function useCurrentAccountMembership(scope: AccountMembershipScope) {
       scope.teamId,
       scope.accessKey,
     ),
-    enabled: Boolean(scope.accountId && scope.teamId && scope.accessKey),
+    enabled: Boolean(scope.accountId && scope.teamId),
     retry: false,
     staleTime: 0,
     refetchOnWindowFocus: 'always',
@@ -59,6 +59,7 @@ export function useClaimAccountMembership(scope: AccountMembershipScope) {
       if (!session?.authenticated
         || session.accountId.toLowerCase() !== scope.accountId.toLowerCase()) return
       queryClient.setQueryData(queryKey, membership)
+      void queryClient.invalidateQueries({ queryKey: ['teams', scope.teamId, 'access'] })
     },
   })
 }

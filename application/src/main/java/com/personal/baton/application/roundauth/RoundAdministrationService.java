@@ -79,7 +79,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
     @Override
     @Transactional
     public MembershipResult claimMembership(ClaimMembershipCommand command) {
-        workspaceAccess.verifyMutation(
+        workspaceAccess.verifyMembershipClaim(
                 command.teamId(),
                 command.seasonId(),
                 command.workspaceAccessKey()

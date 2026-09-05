@@ -183,14 +183,14 @@ class BriefEditionRestDocsTest {
     private org.springframework.restdocs.snippet.Snippet readHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("대상 워크스페이스 접근 키")
+                        .description("대상 워크스페이스 접근 키").optional()
         );
     }
 
     private org.springframework.restdocs.snippet.Snippet generationHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
-                        .description("대상 워크스페이스 접근 키"),
+                        .description("대상 워크스페이스 접근 키").optional(),
                 headerWithName(HttpHeaders.ORIGIN)
                         .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")

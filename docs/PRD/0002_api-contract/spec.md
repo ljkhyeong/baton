@@ -559,7 +559,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 현재 파일럿은 `PREPARING` 또는 `TRANSFERRED` 상태에서 준비 당시 이전 담당자 ID를 선언한 취소만 허용한다. 성공하면 바통을 `CANCELLED`로 만들고 역할의 `nextMemberId` 예약을 비우며 `200 OK`로 현재 역할과 바통을 반환한다. `ACCEPTED` 상태는 취소할 수 없다.
 
-세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환은 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 바통이나 경로의 팀·시즌·역할과 소속이 다른 바통은 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 사용자 인증이 없으므로 실제 사람이 그 구성원인지 증명하는 서명이나 감사 기록으로 해석하지 않는다.
+세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환은 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 바통이나 경로의 팀·시즌·역할과 소속이 다른 바통은 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 공유 키 팀에서는 실제 사람을 인증한 감사 기록으로 해석하지 않는다. 계정 전환 팀은 `confirmedByMemberId`가 로그인 계정과 연결된 활성 구성원인지도 확인하며 불일치는 `403 WORKSPACE_ACCESS_DENIED`다.
 
 `PREPARING` 동안에는 담당자와 담당 기간만 고정되고 역할 내용, 바통 항목과 역할 자료는 계속 보완할 수 있다. `TRANSFERRED` 뒤에는 역할, 그 역할의 바통 항목과 자료를 수락 또는 취소 전까지 수정·완료·보관·복원하거나 다른 역할로 옮길 수 없다. 자료나 바통 항목을 다른 역할 사이에 옮길 때도 출발·도착 역할 중 하나가 `TRANSFERRED`이면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
 
@@ -909,7 +909,9 @@ GET /actuator/health
 | `401` | `UNAUTHORIZED` | WATCH 이벤트 수신기가 비활성 상태이거나 전용 Bearer 토큰이 누락·중복·불일치함 |
 | `401` | `INVALID_CREDENTIALS` | 자체 이메일 계정이 없거나 미검증 상태이거나 비밀번호가 일치하지 않음 |
 | `401` | `AUTHENTICATION_REQUIRED` | `Account` 세션이 필요한 ROUND 관리·참여권 요청에 인증 세션이 없음 |
-| `403` | `WORKSPACE_ACCESS_DENIED` | 공유 접근 키 누락 또는 불일치 |
+| `403` | `WORKSPACE_ACCESS_DENIED` | 공유 키 누락·불일치, 계정 전환 팀의 권한 없음·활동 종료 또는 해당 변경 권한 부족 |
+| `403` | `ACCOUNT_CHANGED` | 로그인한 일반 작업 공간 변경 요청의 `X-Baton-Account-Id`가 누락되거나 세션 계정과 다름 |
+| `404` | `TEAM_INVITATION_NOT_FOUND`, `MEMBERSHIP_NOT_FOUND` | 사용할 수 있는 초대가 없거나 취소·만료됨, 또는 권한을 변경할 계정 연결이 없음 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
 | `403` | `REQUEST_FORBIDDEN` | CSRF, 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
@@ -970,10 +972,10 @@ OIDC, Naver OAuth2와 자체 이메일 로그인은 Spring Security의 표준 OA
 저장소에는 BATON·공급자 액세스 토큰을 두지 않는다. 계정·신원과 ROUND 참여권의 상세 결정은
 PRD-0005와 ADR-0017을 따른다.
 
-기존 `X-Baton-Access-Key`는 워크스페이스 전체를 사용할 수 있는 파일럿 capability(권한 증표)로 남긴다.
-`Account` 세션이나 장기 사용자 권한으로 확대 해석하지 않는다. 워크스페이스 범위 경로는
-`application`의 공유 키 검증으로 보호하고 쿠키 인증을 사용하지 않으므로 해당 기존 경로만
-CSRF 검사에서 제외한다. 공개 생성은 선택적 `X-Baton-Creation-Key`, 키 복구는 별도
+팀의 `accountAccessEnabled=false`이면 기존 공유 키를 검사한다. `true`이면 공유 키를 거부하고
+현재 계정의 활성 구성원 연결과 팀 권한을 검사한다. 로그인 세션이 있는 모든 변경 요청은 공유 키
+유무와 관계없이 CSRF·동일 출처를 요구한다. 일반 작업 공간 변경은 `X-Baton-Account-Id`도
+현재 세션 계정과 대조한다. 계정 없이 공유 키만 사용하는 기존 경로만 CSRF 예외를 유지한다. 공개 생성은 선택적 `X-Baton-Creation-Key`, 키 복구는 별도
 `X-Baton-Recovery-Key`를 검증한다.
 
 WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호한다. 수신기가 비활성
@@ -1203,3 +1205,39 @@ cd frontend && npm ci && cd ..
 항목의 `id`는 계정·팀·시즌·종류·원본·마감 또는 전달 시각에서 결정한다. `sourceId`는 실행 또는 역할 바통 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차다. `title`, `occurredAt`(마감 또는 전달 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
 
 `POST /api/v1/teams/{teamId}/seasons/{seasonId}/notifications/{notificationId}/read`는 동일 출처·CSRF와 본문 `expectedAccountId` 일치를 추가 확인한다. 현재 계정의 현재 알림만 읽음으로 기록하고 전체 알림함을 `200 OK`로 반환한다. 반복 요청은 최초 읽음 시각을 보존한다. 원본이 해소되었거나 다른 계정의 알림이면 `404 NOTIFICATION_NOT_FOUND`, 미연결·활동 종료는 `403 WORKSPACE_ACCESS_DENIED`다. 읽음 표시는 업무를 완료하거나 바통을 수락하지 않는다.
+
+## 팀 초대와 계정 권한 API
+
+제품 행렬·초대 수명과 운영 복구는 [PRD-0009](../0009_team-account-access/spec.md)를 따른다.
+아래 API는 계정 세션을 요구하며 상태 변경·초대 미리보기에 CSRF와 동일 출처를 적용한다.
+요청 본문의 `expectedAccountId`는 필수 UUID이며 세션과 다르면 `409 ACCOUNT_MEMBERSHIP_CONFLICT`다.
+모든 성공 응답은 `200`과 `Cache-Control: no-store`를 반환한다.
+
+| 메서드와 경로 | 요청 | 성공 응답 |
+| --- | --- | --- |
+| `GET /api/v1/team-access/{teamId}` | 공유 키 팀만 `X-Baton-Access-Key` | 팀·현재 계정·전환 여부·내 구성원·내 권한, 관리자용 구성원·초대·최근 권한 이력 |
+| `POST /api/v1/team-access/{teamId}/activate` | `X-Baton-Recovery-Key`, `expectedAccountId`, `memberId` | 지정한 기존 연결 계정을 관리자로 전환·복구한 팀 권한 |
+| `POST /api/v1/team-access/{teamId}/invitations` | `expectedAccountId`, `memberId`, 필수 `permission` | `invitation`과 최초 생성 시에만 제공하는 원문 `token` |
+| `POST /api/v1/team-access/{teamId}/invitations/{invitationId}/revoke` | `expectedAccountId` | 취소 후 팀 권한 |
+| `PUT /api/v1/team-access/{teamId}/members/{memberId}/permission` | `expectedAccountId`, `permission` | 변경 후 팀 권한. `permission=null` 또는 생략은 접근 취소 |
+| `POST /api/v1/team-invitations/preview` | `expectedAccountId`, 43자 URL 안전 `token` | `teamId`, `teamName`, `memberId`, `memberName`, `permission`, `expiresAt` |
+| `POST /api/v1/team-invitations/accept` | 미리보기와 같은 요청 | `accountId`, `teamId`, 이동할 최신 `seasonId`, `memberId`, 현재 `permission` |
+
+`permission`은 `ADMIN`, `MEMBER`, `VIEWER`다. 팀 권한 응답의 `memberId`·`permission`은 연결 전·승인 전
+상태에서 `null`이다. 관리자만 전체 `members`, `invitations`, `audit`을 받으며 공유 키 팀의 전환 준비
+조회는 구성원 목록도 받는다. 구성원 항목은 `memberId`, `memberName`, `active`, nullable `accountId`,
+nullable `permission`을 포함한다. 초대 항목은 `id`, `memberId`, `permission`, `createdAt`, `expiresAt`,
+nullable `acceptedAt`, nullable `revokedAt`이다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
+nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 50건을 반환한다.
+`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`다.
+
+초대 수락의 계정 연결과 권한 변경은 원자적이다. 같은 토큰의 같은 계정 재수락은 현재 권한을 반환한다.
+권한이 취소된 계정은 재수락으로 권한을 되살릴 수 없다. 다른 계정·구성원의 기존 연결과 충돌하면
+`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다.
+
+워크스페이스 응답의 `team`은 기존 `id`, `name`에 `accountAccessEnabled`와 nullable `permission`을
+추가한다. 공유 키 팀에서는 각각 `false`, `null`이며 계정 팀에서는 `true`와 현재 접근 권한이다.
+기존 작업 공간 API의 `X-Baton-Access-Key`는 계정 팀에서 생략할 수 있다. 계정 팀의 구성원 직접 연결
+요청은 `403 WORKSPACE_ACCESS_DENIED`다. 역할·자료·회차·기록 변경은 구성원 이상, 구성원·시즌 관리는
+관리자만 수행한다. 로그인한 일반 변경 요청은 `X-Baton-Account-Id`, 동적으로 조회한 CSRF 헤더와
+동일 출처가 필요하며, 개인 API의 기존 `expectedAccountId` 계약은 유지한다.
