@@ -934,7 +934,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   ])
 
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무/ })).toBeVisible()
   await expect(cleanupBanner).toBeVisible()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^바통/ }).click()
@@ -1018,7 +1018,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
     sessionStorage.setItem(releaseKey, 'true')
   }, CONTENT_CREATION_GUARD_FAILURE_RELEASE_KEY)
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무/ })).toBeVisible()
   await expect(page.getByRole('alert', { name: '콘텐츠 생성 완료 기록 정리' }))
     .toHaveCount(0)
 

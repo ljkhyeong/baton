@@ -667,7 +667,7 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
     `/teams/${workspace.teamId}/seasons/${workspace.seasonId}`
       + `#accessKey=${encodeURIComponent(workspace.accessKey)}`,
   )
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ }))
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무/ }))
     .toBeVisible()
   await page.getByRole('navigation', { name: '주 메뉴' })
     .getByRole('button', { name: '역할' })

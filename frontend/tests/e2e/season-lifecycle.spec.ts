@@ -370,7 +370,7 @@ async function openWorkspace(page: Page) {
     window.localStorage.setItem(`baton-access-key:${teamId}`, accessKey)
   }, { teamId: TEAM_ID, accessKey: ACCESS_KEY })
   await page.goto(WORKSPACE_URL)
-  await expect(page.getByRole('heading', { name: /개의 바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /이번 회차 미완료 업무/ })).toBeVisible()
 }
 
 function seasonSwitcher(page: Page) {
@@ -420,7 +420,7 @@ test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸�
   await trigger.click()
   await dialog.getByRole('button', { name: /2026 가을 시즌/ }).click()
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0건' })).toBeVisible()
   await expect(seasonSwitcher(page)).toHaveAccessibleName(/2026 가을 시즌/)
 })
 
@@ -485,7 +485,7 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
   await dialog.getByRole('button', { name: '현재 시즌을 닫고 시작' }).click()
 
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0건' })).toBeVisible()
   expect(api.successor?.body).toEqual({
     name: '2026 가을 시즌',
     startDate: '2026-10-01',
@@ -522,7 +522,7 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
   expect(api.successorAttempts).toHaveLength(1)
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0건' })).toBeVisible()
   const cleanupBanner = page.getByRole('alert', { name: '시즌 시작 완료 기록 정리' })
   await expect(cleanupBanner).toBeVisible()
   await cleanupBanner.getByRole('button', { name: '완료 기록 정리 다시 확인' }).click()
@@ -628,7 +628,7 @@ test('@operations 이전 시즌에서 늦게 도착한 종료 오류는 현재 �
 
   await page.goBack()
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
-  await expect(page.getByRole('heading', { name: '0개의 바통이 남았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번 회차 미완료 업무 0건' })).toBeVisible()
   await seasonSwitcher(page).click()
   const currentSeasonDialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
   await expect(currentSeasonDialog).toBeVisible()

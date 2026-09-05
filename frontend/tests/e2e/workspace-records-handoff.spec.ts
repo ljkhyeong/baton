@@ -1016,7 +1016,7 @@ test('@handoff @webkit 바통북 인쇄 중에는 주소의 접근 키를 숨기
   await expect(page).toHaveURL(sharedPath)
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무/ })).toBeVisible()
   await expect(page).toHaveURL(sharedPath)
 })
 

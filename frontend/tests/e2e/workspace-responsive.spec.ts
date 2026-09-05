@@ -273,5 +273,5 @@ test('@smoke 일시적인 조회 오류에서 다시 시도할 수 있다', asyn
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '다시 시도하기' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: /바통이 남았어요/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무/ })).toBeVisible()
 })
