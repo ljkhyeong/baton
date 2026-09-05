@@ -1,13 +1,17 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { installApi, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
+import { installApi, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY, makeProjection, WORKSPACE_PATH, SCOPE_PATH } from './support/workspaceApiHarness'
 
 const ACCOUNT = '80000000-0000-4000-8000-000000000001'
 const SUBSCRIPTION = '80000000-0000-4000-8000-000000000002'
 const ADDRESS = `https://cal.b4ton.com/calendars/v1/${'a'.repeat(43)}.ics`
 const ROTATED = `https://cal.b4ton.com/calendars/v1/${'b'.repeat(43)}.ics`
-async function setup(page: Page, options: { lost?: boolean; authenticated?: boolean; invalidUrl?: boolean } = {}) {
-  await installApi(page)
+async function setup(page: Page, options: { lost?: boolean; authenticated?: boolean; invalidUrl?: boolean; viewer?: boolean; denied?: boolean } = {}) {
+  const projection = makeProjection()
+  if (options.viewer) { projection.team.accountAccessEnabled = true; projection.team.permission = 'VIEWER' }
+  await installApi(page, projection)
+  if (options.denied) await page.route(`**${SCOPE_PATH}/workspace`, route => route.fulfill({ status: 403,
+    json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 접근 권한이 없습니다.' } }))
   await page.route('**/api/v1/auth/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/csrf')) return route.fulfill({ json: { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'calendar-test-csrf' } })
@@ -18,13 +22,13 @@ async function setup(page: Page, options: { lost?: boolean; authenticated?: bool
   await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
     claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-09-05T00:00:00Z',
   } }))
-  let status = 'NOT_CREATED'
+  let status = options.denied ? 'ACTIVE' : 'NOT_CREATED'
   const calls: string[] = []
   await page.route('**/calendar-subscription{,/rotate}', async (route) => {
     const request = route.request()
     const action = `${request.method()} ${new URL(request.url()).pathname.endsWith('/rotate') ? 'rotate' : 'subscription'}`
     calls.push(action)
-    expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
+    expect(request.headers()['x-baton-access-key']).toBe(request.method() === 'POST' ? (options.viewer ? '' : ACCESS_KEY) : undefined)
     expect(request.headers()['x-baton-account-id']).toBe(ACCOUNT)
     if (request.method() === 'GET') return route.fulfill({ json: { subscriptionId: status === 'NOT_CREATED' ? null : SUBSCRIPTION, seasonId: SEASON_ID, status } })
     expect(request.headers()['x-csrf-token']).toBe('calendar-test-csrf')
@@ -36,7 +40,8 @@ async function setup(page: Page, options: { lost?: boolean; authenticated?: bool
     return route.fulfill({ status: action === 'POST rotate' ? 200 : 201, json: { subscriptionId: SUBSCRIPTION, seasonId: SEASON_ID,
       feedUrl: options.invalidUrl ? 'javascript:alert(1)' : action === 'POST rotate' ? ROTATED : ADDRESS } })
   })
-  await openSharedWorkspace(page)
+  if (options.viewer || options.denied) await page.goto(WORKSPACE_PATH)
+  else await openSharedWorkspace(page)
   const panel = page.locator('.calendar-panel')
   await panel.locator(':scope > summary').click()
   return { panel, calls }
@@ -90,4 +95,21 @@ test('잘못된 구독 주소는 화면에 표시하지 않는다 @smoke', async
   await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
   await expect(panel.getByRole('alert')).toBeVisible()
   await expect(panel.getByLabel('내 구독 주소')).toHaveCount(0)
+})
+
+test('열람자는 공유 키 없이 개인 캘린더 주소를 발급할 수 있다 @smoke @responsive', async ({ page }) => {
+  const { panel } = await setup(page, { viewer: true })
+  await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
+  await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ADDRESS)
+})
+
+test('팀 접근이 차단되어도 본인 구독을 해제할 수 있다 @smoke @responsive', async ({ page }) => {
+  const { panel, calls } = await setup(page, { denied: true })
+  await expect(page.getByText('작업 공간을 불러오지 못했어요', { exact: true })).toBeVisible()
+  await panel.getByRole('button', { name: '구독 해제', exact: true }).click()
+  await panel.getByRole('button', { name: '구독 해제 확인', exact: true }).click()
+  await expect(panel.getByText('구독을 해제했습니다.', { exact: true })).toBeVisible()
+  expect(calls.filter(call => call.startsWith('POST'))).toEqual([])
+  expect(calls.filter(call => call.startsWith('DELETE'))).toEqual(['DELETE subscription'])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })

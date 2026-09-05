@@ -25,6 +25,17 @@ export function CalendarSubscriptionPanel(props: Props) {
     {open && <CalendarAccess {...props} />}
   </details>
 }
+export function CalendarSubscriptionCleanup({ teamId, seasonId }: { teamId: string; seasonId: string }) {
+  const session = useAuthSession()
+  const accountId = session.data?.authenticated ? session.data.accountId : ''
+  if (!accountId) return null
+  return <details className="calendar-panel">
+    <summary><h2>내 캘린더 구독 해제</h2></summary>
+    <p>팀 접근 권한이 없어도 본인 구독의 상태를 확인하고 해제할 수 있습니다.</p>
+    <CalendarContent key={`${accountId}:${teamId}:${seasonId}`} accountId={accountId}
+      scope={{ accountId, teamId, seasonId, accessKey: '' }} canIssue={false} ended={false} />
+  </details>
+}
 function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembership }: Props) {
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { useAuthSession } from '@/features/auth/useAuthSession'
+import { CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { workspaceKeys } from '@/features/workspace/queries'
 import {
   readAccessKey,
@@ -136,6 +137,7 @@ export default function WorkspacePage() {
             <p>{session.isPending ? '로그인 상태를 확인하고 있습니다.' : '팀의 초대를 수락한 계정으로 로그인하거나 공유 링크로 다시 접속해 주세요.'}</p>
             <Link to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} className="primary-button">로그인</Link>
             <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
+            <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />
           </section>
         </main>
       </>

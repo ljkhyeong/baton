@@ -138,7 +138,7 @@ class CalendarSubscriptionRestDocsTest {
                 .andExpect(status().is(statusCode))
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document(operation,
-                        "활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.",
+                        "활성 구성원과 열린 시즌의 조회 권한을 확인하고 구독 주소를 한 번 반환한다. VIEWER도 발급할 수 있다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.",
                         "캘린더 구독 주소 발급", scopedPathParameters(), generationHeaders(),
                         responseHeaders(headerWithName("Cache-Control").description("no-store")),
                         responseFields(
@@ -170,16 +170,16 @@ class CalendarSubscriptionRestDocsTest {
     private org.springframework.restdocs.snippet.Snippet readHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Account-Id").description("화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함"),
-                headerWithName("X-Baton-Access-Key")
-                        .description("대상 워크스페이스 접근 키")
+                headerWithName("X-Baton-Access-Key").optional()
+                        .description("공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능")
         );
     }
 
     private org.springframework.restdocs.snippet.Snippet generationHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Account-Id").description("화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함"),
-                headerWithName("X-Baton-Access-Key")
-                        .description("대상 워크스페이스 접근 키"),
+                headerWithName("X-Baton-Access-Key").optional()
+                        .description("공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능"),
                 headerWithName(HttpHeaders.ORIGIN)
                         .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")

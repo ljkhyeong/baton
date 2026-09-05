@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
+import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
 import com.personal.baton.application.identity.port.out.CurrentAccountProvider;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
@@ -44,10 +45,11 @@ public class TeamAccessService implements TeamAccessUseCase {
     private final TeamAccountAccessPolicy policy;
     private final CurrentAccountProvider accounts;
     private final Clock clock;
+    private final CalendarSubscriptionStore calendarSubscriptions;
     private final SecureRandom random = new SecureRandom();
     public TeamAccessService(WorkspaceAccessRepository teams, WorkspacePeopleRepository people,
             WorkspaceSeasonRepository seasons, RoundAuthorizationRepository memberships, TeamAccessRepository access,
-            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock) {
+            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions) {
         this.teams = teams;
         this.people = people;
         this.seasons = seasons;
@@ -57,6 +59,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         this.policy = policy;
         this.accounts = accounts;
         this.clock = clock;
+        this.calendarSubscriptions = calendarSubscriptions;
     }
     @Override
     public TeamAccessResult getAccess(UUID teamId, UUID accountId, String accessKey) {
@@ -80,6 +83,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         teams.saveTeam(team);
         membership.changePermission(TeamPermission.ADMIN);
         access.saveMembership(membership);
+        calendarSubscriptions.requestUnauthorizedRevocations(teamId);
         revokePending(teamId, memberId);
         audit(teamId, accountId, memberId, "ADMIN_RECOVERY", previous, TeamPermission.ADMIN);
         return result(team, accountId);
@@ -128,6 +132,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         membership.changePermission(permission);
         access.saveMembership(membership);
         revokePending(teamId, memberId);
+        if (permission == null) calendarSubscriptions.requestMemberRevocation(teamId, memberId);
         if (previous != permission) audit(teamId, accountId, memberId, "PERMISSION_CHANGED", previous, permission);
         return result(team, accountId);
     }

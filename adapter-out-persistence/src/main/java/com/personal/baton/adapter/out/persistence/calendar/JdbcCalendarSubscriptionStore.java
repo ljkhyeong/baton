@@ -3,6 +3,7 @@ package com.personal.baton.adapter.out.persistence.calendar;
 import com.personal.baton.application.calendar.CalendarSubscriptionException;
 import com.personal.baton.application.calendar.CalendarSubscriptionException.Reason;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
+import jakarta.persistence.EntityManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -25,8 +26,20 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
             FROM calendar_subscriptions
             """;
     private static final String OWNER = " WHERE account_id=UUID_TO_BIN(?) AND team_id=UUID_TO_BIN(?) AND season_id=UUID_TO_BIN(?)";
+    private static final String AUTHORIZED_MEMBERSHIP = """
+            SELECT 1 FROM account_team_memberships membership
+            JOIN members member ON member.id=membership.member_id AND member.team_id=membership.team_id
+            JOIN teams team ON team.id=membership.team_id
+            WHERE membership.account_id=calendar_subscriptions.account_id
+              AND membership.team_id=calendar_subscriptions.team_id AND member.deactivated_at IS NULL
+              AND (team.account_access_enabled=FALSE OR membership.permission IS NOT NULL)
+            """;
     private final JdbcTemplate jdbc;
-    public JdbcCalendarSubscriptionStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final EntityManager entityManager;
+    public JdbcCalendarSubscriptionStore(JdbcTemplate jdbc, EntityManager entityManager) {
+        this.jdbc = jdbc;
+        this.entityManager = entityManager;
+    }
 
     @Override
     public Optional<Stored> find(Owner owner) {
@@ -89,17 +102,22 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
     }
 
     @Override
+    public void requestUnauthorizedRevocations(UUID teamId) {
+        // 같은 트랜잭션의 팀 전환·관리자 지정을 JDBC 조회 전에 반영한다.
+        entityManager.flush();
+        jdbc.update("""
+                UPDATE calendar_subscriptions SET revocation_pending=TRUE
+                WHERE team_id=UUID_TO_BIN(?) AND revoked=FALSE AND NOT EXISTS (
+                """ + AUTHORIZED_MEMBERSHIP + ")", teamId.toString());
+    }
+
+    @Override
     public List<Owner> pendingRevocations(Instant now) {
-        return jdbc.query(SELECT + """
-                 WHERE (revocation_pending=TRUE OR (revoked=FALSE AND NOT EXISTS (
-                     SELECT 1 FROM account_team_memberships membership JOIN members member
-                     ON member.id=membership.member_id AND member.team_id=membership.team_id
-                     WHERE membership.account_id=calendar_subscriptions.account_id
-                     AND membership.team_id=calendar_subscriptions.team_id AND member.deactivated_at IS NULL
-                 ))) AND (lease_until IS NULL OR lease_until<=?)
-                 ORDER BY account_id,season_id LIMIT 50
-                """,
-                this::read, utc(now)).stream().map(Stored::owner).toList();
+        return jdbc.query(SELECT + " WHERE (revocation_pending=TRUE OR (revoked=FALSE AND NOT EXISTS ("
+                + AUTHORIZED_MEMBERSHIP + """
+                ))) AND (lease_until IS NULL OR lease_until<=?)
+                ORDER BY account_id,season_id LIMIT 50
+                """, this::read, utc(now)).stream().map(Stored::owner).toList();
     }
 
     private Stored read(ResultSet rs, int ignored) throws SQLException {

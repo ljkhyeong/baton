@@ -11,6 +11,7 @@ import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStor
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.Stored;
 import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
+import com.personal.baton.application.workspace.error.SeasonEndedException;
 import java.time.Clock;
 
 public final class CalendarSubscriptionService implements CalendarSubscriptionUseCase {
@@ -33,7 +34,6 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
 
     @Override
     public Subscription find(Scope scope) {
-        authorize(scope, false);
         Stored stored = store.find(owner(scope)).orElse(null);
         if (stored == null) return new Subscription(null, scope.seasonId(), Status.NOT_CREATED);
         if (stored.revocationPending()) return status(stored, Status.REVOCATION_PENDING);
@@ -54,7 +54,7 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
     public Credential rotate(Scope scope) { return issue(scope, false); }
 
     private Credential issue(Scope scope, boolean create) {
-        authorize(scope, true);
+        authorizeIssuance(scope);
         Claim claim = store.claim(owner(scope), create, false, clock.instant());
         boolean released = false;
         try {
@@ -64,7 +64,7 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
             requireSuccess(result);
             try {
                 // CAL 응답을 기다리는 동안 바뀐 시즌·접근 키·구성원 권한을 다시 확인한다.
-                authorize(scope, true);
+                authorizeIssuance(scope);
             } catch (RuntimeException exception) {
                 store.requestRevocation(owner(scope));
                 throw exception;
@@ -80,7 +80,6 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
 
     @Override
     public void revoke(Scope scope) {
-        authorize(scope, false);
         Owner owner = owner(scope);
         if (store.find(owner).isEmpty()) return;
         store.requestRevocation(owner);
@@ -113,11 +112,11 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
         }
     }
 
-    private void authorize(Scope scope, boolean issuing) {
-        if (issuing) access.verifyMutation(scope.teamId(), scope.seasonId(), scope.accessKey());
-        else access.verifyRead(scope.teamId(), scope.seasonId(), scope.accessKey());
+    private void authorizeIssuance(Scope scope) {
+        var season = access.verifyRead(scope.teamId(), scope.seasonId(), scope.accessKey());
+        if (season.isEnded()) throw new SeasonEndedException();
         if (!enabled) throw new CalendarSubscriptionException(Reason.DISABLED);
-        if (issuing && !memberships.hasActiveMembership(scope.accountId(), scope.teamId())) {
+        if (!memberships.hasActiveMembership(scope.accountId(), scope.teamId())) {
             throw new CalendarSubscriptionException(Reason.ACCESS_DENIED);
         }
     }

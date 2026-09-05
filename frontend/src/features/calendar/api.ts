@@ -28,7 +28,7 @@ function decodeCredential(value: unknown, scope: CalendarScope): CalendarCredent
 }
 export function getCalendarSubscription(scope: CalendarScope, signal: AbortSignal) {
   return apiRequest(path(scope), { method: 'GET', signal,
-    headers: { 'X-Baton-Access-Key': scope.accessKey, 'X-Baton-Account-Id': scope.accountId }, decode: (value) => decodeStatus(value, scope) })
+    headers: { 'X-Baton-Account-Id': scope.accountId }, decode: (value) => decodeStatus(value, scope) })
 }
 export async function issueCalendarSubscription(scope: CalendarScope, rotate: boolean) {
   const csrf = await getCsrfToken()
@@ -39,5 +39,5 @@ export async function issueCalendarSubscription(scope: CalendarScope, rotate: bo
 export async function revokeCalendarSubscription(scope: CalendarScope) {
   const csrf = await getCsrfToken()
   return apiRequest(path(scope), { method: 'DELETE', responseType: 'no-content',
-    headers: { 'X-Baton-Access-Key': scope.accessKey, 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken } })
+    headers: { 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken } })
 }

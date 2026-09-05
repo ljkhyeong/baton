@@ -1244,7 +1244,8 @@ nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 5
 ## 개인 캘린더 구독
 
 기준 경로는 `/api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription`이다.
-모든 요청은 계정 세션, `X-Baton-Access-Key`와 화면에서 확인한 계정 UUID인 `X-Baton-Account-Id`를 요구한다.
+모든 요청은 계정 세션과 화면에서 확인한 계정 UUID인 `X-Baton-Account-Id`를 요구한다.
+`X-Baton-Access-Key`는 공유 키 팀의 발급·재발급에만 필요하며 계정 권한 팀과 본인 상태 조회·폐기는 생략한다.
 계정 헤더가 현재 세션 계정과 다르면 작업을 거부한다. POST·DELETE는 동일 출처와
 CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Control: no-store`다.
 
@@ -1257,7 +1258,9 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 
 요청 본문과 호출자가 지정하는 구독 ID는 없다. GET 상태는 `NOT_CREATED`, `IN_PROGRESS`,
 `ACTIVE`, `REISSUE_REQUIRED`, `REVOKED`, `REVOCATION_PENDING` 중 하나다. GET에는 주소가 없다.
-발급·재발급은 현재 시즌의 활성 구성원만 가능하고, 읽기·폐기는 자기 계정 범위에서 제공한다.
+발급·재발급은 열린 시즌의 조회 권한과 활성 구성원 연결을 확인하며 `VIEWER`도 가능하다.
+조회·폐기는 로그인 계정·팀·시즌으로 찾은 본인 구독에 한정한다. 팀 권한 회수·활동 종료 후에도
+가능하며 현재 팀 조회 권한은 요구하지 않는다. 발급 기능 비활성도 본인 구독 정리를 막지 않는다.
 
 | 상태 | 구독 전용 코드 | 의미 |
 | --- | --- | --- |

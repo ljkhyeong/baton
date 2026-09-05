@@ -32,7 +32,7 @@ public class CalendarSubscriptionController {
     @GetMapping(PATH)
     public ResponseEntity<SubscriptionResponse> find(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader("X-Baton-Access-Key") String accessKey,
+            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
@@ -44,7 +44,7 @@ public class CalendarSubscriptionController {
     @PostMapping(PATH)
     public ResponseEntity<CredentialResponse> create(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader("X-Baton-Access-Key") String accessKey,
+            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
@@ -55,7 +55,7 @@ public class CalendarSubscriptionController {
     @PostMapping(ROTATE_PATH)
     public ResponseEntity<CredentialResponse> rotate(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader("X-Baton-Access-Key") String accessKey,
+            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
@@ -66,7 +66,7 @@ public class CalendarSubscriptionController {
     @DeleteMapping(PATH)
     public ResponseEntity<Void> revoke(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader("X-Baton-Access-Key") String accessKey,
+            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);

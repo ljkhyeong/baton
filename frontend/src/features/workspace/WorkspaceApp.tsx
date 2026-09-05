@@ -12,7 +12,7 @@ import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceCo
 import AccountMembershipPanel from '@/features/membership/AccountMembershipPanel'
 import { TeamAccessPanel } from '@/features/team-access/TeamAccessPanel'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
-import { CalendarSubscriptionPanel } from '@/features/calendar/CalendarSubscriptionPanel'
+import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { BriefEditionPanel } from '@/features/brief/BriefEditionPanel'
 import {
   initialRecordSearchFilters,
@@ -414,9 +414,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       <WorkspaceState
         title="작업 공간을 불러오지 못했어요"
         description={mutationError(workspaceQuery.error)}
-        action={accessKeyRecovery ?? (isAccessDenied && accessDeniedAction
-          ? accessDeniedAction
-          : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
+        action={<>
+          {accessKeyRecovery ?? (isAccessDenied && accessDeniedAction
+            ? accessDeniedAction
+            : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
+          {isAccessDenied && <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />}
+        </>}
       />
     )
   }
@@ -834,7 +837,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               /><CalendarSubscriptionPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
-                changesDisabled={contentChangesDisabled}
+                changesDisabled={Boolean(conflictRecoveryStatus)}
                 onManageMembership={openMemberManagementModal}
               /></>}
               calendarLabel={calendarLabel}

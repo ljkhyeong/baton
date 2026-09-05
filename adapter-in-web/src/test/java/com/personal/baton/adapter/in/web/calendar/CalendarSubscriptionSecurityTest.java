@@ -122,6 +122,22 @@ class CalendarSubscriptionSecurityTest {
         org.mockito.Mockito.verifyNoInteractions(subscriptions);
     }
 
+    @Test
+    @DisplayName("접근 키 없이도 세션 소유자의 상태 조회와 CSRF로 보호한 구독 폐기가 가능하다")
+    void allowsOwnerCleanupWithoutWorkspaceKey() throws Exception {
+        var scope = new com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "");
+        when(subscriptions.find(scope)).thenReturn(new com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Subscription(
+                UUID.randomUUID(), SEASON_ID, com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Status.ACTIVE));
+        mockMvc.perform(get(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Account-Id", ACCOUNT_ID))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).with(csrf()).header("X-Baton-Account-Id", ACCOUNT_ID)
+                        .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin"))
+                .andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(subscriptions).revoke(scope);
+    }
+
     private List<org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder> requests() {
         return List.of(get(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID),
                 post(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID),

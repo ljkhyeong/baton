@@ -18,6 +18,13 @@ import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerif
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
+import com.personal.baton.application.identity.port.out.CurrentAccountProvider;
+import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
+import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.domain.workspace.TeamPermission;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import java.util.Optional;
 import java.net.URI;
 import java.time.*;
 import java.util.List;
@@ -49,6 +56,9 @@ class CalendarSubscriptionServiceTest {
     static final MySQLContainer MYSQL = new MySQLContainer(
             "mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb")
             .withDatabaseName("baton_calendar_subscriptions").withUsername("baton").withPassword("password");
+    @MockitoBean CurrentAccountProvider currentAccount;
+    @Autowired TeamAccessUseCase teamAccess;
+    private UUID administrator;
     @Autowired WorkspaceLifecycleUseCase workspace;
     @Autowired VerifyWorkspaceAccessUseCase access;
     @Autowired com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase people;
@@ -260,6 +270,144 @@ class CalendarSubscriptionServiceTest {
         service.revokePending();
         assertThat(feedStatus(baseUrl, issued.feedUrl())).isEqualTo(404);
         assertThat(service.find(scope).status()).isEqualTo(Status.REVOKED);
+
+        jdbc.update("UPDATE members SET deactivated_at=NULL WHERE team_id=UUID_TO_BIN(?)", scope.teamId().toString());
+        enableAccountAccess();
+        grant(TeamPermission.VIEWER);
+        scope = new Scope(scope.accountId(), scope.teamId(), scope.seasonId(), "");
+        var viewerFeed = service.create(scope);
+        assertThat(feedStatus(baseUrl, viewerFeed.feedUrl())).isEqualTo(200);
+        grant(null);
+        grant(TeamPermission.VIEWER);
+        service.revokePending();
+        assertThat(feedStatus(baseUrl, viewerFeed.feedUrl())).isEqualTo(404);
+        var ownerFeed = service.create(scope);
+        grant(null);
+        service.revoke(scope);
+        assertThat(feedStatus(baseUrl, ownerFeed.feedUrl())).isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName("열람자는 공유 키와 일정 수정 권한 없이 구독을 발급·회전할 수 있다")
+    void allowsViewerToManageReadOnlySubscription() {
+        enableAccountAccess();
+        grant(TeamPermission.VIEWER);
+        scope = new Scope(scope.accountId(), scope.teamId(), scope.seasonId(), "");
+        assertThatThrownBy(() -> access.verifyMutation(scope.teamId(), scope.seasonId(), ""))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
+        UUID id = service.create(scope).subscriptionId();
+        assertThat(service.rotate(scope).subscriptionId()).isEqualTo(id);
+        grant(TeamPermission.MEMBER);
+        grant(TeamPermission.VIEWER);
+        assertThat(store.find(owner()).orElseThrow().revocationPending()).isFalse();
+    }
+
+    @Test
+    @DisplayName("권한 회수 뒤 즉시 재승인해도 폐기를 유지하고 CAL 장애 뒤 같은 주소를 폐기한다")
+    void preservesRevocationAcrossPermissionRestoration() {
+        enableAccountAccess();
+        grant(TeamPermission.MEMBER);
+        UUID id = service.create(scope).subscriptionId();
+        grant(null);
+        grant(TeamPermission.VIEWER);
+        assertThat(store.find(owner()).orElseThrow().revocationPending()).isTrue();
+        when(client.revoke(id)).thenReturn(Result.of(Outcome.UNAVAILABLE), Result.of(Outcome.SUCCESS));
+        service.revokePending();
+        assertThat(service.find(scope).status()).isEqualTo(Status.REVOCATION_PENDING);
+        service.revokePending();
+        assertThat(service.find(scope).status()).isEqualTo(Status.REVOKED);
+        verify(client, times(2)).revoke(id);
+        assertThat(service.create(scope).subscriptionId()).isNotEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("권한 회수가 롤백되면 구독 폐기도 롤백된다")
+    void rollsBackPermissionRevocation() {
+        enableAccountAccess();
+        grant(TeamPermission.VIEWER);
+        service.create(scope);
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            grant(null);
+            tx.setRollbackOnly();
+        });
+        assertThat(store.find(owner()).orElseThrow().revocationPending()).isFalse();
+        assertThat(memberships.hasActiveMembership(scope.accountId(), scope.teamId())).isTrue();
+    }
+
+    @Test
+    @DisplayName("권한과 접근 키가 없어도 본인 구독을 조회·폐기하며 다른 계정과 팀의 구독은 건드리지 않는다")
+    void letsOwnerCleanUpAfterAccessRevocation() {
+        enableAccountAccess();
+        grant(TeamPermission.VIEWER);
+        UUID id = service.create(scope).subscriptionId();
+        grant(null);
+        scope = new Scope(scope.accountId(), scope.teamId(), scope.seasonId(), "");
+        assertThatThrownBy(() -> service.rotate(scope)).isInstanceOf(WorkspaceAccessDeniedException.class);
+        var otherAccount = new Scope(administrator, scope.teamId(), scope.seasonId(), "");
+        var otherTeam = new Scope(scope.accountId(), UUID.randomUUID(), scope.seasonId(), "");
+        for (Scope wrong : List.of(otherAccount, otherTeam)) {
+            assertThat(service.find(wrong).status()).isEqualTo(Status.NOT_CREATED);
+            service.revoke(wrong);
+        }
+        verify(client, never()).revoke(any());
+        service = new CalendarSubscriptionService(access, memberships, store, client, Clock.fixed(NOW, ZoneOffset.UTC), false);
+        assertThat(service.find(scope).status()).isEqualTo(Status.REVOCATION_PENDING);
+        service.revoke(scope);
+        assertThat(service.find(scope).status()).isEqualTo(Status.REVOKED);
+        verify(client).revoke(id);
+    }
+
+    @Test
+    @DisplayName("팀을 계정 권한으로 전환하면 승인 전 구성원의 기존 구독도 폐기한다")
+    void revokesUnapprovedSubscriptionsWhenTeamSwitchesAccessMode() {
+        UUID id = service.create(scope).subscriptionId();
+        enableAccountAccess();
+        assertThat(store.find(owner()).orElseThrow().revocationPending()).isTrue();
+        grant(TeamPermission.VIEWER);
+        service.revokePending();
+        verify(client).revoke(id);
+    }
+
+    @Test
+    @DisplayName("CAL 응답을 기다리는 동안 권한을 회수하면 주소를 반환하지 않고 폐기한다")
+    void rejectsCredentialAfterPermissionRevocation() {
+        enableAccountAccess();
+        grant(TeamPermission.VIEWER);
+        when(client.create(any(), any())).thenAnswer(call -> { grant(null); return credential(call.getArgument(0)); });
+        assertThatThrownBy(() -> service.create(scope)).isInstanceOf(WorkspaceAccessDeniedException.class);
+        assertThat(store.find(owner()).orElseThrow().revocationPending()).isTrue();
+        service.revokePending();
+        assertThat(store.find(owner()).orElseThrow().revoked()).isTrue();
+    }
+
+    @Test
+    @DisplayName("기존 데이터 점검은 활동 중이어도 계정 팀 권한이 없는 구독을 폐기한다")
+    void detectsMissingPermissionDuringRevocationSweep() {
+        enableAccountAccess();
+        grant(TeamPermission.VIEWER);
+        UUID id = service.create(scope).subscriptionId();
+        jdbc.update("UPDATE account_team_memberships SET permission=NULL WHERE account_id=UUID_TO_BIN(?)", scope.accountId().toString());
+        service.revokePending();
+        verify(client).revoke(id);
+    }
+
+    private void enableAccountAccess() {
+        var member = people.createMember(scope.teamId(), scope.seasonId(), UUID.randomUUID().toString(),
+                scope.accessKey(), new CreateMemberCommand("관리자"));
+        administrator = UUID.randomUUID();
+        jdbc.update("INSERT INTO accounts (id, display_name, created_at, updated_at) VALUES (UUID_TO_BIN(?), '관리 계정', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))", administrator.toString());
+        jdbc.update("""
+                INSERT INTO account_team_memberships (id,account_id,team_id,member_id,claimed_at)
+                VALUES (UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),CURRENT_TIMESTAMP(6))
+                """, UUID.randomUUID().toString(), administrator.toString(), scope.teamId().toString(), member.id().toString());
+        when(currentAccount.currentAccountId()).thenReturn(Optional.of(administrator));
+        teamAccess.activate(scope.teamId(), administrator, member.id(), "pilot-recovery-key-0000000000000002");
+    }
+    private void grant(TeamPermission permission) {
+        UUID memberId = UUID.fromString(jdbc.queryForObject("SELECT BIN_TO_UUID(member_id) FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", String.class, scope.accountId().toString()));
+        when(currentAccount.currentAccountId()).thenReturn(Optional.of(administrator));
+        teamAccess.changePermission(scope.teamId(), administrator, memberId, permission);
+        when(currentAccount.currentAccountId()).thenReturn(Optional.of(scope.accountId()));
     }
 
     private int feedStatus(String baseUrl, URI feed) {

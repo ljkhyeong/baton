@@ -643,7 +643,7 @@ export interface paths {
         put?: never;
         /**
          * 캘린더 구독 주소 발급
-         * @description 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+         * @description 활성 구성원과 열린 시즌의 조회 권한을 확인하고 구독 주소를 한 번 반환한다. VIEWER도 발급할 수 있다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
          */
         post: operations["createCalendarSubscription"];
         /**
@@ -667,7 +667,7 @@ export interface paths {
         put?: never;
         /**
          * 캘린더 구독 주소 발급
-         * @description 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+         * @description 활성 구성원과 열린 시즌의 조회 권한을 확인하고 구독 주소를 한 번 반환한다. VIEWER도 발급할 수 있다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
          */
         post: operations["rotateCalendarSubscription"];
         delete?: never;
@@ -5170,10 +5170,10 @@ export interface operations {
             query?: never;
             header: {
                 /**
-                 * @description 대상 워크스페이스 접근 키
+                 * @description 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
                  * @example 00000000-0000-0000-0000-000000002641
@@ -5218,10 +5218,10 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description 대상 워크스페이스 접근 키
+                 * @description 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
                  * @example 00000000-0000-0000-0000-000000002641
@@ -5271,10 +5271,10 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description 대상 워크스페이스 접근 키
+                 * @description 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
                  * @example 00000000-0000-0000-0000-000000002641
@@ -5322,10 +5322,10 @@ export interface operations {
                  */
                 "Sec-Fetch-Site": string;
                 /**
-                 * @description 대상 워크스페이스 접근 키
+                 * @description 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
                  * @example workspace-access-key
                  */
-                "X-Baton-Access-Key": string;
+                "X-Baton-Access-Key"?: string;
                 /**
                  * @description 화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함
                  * @example 00000000-0000-0000-0000-000000002641

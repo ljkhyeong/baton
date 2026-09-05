@@ -2280,11 +2280,11 @@ paths:
           required: true
           schema:
             type: string
-        - description: 대상 워크스페이스 접근 키
+        - description: 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처
@@ -2344,11 +2344,11 @@ paths:
           required: true
           schema:
             type: string
-        - description: 대상 워크스페이스 접근 키
+        - description: 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
       responses:
@@ -2375,7 +2375,7 @@ paths:
       tags:
         - api
     post:
-      description: 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+      description: 활성 구성원과 열린 시즌의 조회 권한을 확인하고 구독 주소를 한 번 반환한다. VIEWER도 발급할 수 있다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
       operationId: createCalendarSubscription
       parameters:
         - description: BATON 팀 UUID
@@ -2399,11 +2399,11 @@ paths:
           required: true
           schema:
             type: string
-        - description: 대상 워크스페이스 접근 키
+        - description: 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처
@@ -2452,7 +2452,7 @@ paths:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/calendar-subscription/rotate:
     post:
-      description: 활성 구성원과 현재 시즌 권한을 확인하고 구독 주소를 한 번 반환한다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
+      description: 활성 구성원과 열린 시즌의 조회 권한을 확인하고 구독 주소를 한 번 반환한다. VIEWER도 발급할 수 있다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.
       operationId: rotateCalendarSubscription
       parameters:
         - description: BATON 팀 UUID
@@ -2476,11 +2476,11 @@ paths:
           required: true
           schema:
             type: string
-        - description: 대상 워크스페이스 접근 키
+        - description: 공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능
           example: workspace-access-key
           in: header
           name: X-Baton-Access-Key
-          required: true
+          required: false
           schema:
             type: string
         - description: BATON 공개 출처와 정확히 같은 브라우저 출처

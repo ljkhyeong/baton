@@ -632,7 +632,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   기본 `BATON_CAL_SUBSCRIPTIONS_ENABLED=false`이며 발급을 켤 때 일정 캡처·전달도 필요하다.
   미게시 `1.1.0-rc.2` 후보의 실제 소비 검증은
   `BATON_CAL_CONTRACT_VERSION=1.1.0-rc.2 bash ops/tests/calendar-consumer-contract.sh`다.
-  구성원 활동 중지와 같은 트랜잭션에 폐기를 기록하며 연결 실패 뒤에도 같은 구독 ID로 재전달한다.
+  열람자도 조회 권한으로 주소를 발급하며 팀 접근이 끊겨도 본인 구독을 해지할 수 있다.
+  구성원 활동 중지·권한 회수·계정 전환과 같은 트랜잭션에 폐기를 기록하며 연결 실패 뒤에도 같은 구독 ID로 재전달한다.
   운영 활성화·공개 HTTPS·외부 캘린더 앱 검증은 별도다. 상세 계약은 PRD-0006을 따른다.
 - CAL 과거 백업 복구: `BATON_CAL_RECOVERY_PREPARATION_ENABLED=false`와
   `BATON_CAL_RECOVERY_RUN_ID=`가 기본값이다. CAL을 새 구독 세대와 복구 모드로 복원한 뒤 새 UUID를
@@ -680,6 +681,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 계정 식별성과 동일 출처 세션: [ADR-0017](docs/ADR/0017_account-identity-and-session/adr.md)
 - ROUND 프로덕션 런타임 통합: [ADR-0018](docs/ADR/0018_round-production-runtime/adr.md)
 - BATON CAL 일정 스냅샷 생산자 경계: [ADR-0019](docs/ADR/0019_calendar_snapshot_producer/adr.md)
+- 개인 캘린더 구독 소유권과 폐기: [ADR-0022](docs/ADR/0022_calendar-subscription-owner-and-recovery/adr.md)
 - BRIEF 조회·생성 애플리케이션 경계: [ADR-0020](docs/ADR/0020_brief-query-generation-boundary/adr.md)
 - 저장소 작업 규칙: [AGENTS.md](AGENTS.md)
 - 현재 인계 상태: [HANDOFF.md](HANDOFF.md)
