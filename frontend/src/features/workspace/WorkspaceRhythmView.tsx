@@ -1,4 +1,6 @@
 import { Icon } from '@/shared/ui/Icon'
+import { PublicHolidayPanel } from '@/features/calendar/PublicHolidayPanel'
+import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
 import {
   ActionableEmpty,
   formatInstant,
@@ -118,6 +120,12 @@ export function RhythmView({
         selectedRoundBusy={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
         changesDisabled={changesDisabled}
       />
+      {season.timeZone === 'Asia/Seoul' && <PublicHolidayPanel
+        key={selectedRound?.id ?? season.id}
+        meetingDate={selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate}
+        date={selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate
+          ?? clampToSeason(pilotCalendarDate(), season)}
+      />}
       {archivedRounds.length > 0 && (
         <details className="archive-shelf round-archive-shelf">
           <summary>보관한 회차 {archivedRounds.length}개</summary>

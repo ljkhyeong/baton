@@ -96,6 +96,8 @@ BATON에서 별도로 조회한다. 원본 항목 ID와 변경 번호는 펼쳐 
 
 ### 백엔드 MVP
 
+- 대한민국 공휴일 조회: 한국천문연구원 무료 API를 사용한다. 일정 화면에서 월별 공휴일과 모임일의 공휴일 여부를 확인하며, 회차 일정은 자동 변경하지 않는다. 서비스 키를 설정하기 전에는 비활성 상태다.
+
 6모듈 Spring Boot 애플리케이션과 다음 최소 기반이 있다.
 
 - `GET /api/v1/system/status`
@@ -348,6 +350,37 @@ ROUND 키 회전은 두 번의 명시적 배포로 수행한다. 먼저 이전 �
 
 기동 뒤에는 서버 자체 확인으로 끝내지 않고, 스터디 구성원의 두 번째 기기에서 HTTPS 공유 링크를 열어 조회와 변경이 같은 데이터에 반영되는지 확인한다.
 
+### 무료 공휴일 연동
+
+[공공데이터포털의 한국천문연구원 특일 정보](https://www.data.go.kr/data/15012690/openapi.do)는
+2026-09-07 기준 무료이며 활용 신청과 서비스 키 발급이 필요하다. 일반 인증키(Decoding)를
+저장소 밖의 소유자 전용 파일에 줄바꿈 없이 저장한다. 키 파일은 `0600`, 상위 디렉터리는 `0700`으로 둔다.
+
+`.env.production`에는 다음 공개 설정과 파일 경로만 추가한다.
+
+```dotenv
+BATON_HOLIDAYS_ENABLED=true
+BATON_HOLIDAYS_SERVICE_KEY_FILE=/srv/baton/secrets/holidays-service-key
+```
+
+기존 `./ops/preflight-production.sh`와 `./ops/production-compose.sh`가 키를 검증해 Spring 설정으로
+전달한다. 로컬 실행은 `BATON_HOLIDAYS_ENABLED=true`와 `BATON_HOLIDAYS_SERVICE_KEY`를 사용한다.
+키를 프런트엔드 환경 변수나 URL에 넣지 않는다.
+
+일정 화면의 **대한민국 공휴일 확인**을 펼치면 선택한 회차의 달을 조회한다. `Asia/Seoul` 시즌에서만
+표시하며, 한국 시각 기준 작년부터 내년까지 지원한다. 서버는 연도별 정상·실패 응답을 1시간 캐시한다.
+서버 1개를 재시작 없이 실행할 때 외부 호출은 세 연도를 모두 조회해도 하루 약 72회 이내다.
+할당량을 초과하면 조회 실패로 표시하며 유료 API로 전환하지 않는다. 조회 실패와 연간 자료 미발표는
+공휴일 없음으로 표시하지 않는다. 공휴일에도 자동 회차는 기존 일정대로 생성된다.
+
+추가요금 없는 운영을 위해 이메일은 기존 SMTP 설정, 캘린더는 기존 CAL 구독, 회의는 기존 ROUND를
+유지한다. 종량제 SES와 Google Calendar 양방향 동기화는 도입하지 않았다. 장애 감시를 외부 서비스로
+옮길 경우 [Better Stack 무료 플랜](https://betterstack.com/uptime/pricing/)의 범위에서 공개 상태 확인과
+이메일 알림만 구성하고 유료 알림·플랜 업그레이드는 선택하지 않는다. 무료 플랜의 계정 설정과 실제
+알림 수신은 별도 확인이 필요하다. 기존 GitHub Actions 감시를 사용할 때 비공개 저장소는
+[포함된 실행량과 초과 사용 차단 설정](https://docs.github.com/en/billing/concepts/product-billing/github-actions)을
+확인한 뒤 활성화한다. 이 설정만으로 기존 서버·SMTP의 이용요금까지 없어지는 것은 아니다.
+
 ### 백업과 복구
 
 ```bash
@@ -577,6 +610,8 @@ npm run e2e:records
 npm run e2e:responsive
 npm run e2e
 npm run e2e:fullstack
+# 실패한 파일·위치만 다시 검증할 때
+npm run e2e:fullstack -- pilot.spec.ts:9
 ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 ```
 

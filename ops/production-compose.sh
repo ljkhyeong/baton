@@ -206,6 +206,7 @@ read_secret_or_placeholder() {
 google_secret_file="$(env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
 naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
 cal_bearer_token_file="$(env_value BATON_CAL_BEARER_TOKEN_FILE)"
+holidays_service_key_file="$(env_value BATON_HOLIDAYS_SERVICE_KEY_FILE)"
 smtp_password_file="$(env_value BATON_SMTP_PASSWORD_FILE)"
 email_outbox_encryption_key_file="$(env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)"
 brief_bearer_token_file="$(env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
@@ -243,6 +244,9 @@ cal_bearer_token="$(
 )"
 smtp_password="$(
   read_secret_or_placeholder "$smtp_password_file" disabled-smtp-password
+)"
+holidays_service_key="$(
+  read_secret_or_placeholder "$holidays_service_key_file" disabled-holidays-service-key
 )"
 email_outbox_encryption_key="$(< "$(canonical_file "$email_outbox_encryption_key_file")")"
 brief_bearer_token="$(
@@ -327,6 +331,9 @@ env \
   -u BATON_CAL_BASE_URL \
   -u BATON_CAL_BEARER_TOKEN \
   -u BATON_CAL_BEARER_TOKEN_FILE \
+  -u BATON_HOLIDAYS_ENABLED \
+  -u BATON_HOLIDAYS_SERVICE_KEY \
+  -u BATON_HOLIDAYS_SERVICE_KEY_FILE \
   -u BATON_WATCH_ENABLED \
   -u BATON_WATCH_MONITORING_ENABLED \
   -u BATON_WATCH_BASE_URL \
@@ -374,6 +381,7 @@ env \
   -u BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
   -u BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
   -u BATON_SECRET_CAL_BEARER_TOKEN \
+  -u BATON_SECRET_HOLIDAYS_SERVICE_KEY \
   -u BATON_SECRET_SMTP_PASSWORD \
   -u BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
   -u BATON_SECRET_BRIEF_BEARER_TOKEN \
@@ -420,6 +428,7 @@ env \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
   BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
+  BATON_SECRET_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
   BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
   BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
   BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \

@@ -352,6 +352,11 @@ for required_secret_name in \
     exit 73
   fi
 done
+if [[ -n "${FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY:-}" \
+  && "$BATON_SECRET_HOLIDAYS_SERVICE_KEY" != "$FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY" ]]; then
+  printf 'Holiday service key was not passed through the protected environment.\n' >&2
+  exit 80
+fi
 if [[ -n "${FAKE_EXPECTED_BRIEF_BEARER_TOKEN:-}" \
   && "$BATON_SECRET_BRIEF_BEARER_TOKEN" != "$FAKE_EXPECTED_BRIEF_BEARER_TOKEN" ]]; then
   printf 'Production wrapper passed the wrong BRIEF Bearer token.\n' >&2
@@ -823,6 +828,27 @@ preflight_env_output="$(PATH="$fake_bin:$PATH" \
   || fail 'BATON_PRODUCTION_ENV_FILE preflight failed'
 assert_contains 'Production preflight passed' "$preflight_env_output" \
   'BATON_PRODUCTION_ENV_FILE preflight'
+
+holidays_enabled_env="$test_root/holidays-enabled.env"
+write_valid_env "$holidays_enabled_env"
+printf '%s\n' 'BATON_HOLIDAYS_ENABLED=true' >> "$holidays_enabled_env"
+expect_preflight_failure 'holidays without service key' "$holidays_enabled_env" \
+  'BATON_HOLIDAYS_SERVICE_KEY_FILE is required'
+holidays_service_key='holiday-test+key/with=symbols'
+holidays_service_key_file="$auth_secret_dir/holidays-service-key"
+printf '%s' "$holidays_service_key" > "$holidays_service_key_file"
+chmod 600 "$holidays_service_key_file"
+printf '%s\n' "BATON_HOLIDAYS_SERVICE_KEY_FILE=$holidays_service_key_file" >> "$holidays_enabled_env"
+holidays_preflight_output="$(PATH="$fake_bin:$PATH" \
+  FAKE_DOCKER_LOG="$test_root/holidays-docker.log" \
+  FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
+  BATON_SECRET_HOLIDAYS_SERVICE_KEY=ambient-invalid-key \
+  "$preflight_script" "$holidays_enabled_env" 2>&1)" \
+  || fail 'enabled holidays production preflight failed'
+assert_contains 'Production preflight passed' "$holidays_preflight_output" \
+  'enabled holidays production preflight'
+assert_not_contains "$holidays_service_key" "$holidays_preflight_output" 'holidays key output'
+assert_not_contains "$holidays_service_key" "$(cat "$test_root/holidays-docker.log")" 'holidays Docker arguments'
 
 cal_enabled_env="$test_root/cal-enabled.env"
 write_valid_env "$cal_enabled_env"

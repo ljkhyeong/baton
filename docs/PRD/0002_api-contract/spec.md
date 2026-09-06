@@ -54,6 +54,21 @@ GET /api/v1/system/status
 
 이 계약은 `SystemStatusRestDocsTest`가 검증하고 REST Docs 스니펫을 생성한다.
 
+### 대한민국 공휴일 조회
+
+`GET /api/v1/calendar/holidays?year=2026`
+
+- 인증: 필요 없음. 팀·계정 정보가 없는 공개 데이터다.
+- 요청: 정수 `year` 필수. 한국 시각 기준 작년부터 내년까지 조회한다.
+- 성공 상태: `200 OK`. `Cache-Control: no-store`와 `X-Request-ID`를 반환한다.
+- 응답: `year`, `status`, `checkedAt`, `holidays`.
+- `status`: `READY`는 조회 성공, `DISABLED`는 연동 꺼짐, `UNAVAILABLE`은 공급자 오류·미발표·불완전 자료,
+  `OUT_OF_RANGE`는 지원 연도 밖이다. 마지막 세 상태의 `checkedAt`은 null, `holidays`는 빈 배열이다.
+- `checkedAt`은 공급자 조회 성공 시각(UTC), 각 공휴일은 `date`(대한민국 달력 날짜 `YYYY-MM-DD`)와
+  `name`을 가진다. 같은 날짜에 이름이 다른 공휴일이 여러 개 있을 수 있다.
+- 서버는 연도별 정상·실패 응답을 1시간 저장한다. 빈 연간 원본을 공휴일 없는 해로 처리하지 않는다.
+- 연도 누락·형식 오류는 기존 `400 INVALID_INPUT` 계약을 따른다. 조회만으로 회차를 변경하지 않는다.
+
 ## 4. 파일럿 워크스페이스 API
 
 ### 워크스페이스 생성

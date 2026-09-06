@@ -48,6 +48,8 @@ round_public_key_file=""
 round_previous_kid=""
 round_previous_public_key_file=""
 cal_bearer_token_file=""
+holidays_enabled="false"
+holidays_service_key_file=""
 
 db_password=""
 db_root_password=""
@@ -133,6 +135,8 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_WORKSPACE_CREATION_KEY) workspace_creation_key="$value" ;;
     BATON_WORKSPACE_RECOVERY_KEY) workspace_recovery_key="$value" ;;
     BATON_CAL_BEARER_TOKEN_FILE) cal_bearer_token_file="$value" ;;
+    BATON_HOLIDAYS_ENABLED) holidays_enabled="$value" ;;
+    BATON_HOLIDAYS_SERVICE_KEY_FILE) holidays_service_key_file="$value" ;;
     BATON_WATCH_BEARER_TOKEN) watch_bearer_token="$value" ;;
     BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN) watch_receiver_bearer_token="$value" ;;
     BATON_BRIEF_DELIVERY_ENABLED) brief_delivery_enabled="$value" ;;
@@ -360,6 +364,14 @@ if [[ -n "$brief_bearer_token_file" && -n "$brief_service_bearer_token_file" \
 fi
 if [[ -n "$cal_bearer_token_file" ]]; then
   validate_bearer_token_file BATON_CAL_BEARER_TOKEN_FILE "$cal_bearer_token_file"
+fi
+[[ "$holidays_enabled" == true || "$holidays_enabled" == false ]] \
+  || fail "BATON_HOLIDAYS_ENABLED must be true or false"
+if [[ "$holidays_enabled" == true ]]; then
+  require_value BATON_HOLIDAYS_SERVICE_KEY_FILE "$holidays_service_key_file"
+fi
+if [[ -n "$holidays_service_key_file" ]]; then
+  validate_scalar_secret_file BATON_HOLIDAYS_SERVICE_KEY_FILE "$holidays_service_key_file"
 fi
 
 oauth_material_count=0
