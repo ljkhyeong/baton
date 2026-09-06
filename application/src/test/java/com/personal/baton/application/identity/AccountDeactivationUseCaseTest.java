@@ -106,7 +106,11 @@ class AccountDeactivationUseCaseTest {
         assertThat(calendars.find(owner).orElseThrow().revocationPending()).isFalse();
         String token = access.invite(fixture.team(), account.getId(), fixture.secondMember(), TeamPermission.ADMIN).token();
         actor.set(other.getId()); access.accept(other.getId(), token);
-        actor.set(account.getId()); deactivate.deactivateAccount(account.getId());
+        actor.set(account.getId());
+        people.updateMemberDeactivation(fixture.team(), fixture.season(), fixture.secondMember(), "", true);
+        assertThatThrownBy(() -> deactivate.deactivateAccount(account.getId())).isInstanceOf(AccountDeactivationBlockedException.class);
+        people.updateMemberDeactivation(fixture.team(), fixture.season(), fixture.secondMember(), "", false);
+        deactivate.deactivateAccount(account.getId());
         var disabled = identities.findAccountById(account.getId()).orElseThrow();
         assertThat(disabled.isActive()).isFalse();
         assertThat(disabled.getSessionVersion()).isEqualTo(account.getSessionVersion() + 1);

@@ -50,4 +50,14 @@ public interface AccountTeamMembershipJpaRepository
     Optional<AccountTeamMembership> findByAccountIdAndTeamId(UUID accountId, UUID teamId);
 
     Optional<AccountTeamMembership> findByMemberId(UUID memberId);
+
+    @Query("""
+            select count(membership) > 0
+            from AccountTeamMembership membership
+            join Member member on member.id = membership.memberId and member.teamId = membership.teamId
+            where membership.teamId = :teamId and membership.memberId <> :memberId
+              and membership.permission = com.personal.baton.domain.workspace.TeamPermission.ADMIN
+              and member.deactivatedAt is null
+            """)
+    boolean existsOtherActiveAdministrator(UUID teamId, UUID memberId);
 }

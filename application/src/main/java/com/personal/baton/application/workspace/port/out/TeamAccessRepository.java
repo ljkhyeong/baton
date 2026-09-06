@@ -14,6 +14,7 @@ public interface TeamAccessRepository {
     List<AccountTeamMembership> lockAccountMemberships(UUID accountId);
     List<AccountTeamMembership> findMemberships(UUID teamId);
     Optional<AccountTeamMembership> findMembershipByMemberId(UUID memberId);
+    boolean existsOtherActiveAdministrator(UUID teamId, UUID memberId);
     AccountTeamMembership saveMembership(AccountTeamMembership membership);
     Optional<UUID> findInvitationTeamId(String tokenHash);
     Optional<TeamInvitation> lockInvitation(String tokenHash);
