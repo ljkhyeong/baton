@@ -51,7 +51,7 @@ class WorkspaceRoundCalendarRecordingTest {
         CalendarChangeRecorder recorder = mock(CalendarChangeRecorder.class);
         Season season = season();
         Routine routine = routine(season.getId());
-        when(repository.findRoutinesBySeasonId(season.getId())).thenReturn(List.of(routine));
+        when(repository.findActiveRoutinesBySeasonId(season.getId())).thenReturn(List.of(routine));
         when(repository.saveSeasonRound(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(repository.saveRoutineExecutions(any())).thenAnswer(invocation -> invocation.getArgument(0));
         WorkspaceRoundCoordinator coordinator = coordinator(repository, recorder);

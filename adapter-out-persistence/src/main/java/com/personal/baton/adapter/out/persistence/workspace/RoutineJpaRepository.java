@@ -9,5 +9,10 @@ public interface RoutineJpaRepository extends JpaRepository<Routine, UUID> {
 
     List<Routine> findAllBySeasonIdOrderByIdAsc(UUID seasonId);
 
+    List<Routine> findAllBySeasonIdAndArchivedAtIsNullOrderByIdAsc(UUID seasonId);
+
+    // 마감 일수와 시각은 DB 제약으로 함께 설정하거나 함께 비운다.
+    boolean existsBySeasonIdAndArchivedAtIsNullAndDeadlineDayOffsetIsNull(UUID seasonId);
+
     List<Routine> findAllBySeasonIdAndIdInAndArchivedAtIsNull(UUID seasonId, List<UUID> routineIds);
 }

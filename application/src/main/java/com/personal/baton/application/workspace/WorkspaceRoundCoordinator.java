@@ -89,7 +89,7 @@ final class WorkspaceRoundCoordinator {
         }
         List<RoutineExecution> executions = snapshotFactory.snapshotAll(
                 round.getId(),
-                repository.findRoutinesBySeasonId(seasonId),
+                repository.findActiveRoutinesBySeasonId(seasonId),
                 round.getMeetingDate(),
                 season.getZoneId()
         );

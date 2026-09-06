@@ -236,6 +236,12 @@ class WorkspaceUseCaseTest {
         RoleResult role = peopleUseCase.createRole(
                 created.teamId(), created.seasonId(), contentIdempotencyKey("exception-role"), created.accessKey(),
                 new CreateRoleCommand("진행자", "모임 준비", null, null, null, null, List.of("질문 확인"), ""));
+        RoutineResult archivedRoutine = operationsUseCase.createRoutine(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("exception-archived-routine"), created.accessKey(),
+                new CreateRoutineCommand("이전 준비 업무", RoutinePhase.BEFORE, "모임 전날", role.id(),
+                        "보관한 업무는 회차에 넣지 않습니다", null, null));
+        operationsUseCase.updateRoutineArchive(created.teamId(), created.seasonId(),
+                archivedRoutine.id(), created.accessKey(), true);
         operationsUseCase.createRoutine(
                 created.teamId(), created.seasonId(), contentIdempotencyKey("exception-routine"), created.accessKey(),
                 new CreateRoutineCommand("질문 모으기", RoutinePhase.BEFORE, "모임 전날", role.id(),
@@ -248,6 +254,10 @@ class WorkspaceUseCaseTest {
         assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isTrue();
         SeasonRoundResult original = lifecycleUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey()).rounds().getFirst();
+        assertThat(original.routineExecutions()).singleElement().satisfies(execution -> {
+            assertThat(execution.routineId()).isNotEqualTo(archivedRoutine.id());
+            assertThat(execution.deadlineAt()).isEqualTo(Instant.parse("2026-07-26T13:00:00Z"));
+        });
         UUID executionId = original.routineExecutions().getFirst().id();
         operationsUseCase.updateRoutineExecutionCompletion(
                 created.teamId(), created.seasonId(), original.id(), executionId, created.accessKey(), true);
@@ -2128,6 +2138,13 @@ class WorkspaceUseCaseTest {
                 new CreateSeasonRoundCommand("보관 전 회차", LocalDate.of(2026, 8, 1))
         );
         RoutineExecutionResult existingExecution = beforeArchive.routineExecutions().getFirst();
+
+        assertThatThrownBy(() -> lifecycleUseCase.updateRoundSchedule(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 8, 1), LocalTime.NOON,
+                        RoundRecurrence.WEEKLY, 7, true)))
+                .isInstanceOf(DomainValidationException.class)
+                .hasMessageContaining("모든 반복 업무에 실제 마감 규칙");
 
         RoutineResult archived = operationsUseCase.updateRoutineArchive(
                 created.teamId(),

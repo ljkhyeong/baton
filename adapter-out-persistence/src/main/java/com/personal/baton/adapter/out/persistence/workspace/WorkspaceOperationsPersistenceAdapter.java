@@ -132,6 +132,16 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     }
 
     @Override
+    public List<Routine> findActiveRoutinesBySeasonId(UUID seasonId) {
+        return routineRepository.findAllBySeasonIdAndArchivedAtIsNullOrderByIdAsc(seasonId);
+    }
+
+    @Override
+    public boolean existsActiveRoutineWithoutDeadlineRule(UUID seasonId) {
+        return routineRepository.existsBySeasonIdAndArchivedAtIsNullAndDeadlineDayOffsetIsNull(seasonId);
+    }
+
+    @Override
     public List<Routine> findActiveRoutinesBySeasonIdAndIds(UUID seasonId, List<UUID> routineIds) {
         return routineRepository.findAllBySeasonIdAndIdInAndArchivedAtIsNull(seasonId, routineIds);
     }
