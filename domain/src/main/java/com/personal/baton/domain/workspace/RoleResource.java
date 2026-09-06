@@ -33,6 +33,9 @@ public class RoleResource {
     @Column(length = 1000)
     private String description;
 
+    @Column(name = "thumbnail_url", length = 2048)
+    private String thumbnailUrl;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -81,6 +84,15 @@ public class RoleResource {
         this.title = normalizedTitle;
         this.url = normalizedUrl;
         this.description = normalizedDescription;
+    }
+
+    public void updateThumbnail(String thumbnailUrl) {
+        requireActive();
+        this.thumbnailUrl = ResourceThumbnail.normalize(thumbnailUrl);
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailUrl;
     }
 
     public void updateArchive(boolean archived, Instant archivedAt) {

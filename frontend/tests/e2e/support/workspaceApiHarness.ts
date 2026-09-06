@@ -1166,6 +1166,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
         description: input.description ?? null,
         createdAt: '2026-07-22T03:00:00Z',
         archivedAt: null,
+        thumbnailUrl: input.thumbnailUrl ?? null,
       }
       projection.resources.push(created)
       return finishContentCreation('roleResource', created)

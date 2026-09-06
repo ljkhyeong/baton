@@ -39,6 +39,7 @@ class ContentChangeRecorder {
     Map<String, String> snapshot(RoleResource value) {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("제목", value.getTitle()); fields.put("주소", value.getUrl()); fields.put("설명", value.getDescription());
+        fields.put("썸네일", value.getThumbnailUrl());
         fields.put("역할", people.findRoleById(value.getRoleId()).orElseThrow().getName());
         fields.put("보관 상태", value.getArchivedAt() == null ? "사용 중" : "보관");
         return fields;

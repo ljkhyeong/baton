@@ -5,7 +5,7 @@ import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, CREATED_ROLE_RESOURCE_ID,
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 확인 후 다음 날짜를 갱신한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
-  projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내', url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
+  projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내', url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z', thumbnailUrl: null })
   await installApi(page, projection)
   await page.route('**/api/v1/auth/**', route => route.fulfill({ json: { authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'csrf' } }))
   await page.route('**/api/v1/account-memberships/current?*', route => route.fulfill({ json: {

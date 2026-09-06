@@ -3201,7 +3201,9 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
                                         "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
                                 optionalRequestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "description", "자료 자료 설명")
+                                        "description", "자료 설명"),
+                                optionalRequestField(WorkspaceRequests.CreateRoleResourceRequest.class,
+                                        "thumbnailUrl", "YouTube·Vimeo HTTPS 썸네일 주소. 없으면 null").type(JsonFieldType.STRING)
                         ),
                         responseFields(roleResourceResponseFields())));
     }
@@ -3250,7 +3252,9 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
                                         "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
                                 optionalRequestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "description", "자료 자료 설명")
+                                        "description", "자료 설명"),
+                                optionalRequestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
+                                        "thumbnailUrl", "YouTube·Vimeo HTTPS 썸네일 주소. 없으면 null").type(JsonFieldType.STRING)
                         ),
                         responseFields(roleResourceResponseFields())));
     }
@@ -4942,6 +4946,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
                 fieldWithPath("resources[].title").description("자료 제목"),
                 fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
+                fieldWithPath("resources[].thumbnailUrl").type(JsonFieldType.STRING).optional().description("저장된 썸네일 주소"),
                 fieldWithPath("resources[].description").optional().description("자료 자료 설명"),
                 fieldWithPath("resources[].createdAt")
                         .type(JsonFieldType.STRING)
@@ -5401,6 +5406,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roleId").description("소유 역할 UUID"),
                 fieldWithPath("title").description("자료 제목"),
                 fieldWithPath("url").description("http 또는 https 외부 링크"),
+                fieldWithPath("thumbnailUrl").type(JsonFieldType.STRING).optional().description("저장된 썸네일 주소"),
                 fieldWithPath("description").optional().description("자료 자료 설명"),
                 fieldWithPath("createdAt")
                         .type(JsonFieldType.STRING)

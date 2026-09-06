@@ -30,7 +30,7 @@ class WorkspaceRoleResourceArchiveMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V26은 기존 역할 자료를 활성 상태로 보존하고 보관 시각을 추가한다")
+    @DisplayName("기존 역할 자료는 보관 시각과 썸네일이 없는 상태로 이관한다")
     @Test
     void preservesExistingRoleResourcesAsActive() {
         migrateTo("23");
@@ -53,6 +53,14 @@ class WorkspaceRoleResourceArchiveMigrationTest {
                 Boolean.class,
                 RESOURCE_ID
         )).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT thumbnail_url FROM role_resources WHERE id = UUID_TO_BIN(?)", String.class, RESOURCE_ID
+        )).isNull();
+        jdbcTemplate.update("UPDATE role_resources SET thumbnail_url = ? WHERE id = UUID_TO_BIN(?)",
+                "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", RESOURCE_ID);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT thumbnail_url FROM role_resources WHERE id = UUID_TO_BIN(?)", String.class, RESOURCE_ID
+        )).isEqualTo("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT version FROM role_resources WHERE id = UUID_TO_BIN(?)",
                 Long.class,

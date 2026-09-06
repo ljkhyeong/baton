@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { ResourceLinkPreview } from './ResourceLinkPreview'
+import type { ResourceLinkPreview as Preview } from './types'
 import { RecordDraftNotice, useRecordDraft } from './RecordDraft'
 import type { WorkspaceScope } from './api'
 import { DecisionText } from './records/DecisionText'
@@ -239,6 +241,19 @@ export function RoleResourceModal({
   )
   const [title, setTitle] = useState(resource?.title ?? initialResource?.title ?? '')
   const [url, setUrl] = useState(resource?.url ?? initialResource?.url ?? '')
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(resource?.thumbnailUrl ?? null)
+  const autoTitle = useRef<string | null>(null)
+  const applyPreview = useCallback((preview: Preview) => {
+    setThumbnailUrl(preview.thumbnailUrl ?? null)
+    if (preview.title) {
+      setTitle(current => {
+        if (current.trim()) return current
+        autoTitle.current = preview.title ?? null
+        return preview.title ?? ''
+      })
+      setTitleValidationMessage('')
+    }
+  }, [])
   const [description, setDescription] = useState(resource?.description ?? initialResource?.description ?? '')
   const draft = useRecordDraft(draftScope, 'resource', resource?.id ?? 'new', { title, url, description })
   const [titleValidationMessage, setTitleValidationMessage] = useState('')
@@ -268,6 +283,7 @@ export function RoleResourceModal({
       title: title.trim(),
       url: normalizedUrl,
       description: description.trim() || null,
+      ...(thumbnailUrl || resource?.thumbnailUrl ? { thumbnailUrl } : {}),
     }))
   }
   return (
@@ -284,6 +300,8 @@ export function RoleResourceModal({
       <form className="modal-form" noValidate onSubmit={submit}>
         <RecordDraftNotice draft={draft} pending={submission.pending} onRestore={value => {
           setTitle(value.title ?? ''); setUrl(value.url ?? ''); setDescription(value.description ?? '')
+          setThumbnailUrl(value.url === resource?.url ? resource?.thumbnailUrl ?? null : null)
+          autoTitle.current = null
         }} />
         <label>
           <span>역할</span>
@@ -311,6 +329,7 @@ export function RoleResourceModal({
             aria-describedby={titleValidationMessage ? 'role-resource-title-error' : undefined}
             value={title}
             onChange={(event) => {
+              autoTitle.current = null
               setTitle(event.target.value)
               setTitleValidationMessage('')
             }}
@@ -335,11 +354,22 @@ export function RoleResourceModal({
             value={url}
             onChange={(event) => {
               setUrl(event.target.value)
+              setThumbnailUrl(event.target.value.trim() === resource?.url ? resource.thumbnailUrl ?? null : null)
+              if (autoTitle.current === title) setTitle('')
+              autoTitle.current = null
               setUrlValidationMessage('')
             }}
             placeholder="https://docs.example.com/guide"
           />
         </label>
+        <ResourceLinkPreview
+          scope={draftScope}
+          url={url}
+          disabled={submission.pending || url.trim() === resource?.url}
+          onResolved={applyPreview}
+        />
+        {thumbnailUrl && <img className="resource-thumbnail" src={thumbnailUrl} alt="자료 썸네일"
+          width={160} height={90} referrerPolicy="no-referrer" />}
         <label>
           <span>자료 설명</span>
           <textarea

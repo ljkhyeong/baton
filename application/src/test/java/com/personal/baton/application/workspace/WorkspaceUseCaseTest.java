@@ -149,6 +149,33 @@ import static org.mockito.Mockito.mock;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkspaceUseCaseTest {
 
+    @Autowired
+    private com.personal.baton.application.workspace.port.in.ResourceLinkPreviewUseCase linkPreviews;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.personal.baton.application.workspace.port.out.ResourceLinkPreviewPort previewPort;
+
+    @Test
+    @DisplayName("자료 정보 조회는 권한을 확인하고 외부 호출 동안 저장 트랜잭션을 중단한다")
+    void previewsResourceOutsideTransaction() {
+        var created = lifecycleUseCase.createWorkspace("workspace-preview-00000000000001", CREATION_KEY,
+                new CreateWorkspaceCommand("링크 자료 팀", "첫 시즌", LocalDate.of(2026, 7, 1),
+                        LocalDate.of(2026, 8, 31), List.of("담당자")));
+        String url = "https://youtu.be/dQw4w9WgXcQ";
+        org.mockito.Mockito.when(previewPort.preview(url)).thenAnswer(invocation -> {
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return new com.personal.baton.application.workspace.port.in.ResourceLinkPreviewUseCase.Preview("소개 영상", null);
+        });
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            assertThat(linkPreviews.preview(created.teamId(), created.seasonId(), created.accessKey(), url).title()).isEqualTo("소개 영상");
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+        });
+        assertThatThrownBy(() -> linkPreviews.preview(created.teamId(), created.seasonId(), "wrong-key", url))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
+        org.mockito.Mockito.verify(previewPort, org.mockito.Mockito.times(1)).preview(url);
+    }
+
+
     @Test
     @DisplayName("템플릿 팀 생성은 역할과 반복 업무를 함께 저장하고 재전송 시 중복하지 않는다")
     void createsTemplateOnce() {
@@ -557,7 +584,8 @@ class WorkspaceUseCaseTest {
                         role.id(),
                         "질문 정리 가이드",
                         "https://docs.example.com/question-guide",
-                        "질문을 모으고 분류하는 기준"
+                        "질문을 모으고 분류하는 기준",
+                        "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
                 )
         );
         RoleResourceResult updatedResource = recordsUseCase.updateRoleResource(
@@ -569,7 +597,8 @@ class WorkspaceUseCaseTest {
                         recorderRole.id(),
                         "질문 정리 가이드 개정판",
                         "https://docs.example.com/question-guide-v2",
-                        "이번 시즌에 맞춘 질문 분류 기준"
+                        "이번 시즌에 맞춘 질문 분류 기준",
+                        "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
                 )
         );
         assertThat(updatedResource.roleId()).isEqualTo(recorderRole.id());
@@ -584,7 +613,8 @@ class WorkspaceUseCaseTest {
                         role.id(),
                         "질문 정리 가이드",
                         "https://docs.example.com/question-guide",
-                        "질문을 모으고 분류하는 기준"
+                        "질문을 모으고 분류하는 기준",
+                        "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
                 )
         );
         assertThat(replayedResource).isEqualTo(updatedResource);
@@ -676,6 +706,7 @@ class WorkspaceUseCaseTest {
             assertThat(savedResource.title()).isEqualTo("질문 정리 가이드 개정판");
             assertThat(savedResource.url()).isEqualTo("https://docs.example.com/question-guide-v2");
             assertThat(savedResource.description()).isEqualTo("이번 시즌에 맞춘 질문 분류 기준");
+            assertThat(savedResource.thumbnailUrl()).isEqualTo("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg");
         });
         assertThat(reloaded.continuitySignals())
                 .singleElement()

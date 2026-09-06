@@ -221,8 +221,13 @@ public final class WorkspaceContract {
             String url,
             String description,
             Instant createdAt,
-            Instant archivedAt
+            Instant archivedAt,
+            String thumbnailUrl
     ) {
+        public RoleResourceResult(UUID id, UUID roleId, String title, String url, String description,
+                Instant createdAt, Instant archivedAt) {
+            this(id, roleId, title, url, description, createdAt, archivedAt, null);
+        }
     }
 
     public record ContinuitySignalResult(

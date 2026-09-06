@@ -1904,6 +1904,7 @@ dialog.inspector::backdrop {
 .resource-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .resource-section-heading button { display: inline-flex; min-height: 32px; align-items: center; gap: 4px; padding: 6px 0; border: 0; color: var(--baton-dark); background: transparent; font-size: 9px; font-weight: 700; cursor: pointer; }
 .resource-section-heading button svg { color: currentColor; }
+.resource-thumbnail { display: block; width: 160px; max-width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; }
 .resource-links > li { align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .resource-links > li:last-child { border-bottom: 0; }
 .resource-links > li > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }

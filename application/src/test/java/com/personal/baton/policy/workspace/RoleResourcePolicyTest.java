@@ -16,6 +16,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Tag("policy")
 class RoleResourcePolicyTest {
 
+    @ParameterizedTest
+    @ValueSource(strings = {"http://i.ytimg.com/image.jpg", "https://i.ytimg.com.evil.test/image.jpg",
+            "https://user:password@i.ytimg.com/image.jpg", "https://i.vimeocdn.com:8443/image.jpg", "https://127.0.0.1/image.jpg"})
+    @DisplayName("자료 저장은 허용된 영상 공급자 밖의 썸네일을 거부한다")
+    void rejectsUnsafeThumbnail(String url) {
+        var resource = RoleResource.create(UUID.randomUUID(), UUID.randomUUID(), "안내 영상",
+                "https://youtu.be/dQw4w9WgXcQ", null, Instant.parse("2026-07-20T01:02:03Z"));
+        assertThatThrownBy(() -> resource.updateThumbnail(url)).isInstanceOf(DomainValidationException.class);
+        assertThat(resource.getThumbnailUrl()).isNull();
+    }
+
+
     @DisplayName("국제화 도메인의 역할 자료 URL은 원문을 보존한다")
     @Test
     void preservesInternationalizedDomainUrl() {

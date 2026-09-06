@@ -1,5 +1,7 @@
 import type { operations } from '@/generated/api'
 
+export type ResourceLinkPreview = JsonResponse<'getResourceLinkPreview', 200>
+
 export type ViewKey = 'today' | 'roles' | 'rhythm' | 'memory' | 'handoff' | 'records'
 
 type OperationId = keyof operations

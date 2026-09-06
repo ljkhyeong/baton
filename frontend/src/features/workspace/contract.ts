@@ -26,6 +26,9 @@ function defineEndpoint<Path extends ApiPath, Method extends SupportedMethod<Pat
 }
 
 export const workspaceEndpoints = {
+  getResourceLinkPreview: defineEndpoint(
+    '/api/v1/teams/{teamId}/seasons/{seasonId}/resource-link-preview', 'GET',
+  ),
   createWorkspace: defineEndpoint('/api/v1/workspaces', 'POST'),
   getWorkspace: defineEndpoint(
     '/api/v1/teams/{teamId}/seasons/{seasonId}/workspace',

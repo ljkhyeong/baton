@@ -173,6 +173,7 @@ function normalizePayload<Operation extends ContentCreationOperation>(
         title: resource.title.trim(),
         url: resource.url.trim(),
         description: trimNullable(resource.description ?? null),
+        ...(resource.thumbnailUrl ? { thumbnailUrl: resource.thumbnailUrl.trim() } : {}),
       })
     }
     case 'roleHandoff': {

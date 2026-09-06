@@ -229,7 +229,8 @@ public class WorkspaceRecordsController {
                         request.roleId(),
                         request.title(),
                         request.url(),
-                        request.description()
+                        request.description(),
+                        request.thumbnailUrl()
                 )
         );
         return RoleResourceResponse.from(result);
@@ -255,7 +256,8 @@ public class WorkspaceRecordsController {
                         request.roleId(),
                         request.title(),
                         request.url(),
-                        request.description()
+                        request.description(),
+                        request.thumbnailUrl()
                 )
         ));
     }

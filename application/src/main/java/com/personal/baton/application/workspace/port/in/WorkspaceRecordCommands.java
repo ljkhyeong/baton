@@ -56,15 +56,23 @@ public final class WorkspaceRecordCommands {
             UUID roleId,
             String title,
             String url,
-            String description
+            String description,
+            String thumbnailUrl
     ) {
+        public CreateRoleResourceCommand(UUID roleId, String title, String url, String description) {
+            this(roleId, title, url, description, null);
+        }
     }
 
     public record UpdateRoleResourceCommand(
             UUID roleId,
             String title,
             String url,
-            String description
+            String description,
+            String thumbnailUrl
     ) {
+        public UpdateRoleResourceCommand(UUID roleId, String title, String url, String description) {
+            this(roleId, title, url, description, null);
+        }
     }
 }

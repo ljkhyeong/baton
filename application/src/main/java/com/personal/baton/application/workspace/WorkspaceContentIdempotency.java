@@ -211,6 +211,9 @@ final class WorkspaceContentIdempotency {
         digest.append(resource.getTitle());
         digest.append(resource.getUrl());
         digest.appendNullable(resource.getDescription());
+        if (resource.getThumbnailUrl() != null) {
+            digest.append(resource.getThumbnailUrl());
+        }
         return digest.digestHex();
     }
 

@@ -1,3 +1,4 @@
+import { isResourceThumbnail } from './resourceLinkPreviewDecoder'
 import type {
   AcceptRoleHandoffResponse,
   CancelRoleHandoffResponse,
@@ -197,6 +198,7 @@ function isRoleResource(value: unknown) {
     && isNullableInstant(value.archivedAt)
     && isNullableInstant(value.createdAt)
     && isNullableString(value.description)
+    && isResourceThumbnail(value.thumbnailUrl)
     && hasUuidFields(value, ['id', 'roleId'])
 }
 

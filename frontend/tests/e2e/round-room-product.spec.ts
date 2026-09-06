@@ -215,6 +215,7 @@ function projectionWithRoundResource() {
     description: '스터디 진행 순서',
     createdAt: '2026-08-09T11:00:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   return projection
 }
@@ -229,6 +230,7 @@ function projectionWithMultipleRoundResources() {
     description: '스터디 회고 질문',
     createdAt: '2026-08-09T11:01:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   return projection
 }

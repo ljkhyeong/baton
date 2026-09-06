@@ -235,6 +235,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
     description: '다음 담당자가 바로 적용할 운영 기준입니다.',
     createdAt: '2026-07-05T03:00:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   initialProjection.resources.push({
     id: SECOND_ROLE_RESOURCE_ID,
@@ -244,6 +245,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
     description: '회고 진행자가 질문 순서를 정할 때 사용합니다.',
     createdAt: '2026-07-03T15:30:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -337,6 +339,7 @@ test('@records 보관한 역할 자료는 보관 기록으로만 탐색한다', 
     description: '이전 시즌에 사용한 문제 선정 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
     archivedAt: '2026-07-20T03:00:00Z',
+    thumbnailUrl: null,
   })
   await installApi(page, projection)
   await openSharedWorkspace(page)
@@ -607,6 +610,7 @@ test('@handoff 역할 자료를 수정하고 인수인계 문서와 다시 불�
     description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -689,6 +693,7 @@ test('@handoff 역할 자료를 보관함으로 옮기고 복원한다', async (
     description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -736,6 +741,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
     description: '기존 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
@@ -756,6 +762,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
     description: '서버의 최신 기준입니다.',
     createdAt: '2026-07-06T03:00:00Z',
     archivedAt: null,
+    thumbnailUrl: null,
   })
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
@@ -1213,7 +1220,7 @@ test('@memory @records @responsive 결정 Markdown은 명시적으로 전환하�
 test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 변경 후 재확인을 표시한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
-    url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
+    url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z', thumbnailUrl: null })
   await installApi(page, projection)
   const accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
   await page.route('**/api/v1/auth/session', route => route.fulfill({ json: {

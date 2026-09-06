@@ -64,6 +64,7 @@ final class WorkspaceRoleResourceCoordinator {
                 command.description(),
                 Instant.now(clock)
         );
+        resource.updateThumbnail(command.thumbnailUrl());
         ContentCreationAttempt attempt = contentIdempotency.prepare(
                 teamId,
                 seasonId,
@@ -105,6 +106,7 @@ final class WorkspaceRoleResourceCoordinator {
         String previousUrl = resource.getUrl();
         UUID previousRoleId = resource.getRoleId();
         resource.update(command.roleId(), command.title(), command.url(), command.description());
+        resource.updateThumbnail(command.thumbnailUrl());
         changes.record(teamId, seasonId, ContentRecordKind.ROLE_RESOURCE, resourceId, before, changes.snapshot(resource));
         RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);

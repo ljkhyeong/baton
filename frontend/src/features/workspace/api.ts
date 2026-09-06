@@ -1,3 +1,4 @@
+import { decodeResourceLinkPreview } from './resourceLinkPreviewDecoder'
 import { apiRequest, type ContentRequestOptions } from '@/shared/api/client'
 import { getCsrfToken } from '@/features/auth/api'
 import type { AuthSession } from '@/features/auth/types'
@@ -129,6 +130,17 @@ export type WorkspaceScope = {
   seasonId: string
   accessKey: string
   accountId?: string
+}
+
+export function getResourceLinkPreview(scope: WorkspaceScope, url: string, signal?: AbortSignal) {
+  const endpoint = workspaceEndpoints.getResourceLinkPreview
+  return workspaceRequest(resolveEndpointPath(endpoint, scope), {
+    method: endpoint.method,
+    headers: scopedHeaders(scope),
+    query: { url },
+    signal,
+    decode: decodeResourceLinkPreview,
+  })
 }
 
 async function workspaceRequest<T>(path: string, options: ContentRequestOptions<T>): Promise<T> {

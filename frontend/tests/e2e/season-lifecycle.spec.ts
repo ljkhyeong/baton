@@ -163,6 +163,7 @@ function projection(
       roleId: ROLE_ID,
       title: '문제 목록',
       url: 'https://example.com/problems',
+      thumbnailUrl: null,
       description: null,
       createdAt: '2026-07-10T05:00:00Z',
       archivedAt: null,
@@ -721,6 +722,7 @@ test('@handoff @responsive 이전 시즌 기록을 필요할 때 조회하고 �
     copies.push(input)
     const resource: RoleResource = {
       ...input, description: input.description ?? null, id: fixtureUuid(72), createdAt: '2026-10-01T00:00:00Z', archivedAt: null,
+      thumbnailUrl: null,
     }
     target.resources.push(resource)
     await fulfillJson(route, resource, 201)

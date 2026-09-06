@@ -1264,6 +1264,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/resource-link-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 자료 링크 정보 조회
+         * @description YouTube·Vimeo의 공개 영상 제목과 썸네일을 조회한다. 미지원 링크·외부 오류는 두 필드가 null이며 수동 등록을 계속할 수 있다. 시즌 읽기 권한이 필요하다.
+         */
+        get: operations["getResourceLinkPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/resource-reviews": {
         parameters: {
             query?: never;
@@ -2439,34 +2459,6 @@ export interface components {
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
         };
-        Schema_71d9598b6bc02fa6: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
-             */
-            createdAt: string | null;
-            /** @description 자료 자료 설명 */
-            description: string | null;
-            /**
-             * Format: uuid
-             * @description 자료 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-            /** @description 자료 제목 */
-            title: string;
-            /** @description http 또는 https 외부 링크 */
-            url: string;
-        };
         Schema_78f1554c32b35a98: {
             /**
              * Format: date
@@ -2634,14 +2626,16 @@ export interface components {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
             ended: boolean;
         };
-        Schema_491e14a825d07254: {
-            /** @description 자료 자료 설명 */
+        Schema_412bb47f905cd28b: {
+            /** @description 자료 설명 */
             description?: string | null;
             /**
              * Format: uuid
              * @description 자료를 소유하는 역할 UUID
              */
             roleId: string;
+            /** @description YouTube·Vimeo HTTPS 썸네일 주소. 없으면 null */
+            thumbnailUrl?: string | null;
             /** @description 자료 제목 */
             title: string;
             /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
@@ -2761,7 +2755,462 @@ export interface components {
             /** @description 반복 업무 제목 */
             title: string;
         };
-        Schema_4907c7cda751d086: {
+        Schema_5411bd92352a352b: {
+            /** @description 완료 여부 */
+            completed: boolean;
+        };
+        Schema_5708f9538b8cd93c: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: uuid
+             * @description 시즌 회차 UUID
+             */
+            id: string;
+            /**
+             * Format: date
+             * @description 모임 날짜
+             */
+            meetingDate: string | null;
+            /** @description 시즌 안에서 유일한 회차 이름 */
+            name: string;
+            /**
+             * @description 수동 또는 자동 생성 출처
+             * @enum {string}
+             */
+            origin: "MANUAL" | "AUTOMATIC";
+            /** @description 회차 반복 업무 실행 목록 */
+            routineExecutions: {
+                /**
+                 * Format: date-time
+                 * @description 회차 생성 시 고정한 UTC 실제 마감
+                 */
+                deadlineAt: string | null;
+                /** @description 회차 생성 시점의 실행 방법 */
+                detail: string;
+                /** @description 회차 생성 시점의 기한 문구 */
+                dueLabel: string;
+                /**
+                 * Format: uuid
+                 * @description 회차 반복 업무 실행 UUID
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 회차 생성 시점의 담당 역할 UUID
+                 */
+                ownerRoleId: string;
+                /**
+                 * @description 회차 생성 시점의 실행 단계
+                 * @enum {string}
+                 */
+                phase: "BEFORE" | "DURING" | "AFTER";
+                /**
+                 * Format: uuid
+                 * @description 소속 회차 UUID
+                 */
+                roundId: string;
+                /**
+                 * Format: uuid
+                 * @description 원본 반복 업무 정의 UUID
+                 */
+                routineId: string;
+                /**
+                 * @description WAITING 또는 DONE
+                 * @enum {string}
+                 */
+                status: "WAITING" | "DONE";
+                /**
+                 * @description 실행의 미설정, 예정, 진행, 지연 또는 완료 상태
+                 * @enum {string}
+                 */
+                timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
+                /** @description 회차 생성 시점의 반복 업무 제목 */
+                title: string;
+            }[];
+            /**
+             * Format: date-time
+             * @description 날짜 변경이 반영된 자동 회차의 UTC 모임 시각
+             */
+            scheduledAt: string | null;
+            /**
+             * Format: date
+             * @description 자동 일정의 원래 발생일
+             */
+            scheduledOccurrenceDate: string | null;
+            /**
+             * @description 회차의 예정, 진행, 지연 또는 완료 상태
+             * @enum {string}
+             */
+            timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
+        };
+        Schema_6569daaafc6922c9: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /**
+             * Format: uuid
+             * @description 확인한 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * @description 추가 전달 있음·없음 또는 확인 근거 없음
+             * @enum {string}
+             */
+            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
+        };
+        Schema_9615d143264cd2dc: {
+            /** @description 새 에디션을 만들었으면 true, 직전 상태를 재사용했으면 false */
+            created: boolean;
+            /** @description 생성 전에 완료를 확인한 BATON BRIEF outbox 최대 ID */
+            deliveryWatermark: number;
+            /**
+             * Format: uuid
+             * @description BRIEF가 반환한 불변 에디션 UUID
+             */
+            editionId: string;
+            /**
+             * Format: uuid
+             * @description BATON의 내구성 있는 생성 실행 UUID
+             */
+            executionId: string;
+            /** @description 작업공간·시즌 범위 에디션 세대 */
+            generation: number;
+            /** @description BRIEF 로컬 수신 순서 cursor */
+            sourceCursor: number;
+        };
+        Schema_59121c6eafa63b3f: {
+            /** @description 계정 권한 전환 여부 */
+            accountAccessEnabled: boolean;
+            /**
+             * Format: uuid
+             * @description 현재 계정
+             */
+            accountId: string;
+            /** @description 최근 접근 변경 50건, 관리자에게만 제공 */
+            audit: {
+                /** @description 변경 종류 */
+                action: string;
+                /**
+                 * Format: uuid
+                 * @description 변경 계정
+                 */
+                actorAccountId: string;
+                /**
+                 * Format: date-time
+                 * @description 변경 시각
+                 */
+                changedAt: string;
+                /**
+                 * Format: uuid
+                 * @description 변경 이력 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 대상 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 변경 뒤 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+                /**
+                 * @description 이전 권한
+                 * @enum {string|null}
+                 */
+                previousPermission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            }[];
+            /** @description 초대 목록, 관리자에게만 제공 */
+            invitations: {
+                /**
+                 * Format: date-time
+                 * @description 수락 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: date-time
+                 * @description 생성 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 만료 시각
+                 */
+                expiresAt: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 초대 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /**
+                 * Format: date-time
+                 * @description 취소 시각
+                 */
+                revokedAt: string | null;
+            }[];
+            /**
+             * Format: uuid
+             * @description 내 연결 구성원
+             */
+            memberId: string | null;
+            /** @description 관리 가능한 구성원 */
+            members: {
+                /**
+                 * Format: uuid
+                 * @description 연결 계정
+                 */
+                accountId: string | null;
+                /** @description 활동 여부 */
+                active: boolean;
+                /**
+                 * Format: uuid
+                 * @description 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 구성원 이름 */
+                memberName: string;
+                /**
+                 * @description 승인된 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            }[];
+            /**
+             * @description 내 권한
+             * @enum {string|null}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+        };
+        Schema_91972c4c08e8d75c: {
+            /** @description YouTube·Vimeo HTTPS 이미지 주소. 없으면 null */
+            thumbnailUrl: string | null;
+            /** @description 최대 200자의 제목. 조회 불가 시 null */
+            title: string | null;
+        };
+        Schema_254976d61d5d5175: {
+            /**
+             * Format: uuid
+             * @description 구독 소유 계정 UUID
+             */
+            accountId: string;
+            /**
+             * Format: uuid
+             * @description 다음 조회 기준 시즌 UUID. 마지막 페이지는 null
+             */
+            nextAfterSeasonId: string | null;
+            /** @description 해제 기록을 포함한 본인 구독. 없으면 빈 배열 */
+            subscriptions: {
+                /**
+                 * @description BATON 관리 상태. CHECK_REQUIRED는 CAL 최신 상태를 아직 조회하지 않았음을 뜻함
+                 * @enum {string}
+                 */
+                managementStatus: "CHECK_REQUIRED" | "IN_PROGRESS" | "REVOKED" | "REVOCATION_PENDING";
+                /**
+                 * Format: uuid
+                 * @description 시즌 UUID
+                 */
+                seasonId: string;
+                /** @description 구독 식별을 위한 현재 시즌 이름 */
+                seasonName: string;
+                /**
+                 * Format: uuid
+                 * @description CAL 구독 UUID
+                 */
+                subscriptionId: string;
+                /**
+                 * Format: uuid
+                 * @description 팀 UUID
+                 */
+                teamId: string;
+                /** @description 구독 식별을 위한 현재 팀 이름 */
+                teamName: string;
+            }[];
+        };
+        Schema_864038dbb358c10b: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /** @description 모임 날짜 기준 마감일 오프셋 */
+            deadlineDayOffset: number | null;
+            /** @description 시즌 시간대 기준 마감 시각 */
+            deadlineTime: string | null;
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 반복 업무 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 반복 업무 제목 */
+            title: string;
+        };
+        Schema_877191c8ad12d442: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+            /**
+             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
+             * @enum {string|null}
+             */
+            template?: "STUDY_V1" | "TEAM_V1" | null;
+        };
+        Schema_7384160ed9534c5f: {
+            /** @description 다음 시즌으로 이어 갈 원본 역할 UUID 집합 */
+            copyRoleIds: string[];
+            /** @description 다음 시즌으로 이어 갈 원본 반복 업무 UUID 집합 */
+            copyRoutineIds: string[];
+            /**
+             * Format: date
+             * @description 다음 시즌 종료일
+             */
+            endDate: string;
+            /** @description 팀 안에서 유일한 다음 시즌 이름 */
+            name: string;
+            /**
+             * Format: date
+             * @description 원본 시즌 종료일보다 늦은 시작일
+             */
+            startDate: string;
+        };
+        Schema_974296610da1dd74: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            accountId: string;
+            /** @description 참여 팀 목록 */
+            teams: {
+                /**
+                 * Format: uuid
+                 * @description 본인 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 본인 구성원 이름 */
+                memberName: string;
+                /**
+                 * @description 현재 팀 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /** @description 이동할 시즌의 종료 여부 */
+                seasonEnded: boolean;
+                /**
+                 * Format: uuid
+                 * @description 열린 시즌 또는 가장 최근 종료 시즌 식별자
+                 */
+                seasonId: string;
+                /** @description 이동할 시즌 이름 */
+                seasonName: string;
+                /**
+                 * Format: uuid
+                 * @description 팀 식별자
+                 */
+                teamId: string;
+                /** @description 팀 이름 */
+                teamName: string;
+            }[];
+        };
+        Schema_8722349937f63e53: {
+            /** @description 새 비밀번호 */
+            password: string;
+            /** @description 메일 링크에서 읽은 일회용 재설정 토큰 */
+            token: string;
+        };
+        Schema_9708540752768ac7: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * @description 항목 분류
+             * @enum {string}
+             */
+            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
+            /** @description 완료 여부 */
+            completed: boolean;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
+             */
+            createdAt: string | null;
+            /**
+             * Format: uuid
+             * @description 인수인계 항목 UUID
+             */
+            id: string;
+            /** @description 항목 내용 */
+            label: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+        };
+        Schema_369557117885952d: {
+            /**
+             * Format: uuid
+             * @description 시즌 UUID
+             */
+            seasonId: string;
+            /** @description NOT_CREATED, IN_PROGRESS, ACTIVE, REISSUE_REQUIRED, REVOKED, REVOCATION_PENDING 중 하나 */
+            status: string;
+            /**
+             * Format: uuid
+             * @description 구독 UUID. 발급 전에는 null
+             */
+            subscriptionId: string | null;
+        };
+        Schema_a3a4166a4bce5e87: {
             /** @description 설명 가능한 규칙으로 계산한 조직 연속성 위험 신호 */
             continuitySignals: {
                 /** @description 현재 기록에서 이 신호가 발생한 이유 */
@@ -2909,6 +3358,8 @@ export interface components {
                  * @description 소유 역할 UUID
                  */
                 roleId: string;
+                /** @description 저장된 썸네일 주소 */
+                thumbnailUrl: string | null;
                 /** @description 자료 제목 */
                 title: string;
                 /** @description http 또는 https 외부 링크 */
@@ -3297,455 +3748,6 @@ export interface components {
                  */
                 permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
             };
-        };
-        Schema_5411bd92352a352b: {
-            /** @description 완료 여부 */
-            completed: boolean;
-        };
-        Schema_5708f9538b8cd93c: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * Format: uuid
-             * @description 시즌 회차 UUID
-             */
-            id: string;
-            /**
-             * Format: date
-             * @description 모임 날짜
-             */
-            meetingDate: string | null;
-            /** @description 시즌 안에서 유일한 회차 이름 */
-            name: string;
-            /**
-             * @description 수동 또는 자동 생성 출처
-             * @enum {string}
-             */
-            origin: "MANUAL" | "AUTOMATIC";
-            /** @description 회차 반복 업무 실행 목록 */
-            routineExecutions: {
-                /**
-                 * Format: date-time
-                 * @description 회차 생성 시 고정한 UTC 실제 마감
-                 */
-                deadlineAt: string | null;
-                /** @description 회차 생성 시점의 실행 방법 */
-                detail: string;
-                /** @description 회차 생성 시점의 기한 문구 */
-                dueLabel: string;
-                /**
-                 * Format: uuid
-                 * @description 회차 반복 업무 실행 UUID
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 회차 생성 시점의 담당 역할 UUID
-                 */
-                ownerRoleId: string;
-                /**
-                 * @description 회차 생성 시점의 실행 단계
-                 * @enum {string}
-                 */
-                phase: "BEFORE" | "DURING" | "AFTER";
-                /**
-                 * Format: uuid
-                 * @description 소속 회차 UUID
-                 */
-                roundId: string;
-                /**
-                 * Format: uuid
-                 * @description 원본 반복 업무 정의 UUID
-                 */
-                routineId: string;
-                /**
-                 * @description WAITING 또는 DONE
-                 * @enum {string}
-                 */
-                status: "WAITING" | "DONE";
-                /**
-                 * @description 실행의 미설정, 예정, 진행, 지연 또는 완료 상태
-                 * @enum {string}
-                 */
-                timingStatus: "UNSCHEDULED" | "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
-                /** @description 회차 생성 시점의 반복 업무 제목 */
-                title: string;
-            }[];
-            /**
-             * Format: date-time
-             * @description 날짜 변경이 반영된 자동 회차의 UTC 모임 시각
-             */
-            scheduledAt: string | null;
-            /**
-             * Format: date
-             * @description 자동 일정의 원래 발생일
-             */
-            scheduledOccurrenceDate: string | null;
-            /**
-             * @description 회차의 예정, 진행, 지연 또는 완료 상태
-             * @enum {string}
-             */
-            timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
-        };
-        Schema_6569daaafc6922c9: {
-            /**
-             * Format: date-time
-             * @description BATON 확인 UTC 시각
-             */
-            checkedAt: string;
-            /**
-             * Format: uuid
-             * @description 확인한 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * @description 추가 전달 있음·없음 또는 확인 근거 없음
-             * @enum {string}
-             */
-            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
-        };
-        Schema_9615d143264cd2dc: {
-            /** @description 새 에디션을 만들었으면 true, 직전 상태를 재사용했으면 false */
-            created: boolean;
-            /** @description 생성 전에 완료를 확인한 BATON BRIEF outbox 최대 ID */
-            deliveryWatermark: number;
-            /**
-             * Format: uuid
-             * @description BRIEF가 반환한 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * Format: uuid
-             * @description BATON의 내구성 있는 생성 실행 UUID
-             */
-            executionId: string;
-            /** @description 작업공간·시즌 범위 에디션 세대 */
-            generation: number;
-            /** @description BRIEF 로컬 수신 순서 cursor */
-            sourceCursor: number;
-        };
-        Schema_59121c6eafa63b3f: {
-            /** @description 계정 권한 전환 여부 */
-            accountAccessEnabled: boolean;
-            /**
-             * Format: uuid
-             * @description 현재 계정
-             */
-            accountId: string;
-            /** @description 최근 접근 변경 50건, 관리자에게만 제공 */
-            audit: {
-                /** @description 변경 종류 */
-                action: string;
-                /**
-                 * Format: uuid
-                 * @description 변경 계정
-                 */
-                actorAccountId: string;
-                /**
-                 * Format: date-time
-                 * @description 변경 시각
-                 */
-                changedAt: string;
-                /**
-                 * Format: uuid
-                 * @description 변경 이력 식별자
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 대상 구성원
-                 */
-                memberId: string;
-                /**
-                 * @description 변경 뒤 권한
-                 * @enum {string|null}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-                /**
-                 * @description 이전 권한
-                 * @enum {string|null}
-                 */
-                previousPermission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-            }[];
-            /** @description 초대 목록, 관리자에게만 제공 */
-            invitations: {
-                /**
-                 * Format: date-time
-                 * @description 수락 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: date-time
-                 * @description 생성 시각
-                 */
-                createdAt: string;
-                /**
-                 * Format: date-time
-                 * @description 만료 시각
-                 */
-                expiresAt: string;
-                /**
-                 * Format: uuid
-                 * @description 초대 식별자
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 초대 구성원
-                 */
-                memberId: string;
-                /**
-                 * @description 초대 권한
-                 * @enum {string}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER";
-                /**
-                 * Format: date-time
-                 * @description 취소 시각
-                 */
-                revokedAt: string | null;
-            }[];
-            /**
-             * Format: uuid
-             * @description 내 연결 구성원
-             */
-            memberId: string | null;
-            /** @description 관리 가능한 구성원 */
-            members: {
-                /**
-                 * Format: uuid
-                 * @description 연결 계정
-                 */
-                accountId: string | null;
-                /** @description 활동 여부 */
-                active: boolean;
-                /**
-                 * Format: uuid
-                 * @description 구성원 식별자
-                 */
-                memberId: string;
-                /** @description 구성원 이름 */
-                memberName: string;
-                /**
-                 * @description 승인된 권한
-                 * @enum {string|null}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-            }[];
-            /**
-             * @description 내 권한
-             * @enum {string|null}
-             */
-            permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
-        };
-        Schema_254976d61d5d5175: {
-            /**
-             * Format: uuid
-             * @description 구독 소유 계정 UUID
-             */
-            accountId: string;
-            /**
-             * Format: uuid
-             * @description 다음 조회 기준 시즌 UUID. 마지막 페이지는 null
-             */
-            nextAfterSeasonId: string | null;
-            /** @description 해제 기록을 포함한 본인 구독. 없으면 빈 배열 */
-            subscriptions: {
-                /**
-                 * @description BATON 관리 상태. CHECK_REQUIRED는 CAL 최신 상태를 아직 조회하지 않았음을 뜻함
-                 * @enum {string}
-                 */
-                managementStatus: "CHECK_REQUIRED" | "IN_PROGRESS" | "REVOKED" | "REVOCATION_PENDING";
-                /**
-                 * Format: uuid
-                 * @description 시즌 UUID
-                 */
-                seasonId: string;
-                /** @description 구독 식별을 위한 현재 시즌 이름 */
-                seasonName: string;
-                /**
-                 * Format: uuid
-                 * @description CAL 구독 UUID
-                 */
-                subscriptionId: string;
-                /**
-                 * Format: uuid
-                 * @description 팀 UUID
-                 */
-                teamId: string;
-                /** @description 구독 식별을 위한 현재 팀 이름 */
-                teamName: string;
-            }[];
-        };
-        Schema_864038dbb358c10b: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /** @description 모임 날짜 기준 마감일 오프셋 */
-            deadlineDayOffset: number | null;
-            /** @description 시즌 시간대 기준 마감 시각 */
-            deadlineTime: string | null;
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 반복 업무 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 반복 업무 제목 */
-            title: string;
-        };
-        Schema_877191c8ad12d442: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 한 명 이상의 구성원 이름 */
-            memberNames: string[];
-            /** @description 첫 시즌 이름 */
-            seasonName: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-            /** @description 팀 이름 */
-            teamName: string;
-            /**
-             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
-             * @enum {string|null}
-             */
-            template?: "STUDY_V1" | "TEAM_V1" | null;
-        };
-        Schema_7384160ed9534c5f: {
-            /** @description 다음 시즌으로 이어 갈 원본 역할 UUID 집합 */
-            copyRoleIds: string[];
-            /** @description 다음 시즌으로 이어 갈 원본 반복 업무 UUID 집합 */
-            copyRoutineIds: string[];
-            /**
-             * Format: date
-             * @description 다음 시즌 종료일
-             */
-            endDate: string;
-            /** @description 팀 안에서 유일한 다음 시즌 이름 */
-            name: string;
-            /**
-             * Format: date
-             * @description 원본 시즌 종료일보다 늦은 시작일
-             */
-            startDate: string;
-        };
-        Schema_974296610da1dd74: {
-            /**
-             * Format: uuid
-             * @description 현재 로그인 계정
-             */
-            accountId: string;
-            /** @description 참여 팀 목록 */
-            teams: {
-                /**
-                 * Format: uuid
-                 * @description 본인 구성원 식별자
-                 */
-                memberId: string;
-                /** @description 본인 구성원 이름 */
-                memberName: string;
-                /**
-                 * @description 현재 팀 권한
-                 * @enum {string}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER";
-                /** @description 이동할 시즌의 종료 여부 */
-                seasonEnded: boolean;
-                /**
-                 * Format: uuid
-                 * @description 열린 시즌 또는 가장 최근 종료 시즌 식별자
-                 */
-                seasonId: string;
-                /** @description 이동할 시즌 이름 */
-                seasonName: string;
-                /**
-                 * Format: uuid
-                 * @description 팀 식별자
-                 */
-                teamId: string;
-                /** @description 팀 이름 */
-                teamName: string;
-            }[];
-        };
-        Schema_8722349937f63e53: {
-            /** @description 새 비밀번호 */
-            password: string;
-            /** @description 메일 링크에서 읽은 일회용 재설정 토큰 */
-            token: string;
-        };
-        Schema_9708540752768ac7: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * @description 항목 분류
-             * @enum {string}
-             */
-            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
-            /** @description 완료 여부 */
-            completed: boolean;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
-             */
-            createdAt: string | null;
-            /**
-             * Format: uuid
-             * @description 인수인계 항목 UUID
-             */
-            id: string;
-            /** @description 항목 내용 */
-            label: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-        };
-        Schema_369557117885952d: {
-            /**
-             * Format: uuid
-             * @description 시즌 UUID
-             */
-            seasonId: string;
-            /** @description NOT_CREATED, IN_PROGRESS, ACTIVE, REISSUE_REQUIRED, REVOKED, REVOCATION_PENDING 중 하나 */
-            status: string;
-            /**
-             * Format: uuid
-             * @description 구독 UUID. 발급 전에는 null
-             */
-            subscriptionId: string | null;
         };
         Schema_a55bef4846f0ff82: {
             /**
@@ -4808,6 +4810,36 @@ export interface components {
             textFormat?: "PLAIN_TEXT" | "MARKDOWN" | null;
             /** @description 결정 제목 */
             title: string;
+        };
+        Schema_fd5cbd7db13878dd: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
+             */
+            createdAt: string | null;
+            /** @description 자료 자료 설명 */
+            description: string | null;
+            /**
+             * Format: uuid
+             * @description 자료 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+            /** @description 저장된 썸네일 주소 */
+            thumbnailUrl: string | null;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description http 또는 https 외부 링크 */
+            url: string;
         };
         Schema_ff84191332228cdc: {
             /** @description 이 응답에서만 제공하는 원문 접근 키 */
@@ -7999,6 +8031,42 @@ export interface operations {
             };
         };
     };
+    getResourceLinkPreview: {
+        parameters: {
+            query: {
+                /** @description 등록할 링크. 공백 제외 필수, 최대 2048자 */
+                url: string;
+            };
+            header?: {
+                /**
+                 * @description 공유 키 팀의 접근 키. 계정 팀은 로그인 세션 사용
+                 * @example key
+                 */
+                "X-Baton-Access-Key"?: string;
+            };
+            path: {
+                /** @description 시즌 식별자 */
+                seasonId: string;
+                /** @description 팀 식별자 */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_91972c4c08e8d75c"];
+                };
+            };
+        };
+    };
     getDueResourceReviews: {
         parameters: {
             query?: never;
@@ -8063,7 +8131,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_491e14a825d07254"];
+                "application/json": components["schemas"]["Schema_412bb47f905cd28b"];
             };
         };
         responses: {
@@ -8075,7 +8143,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_71d9598b6bc02fa6"];
+                    "application/json": components["schemas"]["Schema_fd5cbd7db13878dd"];
                 };
             };
             /** @description 400 */
@@ -8154,7 +8222,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_491e14a825d07254"];
+                "application/json": components["schemas"]["Schema_412bb47f905cd28b"];
             };
         };
         responses: {
@@ -8166,7 +8234,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_71d9598b6bc02fa6"];
+                    "application/json": components["schemas"]["Schema_fd5cbd7db13878dd"];
                 };
             };
             /** @description 404 */
@@ -8233,7 +8301,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_71d9598b6bc02fa6"];
+                    "application/json": components["schemas"]["Schema_fd5cbd7db13878dd"];
                 };
             };
         };
@@ -9536,7 +9604,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_4907c7cda751d086"];
+                    "application/json": components["schemas"]["Schema_a3a4166a4bce5e87"];
                 };
             };
             /** @description 403 */

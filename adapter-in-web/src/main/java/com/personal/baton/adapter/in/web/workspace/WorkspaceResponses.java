@@ -429,7 +429,8 @@ public final class WorkspaceResponses {
             String url,
             String description,
             Instant createdAt,
-            Instant archivedAt
+            Instant archivedAt,
+            String thumbnailUrl
     ) {
 
         public static RoleResourceResponse from(WorkspaceContract.RoleResourceResult result) {
@@ -440,7 +441,8 @@ public final class WorkspaceResponses {
                     result.url(),
                     result.description(),
                     result.createdAt(),
-                    result.archivedAt()
+                    result.archivedAt(),
+                    result.thumbnailUrl()
             );
         }
     }

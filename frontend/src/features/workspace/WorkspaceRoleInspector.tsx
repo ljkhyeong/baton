@@ -95,6 +95,8 @@ export function RoleInspector({
             {activeResources.map((resource) => (
               <li key={resource.id}>
                 <span>
+                  {resource.thumbnailUrl && <img className="resource-thumbnail" src={resource.thumbnailUrl}
+                    alt="" width={160} height={90} loading="lazy" referrerPolicy="no-referrer" />}
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}
                 </span>
