@@ -158,7 +158,7 @@ export function RoleHandoffModal({
     cancel: {
       title: '역할 인수인계 취소',
       description: '인수인계를 취소하면 역할과 인수인계 문서를 다시 수정할 수 있습니다.',
-      submit: '인수인계 전달 취소',
+      submit: '인수인계 취소',
       pending: '인수인계 취소하는 중…',
     },
   }[mode]
@@ -330,7 +330,7 @@ export function HandoffPreview({
     <ModalShell
       className="handoff-book"
       title={`${role.name} 인수인계 문서`}
-      description={`${workspaceLabel} · ${owner ? memberDisplayName(owner) : '이전 담당자'}에서 ${next ? memberDisplayName(next) : '다음 담당자'}에게 전달할 업무와 자료입니다.`}
+      description={`${workspaceLabel} · ${owner ? memberDisplayName(owner) : '이전 담당자'} → ${next ? memberDisplayName(next) : '다음 담당자'} · 전달할 업무와 자료입니다.`}
       onClose={onClose}
     >
       <div className="book-preview">
@@ -410,7 +410,7 @@ export function HandoffPreview({
             : <p>등록된 인수인계 항목이 없습니다.</p>}
         </section>
         <div className="book-actions">
-          <p>현재 화면의 기록을 출력하거나 PDF로 저장합니다. 주소의 접근 키가 출력되지 않도록 브라우저 인쇄 메뉴 대신 아래 버튼을 사용해 주세요.</p>
+          <p>현재 화면의 기록을 출력하거나 PDF로 저장합니다. 공유 링크가 인쇄물에 남지 않도록 아래 버튼으로 인쇄해 주세요.</p>
           <button type="button" className="primary-button full-button" onClick={printBook}>
             인쇄 / PDF 저장
           </button>

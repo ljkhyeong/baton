@@ -83,7 +83,7 @@ export default function OnboardingForm() {
                     className="text-button"
                     onClick={creation.startNewRequest}
                   >
-                    기존 작업 공간 확인 후 새로 만들기
+                    기존 작업 공간 확인 완료
                   </button>
                 )}
           </div>

@@ -23,16 +23,16 @@ export default function AuthPageShell({
         </Link>
         <div className="auth-story-copy">
           <span className="section-kicker">계정</span>
-          <h1 id="auth-story-title">로그인 방법 선택</h1>
+          <h1 id="auth-story-title">로그인과 계정 관리</h1>
           <p>
-            Google, Naver, 이메일 중 로그인 방법을 선택하세요.
+            가입할 때 사용한 방법으로 로그인하세요.
             같은 이메일이어도 로그인 방법이 다르면 별도 계정입니다.
           </p>
-          <div className="auth-identity-rail" aria-label="BATON에서 사용할 수 있는 로그인 방법">
+          <div className="auth-identity-rail" aria-label="로그인 방법마다 계정이 구분됩니다">
             <span>Google</span>
             <span>Naver</span>
             <span>이메일</span>
-            <strong>BATON 계정</strong>
+            <strong>방법별 별도 계정</strong>
           </div>
         </div>
       </section>

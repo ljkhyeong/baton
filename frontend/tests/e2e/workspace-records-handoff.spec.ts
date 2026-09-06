@@ -305,12 +305,12 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   const archivedResult = page.getByRole('article').filter({
     has: page.getByRole('heading', { name: '자주 생기는 문제와 대응법' }),
   })
-  await expect(archivedResult).toContainText('기록 시각 미상')
+  await expect(archivedResult).toContainText('작성일을 알 수 없음')
   await expect(archivedResult.getByRole('button', { name: '인수인계 문서에서 보기' })).toHaveCount(0)
 
   await search.getByLabel('시작일').fill('2026-07-01')
   await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
-  await expect(page.getByText('생성 시각을 알 수 없는 이전 기록 1개는 기간 검색에서 제외했습니다.')).toBeVisible()
+  await expect(page.getByText('작성일을 알 수 없는 이전 기록 1개는 날짜 검색에서 제외했습니다.')).toBeVisible()
 
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('docs.example.com')

@@ -490,7 +490,7 @@ class ContinuitySignalAnalyzerTest {
                 .filteredOn(signal -> signal.roleId().equals(coverageGap.getId()))
                 .singleElement()
                 .satisfies(signal -> {
-                    assertThat(signal.title()).contains("담당자 없는 기간 예정");
+                    assertThat(signal.title()).contains("담당자가 없는 기간이 있습니다");
                     assertThat(signal.reason()).contains(TODAY.toString(), "29일의 담당 공백");
                     assertThat(signal.recommendedAction()).contains("취소", "다시 준비");
                 });

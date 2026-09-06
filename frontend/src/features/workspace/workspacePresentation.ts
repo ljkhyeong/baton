@@ -13,7 +13,7 @@ export const phaseCopy = {
 } satisfies Record<RoutinePhase, string>
 
 export const categoryCopy = {
-  RESPONSIBILITY: '책임',
+  RESPONSIBILITY: '담당 업무',
   ROUTINE: '반복 업무',
   RESOURCE: '자료',
   ADVICE: '조언',

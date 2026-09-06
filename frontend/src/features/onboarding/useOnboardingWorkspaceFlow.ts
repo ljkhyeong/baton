@@ -51,7 +51,7 @@ function errorMessage(error: unknown) {
     return '공유 링크가 변경되어 작업 공간을 다시 열 수 없습니다. 이미 만들어졌을 수 있으니 운영자에게 최신 링크를 요청하세요.'
   }
   if (error instanceof ApiError && error.code === 'IDEMPOTENCY_KEY_REUSED') {
-    return '이전에 보낸 내용과 입력이 달라 작업 공간을 만들 수 없습니다. 기존 작업 공간을 확인한 뒤 새로 만들기를 선택하세요.'
+    return '이전에 보낸 내용과 입력이 달라 작업 공간을 만들 수 없습니다. 기존 작업 공간이 있는지 확인한 뒤 다시 제출하세요.'
   }
   if (error instanceof ApiError || error instanceof ApiClientError) return error.message
   return '작업 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
@@ -106,11 +106,11 @@ function confirmationMessage(
     case 'pendingMissing':
       return '다른 탭에서 이 요청의 결과를 확인했거나 확인 대기 목록에서 삭제했습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
     case 'pendingChanged':
-      return '다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다. ‘최근 작업 공간’이나 다른 탭에서 만들어졌는지 확인한 뒤 새로 만들기를 선택하세요.'
+      return '다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다. ‘최근 작업 공간’이나 다른 탭에서 이미 만들어졌는지 확인하세요.'
     case 'concurrentAttempt':
       return '다른 탭에서 같은 작업 공간을 만들고 있었습니다. 이미 만들어졌을 수 있으니 ‘최근 작업 공간’이나 다른 탭에서 먼저 확인하세요.'
     case 'replayExpired':
-      return '공유 링크가 바뀌어 작업 공간을 다시 열 수 없습니다. 운영자에게 최신 링크를 받아 기존 작업 공간을 확인한 뒤 새로 만들기를 선택하세요.'
+      return '공유 링크가 바뀌어 저장된 링크로는 작업 공간을 열 수 없습니다. 운영자에게 최신 링크를 받아 기존 작업 공간을 먼저 확인하세요.'
     case 'cleanupRequired':
       return creationJournalCleanupRequiredMessage
   }

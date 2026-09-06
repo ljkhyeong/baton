@@ -156,7 +156,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
         type="submit"
       >
         {verificationMutation.isPending
-          ? (passwordReset ? '비밀번호 변경 중' : '계정 준비 중')
+          ? (passwordReset ? '비밀번호 변경 중' : '가입 완료 중')
           : (passwordReset ? '비밀번호 변경' : '비밀번호 정하고 인증 완료')}
       </button>
     </form>

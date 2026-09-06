@@ -200,7 +200,7 @@ export function createWorkspaceContentActions({
     mutations.memberDeactivation.mutate({ id: member.id, request: { deactivated } }, {
       onSuccess: (updatedMember) => notify(deactivated
         ? `${updatedMember.name}님의 활동을 종료했어요. 기존 기록의 이름은 유지됩니다.`
-        : `${updatedMember.name}님을 다시 활성화했어요.`),
+        : `${updatedMember.name}님의 활동을 재개했어요.`),
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`구성원 활동 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')

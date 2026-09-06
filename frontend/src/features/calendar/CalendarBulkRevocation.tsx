@@ -106,9 +106,9 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
     </div>}
     {operation.isPending && <div className="calendar-actions">
       <p role="status">구독 해제 중 · 결과 확인 {results.length}/{total}개</p>
-      <button type="button" className="secondary-button" onClick={() => controller.current?.abort()}>해제 작업 중단</button>
+      <button type="button" className="secondary-button" onClick={() => controller.current?.abort()}>남은 구독 해제 중단</button>
     </div>}
-    {results.length > 0 && <section className="calendar-bulk-results" aria-label="선택 해제 결과">
+    {results.length > 0 && <section className="calendar-bulk-results" aria-label="구독 해제 결과">
       <p role="status">해제됨 {results.filter(result => result.outcome === 'REVOKED').length}개 · 처리 중 {results.filter(result => result.outcome === 'PENDING').length}개 · 확인 필요 {results.filter(result => !['REVOKED', 'PENDING'].includes(result.outcome)).length}개</p>
       <ul>{results.map(result => <li key={result.subscription.subscriptionId}>
         <span>{result.subscription.teamName} · {result.subscription.seasonName}</span><strong>{outcomeLabels[result.outcome]}</strong>

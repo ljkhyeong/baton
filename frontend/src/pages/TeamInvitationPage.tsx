@@ -38,7 +38,7 @@ function InvitationPageContent() {
           : !session.data?.authenticated ? <>
             <p>초대를 받을 계정으로 로그인한 뒤 팀과 구성원 이름을 확인해 주세요.</p>
             {stored ? <Link to="/login?returnTo=%2Fjoin" className="primary-button">로그인하고 초대 확인</Link>
-              : <p>초대를 보관할 수 없습니다. 로그인한 뒤 받은 초대 링크를 다시 열어 주세요. <Link to="/login">로그인</Link></p>}
+              : <p>이 브라우저에 초대 링크를 저장하지 못했습니다. 로그인한 뒤 받은 링크를 다시 여세요. <Link to="/login">로그인</Link></p>}
           </> : <InvitationContent key={`${session.data.accountId}:${token}`} accountId={session.data.accountId} token={token} />}
     <Link to="/">처음 화면으로 이동</Link>
   </section></main>

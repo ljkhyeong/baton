@@ -84,7 +84,7 @@ final class HandoffContinuitySignalAnalyzer {
                     : handoffParticipantReason(handoff, membersById, currentCoverageMissing);
             String recommendedAction = participantsActive
                     ? handoffAction(handoff, readiness, coverageGap, currentCoverageMissing)
-                    : "활동 종료한 구성원을 다시 활성화하거나 인수인계를 취소한 뒤 참여자를 다시 정하세요.";
+                    : "구성원의 활동을 재개하거나 인수인계를 취소한 뒤 담당자를 다시 정하세요.";
             signals.add(new ContinuitySignalResult(
                     ContinuitySignalType.HANDOFF_INCOMPLETE,
                     participantsActive
@@ -171,7 +171,7 @@ final class HandoffContinuitySignalAnalyzer {
             return role.getName() + " 인수인계 참여자 확인 필요";
         }
         if (coverageGap) {
-            return role.getName() + " 담당자 없는 기간 예정";
+            return role.getName() + " 담당자가 없는 기간이 있습니다";
         }
         if (currentCoverageMissing) {
             return role.getName() + " 담당자 없음 · 인수인계 수락 필요";

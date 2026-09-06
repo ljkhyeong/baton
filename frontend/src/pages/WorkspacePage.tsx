@@ -147,7 +147,7 @@ export default function WorkspacePage() {
   const storedKeyFallback = candidateIsActive && storedAccessKey && storedAccessKey !== hashAccessKey
     ? (
         <div className="workspace-key-fallback">
-          <p>이 브라우저에 저장된 공유 링크로 다시 열 수 있습니다.</p>
+          <p>이 브라우저에 이전에 사용한 공유 링크가 남아 있습니다.</p>
           <button type="button" className="primary-button" onClick={reopenWithStoredKey}>저장된 공유 링크로 열기</button>
         </div>
       )

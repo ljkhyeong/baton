@@ -201,7 +201,7 @@ export function WorkspaceSyncStatus({
     : conflictRecoveryStatus === 'failed'
       ? '다른 사람이 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 수정하세요.'
       : failed
-        ? '최신 내용을 확인하지 못했어요 · 저장된 내용 표시 중'
+        ? '최신 내용을 불러오지 못했습니다. 마지막으로 불러온 내용을 표시합니다.'
         : syncing
           ? '다른 구성원의 변경을 확인하는 중…'
           : `${formatSyncTime(updatedAt)}에 화면 갱신`

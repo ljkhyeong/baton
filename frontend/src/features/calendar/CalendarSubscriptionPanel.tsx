@@ -13,7 +13,7 @@ import './calendar.scss'
 
 type Props = { workspace: WorkspaceProjection; accessKey: string; changesDisabled: boolean; onManageMembership: () => void }
 const labels: Record<CalendarStatus, string> = {
-  NOT_CREATED: '아직 구독하지 않았습니다.', IN_PROGRESS: '구독 요청을 처리 중입니다.',
+  NOT_CREATED: '아직 구독하지 않았습니다.', IN_PROGRESS: '구독 주소를 만드는 중입니다.',
   ACTIVE: '구독 중입니다.', REISSUE_REQUIRED: '새 구독 주소가 필요합니다. 주소를 재발급하고 캘린더 앱에 다시 등록해 주세요.',
   REVOKED: '구독을 해제했습니다.', REVOCATION_PENDING: '구독 해제를 처리 중입니다. 완료될 때까지 기존 주소가 작동할 수 있습니다.',
 }

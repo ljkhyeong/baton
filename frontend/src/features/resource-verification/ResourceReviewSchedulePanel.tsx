@@ -29,7 +29,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
         {values.enabled && <>
           <label>확인 간격(일)<input type="number" min={1} max={365} required value={values.intervalDays} onChange={event => setDraft({ ...values, intervalDays: event.target.value })} /></label>
           <label>다음 확인일<input type="date" required value={values.nextReviewOn} onChange={event => setDraft({ ...values, nextReviewOn: event.target.value })} /></label>
-          <p>‘사용 가능’으로 기록하면 설정한 간격 뒤로 다음 확인일을 바꿉니다. ‘수정 필요’이면 날짜를 유지합니다.</p>
+          <p>‘사용 가능’으로 기록한 날부터 설정한 일수 뒤가 다음 확인일이 됩니다. ‘수정 필요’이면 날짜를 유지합니다.</p>
         </>}
         <button type="submit">{save.isPending ? '주기 저장 중…' : '재확인 주기 저장'}</button>
       </fieldset>

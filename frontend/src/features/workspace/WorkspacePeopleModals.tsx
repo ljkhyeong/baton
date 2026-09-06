@@ -93,9 +93,9 @@ export function MemberManagementModal({
               if (!actionsDisabled) onToggleDeactivation(member)
             }}
             aria-disabled={actionsDisabled || undefined}
-            aria-label={`${member.name} ${active ? '활동 종료' : '다시 활성화'}`}
+            aria-label={`${member.name} ${active ? '활동 종료' : '활동 재개'}`}
           >
-            {pending ? '처리 중…' : active ? '활동 종료' : '다시 활성화'}
+            {pending ? '처리 중…' : active ? '활동 종료' : '활동 재개'}
           </button>
         </span>
       </li>

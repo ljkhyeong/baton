@@ -1379,7 +1379,7 @@ test('동기화 실패에도 기존 내용을 유지하고 수동으로 다시 �
   await page.getByRole('button', { name: '지금 새로고침' }).click()
 
   const syncStatus = page.locator('.workspace-sync-status')
-  await expect(syncStatus).toContainText('최신 내용을 확인하지 못했어요')
+  await expect(syncStatus).toContainText('최신 내용을 불러오지 못했습니다.')
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
 
   api.restoreWorkspaceGets()

@@ -103,7 +103,7 @@ export default function PendingWorkspaceCreationPanel({
     if (result === 'discarded' || result === 'missing') {
       setConfirmingId(null)
       setNotice(result === 'discarded'
-        ? '확인 대기 목록에서 삭제했습니다. 서버의 작업 공간은 유지됩니다.'
+        ? '확인 대기 목록에서 삭제했습니다. 생성된 작업 공간은 삭제하지 않습니다.'
         : '다른 탭에서 이미 정리한 임시 기록입니다.')
       onRefresh()
       requestAnimationFrame(() => {
@@ -129,7 +129,7 @@ export default function PendingWorkspaceCreationPanel({
       onRefresh()
       return
     }
-    setError('확인 대기 목록에서 삭제하지 못했습니다. 저장소 권한을 확인해 주세요.')
+    setError('확인 대기 목록에서 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')
   }
 
   const load = (item: PendingWorkspaceCreationItem) => {

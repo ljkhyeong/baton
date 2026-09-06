@@ -172,7 +172,7 @@ export default function AccountMembershipPanel({
           : (
               <p>{changesDisabled
                 ? '선택할 수 있는 구성원이 없습니다.'
-                : '선택할 수 있는 구성원이 없습니다. 구성원을 먼저 추가하거나 다시 활성화해 주세요.'}</p>
+                : '선택할 수 있는 구성원이 없습니다. 구성원을 추가하거나 기존 구성원의 활동을 재개해 주세요.'}</p>
             )}
     </section>
   )

@@ -33,7 +33,7 @@ const statusLabels: Record<string, string> = { ACTIVE: '미해결', RESOLVED: '�
 function errorMessage(error: unknown) {
   if (error instanceof ApiError) {
     const messages: Record<string, string> = {
-      BRIEF_DELIVERY_INCOMPLETE: '최신 기록을 반영하고 있습니다. 잠시 후 요약 만들기를 다시 누르세요.',
+      BRIEF_DELIVERY_INCOMPLETE: '최신 기록을 반영하고 있습니다. 잠시 후 ‘이번 주 요약 만들기’를 다시 누르세요.',
       BRIEF_GENERATION_IN_PROGRESS: '요약을 만들고 있습니다. 잠시 후 ‘최신 요약 다시 조회’를 누르세요.',
       BRIEF_CONFIGURATION_ERROR: '요약 서비스의 연결 설정을 확인해야 합니다. 운영자에게 문의해 주세요.',
       BRIEF_UNAVAILABLE: '요약 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.',

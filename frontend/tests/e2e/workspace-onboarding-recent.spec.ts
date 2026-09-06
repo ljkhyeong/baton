@@ -548,14 +548,14 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
   await page.getByLabel('팀 이름').fill(`${request.teamName} 수정`)
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(page.getByText(
-    '공유 링크가 바뀌어 작업 공간을 다시 열 수 없습니다.',
+    '공유 링크가 바뀌어 저장된 링크로는 작업 공간을 열 수 없습니다.',
   )).toBeVisible()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
   await page.getByRole('button', {
-    name: '기존 작업 공간 확인 후 새로 만들기',
+    name: '기존 작업 공간 확인 완료',
   }).click()
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 
@@ -609,7 +609,7 @@ test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와�
   await expect(page.getByLabel('팀 이름')).toHaveValue(otherRequest.teamName)
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(page.getByText(
-    '공유 링크가 바뀌어 작업 공간을 다시 열 수 없습니다.',
+    '공유 링크가 바뀌어 저장된 링크로는 작업 공간을 열 수 없습니다.',
   )).toBeVisible()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
@@ -875,7 +875,7 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
   )).toHaveLength(0)
 
   await page.getByRole('button', {
-    name: '기존 작업 공간 확인 후 새로 만들기',
+    name: '기존 작업 공간 확인 완료',
   }).click()
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 })
@@ -948,7 +948,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
-    name: '기존 작업 공간 확인 후 새로 만들기',
+    name: '기존 작업 공간 확인 완료',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
   expect(api.calls.filter((call) =>
@@ -989,7 +989,7 @@ test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제�
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
-    name: '기존 작업 공간 확인 후 새로 만들기',
+    name: '기존 작업 공간 확인 완료',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
   expect(api.calls.filter((call) =>
