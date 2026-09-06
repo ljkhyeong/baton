@@ -2,6 +2,7 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
+import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
@@ -123,6 +124,11 @@ class TeamAccessUseCaseTest {
         when(current.currentAccountId()).thenReturn(Optional.of(admin.getId()));
         var invitation = access.invite(team, admin.getId(), viewerMember, TeamPermission.VIEWER);
         assertThat(invitation.token()).matches("[A-Za-z0-9_-]{43}");
+        assertThatThrownBy(() -> access.accept(admin.getId(), invitation.token()))
+                .isInstanceOf(AccountMembershipConflictException.class);
+        when(current.currentAccountId()).thenReturn(Optional.of(invited.getId()));
+        assertThatThrownBy(() -> access.accept(invited.getId(), invitation.token()))
+                .isInstanceOf(AccountMembershipConflictException.class);
         when(current.currentAccountId()).thenReturn(Optional.of(viewer.getId()));
         assertThat(access.getMyTeams(viewer.getId()).teams()).isEmpty();
         assertThat(access.preview(viewer.getId(), invitation.token()).memberId()).isEqualTo(viewerMember);
@@ -191,6 +197,9 @@ class TeamAccessUseCaseTest {
         assertThat(access.getAccess(team, admin.getId(), null).invitations())
                 .filteredOn(value -> value.id().equals(expired.invitation().id()))
                 .singleElement().satisfies(value -> assertThat(value.revokedAt()).isEqualTo(clock.instant()));
+        when(current.currentAccountId()).thenReturn(Optional.of(viewer.getId()));
+        assertThatThrownBy(() -> access.accept(viewer.getId(), fresh.token()))
+                .isInstanceOf(AccountMembershipConflictException.class);
         when(current.currentAccountId()).thenReturn(Optional.of(invited.getId()));
         assertThat(access.accept(invited.getId(), fresh.token()).memberId()).isEqualTo(inviteMember);
         access.changePermission(team, invited.getId(), adminMember, TeamPermission.VIEWER);

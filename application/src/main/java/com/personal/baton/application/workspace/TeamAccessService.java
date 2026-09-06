@@ -187,9 +187,9 @@ public class TeamAccessService implements TeamAccessUseCase {
             return accepted(team, membership);
         }
         if (!invitation.isPending(clock.instant())) throw invitationNotFound();
-        AccountTeamMembership membership = access.findMemberships(teamId).stream()
-                .filter(value -> value.getAccountId().equals(accountId) || value.getMemberId().equals(member.getId()))
-                .findFirst().orElseGet(() -> AccountTeamMembership.create(UUID.randomUUID(), accountId, teamId,
+        AccountTeamMembership membership = memberships.findMembership(accountId, teamId)
+                .or(() -> access.findMembershipByMemberId(member.getId()))
+                .orElseGet(() -> AccountTeamMembership.create(UUID.randomUUID(), accountId, teamId,
                         member.getId(), clock.instant()));
         if (!membership.getAccountId().equals(accountId) || !membership.getMemberId().equals(member.getId()))
             throw new AccountMembershipConflictException("이미 다른 계정 또는 구성원으로 연결되어 있습니다");
