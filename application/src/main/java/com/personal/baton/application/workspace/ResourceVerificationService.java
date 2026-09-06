@@ -18,10 +18,7 @@ import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import java.util.UUID;
 import java.util.List;
 import java.util.Optional;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,26 +52,12 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
         if (scope.season().getEndedAt() != null) {
             return new DueReviewsResult(teamId, seasonId, today, scope.season().getZoneId().getId(), List.of());
         }
-        var roles = people.findRolesByTeamIdAndSeasonId(teamId, seasonId).stream()
-                .collect(Collectors.toMap(value -> value.getId(), Function.identity()));
-        var resources = records.findRoleResourcesByRoleIds(List.copyOf(roles.keySet())).stream()
-                .filter(value -> value.getArchivedAt() == null).toList();
-        var schedules = verifications.findSchedules(resources.stream().map(RoleResource::getId).toList()).stream()
-                .filter(value -> value.isDueOn(today))
-                .collect(Collectors.toMap(ResourceReviewSchedule::getResourceId, Function.identity()));
-        var members = people.findMembersByTeamId(teamId).stream().filter(Member::isActive)
-                .collect(Collectors.toMap(Member::getId, Function.identity()));
-        var due = new ArrayList<DueReviewResult>();
-        for (var resource : resources) {
-            var schedule = schedules.get(resource.getId());
-            if (schedule == null) continue;
-            var role = roles.get(resource.getRoleId());
-            var member = members.get(role.getCurrentMemberId());
-            due.add(new DueReviewResult(resource.getId(), role.getId(), resource.getTitle(), role.getName(),
-                    member == null ? null : member.getId(), member == null ? null : member.getName(), schedule.getNextReviewOn()));
-        }
-        due.sort(Comparator.comparing(DueReviewResult::nextReviewOn).thenComparing(DueReviewResult::resourceId));
-        return new DueReviewsResult(teamId, seasonId, today, scope.season().getZoneId().getId(), List.copyOf(due));
+        var due = verifications.findDueReviews(teamId, seasonId, today).stream()
+                .map(value -> new DueReviewResult(value.getResourceId(), value.getRoleId(), value.getTitle(),
+                        value.getRoleName(), value.getMemberId(), value.getMemberName(), value.getNextReviewOn()))
+                .sorted(Comparator.comparing(DueReviewResult::nextReviewOn).thenComparing(DueReviewResult::resourceId))
+                .toList();
+        return new DueReviewsResult(teamId, seasonId, today, scope.season().getZoneId().getId(), due);
     }
 
     @Override

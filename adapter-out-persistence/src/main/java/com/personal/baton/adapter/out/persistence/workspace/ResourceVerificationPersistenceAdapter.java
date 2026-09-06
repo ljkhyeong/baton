@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.persistence.workspace;
 
 import com.personal.baton.application.workspace.port.out.ResourceVerificationRepository;
 import com.personal.baton.domain.workspace.ResourceVerification;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import com.personal.baton.domain.workspace.ResourceReviewSchedule;
@@ -16,7 +17,10 @@ public class ResourceVerificationPersistenceAdapter implements ResourceVerificat
         this.schedules = schedules;
         this.repository = repository;
     }
-    @Override public List<ResourceReviewSchedule> findSchedules(List<UUID> resourceIds) { return schedules.findAllById(resourceIds); }
+    @Override
+    public List<DueReview> findDueReviews(UUID teamId, UUID seasonId, LocalDate today) {
+        return schedules.findDueReviews(teamId, seasonId, today);
+    }
     @Override public Optional<ResourceReviewSchedule> findSchedule(UUID resourceId) { return schedules.findById(resourceId); }
     @Override public ResourceReviewSchedule saveSchedule(ResourceReviewSchedule schedule) { return schedules.saveAndFlush(schedule); }
     @Override
