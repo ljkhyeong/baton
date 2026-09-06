@@ -181,6 +181,11 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     }
 
     @Override
+    public boolean existsSeasonRoundOutsideRange(UUID seasonId, LocalDate startDate, LocalDate endDate) {
+        return seasonRoundRepository.existsOutsideRange(seasonId, startDate, endDate);
+    }
+
+    @Override
     public boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name) {
         return seasonRoundRepository.existsBySeasonIdAndName(seasonId, name);
     }

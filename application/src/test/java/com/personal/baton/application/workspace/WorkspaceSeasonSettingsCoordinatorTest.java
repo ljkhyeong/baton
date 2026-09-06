@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -55,8 +53,8 @@ class WorkspaceSeasonSettingsCoordinatorTest {
         assertThat(result.name()).isEqualTo("여름 스터디");
         assertThat(result.startDate()).isEqualTo(LocalDate.of(2026, 7, 1));
         assertThat(result.endDate()).isEqualTo(LocalDate.of(2026, 8, 31));
-        verify(operationsRepository, never()).findSeasonRoundsBySeasonId(any());
-        verify(peopleRepository, never()).findRolesByTeamIdAndSeasonId(any(), any());
-        verify(peopleRepository, never()).findRoleHandoffsByRoleIds(any());
+        verify(operationsRepository, never()).existsSeasonRoundOutsideRange(any(), any(), any());
+        verify(peopleRepository, never()).existsRoleAssignmentOutsideRange(any(), any(), any(), any());
+        verify(peopleRepository, never()).existsOpenRoleHandoffOutsideRange(any(), any(), any(), any());
     }
 }

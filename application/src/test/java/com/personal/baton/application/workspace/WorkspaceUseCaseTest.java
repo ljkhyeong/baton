@@ -6204,7 +6204,8 @@ class WorkspaceUseCaseTest {
                         LocalDate.of(2026, 7, 10),
                         LocalDate.of(2026, 8, 31)
                 )
-        )).isInstanceOf(DomainValidationException.class);
+        )).isInstanceOf(DomainValidationException.class)
+                .hasMessage("기존 역할 배정 기간을 제외하도록 시즌 기간을 줄일 수 없습니다");
         assertThatThrownBy(() -> lifecycleUseCase.updateSeason(
                 created.teamId(),
                 created.seasonId(),
@@ -6214,7 +6215,56 @@ class WorkspaceUseCaseTest {
                         LocalDate.of(2026, 7, 1),
                         LocalDate.of(2026, 8, 15)
                 )
-        )).isInstanceOf(DomainValidationException.class);
+        )).isInstanceOf(DomainValidationException.class)
+                .hasMessage("기존 회차 날짜를 제외하도록 시즌 기간을 줄일 수 없습니다");
+
+        var updated = lifecycleUseCase.updateSeason(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("여름 시즌", LocalDate.of(2026, 7, 5), LocalDate.of(2026, 8, 25)));
+        assertThat(updated.startDate()).isEqualTo(LocalDate.of(2026, 7, 5));
+        assertThat(updated.endDate()).isEqualTo(LocalDate.of(2026, 8, 25));
+    }
+
+    @Test
+    @DisplayName("시즌 기간은 진행 중 인수인계의 다음 담당 기간을 포함하고 취소된 인수인계는 제외한다")
+    void preservesOpenHandoffRangeWhenUpdatingSeason() {
+        var created = lifecycleUseCase.createWorkspace("workspace-open-handoff-season-range-01", CREATION_KEY,
+                new CreateWorkspaceCommand("인수인계 기간 검증 팀", "가을 준비 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 10, 31), List.of("박민서", "김준호")));
+        var workspace = lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey());
+        UUID currentMember = memberNamed(workspace, "박민서").id();
+        UUID nextMember = memberNamed(workspace, "김준호").id();
+        var role = peopleUseCase.createRole(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("range-handoff-role"), created.accessKey(),
+                new CreateRoleCommand("진행 담당", "모임 진행", currentMember, null,
+                        LocalDate.of(2026, 7, 1), null, List.of(), null));
+        var prepared = peopleUseCase.prepareRoleHandoff(created.teamId(), created.seasonId(), role.id(),
+                contentIdempotencyKey("range-handoff-prepare"), created.accessKey(),
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
+                        nextMember, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
+        var shortened = new UpdateSeasonCommand("가을 준비 시즌", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31));
+        String message = "준비 중인 인수인계의 다음 담당 기간을 제외하도록 시즌 기간을 줄일 수 없습니다";
+        assertThatThrownBy(() -> lifecycleUseCase.updateSeason(
+                created.teamId(), created.seasonId(), created.accessKey(), shortened))
+                .isInstanceOf(DomainValidationException.class).hasMessage(message);
+        lifecycleUseCase.updateSeason(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("가을 준비 시즌", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30)));
+
+        peopleUseCase.transferRoleHandoff(created.teamId(), created.seasonId(), role.id(), prepared.handoff().id(),
+                created.accessKey(), new WorkspacePeopleCommands.TransferRoleHandoffCommand(currentMember, true));
+        assertThatThrownBy(() -> lifecycleUseCase.updateSeason(
+                created.teamId(), created.seasonId(), created.accessKey(), shortened))
+                .isInstanceOf(DomainValidationException.class).hasMessage(message);
+        peopleUseCase.cancelRoleHandoff(created.teamId(), created.seasonId(), role.id(), prepared.handoff().id(),
+                created.accessKey(), new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(currentMember));
+        assertThat(lifecycleUseCase.updateSeason(created.teamId(), created.seasonId(), created.accessKey(), shortened).endDate())
+                .isEqualTo(LocalDate.of(2026, 8, 31));
+
+        peopleUseCase.prepareRoleHandoff(created.teamId(), created.seasonId(), role.id(),
+                contentIdempotencyKey("range-handoff-without-end"), created.accessKey(),
+                new WorkspacePeopleCommands.PrepareRoleHandoffCommand(nextMember, LocalDate.of(2026, 8, 2), null));
+        assertThat(lifecycleUseCase.updateSeason(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("가을 준비 시즌", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 2))).endDate())
+                .isEqualTo(LocalDate.of(2026, 8, 2));
     }
 
     @DisplayName("접근 키 변경 재생은 시즌을 바꿔도 팀 범위를 유지하고 기존 시즌 기반 기록도 복원한다")

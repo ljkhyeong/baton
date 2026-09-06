@@ -4,6 +4,7 @@ import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +49,8 @@ public interface WorkspacePeopleRepository {
 
     List<Role> findRolesByTeamIdAndSeasonId(UUID teamId, UUID seasonId);
 
+    boolean existsRoleAssignmentOutsideRange(UUID teamId, UUID seasonId, LocalDate startDate, LocalDate endDate);
+
     List<Role> findRolesByTeamIdAndSeasonIdAndIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
 
     List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
@@ -66,4 +69,6 @@ public interface WorkspacePeopleRepository {
     }
 
     boolean existsOpenRoleHandoffBySeasonId(UUID seasonId);
+
+    boolean existsOpenRoleHandoffOutsideRange(UUID teamId, UUID seasonId, LocalDate startDate, LocalDate endDate);
 }

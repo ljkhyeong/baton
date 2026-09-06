@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.persistence.workspace;
 
 import com.personal.baton.domain.workspace.Role;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,15 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
 
     @EntityGraph(attributePaths = "responsibilities")
     List<Role> findAllByTeamIdAndSeasonIdAndIdIn(UUID teamId, UUID seasonId, List<UUID> roleIds);
+
+    @Query("""
+            select count(role) > 0
+            from Role role
+            where role.teamId = :teamId and role.seasonId = :seasonId
+              and (role.assignmentStartDate not between :startDate and :endDate
+                   or role.assignmentEndDate not between :startDate and :endDate)
+            """)
+    boolean existsAssignmentOutsideRange(UUID teamId, UUID seasonId, LocalDate startDate, LocalDate endDate);
 
     @Query("""
             select role.id

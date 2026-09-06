@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 
 public interface SeasonRoundJpaRepository extends JpaRepository<SeasonRound, UUID> {
 
@@ -26,6 +27,14 @@ public interface SeasonRoundJpaRepository extends JpaRepository<SeasonRound, UUI
     );
 
     boolean existsBySeasonId(UUID seasonId);
+
+    @Query("""
+            select count(round) > 0
+            from SeasonRound round
+            where round.seasonId = :seasonId
+              and round.meetingDate not between :startDate and :endDate
+            """)
+    boolean existsOutsideRange(UUID seasonId, LocalDate startDate, LocalDate endDate);
 
     boolean existsBySeasonIdAndName(UUID seasonId, String name);
 

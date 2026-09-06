@@ -54,6 +54,8 @@ public interface WorkspaceOperationsRepository {
 
     boolean existsSeasonRoundBySeasonId(UUID seasonId);
 
+    boolean existsSeasonRoundOutsideRange(UUID seasonId, LocalDate startDate, LocalDate endDate);
+
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 
     boolean existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
