@@ -63,10 +63,10 @@ final class RoutineContinuitySignalAnalyzer {
                             : ContinuitySignalSeverity.WARNING,
                     routine.getOwnerRoleId(),
                     routine.getId(),
-                    routine.getTitle() + " 반복 지연",
+                    routine.getTitle() + " 여러 회차에서 마감 지남",
                     routine.getTitle() + " 반복 업무가 서로 다른 " + overdueRoundCount
                             + "개 회차에서 마감 뒤에도 완료되지 않았습니다.",
-                    "반복 업무의 담당, 마감과 실행 방법을 다시 정하고 밀린 회차를 정리하세요.",
+                    "담당자와 마감을 확인하고 밀린 업무를 처리하세요.",
                     null
             ));
         }

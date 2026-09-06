@@ -140,7 +140,7 @@ export function createWorkspaceEditorActions({
     if (isRoleHandoffLocked(roleHandoffs, role.id)) {
       setSelectedRoleId(role.id)
       setView('handoff')
-      notify('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
+      notify('인수인계 전달 후에는 수락하거나 취소해야 수정할 수 있어요.', 'error')
       return
     }
     mutations.roleUpdate.reset()

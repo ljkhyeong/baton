@@ -117,7 +117,7 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
   await page.getByLabel('시작일').fill('2026-09-01')
   await page.getByLabel('종료일').fill('2026-11-30')
   await page.getByLabel('구성원 이름').fill('박민서\n김준호, 최유진')
-  await page.getByLabel('파일럿 생성 코드 (선택)').fill('pilot-only-code')
+  await page.getByLabel('작업 공간 생성 코드 (선택)').fill('pilot-only-code')
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
@@ -268,7 +268,7 @@ test('생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 �
     await page.getByLabel('종료일').fill('2027-08-31')
     await page.getByLabel('구성원 이름').fill('박민서\n김준호')
     await page.getByRole('button', { name: '작업 공간 만들기' }).click()
-    await expect(page.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+    await expect(page.getByRole('alert')).toContainText('일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.')
   }
 
   await page.goto('/')
@@ -355,13 +355,13 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await pendingRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
-  await page.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
+  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
 
   await expect(page.getByRole('alert')).toContainText('입력한 작업 공간 정보를 확인해 주세요.')
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
@@ -399,14 +399,14 @@ test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리�
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByText(
-    '이전 생성 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '작업 공간을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
   await expect(page.getByRole('button', { name: '임시 기록 정리 필요' })).toBeDisabled()
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(await pendingCreationEntries(page)).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
+  await page.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
 
   await expect(page.getByRole('alert')).toContainText('브라우저의 임시 기록을 정리했습니다.')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -443,7 +443,7 @@ test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 �
 
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByText(
-    '이전 생성 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '작업 공간을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
   await expect(page.getByRole('button', { name: '임시 기록 정리 필요' })).toBeDisabled()
@@ -452,7 +452,7 @@ test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 �
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 정리 재시도' }).click()
+  await page.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -479,7 +479,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재�
   await fillOnboardingForm(page, request)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  const cleanupButton = page.getByRole('button', { name: '임시 기록 정리 재시도' })
+  const cleanupButton = page.getByRole('button', { name: '임시 기록 삭제 재시도' })
   await expect(cleanupButton).toBeVisible()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
 
@@ -487,15 +487,15 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재�
   await api.attachPage(peerPage)
   await peerPage.goto('/')
   const peerRegion = peerPage.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await peerRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await peerRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await peerRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
 
   api.holdNextWorkspaceCreation()
-  await peerPage.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
+  await peerPage.getByRole('button', { name: '작업 공간 다시 확인' }).click()
   await expect.poll(() => api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces').length).toBe(2)
 
@@ -536,26 +536,26 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
   await fillOnboardingForm(page, request)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('작업 공간이 이미 만들어졌을 수 있으니 운영자나 기존 공유 링크를 먼저 확인해 주세요.')
+  await expect(page.getByRole('alert')).toContainText('이미 만들어졌을 수 있으니 운영자에게 최신 링크를 요청하세요.')
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(firstAttempt.headers['idempotency-key']).toBe(pendingEntry.idempotencyKey)
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
-  await expect(page.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
   await page.getByLabel('팀 이름').fill(`${request.teamName} 수정`)
-  await expect(page.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(page.getByText(
-    '이전 생성 요청으로 만든 작업 공간의 접근 키가 이미 변경되어 결과를 다시 받을 수 없습니다.',
+    '공유 링크가 바뀌어 작업 공간을 다시 열 수 없습니다.',
   )).toBeVisible()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
   await page.getByRole('button', {
-    name: '기존 결과를 확인했고 새 요청으로 전환',
+    name: '기존 작업 공간 확인 후 새로 만들기',
   }).click()
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 
@@ -597,19 +597,19 @@ test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와�
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   const pendingRegion = page.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await pendingRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${otherRequest.teamName} ${otherRequest.seasonName} 저장된 입력 불러오기`,
   }).click()
 
   await expect(page.getByLabel('팀 이름')).toHaveValue(otherRequest.teamName)
-  await expect(page.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(page.getByText(
-    '이전 생성 요청으로 만든 작업 공간의 접근 키가 이미 변경되어 결과를 다시 받을 수 없습니다.',
+    '공유 링크가 바뀌어 작업 공간을 다시 열 수 없습니다.',
   )).toBeVisible()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
@@ -797,9 +797,9 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await pendingRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await expect(pendingRegion.getByText(pendingRequest.teamName)).toBeVisible()
   await pendingRegion.getByRole('button', {
     name: `${pendingRequest.teamName} ${pendingRequest.seasonName} 저장된 입력 불러오기`,
@@ -812,7 +812,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect(page.getByLabel('구성원 이름')).toHaveValue(
     [...pendingRequest.memberNames].sort().join('\n'),
   )
-  const loadedNotice = page.getByText('저장된 입력을 불러왔습니다. 필요한 생성 코드를 입력한 뒤 같은 생성 결과를 확인해 주세요.')
+  const loadedNotice = page.getByText('입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘작업 공간 다시 확인’을 누르세요.')
   await expect(loadedNotice).toBeVisible()
   expect(api.calls.filter((call) => call.path === '/api/v1/workspaces')).toHaveLength(0)
 
@@ -821,7 +821,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect(loadedNotice).toBeHidden()
   await page.getByLabel('팀 이름').fill(pendingRequest.teamName)
 
-  await page.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
+  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: '이번 회차 미완료 업무 0개' })).toBeVisible()
 
@@ -849,9 +849,9 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await pendingRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -865,17 +865,17 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
       }),
     }))
   }, { prefix: PENDING_CREATION_STORAGE_PREFIX, entry: pendingEntry })
-  await page.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
+  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('다른 탭에서 복구 기록이 변경됐습니다.')
-  await expect(page.getByText('이 입력의 복구 기록이 다른 탭에서 변경되었습니다.')).toBeVisible()
-  await expect(page.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(page.getByRole('alert')).toContainText('다른 탭에서 임시 기록이 변경됐습니다.')
+  await expect(page.getByText('다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다.')).toBeVisible()
+  await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(0)
 
   await page.getByRole('button', {
-    name: '기존 결과를 확인했고 새 요청으로 전환',
+    name: '기존 작업 공간 확인 후 새로 만들기',
   }).click()
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 })
@@ -909,30 +909,30 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
 
   const pendingLabel = `${pendingRequest.teamName} ${pendingRequest.seasonName}`
   const pageRegion = page.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await pageRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await pageRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await pageRegion.getByRole('button', {
     name: `${pendingLabel} 저장된 입력 불러오기`,
   }).click()
-  await page.getByRole('button', { name: '같은 생성 결과 확인하기' }).click()
+  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
   await expect.poll(() =>
     api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces').length,
   ).toBe(1)
 
   const peerRegion = peerPage.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
-  await peerRegion.getByText('확인하지 못한 생성 요청 1개').click()
+  await peerRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
   await peerRegion.getByRole('button', {
     name: `${pendingLabel} 저장된 입력 불러오기`,
   }).click()
-  await expect(peerPage.getByRole('button', { name: '같은 생성 결과 확인하기' })).toBeVisible()
+  await expect(peerPage.getByRole('button', { name: '작업 공간 다시 확인' })).toBeVisible()
   await peerRegion.getByRole('button', {
-    name: `${pendingLabel} 복구 목록에서 삭제`,
+    name: `${pendingLabel} 확인 대기 목록에서 삭제`,
   }).click()
   await peerRegion.getByRole('group', {
-    name: '복구 목록에서 삭제할까요?',
+    name: '확인 대기 목록에서 삭제할까요?',
   }).getByRole('button', { name: '목록에서 삭제' }).click()
 
   await expect(peerRegion.getByRole('alert')).toContainText('다른 탭에서 작업 공간 생성 결과를 확인 중입니다.')
@@ -941,14 +941,14 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
   api.releaseWorkspaceCreation()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(peerPage)).length).toBe(0)
-  await expect(peerPage.getByText('다른 탭에서 이 요청의 결과를 확인했거나 복구 목록에서 삭제했습니다.')).toBeVisible()
-  await expect(peerPage.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(peerPage.getByText('다른 탭에서 이 요청의 결과를 확인했거나 확인 대기 목록에서 삭제했습니다.')).toBeVisible()
+  await expect(peerPage.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(peerPage.getByRole('link', { name: new RegExp(pendingRequest.teamName) })).toBeVisible()
   expect(api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
-    name: '기존 결과를 확인했고 새 요청으로 전환',
+    name: '기존 작업 공간 확인 후 새로 만들기',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
   expect(api.calls.filter((call) =>
@@ -983,13 +983,13 @@ test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제�
 
   api.releaseWorkspaceCreation()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(peerPage.getByRole('button', { name: '기존 결과 확인 필요' })).toBeDisabled()
+  await expect(peerPage.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(peerPage.getByRole('link', { name: new RegExp(request.teamName) })).toBeVisible()
   expect(api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
-    name: '기존 결과를 확인했고 새 요청으로 전환',
+    name: '기존 작업 공간 확인 후 새로 만들기',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
   expect(api.calls.filter((call) =>
@@ -998,7 +998,7 @@ test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제�
 
 test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 만든다', async ({ page }) => {
   const pendingRequests = Array.from({ length: 5 }, (_, index): CreateWorkspaceRequest => ({
-    teamName: `생성 결과 미확인 스터디 ${index + 1}`,
+    teamName: `작업 공간이 만들어졌는지 확인해 주세요 스터디 ${index + 1}`,
     seasonName: `2028 봄 시즌 ${index + 1}`,
     startDate: '2028-03-01',
     endDate: '2028-05-31',
@@ -1017,7 +1017,7 @@ test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '확인되지 않은 작업 공간 생성 요청',
+    name: '완료 여부를 확인할 작업 공간',
   })
   await expect(pendingRegion.getByRole('listitem')).toHaveCount(5)
 
@@ -1031,7 +1031,7 @@ test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 
   await fillOnboardingForm(page, newRequest)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('확인하지 못한 생성 요청이 5개 남아')
+  await expect(page.getByRole('alert')).toContainText('완료 여부를 확인하지 못한 작업 공간이 5개 있습니다.')
   expect(api.calls.filter((call) => call.path === '/api/v1/workspaces')).toHaveLength(0)
   await expect.poll(async () =>
     (await pendingCreationEntries(page))
@@ -1041,9 +1041,9 @@ test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 
 
   const firstRequest = pendingRequests[0]!
   const firstItem = pendingRegion.getByRole('listitem').filter({ hasText: firstRequest.teamName })
-  const discardButtonName = `${firstRequest.teamName} ${firstRequest.seasonName} 복구 목록에서 삭제`
+  const discardButtonName = `${firstRequest.teamName} ${firstRequest.seasonName} 확인 대기 목록에서 삭제`
   await firstItem.getByRole('button', { name: discardButtonName }).click()
-  const confirmation = firstItem.getByRole('group', { name: '복구 목록에서 삭제할까요?' })
+  const confirmation = firstItem.getByRole('group', { name: '확인 대기 목록에서 삭제할까요?' })
   await expect(confirmation).toBeVisible()
   await confirmation.getByRole('button', { name: '계속 보관' }).click()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(5)
@@ -1121,14 +1121,14 @@ test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복
   expect(call.headers['x-baton-access-key']).toBe('wrong-access-key')
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
 
-  await page.getByRole('button', { name: '저장된 키로 다시 열기' }).click()
+  await page.getByRole('button', { name: '저장된 공유 링크로 열기' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
   const successfulGet = [...api.calls].reverse().find((candidate) => candidate.method === 'GET' && candidate.path === `${SCOPE_PATH}/workspace`)
   expect(successfulGet?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
 })
 
-test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND 기록을 함께 지운다', async ({ page, context }) => {
+test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기록을 함께 지운다', async ({ page, context }) => {
   test.slow()
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -1177,14 +1177,14 @@ test('@smoke 이 기기 권한 제거는 접근 키와 최근 목록과 ROUND �
   await expect.poll(workspaceGetCount).toBeGreaterThan(requestsBeforeRefresh)
 
   page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('저장된 접근 키와 모든 최근 시즌 기록')
+    expect(dialog.message()).toContain('공유 링크와 최근 방문 목록')
     await dialog.accept()
   })
   await page.getByRole('button', {
-    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
+    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 공유 링크 삭제',
   }).click()
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
-  await expect(peer.getByText('접근 키 필요')).toBeVisible()
+  await expect(peer.getByText('로그인 또는 공유 링크 필요')).toBeVisible()
   api.releaseWorkspaceGets()
   const requestsAfterRemoval = workspaceGetCount()
   await peer.evaluate(() => {
@@ -1228,14 +1228,14 @@ test('최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록�
   await page.goto('/')
 
   const forgetButton = page.getByRole('button', {
-    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
+    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 공유 링크 삭제',
   })
   await expect(forgetButton).toBeVisible()
   page.once('dialog', (dialog) => dialog.accept())
   await forgetButton.click()
 
   await expect(forgetButton).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('접근 키는 제거했지만 최근 작업 공간 목록을 갱신하지 못했습니다.')
+  await expect(page.getByRole('alert')).toContainText('공유 링크는 지웠지만 최근 방문 목록을 지우지 못했습니다.')
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
     .toBeNull()
   expect(await page.evaluate(() =>
@@ -1269,7 +1269,7 @@ test('접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다
   await page.goto('/')
 
   const forgetButton = page.getByRole('button', {
-    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 접근 권한 제거',
+    name: '알고리즘 한 바퀴 2026 여름 시즌 이 기기에서 공유 링크 삭제',
   })
   page.once('dialog', (dialog) => dialog.accept())
   await forgetButton.click()

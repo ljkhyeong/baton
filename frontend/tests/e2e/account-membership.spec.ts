@@ -181,12 +181,12 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
   } })
   await openSharedWorkspace(page)
   const panel = page.getByRole('region', { name: '내 담당 업무' })
-  await expect(panel).toContainText('미완료 1건 · 수락 대기 1건')
+  await expect(panel).toContainText('남은 업무 1건 · 넘겨받을 업무 1건')
   await expect(panel.getByText('다른 사람의 업무')).toHaveCount(0)
   await expect(panel.getByText('문제 5개 선정')).toHaveCount(0)
   await panel.getByRole('button', { name: /풀이 노트 정리/ }).focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByLabel('운영 회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
   const execution = page.getByRole('button', { name: /^풀이 노트 정리 이번 회차의 핵심 풀이를/ })
   await expect(execution).toBeFocused()
   await expect(execution).toBeInViewport()
@@ -222,15 +222,15 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
 
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
   await expect(dialog.getByText('내 계정 연결', { exact: true })).toBeVisible()
-  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => {
     expect(confirmation.message()).toContain('연결 후에는 다른 구성원으로 바꿀 수 없습니다.')
     await confirmation.accept()
   })
-  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+  await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
 
-  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
-  await expect(dialog.getByText(/박민서 구성원으로 연결되었습니다/)).toBeVisible()
+  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
+  await expect(dialog.getByText(/내 계정은 박민서 이름으로 연결되어 있습니다/)).toBeVisible()
 
   const currentCall = membershipApi.calls.find(
     (call) => call.method === 'GET'
@@ -258,7 +258,7 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
     .click()
   await page.getByRole('button', { name: '구성원 관리' }).click()
   await expect(page.getByRole('dialog', { name: '구성원 관리' })
-    .getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+    .getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 })
 
 test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동으로 전환한다', async ({ page }, testInfo) => {
@@ -273,9 +273,9 @@ test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동
   await page.getByRole('button', { name: '구성원 관리' }).click()
 
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => confirmation.accept())
-  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+  await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
 
   await expect(dialog).toBeHidden()
   await expect(page.getByRole('region', { name: '내 담당 업무' }).getByRole('link', { name: '로그인', exact: true })).toBeVisible()
@@ -291,7 +291,7 @@ test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 �
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '구성원 관리' }).click()
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
 
   const lookupStarted = Promise.withResolvers<void>()
   const lookupResponse = Promise.withResolvers<void>()
@@ -307,15 +307,15 @@ test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 �
   await lookupStarted.promise
   try {
     page.once('dialog', (confirmation) => confirmation.accept())
-    await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
-    await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+    await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
+    await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 
     const lateResponse = page.waitForResponse('**/api/v1/account-memberships/current?*')
     lookupResponse.resolve()
     await (await lateResponse).finished()
 
-    await expect(dialog.getByText('박민서 구성원으로 연결되었습니다.')).toBeVisible()
-    await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toHaveCount(0)
+    await expect(dialog.getByText('내 계정은 박민서 이름으로 연결되어 있습니다.')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toHaveCount(0)
   } finally {
     lookupResponse.resolve()
   }
@@ -331,10 +331,10 @@ test('membership 응답의 additive field를 무시한다', async ({ page }, tes
   await page.getByRole('button', { name: '구성원 관리' }).click()
 
   let dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => confirmation.accept())
-  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
-  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+  await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
+  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 
   await page.reload()
   await navigation(page, testInfo.project.name)
@@ -342,7 +342,7 @@ test('membership 응답의 additive field를 무시한다', async ({ page }, tes
     .click()
   await page.getByRole('button', { name: '구성원 관리' }).click()
   dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 })
 
 test('익명 사용자는 접근 키를 URL에 복제하지 않는 로그인 복귀 경로를 받는다', async ({ page }, testInfo) => {
@@ -377,8 +377,8 @@ test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시�
   membershipApi.restoreAuthSession()
   await dialog.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
   await expect(dialog).toBeHidden()
-  await page.getByRole('region', { name: '내 담당 업무' }).getByRole('button', { name: '구성원 연결하기' }).click()
-  await expect(dialog.getByLabel('연결할 구성원')).toBeVisible()
+  await page.getByRole('region', { name: '내 담당 업무' }).getByRole('button', { name: '내 이름 선택하기' }).click()
+  await expect(dialog.getByLabel('내 이름')).toBeVisible()
 })
 
 test('@smoke 기존 계정 정보가 있어도 세션 재조회 실패 중에는 구성원을 연결하지 않는다', async ({ page }, testInfo) => {
@@ -388,7 +388,7 @@ test('@smoke 기존 계정 정보가 있어도 세션 재조회 실패 중에는
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '구성원 관리' }).click()
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toBeEnabled()
 
   await page.route('**/api/v1/auth/session', (route) => route.fulfill({
     status: 503,
@@ -401,12 +401,12 @@ test('@smoke 기존 계정 정보가 있어도 세션 재조회 실패 중에는
     window.dispatchEvent(new Event('visibilitychange'))
   })
   await expect(dialog.getByText(/로그인 상태를 확인하지 못했습니다/)).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toHaveCount(0)
   expect(membershipApi.calls.filter((call) => call.method === 'POST')).toHaveLength(0)
 
   await page.unroute('**/api/v1/auth/session')
   await dialog.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
-  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toBeEnabled()
 })
 
 test('다른 계정 범위의 current membership 응답은 연결 상태로 캐시하지 않는다', async ({ page }, testInfo) => {
@@ -428,7 +428,7 @@ test('다른 계정 범위의 current membership 응답은 연결 상태로 캐�
 
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
   await expect(dialog.getByText(/서버 응답을 확인할 수 없습니다/)).toBeVisible()
-  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toHaveCount(0)
+  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toHaveCount(0)
 })
 
 test('활동 종료된 선택값은 남은 활동 구성원으로 보정해 claim한다', async ({ page }, testInfo) => {
@@ -441,14 +441,14 @@ test('활동 종료된 선택값은 남은 활동 구성원으로 보정해 clai
   await page.getByRole('button', { name: '구성원 관리' }).click()
 
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  const memberSelect = dialog.getByLabel('연결할 구성원')
+  const memberSelect = dialog.getByLabel('내 이름')
   await memberSelect.selectOption(MEMBER_ONE_ID)
   await dialog.getByRole('button', { name: '박민서 활동 종료' }).click()
   await expect(memberSelect).toHaveValue(MEMBER_TWO_ID)
 
   page.once('dialog', async (confirmation) => confirmation.accept())
-  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
-  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toBeVisible()
+  await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
+  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 
   const claimCall = membershipApi.calls.find(
     (call) => call.method === 'POST'
@@ -478,8 +478,8 @@ test('종료 시즌에서도 연결 이력 진입을 열고 새 claim만 막는�
   await manageMembers.click()
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
   await expect(dialog.getByText(/종료된 시즌은 읽기 전용입니다/)).toBeVisible()
-  await expect(dialog.getByLabel('연결할 구성원')).toBeDisabled()
-  await expect(dialog.getByRole('button', { name: '선택한 구성원과 연결' })).toBeDisabled()
+  await expect(dialog.getByLabel('내 이름')).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toBeDisabled()
   expect(membershipApi.calls.some((call) =>
     call.method === 'GET'
       && call.path === '/api/v1/account-memberships/current')).toBe(true)
@@ -502,12 +502,12 @@ test('claim 응답의 구성원 범위가 다르면 연결 cache를 갱신하지
   await page.getByRole('button', { name: '구성원 관리' }).click()
 
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await dialog.getByLabel('연결할 구성원').selectOption(MEMBER_ONE_ID)
+  await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => confirmation.accept())
-  await dialog.getByRole('button', { name: '선택한 구성원과 연결' }).click()
+  await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
 
   await expect(dialog.getByText(/서버 응답을 확인할 수 없습니다/)).toBeVisible()
-  await expect(dialog.getByText('내 계정이 연결되어 있습니다.')).toHaveCount(0)
+  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toHaveCount(0)
 })
 
 
@@ -543,7 +543,7 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
   await inbox.locator('summary').click()
   await inbox.locator('.notification-source').click()
   await expect(page.locator(`[data-execution-id="${execution.id}"]`)).toBeVisible()
-  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '운영' })).toHaveAttribute('aria-current', 'page')
+  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '일정' })).toHaveAttribute('aria-current', 'page')
 })
 
  test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 다시 켜도 읽음 상태가 남는다', async ({ page }) => {

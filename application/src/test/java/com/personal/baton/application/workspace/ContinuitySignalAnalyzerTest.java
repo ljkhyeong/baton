@@ -158,9 +158,9 @@ class ContinuitySignalAnalyzerTest {
                     assertThat(signal.reason())
                             .contains(
                                     "개인 메모에만 맥락이 있습니다",
-                                    "책임 목록",
-                                    "활성 인수인계 항목",
-                                    "역할 자료"
+                                    "담당 업무 없음",
+                                    "인수인계 항목 없음",
+                                    "참고 자료 없음"
                             );
                     assertThat(signal.recommendedAction()).contains("보완");
                 });
@@ -269,7 +269,7 @@ class ContinuitySignalAnalyzerTest {
         assertThat(signals)
                 .filteredOn(signal -> signal.roleId().equals(preparingRole.getId()))
                 .singleElement()
-                .satisfies(signal -> assertThat(signal.reason()).contains("활성 인수인계 항목이 없습니다"));
+                .satisfies(signal -> assertThat(signal.reason()).contains("등록된 인수인계 항목이 없습니다"));
         assertThat(signals)
                 .filteredOn(signal -> signal.roleId().equals(transferredRole.getId()))
                 .singleElement()
@@ -379,7 +379,7 @@ class ContinuitySignalAnalyzerTest {
                 .filteredOn(signal -> signal.roleId().equals(transferredFromInactiveRole.getId()))
                 .singleElement()
                 .satisfies(signal -> {
-                    assertThat(signal.title()).contains("현재 담당 공백", "수락 대기");
+                    assertThat(signal.title()).contains("담당자 없음", "수락 필요");
                     assertThat(signal.severity()).isEqualTo(ContinuitySignalSeverity.CRITICAL);
                     assertThat(signal.reason()).contains("활동을 종료", "즉시 수락");
                     assertThat(signal.recommendedAction()).contains("즉시 수락");
@@ -471,7 +471,7 @@ class ContinuitySignalAnalyzerTest {
         assertThat(signals)
                 .filteredOn(signal -> signal.roleId().equals(notStarted.getId()))
                 .singleElement()
-                .satisfies(signal -> assertThat(signal.title()).contains("준비 미시작"));
+                .satisfies(signal -> assertThat(signal.title()).contains("인수인계를 시작해 주세요"));
         assertThat(signals)
                 .filteredOn(signal -> signal.roleId().equals(readyToTransfer.getId()))
                 .singleElement()
@@ -490,7 +490,7 @@ class ContinuitySignalAnalyzerTest {
                 .filteredOn(signal -> signal.roleId().equals(coverageGap.getId()))
                 .singleElement()
                 .satisfies(signal -> {
-                    assertThat(signal.title()).contains("담당 공백 예정");
+                    assertThat(signal.title()).contains("담당자 없는 기간 예정");
                     assertThat(signal.reason()).contains(TODAY.toString(), "29일의 담당 공백");
                     assertThat(signal.recommendedAction()).contains("취소", "다시 준비");
                 });

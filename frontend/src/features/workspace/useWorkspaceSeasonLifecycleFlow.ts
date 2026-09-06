@@ -93,7 +93,7 @@ export function useWorkspaceSeasonLifecycleFlow({
       season.previousSeasonId === workspace.season.id)
     if (hasSuccessor) {
       openSwitcher()
-      notify('이미 이어진 다음 시즌을 목록에서 열어 주세요.')
+      notify('다음 시즌은 이미 만들어졌습니다. 시즌 목록에서 여세요.')
       return
     }
 
@@ -144,7 +144,7 @@ export function useWorkspaceSeasonLifecycleFlow({
 
     updateSeasonEndingMutation.mutate({ ended: ending }, {
       onSuccess: () => notify(ending
-        ? '시즌을 종료하고 기록을 읽기 전용으로 보존했어요.'
+        ? '시즌을 종료했어요. 기록은 계속 볼 수 있지만 수정할 수 없습니다.'
         : '시즌을 다시 열었어요.'),
     })
   }

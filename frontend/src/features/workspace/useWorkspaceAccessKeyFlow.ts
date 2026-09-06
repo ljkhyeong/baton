@@ -25,12 +25,12 @@ type WorkspaceAccessKeyFlowOptions = {
   notify: (message: string, tone?: ToastTone) => void
 }
 
-const rotationCleanupErrorMessage = '접근 키는 바뀌었지만 브라우저의 임시 기록을 정리하지 못했습니다. 새 공유 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const rotationJournalCleanupErrorMessage = '이전 접근 키 변경 요청의 브라우저 임시 기록을 정리하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const staleRotationReplayMessage = '이전 접근 키 변경 결과를 정리했어요. 접근 키는 이번 요청에서 새로 바뀌지 않았습니다. 접근 키 바꾸기를 다시 눌러 주세요.'
-const rotationBusyMessage = '다른 탭에서 접근 키 변경 결과를 확인 중입니다. 그 탭의 처리가 끝난 뒤 다시 시도해 주세요.'
-const rotationLockUnsupportedMessage = '이 브라우저에서는 접근 키를 바꿀 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
-const rotationLockFailedMessage = '접근 키를 바꿀 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
+const rotationCleanupErrorMessage = '새 공유 링크를 발급했지만 임시 기록을 지우지 못했습니다. 새 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도하세요.'
+const rotationJournalCleanupErrorMessage = '이전 공유 링크의 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.'
+const staleRotationReplayMessage = '임시 기록을 지웠습니다. 새 링크는 아직 발급하지 않았습니다. ‘공유 링크 재발급’을 다시 누르세요.'
+const rotationBusyMessage = '다른 탭에서 새 공유 링크를 확인하고 있습니다. 그 탭에서 끝낸 뒤 다시 시도하세요.'
+const rotationLockUnsupportedMessage = '이 브라우저에서는 공유 링크를 재발급할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
+const rotationLockFailedMessage = '공유 링크를 재발급할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
 const accessKeyRotationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
@@ -122,7 +122,7 @@ export function useWorkspaceAccessKeyFlow({
     if (rotatedAccessKey === currentAccessKey) {
       const message = pendingCleared
         ? staleRotationReplayMessage
-        : '이전 접근 키 변경 결과를 정리하지 못해 이번 요청에서 새 키를 발급하지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+        : '임시 기록을 지우지 못해 새 링크를 발급하지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.'
       setRotationStorageError(message)
       notify(message, 'error')
       return
@@ -135,15 +135,15 @@ export function useWorkspaceAccessKeyFlow({
     if (saved) {
       if (pendingCleared) {
         onCloseModal()
-        notify('접근 키를 바꿨어요. 이제 새 공유 링크만 사용할 수 있습니다.')
+        notify('공유 링크를 재발급했어요. 이제 새 링크만 사용할 수 있습니다.')
       } else {
         notify(rotationCleanupErrorMessage, 'error')
       }
     } else {
       onOpenShareLink()
       const message = pendingCleared
-        ? '새 키를 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.'
-        : '새 접근 키 저장과 브라우저 임시 기록 정리를 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관해 주세요.'
+        ? '새 공유 링크를 브라우저에 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요.'
+        : '새 공유 링크가 브라우저에 저장됐는지 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요. 임시 기록도 지우지 못했습니다.'
       notify(message, 'error')
     }
   }
@@ -178,7 +178,7 @@ export function useWorkspaceAccessKeyFlow({
         const idempotencyKey = pendingAccessKeyRotation(teamId)
         if (!idempotencyKey) {
           rotateAccessKeyMutation.reset()
-          setRotationStorageError('다른 탭에서 접근 키 변경 기록을 이미 정리했습니다. 최신 공유 링크가 있는지 확인해 주세요.')
+          setRotationStorageError('다른 탭에서 임시 기록을 지웠습니다. 최신 공유 링크가 있는지 확인하세요.')
           return
         }
 
@@ -212,7 +212,7 @@ export function useWorkspaceAccessKeyFlow({
   const rotateWorkspaceAccessKey = async () => {
     if (rotationRequestInFlightRef.current || rotateAccessKeyMutation.isPending) return false
     rotationRequestInFlightRef.current = true
-    const confirmed = window.confirm('접근 키를 바꾸면 지금까지 공유한 링크는 즉시 열리지 않게 됩니다. 새 키로 교체할까요?')
+    const confirmed = window.confirm('공유 링크를 재발급할까요? 지금까지 공유한 링크는 즉시 사용할 수 없게 됩니다.')
     if (!confirmed) {
       rotationRequestInFlightRef.current = false
       return false

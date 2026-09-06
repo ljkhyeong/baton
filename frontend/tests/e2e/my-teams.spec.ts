@@ -28,7 +28,7 @@ test('@smoke @responsive 내 팀에서 공유 키 없이 이동하고 계정을 
   await expect(page.getByRole('button', { name: '오늘', exact: true }).filter({ visible: true })).toBeVisible()
   accountId = OTHER_ACCOUNT
   await page.getByRole('link', { name: '내 팀', exact: true }).filter({ visible: true }).click()
-  await expect(page.getByText('계정으로 접근할 수 있는 팀이 없습니다.', { exact: false })).toBeVisible()
+  await expect(page.getByText('이 계정으로 참여한 팀이 없습니다.', { exact: false })).toBeVisible()
   await expect(page.getByRole('link', { name: `${projection.team.name} 열기` })).toHaveCount(0)
 })
 

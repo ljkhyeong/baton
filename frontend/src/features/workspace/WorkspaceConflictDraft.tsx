@@ -49,7 +49,7 @@ export function WorkspaceConflictDraft({ draft, onDiscard }: {
 
   return <details className="conflict-draft" open>
     <summary>저장하지 못한 입력 내용 · {draft.title}</summary>
-    <p>최신 기록을 확인한 뒤 필요한 내용을 복사해 다시 편집하세요. 이 화면에서는 수정·재제출할 수 없습니다.</p>
+    <p>입력 내용을 복사한 뒤 최신 기록을 열어 다시 수정하세요. 아래 내용은 직접 수정할 수 없습니다.</p>
     <label>
       <span>저장하지 못한 입력 내용 (읽기 전용)</span>
       <textarea ref={textAreaRef} rows={6} readOnly value={draft.text} />
@@ -59,6 +59,6 @@ export function WorkspaceConflictDraft({ draft, onDiscard }: {
       <button type="button" className="secondary-button" onClick={onDiscard}>초안 버리기</button>
     </div>
     <p aria-live="polite">{copyMessage}</p>
-    <small>새 충돌, 새로고침, 계정·팀·시즌·접근 키 변경 또는 접근 권한 상실 시 이 초안은 사라집니다.</small>
+    <small>새로고침하거나 계정·팀·시즌을 바꾸면 이 초안은 사라집니다. 다른 수정과 다시 충돌하거나 공유 링크·접근 권한이 바뀌어도 사라집니다.</small>
   </details>
 }

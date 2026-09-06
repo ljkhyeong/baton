@@ -125,10 +125,10 @@ final class HandoffContinuitySignalAnalyzer {
                             : ContinuitySignalSeverity.CRITICAL,
                     role.getId(),
                     null,
-                    role.getName() + " 인수인계 준비 미시작",
-                    role.getName() + " 역할의 다음 담당자는 정했지만 담당 종료가 "
+                    role.getName() + " 인수인계를 시작해 주세요",
+                    role.getName() + " 역할의 다음 담당자는 정했습니다. 현재 담당 기간이 "
                             + assignmentDateDescription(assignmentEndDate, today)
-                            + " 실제 역할 인수인계를 시작하지 않았습니다.",
+                            + " 인수인계를 시작하지 않았습니다.",
                     "인수인계 화면에서 다음 담당 기간을 확인하고 역할 인수인계를 준비하세요.",
                     assignmentEndDate
             ));
@@ -171,10 +171,10 @@ final class HandoffContinuitySignalAnalyzer {
             return role.getName() + " 인수인계 참여자 확인 필요";
         }
         if (coverageGap) {
-            return role.getName() + " 담당 공백 예정";
+            return role.getName() + " 담당자 없는 기간 예정";
         }
         if (currentCoverageMissing) {
-            return role.getName() + " 현재 담당 공백·인수인계 수락 대기";
+            return role.getName() + " 담당자 없음 · 인수인계 수락 필요";
         }
         if (handoff.getStatus() == RoleHandoffStatus.TRANSFERRED) {
             return role.getName() + " 인수인계 수락 대기";
@@ -206,7 +206,7 @@ final class HandoffContinuitySignalAnalyzer {
             String formerOwner = fromMember == null
                     ? "이전 담당자 기록을 확인할 수 없어"
                     : "이전 담당자 " + fromMember.getName() + "님이 활동을 종료해";
-            return formerOwner + " 현재 담당 공백입니다. 전달된 인수인계는 다음 담당자가 "
+            return formerOwner + " 현재 담당자가 없습니다. 전달된 인수인계는 다음 담당자가 "
                     + "즉시 수락할 수 있습니다.";
         }
         String dateReason = role.getName() + " 역할의 새 담당 시작일이 " + incomingStartDate + "입니다. ";
@@ -221,7 +221,7 @@ final class HandoffContinuitySignalAnalyzer {
             return dateReason + "인수인계 전달은 끝났지만 아직 다음 담당자가 수락하지 않았습니다.";
         }
         if (readiness.itemCount() == 0) {
-            return dateReason + "준비한 활성 인수인계 항목이 없습니다.";
+            return dateReason + "등록된 인수인계 항목이 없습니다.";
         }
         if (readiness.incompleteItemCount() > 0) {
             return dateReason + "미완료 인수인계 항목이 "
@@ -246,7 +246,7 @@ final class HandoffContinuitySignalAnalyzer {
             return "다음 담당자가 인수인계를 수락하고 남은 항목을 확인하세요.";
         }
         if (readiness.itemCount() == 0) {
-            return "활성 인수인계 항목을 추가한 뒤 현재 담당자가 인수인계를 전달하세요.";
+            return "인수인계 항목을 추가한 뒤 현재 담당자가 다음 담당자에게 전달하세요.";
         }
         if (readiness.incompleteItemCount() == 0) {
             return "현재 담당자가 준비된 인수인계를 다음 담당자에게 전달하세요.";

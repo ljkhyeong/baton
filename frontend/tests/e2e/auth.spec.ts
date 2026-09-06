@@ -291,7 +291,7 @@ test('@smoke 로그인한 이메일 계정은 비밀번호를 바꾸고 모든 �
   await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
   await page.getByLabel('새 비밀번호 확인').fill('different new password value')
   await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('새 비밀번호 확인이 일치하지 않습니다.')
+  await expect(page.getByRole('alert')).toContainText('새 비밀번호를 두 칸에 똑같이 입력해 주세요.')
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(0)
 
   await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
@@ -639,7 +639,7 @@ test('이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', 
 
   await expect(page.getByRole('heading', { name: '인증 메일을 확인해 주세요.' }))
     .toBeVisible()
-  await expect(page.getByRole('status')).toContainText('비밀번호를 설정한 뒤 이메일로 로그인하세요.')
+  await expect(page.getByRole('status')).toContainText('메일의 링크에서 비밀번호를 설정하세요.')
   const registration = requiredCall(
     api.calls,
     'POST',
@@ -816,7 +816,7 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await page.getByRole('button', { name: '로그아웃' }).click()
 
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
-  await expect(peer.getByText('접근 키 필요')).toBeVisible()
+  await expect(peer.getByText('로그인 또는 공유 링크 필요')).toBeVisible()
   const workspaceGetCount = () => workspaceApi.calls.filter((call) =>
     call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
   ).length
@@ -858,13 +858,13 @@ for (const otherTab of [false, true]) {
       await expect(logoutPage.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible()
     }
     const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
-    await chrome.getByRole('button', { name: '키 관리' }).click()
+    await chrome.getByRole('button', { name: '링크 관리' }).click()
     workspaceApi.holdAccessKeyRotations()
     try {
       const rotationStarted = page.waitForRequest(`**${SCOPE_PATH}/access-key/rotate`)
       page.once('dialog', (dialog) => dialog.accept())
-      await page.getByRole('dialog', { name: '공유 접근 키 관리' })
-        .getByRole('button', { name: '접근 키 바꾸기' }).click()
+      await page.getByRole('dialog', { name: '공유 링크 관리' })
+        .getByRole('button', { name: '공유 링크 재발급' }).click()
       await rotationStarted
       if (!otherTab) {
         await page.goBack()
@@ -872,7 +872,7 @@ for (const otherTab of [false, true]) {
       }
       await logoutPage.getByRole('button', { name: '로그아웃', exact: true }).click()
       await expect(logoutPage.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
-      if (otherTab) await expect(page.getByText('접근 키 필요')).toBeVisible()
+      if (otherTab) await expect(page.getByText('로그인 또는 공유 링크 필요')).toBeVisible()
 
       const rotationResponse = page.waitForResponse(`**${SCOPE_PATH}/access-key/rotate`)
       workspaceApi.releaseAccessKeyRotations()
@@ -1004,7 +1004,7 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
 
   await expect(page.getByRole('status')).toContainText(
-    '이 기기의 접근 정보를 정리했습니다.',
+    '이 기기에 저장된 팀 접속 정보를 지웠습니다.',
   )
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
@@ -1057,7 +1057,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   await popup.close()
   await page.bringToFront()
   await page.reload()
-  await expect(personalPanel).toContainText('아직 연결한 팀 구성원이 없습니다.')
+  await expect(personalPanel).toContainText('먼저 이 팀에서 사용할 내 이름을 선택하세요.')
   await expect(page).toHaveURL(originalUrl)
   expect(originalUrl).toContain(`#accessKey=${ACCESS_KEY}`)
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()

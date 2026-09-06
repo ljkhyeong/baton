@@ -282,7 +282,7 @@ test('@webkit 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 
   inspector = await openRoundResource(page, testInfo.project.name)
   await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
   page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('같은 방 ID로 다시 입장할 수 없습니다.')
+    expect(dialog.message()).toContain('이 방에 다시 입장할 수 없습니다.')
     await dialog.accept()
   })
   await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
@@ -321,7 +321,7 @@ test('@smoke ROUND 시작 중 화면을 떠나면 자동 입장하지 않고 돌
       && new URL(response.url()).pathname === '/api/v1/round-room-mappings')
     creationResponse.resolve()
     await (await response).finished()
-    await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: /담당 업무부터/ })).toBeVisible()
     expect(await page.evaluate((roomId) => sessionStorage.getItem(`baton-round-entry:v1:${roomId}`), ROOM_ID)).toBeNull()
 
     await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
@@ -399,7 +399,7 @@ test('로그인했지만 구성원 연결 전에는 ROUND 대신 계정 연결�
   await openSharedWorkspace(page)
   const inspector = await openRoundResource(page, testInfo.project.name)
 
-  await inspector.getByRole('button', { name: '계정 연결 후 ROUND 시작' }).click()
+  await inspector.getByRole('button', { name: '내 이름 선택 후 ROUND 시작' }).click()
   await expect(page.getByRole('dialog', { name: '구성원 관리' }))
     .toContainText('내 계정 연결')
   expect(roundApi.calls.filter((call) => call.path === '/api/v1/round-room-mappings'))

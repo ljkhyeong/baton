@@ -19,7 +19,7 @@ export function NotificationPreferencesPanel({ accountId }: { accountId: string 
   }, onError: () => { void query.refetch() } })
   if (query.isPending) return <p role="status">알림 설정을 불러오고 있습니다.</p>
   return <section className="notification-preferences" aria-label="개인 알림 설정">
-    <p>이 계정의 모든 팀과 기기에 적용합니다. 서비스 내 알림함의 표시를 설정합니다.</p>
+    <p>내 알림에 표시할 항목을 고르세요. 모든 팀과 기기에 같은 설정이 적용됩니다.</p>
     {query.isError && <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>}
     {values && <form onSubmit={event => { event.preventDefault(); if (!query.isError && !query.isFetching && !save.isPending) save.mutate() }}>
       <fieldset disabled={query.isError || query.isFetching || save.isPending}>

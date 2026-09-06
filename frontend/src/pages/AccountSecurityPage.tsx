@@ -14,7 +14,7 @@ export default function AccountSecurityPage() {
         <AuthPageShell
           eyebrow="MY ACCOUNT"
           title="내 계정"
-          description="로그인 방법과 로그인 상태를 확인합니다."
+          description="로그인 방법을 확인하고 계정을 관리하세요."
         >
           <div className="auth-loading" role="status">로그인 상태를 확인하고 있습니다.</div>
         </AuthPageShell>
@@ -29,7 +29,7 @@ export default function AccountSecurityPage() {
         <AuthPageShell
           eyebrow="MY ACCOUNT"
           title="내 계정"
-          description="로그인 방법과 로그인 상태를 확인합니다."
+          description="로그인 방법을 확인하고 계정을 관리하세요."
         >
           <div className="auth-result auth-result-warning" role="alert">
             <span className="auth-result-mark" aria-hidden="true">!</span>

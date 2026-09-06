@@ -44,13 +44,13 @@ function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembers
   const membership = useCurrentAccountMembership({ accountId, teamId: scope.teamId, accessKey })
   if (session.isPending) return <p role="status">로그인 상태를 확인하고 있습니다.</p>
   if (session.isError) return <p>로그인 상태를 확인하지 못했습니다. <button type="button" className="secondary-button" onClick={() => void session.refetch()}>다시 확인</button></p>
-  if (!accountId) return <p>로그인하고 팀 구성원과 연결하면 내 캘린더에 일정을 추가할 수 있습니다. <WorkspaceLoginLink {...scope}>로그인</WorkspaceLoginLink></p>
+  if (!accountId) return <p>로그인한 뒤 팀에 등록된 본인 이름을 선택하면 내 캘린더에 일정을 추가할 수 있습니다. <WorkspaceLoginLink {...scope}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
   if (membership.isError) return <p>구성원 연결을 확인하지 못했습니다. <button type="button" className="secondary-button" onClick={() => void membership.refetch()}>다시 확인</button></p>
   const memberId = membership.data?.claimed ? membership.data.memberId : ''
   const active = workspace.members.some((member) => isSameUuid(member.id, memberId) && isActiveMember(member))
   return <>
-    {!memberId && <p>구독 주소를 발급하려면 팀 구성원과 연결해 주세요. <button type="button" className="secondary-button" onClick={onManageMembership}>구성원 연결하기</button></p>}
+    {!memberId && <p>먼저 ‘내 계정 연결’에서 본인 이름을 선택하세요. <button type="button" className="secondary-button" onClick={onManageMembership}>구성원 연결하기</button></p>}
     {!!memberId && !active && <p>활동 중인 구성원만 구독 주소를 발급할 수 있습니다. 기존 구독은 해제할 수 있습니다.</p>}
     <CalendarContent key={`${accountId}:${scope.teamId}:${scope.seasonId}:${accessKey}:${active}`}
       accountId={accountId} scope={scope} canIssue={active && !workspace.season.endedAt && !changesDisabled}
@@ -142,9 +142,9 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
     {subscription.isPending && <p role="status">구독 상태를 확인하고 있습니다.</p>}
     {status && <p role="status">{labels[status]}</p>}
     {processing && <p className="calendar-polling-note" role="status">
-      {subscription.isError ? '조회에 실패해 자동 확인을 멈췄습니다. ‘상태 다시 확인’을 눌러 주세요.'
-        : pollExpired ? '90초가 지나 자동 확인을 종료했습니다. ‘상태 다시 확인’을 누르면 다시 시작합니다.'
-        : '이 항목을 열어 둔 동안 최대 90초간 자동으로 확인합니다.'}
+      {subscription.isError ? '자동 확인을 멈췄습니다. ‘상태 다시 확인’을 누르세요.'
+        : pollExpired ? '아직 완료 여부를 확인하지 못했습니다. ‘상태 다시 확인’을 누르세요.'
+        : '처리가 끝났는지 확인하고 있습니다.'}
     </p>}
     {ended && <p>종료된 시즌은 새 주소를 발급할 수 없습니다. 기존 구독의 상태 확인과 해제는 가능합니다.</p>}
     {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'}{!unavailable && <> ‘상태 다시 확인’을 눌러 주세요.</>}</p>}

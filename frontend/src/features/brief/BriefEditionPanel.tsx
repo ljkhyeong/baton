@@ -28,13 +28,13 @@ const reasonLabels: Record<string, string> = {
 const severityLabels: Record<string, string> = {
   HIGH: '높음', MEDIUM: '보통', LOW: '낮음', CRITICAL: '긴급', WARNING: '주의',
 }
-const statusLabels: Record<string, string> = { ACTIVE: '미해소', RESOLVED: '해소됨' }
+const statusLabels: Record<string, string> = { ACTIVE: '미해결', RESOLVED: '해결됨' }
 
 function errorMessage(error: unknown) {
   if (error instanceof ApiError) {
     const messages: Record<string, string> = {
-      BRIEF_DELIVERY_INCOMPLETE: '운영 기록을 요약 서비스에 전달하고 있습니다. 잠시 후 생성을 다시 시도해 주세요.',
-      BRIEF_GENERATION_IN_PROGRESS: '같은 운영 기록으로 요약을 만들고 있습니다. 잠시 후 최신 요약을 다시 조회해 주세요.',
+      BRIEF_DELIVERY_INCOMPLETE: '최신 기록을 반영하고 있습니다. 잠시 후 요약 만들기를 다시 누르세요.',
+      BRIEF_GENERATION_IN_PROGRESS: '요약을 만들고 있습니다. 잠시 후 ‘최신 요약 다시 조회’를 누르세요.',
       BRIEF_CONFIGURATION_ERROR: '요약 서비스의 연결 설정을 확인해야 합니다. 운영자에게 문의해 주세요.',
       BRIEF_UNAVAILABLE: '요약 서비스에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.',
     }
@@ -50,7 +50,7 @@ export function BriefEditionPanel(props: PanelProps) {
   const [open, setOpen] = useState(false)
   return (
     <details className="brief-panel" onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary><h2>주간 운영 요약</h2><span>생성 시점의 점검 결과</span></summary>
+      <summary><h2>주간 운영 요약</h2><span>요약을 만든 시점의 기록입니다.</span></summary>
       {open && <BriefAccess {...props} />}
     </details>
   )
@@ -63,10 +63,10 @@ function BriefAccess({ workspace, accessKey, changesDisabled, onManageMembership
   const membership = useCurrentAccountMembership({ accountId, teamId: scope.teamId, accessKey })
   if (session.isPending) return <p role="status">로그인 상태를 확인하고 있습니다.</p>
   if (session.isError) return <p>로그인 상태를 확인하지 못했습니다. <button type="button" disabled={session.isFetching} onClick={() => void session.refetch()}>로그인 상태 다시 확인</button></p>
-  if (!accountId) return <p>로그인하고 팀 구성원과 연결하면 주간 운영 요약을 볼 수 있습니다. <WorkspaceLoginLink {...scope}>로그인</WorkspaceLoginLink></p>
+  if (!accountId) return <p>로그인한 뒤 팀에 등록된 본인 이름을 선택하면 주간 운영 요약을 볼 수 있습니다. <WorkspaceLoginLink {...scope}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
   if (membership.isError) return <p>구성원 연결을 확인하지 못했습니다. <button type="button" disabled={membership.isFetching} onClick={() => void membership.refetch()}>구성원 연결 다시 확인</button></p>
-  if (!membership.data?.claimed) return <p>요약을 보려면 로그인 계정을 팀 구성원과 연결해 주세요. <button type="button" onClick={onManageMembership}>구성원 연결하기</button></p>
+  if (!membership.data?.claimed) return <p>요약을 보려면 ‘내 계정 연결’에서 본인 이름을 선택하세요. <button type="button" onClick={onManageMembership}>내 이름 선택하기</button></p>
   const memberId = membership.data.memberId
   if (!workspace.members.some((member) => isSameUuid(member.id, memberId) && isActiveMember(member))) {
     return <p>활동 중인 팀 구성원만 주간 운영 요약을 볼 수 있습니다.</p>
@@ -126,7 +126,7 @@ function BriefContent({ accountId, scope, ended, changesDisabled }: {
       {errorMessage(generation.error)}
       {generation.error instanceof ApiClientError && ' 생성 결과를 확인하지 못했으므로 최신 요약을 먼저 다시 조회해 주세요.'}
     </p>}
-    {generation.isSuccess && <p role="status">{generation.data.created ? '주간 운영 요약을 만들었습니다.' : '같은 운영 기록의 요약이 있어 기존 결과를 사용했습니다.'}</p>}
+    {generation.isSuccess && <p role="status">{generation.data.created ? '주간 운영 요약을 만들었습니다.' : '바뀐 기록이 없어 이전 요약을 표시합니다.'}</p>}
     {edition.isSuccess && edition.data === null && <p>아직 만든 주간 운영 요약이 없습니다.{!ended && ' 이번 주 요약 만들기로 시작하세요.'}</p>}
     {visibleEdition && <EditionSnapshot edition={visibleEdition} />}
   </div>
@@ -150,13 +150,13 @@ function EditionSnapshot({ edition }: { edition: BriefEdition }) {
             <span>{statusLabels[item.status] ?? '상태 확인 필요'}</span>
           </div>
           <h4>{reasonLabels[item.reasonCode] ?? '추가 점검 항목'}</h4>
-          <p><time dateTime={item.observedAt}>{formatTime.format(new Date(item.observedAt))}</time> 관찰</p>
+          <p><time dateTime={item.observedAt}>{formatTime.format(new Date(item.observedAt))}</time> 확인</p>
           <details className="brief-item-details"><summary>문의용 상세 정보</summary>
             <dl><dt>점검 코드</dt><dd>{item.reasonCode}</dd><dt>원본 기록 ID</dt><dd>{item.sourceReference}</dd></dl>
           </details>
         </li>)}
       </ul>
     )}
-    <p className="brief-note">생성 당시의 기록이며 현재 상태와 다를 수 있습니다. 지금 필요한 조치는 오늘 화면의 운영 점검에서 확인하세요.</p>
+    <p className="brief-note">요약 이후 내용이 바뀌었을 수 있습니다. 현재 문제는 ‘오늘’ 화면에서 확인하세요.</p>
   </article>
 }

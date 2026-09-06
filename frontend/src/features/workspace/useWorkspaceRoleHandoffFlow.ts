@@ -126,7 +126,7 @@ export function useWorkspaceRoleHandoffFlow({
     }, {
       onSuccess: () => {
         close()
-        notify('다음 담당자의 인수인계 수락과 역할 배정을 기록했어요.')
+        notify('인수인계를 수락해 다음 담당자로 교체했어요.')
       },
     })
   }
@@ -140,7 +140,7 @@ export function useWorkspaceRoleHandoffFlow({
     }, {
       onSuccess: () => {
         close()
-        notify('역할 인수인계를 취소하고 편집을 다시 열었어요.')
+        notify('인수인계를 취소했어요. 다시 수정할 수 있습니다.')
       },
     })
   }

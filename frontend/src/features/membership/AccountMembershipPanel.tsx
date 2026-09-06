@@ -102,10 +102,10 @@ export default function AccountMembershipPanel({
     )
     return (
       <section className="account-membership-panel account-membership-panel-connected">
-        <strong>내 계정이 연결되어 있습니다.</strong>
+        <strong>이 팀에서 사용하는 내 이름</strong>
         <p>
           {claimedMember
-            ? `${memberDisplayName(claimedMember)} 구성원으로 연결되었습니다.`
+            ? `내 계정은 ${memberDisplayName(claimedMember)} 이름으로 연결되어 있습니다.`
             : '현재 목록에 없는 이전 구성원과 연결되어 있습니다.'}
         </p>
         <small>구성원 활동이 종료되어도 연결 이력은 유지됩니다.</small>
@@ -120,7 +120,7 @@ export default function AccountMembershipPanel({
         <p className="account-membership-warning">
           {seasonEnded
             ? '종료된 시즌은 읽기 전용입니다. 활동 중인 시즌에서 계정을 연결해 주세요.'
-            : '다른 변경과 충돌해 최신 상태를 확인하는 중입니다. 복구가 끝난 뒤 다시 연결해 주세요.'}
+            : '다른 사람이 수정한 내용을 불러오고 있습니다. 완료되면 다시 연결해 주세요.'}
         </p>
       )}
       {membershipQuery.isError
@@ -134,7 +134,7 @@ export default function AccountMembershipPanel({
           ? (
               <>
                 <label>
-                  <span>연결할 구성원</span>
+                  <span>내 이름</span>
                   <select
                     value={selectedMemberId}
                     disabled={changesDisabled || claimMutation.isPending}
@@ -162,7 +162,7 @@ export default function AccountMembershipPanel({
                     })
                   }}
                 >
-                  {claimMutation.isPending ? '계정 연결 중…' : '선택한 구성원과 연결'}
+                  {claimMutation.isPending ? '계정 연결 중…' : '이 이름으로 연결'}
                 </button>
                 {claimMutation.isError && (
                   <p className="form-error" role="alert">{errorMessage(claimMutation.error)}</p>
@@ -171,8 +171,8 @@ export default function AccountMembershipPanel({
             )
           : (
               <p>{changesDisabled
-                ? '연결할 활동 중 구성원이 없습니다.'
-                : '연결할 활동 중 구성원이 없습니다. 구성원을 먼저 추가하거나 다시 활성화해 주세요.'}</p>
+                ? '선택할 수 있는 구성원이 없습니다.'
+                : '선택할 수 있는 구성원이 없습니다. 구성원을 먼저 추가하거나 다시 활성화해 주세요.'}</p>
             )}
     </section>
   )

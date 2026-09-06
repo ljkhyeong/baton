@@ -26,18 +26,18 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
   } else if (!accountId) {
     content = (
       <p>
-        로그인하고 팀 구성원과 계정을 연결하면 내 담당 업무를 모아 볼 수 있습니다.{' '}
+        로그인한 뒤 팀에 등록된 본인 이름을 선택하면 내 업무를 볼 수 있습니다.{' '}
         <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>
           로그인
         </WorkspaceLoginLink>
       </p>
     )
   } else if (membership.isPending) {
-    content = <p>팀 구성원 연결을 확인하고 있습니다.</p>
+    content = <p>이 팀에서 사용하는 내 이름을 확인하고 있습니다.</p>
   } else if (membership.isError) {
     content = <p>구성원 연결을 확인하지 못했습니다. <button type="button" disabled={membership.isFetching} onClick={() => void membership.refetch()}>다시 확인</button></p>
   } else if (!membership.data?.claimed) {
-    content = <p>아직 연결한 팀 구성원이 없습니다. <button type="button" onClick={onManageMembership}>구성원 연결하기</button></p>
+    content = <p>먼저 이 팀에서 사용할 내 이름을 선택하세요. <button type="button" onClick={onManageMembership}>내 이름 선택하기</button></p>
   } else {
     const memberId = membership.data.memberId
     const member = workspace.members.find((candidate) => candidate.id === memberId)
@@ -49,15 +49,15 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
         timeZone: workspace.season.timeZone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
       })
       content = <>
-        <p>{member.name}님의 현재 담당 역할 기준입니다. 미완료 {unfinished.length}건 · 수락 대기 {awaiting.length}건</p>
+        <p>{member.name}님의 남은 업무 {unfinished.length}건 · 넘겨받을 업무 {awaiting.length}건</p>
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
         <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}`}
           scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
           workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} />
         <div className="personal-work-columns">
           <div>
-            <h3>미완료 반복 업무</h3>
-            {unfinished.length === 0 ? <p>남은 담당 반복 업무가 없습니다.</p> : <ul>
+            <h3>남은 업무</h3>
+            {unfinished.length === 0 ? <p>남은 담당 업무가 없습니다.</p> : <ul>
               {unfinished.map(({ round, execution }) => <li key={execution.id}>
                 <button type="button" onClick={() => onOpenRound(round.id, execution.id)}>
                   <strong>{execution.title}</strong>
@@ -68,8 +68,8 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             </ul>}
           </div>
           <div>
-            <h3>내 수락을 기다리는 인수인계</h3>
-            {awaiting.length === 0 ? <p>수락을 기다리는 인수인계가 없습니다.</p> : <ul>
+            <h3>넘겨받을 업무</h3>
+            {awaiting.length === 0 ? <p>내가 수락할 인수인계가 없습니다.</p> : <ul>
               {awaiting.map((handoff) => <li key={handoff.id}>
                 <button type="button" onClick={() => onOpenHandoff(handoff.roleId)}>
                   <strong>{workspace.roles.find((role) => role.id === handoff.roleId)?.name}</strong>

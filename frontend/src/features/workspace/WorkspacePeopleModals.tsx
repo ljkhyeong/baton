@@ -105,7 +105,7 @@ export function MemberManagementModal({
   return (
     <ModalShell
       title="구성원 관리"
-      description="표시 이름과 활동 여부를 관리합니다. 활동을 종료해도 기존 역할과 결정 기록의 이름은 남습니다."
+      description="구성원 이름을 바꾸거나 활동을 종료할 수 있습니다. 활동을 종료해도 기존 기록은 남습니다."
       closeDisabled={Boolean(pendingMemberId)}
       onClose={onClose}
     >
@@ -299,8 +299,8 @@ export function RoleModal({
     <ModalShell
       title={editing ? '역할 수정' : '새 역할 만들기'}
       description={editing
-        ? '담당자와 기간, 책임처럼 달라진 역할 정보를 현재 운영에 맞게 고쳐주세요.'
-        : '사람의 직함보다, 팀에 계속 남아야 할 책임과 담당 기간을 정리해 주세요.'}
+        ? '담당자, 담당 기간, 업무 내용을 수정하세요.'
+        : '맡길 업무와 담당자, 담당 기간을 정하세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -322,7 +322,7 @@ export function RoleModal({
             required
             value={purpose}
             onChange={(event) => setPurpose(event.target.value)}
-            placeholder="이 역할이 팀에서 해결하는 문제를 적어주세요"
+            placeholder="예: 모임에서 나온 질문이 빠짐없이 해결되도록 합니다"
             rows={3}
           />
         </label>
@@ -399,8 +399,7 @@ export function RoleModal({
         </div>
         {assignmentLocked && (
           <small className="form-hint">
-            인수인계 준비 중에는 담당자와 담당 기간이 전달 기록에 고정됩니다.
-            역할 설명과 책임은 계속 보완할 수 있어요.
+            인수인계를 준비하는 동안 담당자와 담당 기간은 바꿀 수 없습니다. 역할 설명과 담당 업무는 수정할 수 있습니다.
           </small>
         )}
         <label>

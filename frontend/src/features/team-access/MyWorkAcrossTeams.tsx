@@ -45,14 +45,14 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
         key: `${workspace.team.id}:${workspace.season.id}:${execution.id}`, title: execution.title,
         context: `${workspace.team.name} · ${workspace.season.name} · ${round.name}`,
         kind: execution.timingStatus === 'OVERDUE' ? 'overdue' : 'routine',
-        label: execution.timingStatus === 'OVERDUE' ? '기한 지남' : '미완료 반복 업무',
+        label: execution.timingStatus === 'OVERDUE' ? '기한 지남' : '남은 업무',
         deadline: execution.deadlineAt, timeZone: workspace.season.timeZone,
         href: `${base}?${new URLSearchParams({ workKind: 'execution', workId: execution.id, roundId: round.id })}`,
       })),
       ...awaiting.map(handoff => ({
         key: `${workspace.team.id}:${workspace.season.id}:${handoff.id}`,
         title: workspace.roles.find(role => role.id === handoff.roleId)?.name ?? '인수인계',
-        context: `${workspace.team.name} · ${workspace.season.name}`, kind: 'handoff', label: '인수인계 수락 대기',
+        context: `${workspace.team.name} · ${workspace.season.name}`, kind: 'handoff', label: '넘겨받을 업무',
         deadline: null, timeZone: workspace.season.timeZone,
         href: `${base}?${new URLSearchParams({ workKind: 'handoff', workId: handoff.id })}`,
       })),
@@ -64,13 +64,13 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
     <div className="my-teams-heading"><h2 id="all-my-work-title">모든 팀의 내 할 일</h2>
       <button type="button" className="text-button" disabled={all.some(query => query.isFetching)}
         onClick={() => { all.forEach(query => { void query.refetch() }) }}>업무 새로고침</button></div>
-    <p>승인된 팀의 진행 중 시즌에서 내 담당 반복 업무와 수락 대기 인수인계를 모았습니다.</p>
-    <label>볼 업무<select value={filter} onChange={event => setFilter(event.target.value)}>
-      <option value="all">전체</option><option value="overdue">기한 지난 반복 업무</option><option value="handoff">수락 대기 인수인계</option>
+    <p>내가 맡은 업무와 넘겨받을 업무를 확인하세요. 종료된 시즌은 제외합니다.</p>
+    <label>업무 구분<select value={filter} onChange={event => setFilter(event.target.value)}>
+      <option value="all">전체</option><option value="overdue">기한 지난 업무</option><option value="handoff">넘겨받을 업무</option>
     </select></label>
-    {pending > 0 && <p role="status">{pending}개 시즌을 확인 중입니다. 먼저 불러온 업무부터 표시합니다.</p>}
-    {failed.length > 0 && <p role="alert">일부 팀·시즌의 업무를 불러오지 못해 제외했습니다. 업무 새로고침으로 다시 확인해 주세요.</p>}
-    {visible.length === 0 ? <p>{pending || failed.length ? '현재 확인된 업무가 없습니다.' : '선택한 조건의 남은 업무가 없습니다.'}</p>
+    {pending > 0 && <p role="status">{pending}개 시즌의 업무를 불러오고 있습니다.</p>}
+    {failed.length > 0 && <p role="alert">일부 팀이나 시즌의 업무가 빠져 있습니다. ‘업무 새로고침’을 눌러 다시 불러오세요.</p>}
+    {visible.length === 0 ? <p>{pending || failed.length ? '선택한 조건에서 확인된 업무가 없습니다.' : '선택한 조건의 남은 업무가 없습니다.'}</p>
       : <ul>{visible.map(task => <li key={task.key}>
         <Link to={task.href}><strong>{task.title}</strong><span>{task.context}</span>
           <small>{task.label}{task.deadline && ` · ${new Intl.DateTimeFormat('ko-KR', { timeZone: task.timeZone, dateStyle: 'short', timeStyle: 'short' }).format(new Date(task.deadline))} (${task.timeZone}) 마감`}</small>

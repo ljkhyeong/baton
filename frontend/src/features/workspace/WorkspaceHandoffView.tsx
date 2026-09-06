@@ -117,12 +117,12 @@ export function HandoffView({
   const handoffSummaryTitle = selectedHandoff?.status === 'ACCEPTED'
     ? `${next?.name ?? '다음 담당자'}님이 이어받은 인수인계`
     : selectedHandoff?.status === 'CANCELLED'
-      ? '다음 전달을 다시 준비하는 인수인계'
+      ? '취소된 인수인계'
       : next
         ? isActiveMember(next)
           ? `${next.name}님에게 넘길 인수인계`
           : `${next.name}님은 활동을 종료했어요`
-        : '다음 담당자를 기다리는 인수인계'
+        : '다음 담당자를 정해 주세요'
   const remainingDays = daysUntil(season.endDate, calendarDate)
   return (
     <>
@@ -184,11 +184,11 @@ export function HandoffView({
                   <strong>
                     {selectedHandoff?.status === 'ACCEPTED'
                       ? `${next?.name ?? '다음 담당자'}님의 수락을 기록했어요`
-                      : '다음 담당자와 역할 기간을 정해 준비를 시작하세요'}
+                      : '다음 담당자와 담당 기간을 정하세요'}
                   </strong>
                   <p>
                     {selected.currentMemberId && selected.assignmentStartDate
-                      ? '준비 단계에서는 인수인계 문서를 계속 다듬을 수 있고, 전달한 뒤에는 수락 또는 취소까지 내용이 잠깁니다.'
+                      ? '준비 중에는 문서를 수정할 수 있습니다. 전달한 뒤에는 수락하거나 취소할 때까지 수정할 수 없습니다.'
                       : '인수인계 준비를 시작하려면 역할의 현재 담당자와 담당 시작일을 먼저 정해야 합니다.'}
                   </p>
                   <button
@@ -208,7 +208,7 @@ export function HandoffView({
                   <span className="handoff-state-label">준비 중</span>
                   <strong>{next?.name ?? '다음 담당자'}님에게 전달할 인수인계를 검토하세요</strong>
                   <p>
-                    수락 뒤 담당 기간은 {formatDateRange(
+                    새 담당자의 담당 기간은 {formatDateRange(
                       selectedHandoff.incomingAssignmentStartDate,
                       selectedHandoff.incomingAssignmentEndDate,
                     )}입니다.
@@ -220,7 +220,7 @@ export function HandoffView({
                       disabled={changesDisabled || handoffTransitionPending}
                       onClick={() => onTransferHandoff(selected, selectedHandoff)}
                     >
-                      인수인계 전달 검토
+                      내용 확인 후 전달
                     </button>
                     <button
                       type="button"
@@ -302,7 +302,7 @@ export function HandoffView({
               title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 인수인계 항목이 없어요'}
               description={selectedArchivedItems.length
                 ? '아래 보관함에서 다시 필요한 항목을 복원하거나 새 항목을 추가해 주세요.'
-                : '다음 담당자가 알아야 할 책임, 자료와 조언을 추가해 주세요.'}
+                : '다음 담당자가 알아야 할 업무, 자료, 주의사항을 추가하세요.'}
               actionLabel={selectedArchivedItems.length ? '새 항목 추가하기' : '첫 항목 추가하기'}
               onAction={onAddItem}
               disabled={selectedChangesDisabled}

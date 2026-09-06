@@ -17,8 +17,8 @@ export default function RegistrationGate() {
     return (
       <div className="auth-result auth-result-warning" role="alert">
         <span className="auth-result-mark" aria-hidden="true">!</span>
-        <h3>계정 만들기 상태를 확인하지 못했습니다.</h3>
-        <p>안전하게 가입 폼을 열지 않았습니다. 기존 계정 로그인은 계속 사용할 수 있습니다.</p>
+        <h3>지금 가입할 수 있는지 확인하지 못했습니다.</h3>
+        <p>잠시 후 다시 확인해 주세요. 기존 계정으로는 로그인할 수 있습니다.</p>
         <div className="auth-result-actions">
           <button
             className="primary-button auth-link-button"

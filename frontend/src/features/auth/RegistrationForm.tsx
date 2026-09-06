@@ -16,8 +16,7 @@ export default function RegistrationForm() {
         <span className="auth-result-mark" aria-hidden="true">✓</span>
         <h3>인증 메일을 확인해 주세요.</h3>
         <p>
-          입력한 주소가 가입 가능한 경우 같은 안내 메일을 보냈습니다.
-          메일의 링크에서 비밀번호를 설정한 뒤 이메일로 로그인하세요.
+          가입할 수 있는 이메일이면 인증 메일을 보내드립니다. 메일의 링크에서 비밀번호를 설정하세요.
         </p>
         <Link className="primary-button auth-link-button" to="/login">로그인 화면으로</Link>
       </div>
@@ -42,7 +41,7 @@ export default function RegistrationForm() {
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
         />
-        <small>스터디에서 알아볼 수 있는 이름을 입력하세요.</small>
+        <small>팀에서 알아볼 수 있는 이름을 입력하세요.</small>
       </label>
       <label>
         <span>이메일</span>

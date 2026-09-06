@@ -93,7 +93,7 @@ function buildSearchResults({
       title: decision.title,
       primaryLabel: '이유',
       primaryText: reason,
-      secondaryLabel: decision.alternative ? '검토한 다른 선택' : undefined,
+      secondaryLabel: decision.alternative ? '검토한 대안' : undefined,
       secondaryText: alternative || undefined,
       createdAt: decision.createdAt,
       archivedAt: decision.archivedAt,

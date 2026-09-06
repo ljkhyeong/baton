@@ -14,10 +14,10 @@ const navItems: {
 }[] = [
   { key: 'today', label: '오늘', icon: 'today' },
   { key: 'roles', label: '역할', icon: 'roles' },
-  { key: 'rhythm', label: '운영', icon: 'rhythm' },
+  { key: 'rhythm', label: '일정', icon: 'rhythm' },
   { key: 'memory', label: '기록', icon: 'memory' },
   { key: 'handoff', label: '인수인계', icon: 'handoff' },
-  { key: 'records', label: '탐색', icon: 'search' },
+  { key: 'records', label: '검색', icon: 'search' },
 ]
 
 function formatSyncTime(value: number) {
@@ -113,7 +113,7 @@ export function Sidebar({
           <span><strong>{activeMemberCount}명 활동 중</strong><small>{workspace.season.name}</small></span>
           <span className="profile-actions">
             <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
-            <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '키 관리'}</button>
+            <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
           </span>
         </div>
       </div>
@@ -151,7 +151,7 @@ export function MobileTopbar({
       <span className="mobile-workspace-actions">
         <Link className="team-list-link" to="/my-teams">내 팀</Link>
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
-        <button type="button" className="mobile-share" onClick={onManageAccess}>{accountAccessEnabled ? '권한 관리' : '키 관리'}</button>
+        <button type="button" className="mobile-share" onClick={onManageAccess}>{accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
       </span>
     </header>
   )
@@ -197,9 +197,9 @@ export function WorkspaceSyncStatus({
   const conflictUnresolved = Boolean(conflictRecoveryStatus)
   const needsAttention = failed || conflictUnresolved
   const message = conflictRecoveryStatus === 'refreshing'
-    ? '동시 수정이 감지되어 최신 내용을 확인하는 중…'
+    ? '다른 사람이 수정한 내용을 불러오는 중…'
     : conflictRecoveryStatus === 'failed'
-      ? '동시 수정이 감지됐어요 · 최신 기록을 확인해야 다시 수정할 수 있어요.'
+      ? '다른 사람이 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 수정하세요.'
       : failed
         ? '최신 내용을 확인하지 못했어요 · 저장된 내용 표시 중'
         : syncing
@@ -242,12 +242,12 @@ export function ContentCreationCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="항목 생성 임시 기록 정리"
+      aria-label="새 항목 추가를 위한 임시 기록 삭제"
     >
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>브라우저에 남은 요청 정보를 정리해야 합니다.</strong>
+          <strong>새 항목을 추가하려면 브라우저의 임시 기록을 지워야 합니다.</strong>
           <small>{message}</small>
         </span>
       </div>
@@ -258,7 +258,7 @@ export function ContentCreationCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '임시 기록 정리 중…' : '임시 기록 정리 재시도'}
+          {pending ? '임시 기록 정리 중…' : '임시 기록 삭제 재시도'}
         </button>
       </div>
     </section>

@@ -112,7 +112,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
     >
       <div className="auth-verification-intro" role="status">
         {passwordReset
-          ? '새 비밀번호를 저장하면 모든 기기에서 로그아웃합니다. 팀 공유 접근 키와 이미 발급된 ROUND 입장 권한은 유지됩니다.'
+          ? '새 비밀번호를 저장하면 모든 기기에서 로그아웃합니다. 팀 공유 링크와 이미 발급된 ROUND 입장 권한은 유지됩니다.'
           : '이 계정에서 사용할 비밀번호를 정해 주세요. 저장하면 이메일 인증도 완료됩니다.'}
       </div>
       <label>

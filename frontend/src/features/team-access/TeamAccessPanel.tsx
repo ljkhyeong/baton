@@ -50,16 +50,16 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
   return <div>
-    <p>{access.accountAccessEnabled ? `계정 권한으로 접근합니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 취소'}`
-      : '현재는 공유 링크로 접근합니다. 운영자가 첫 관리자를 지정하면 계정 권한으로 전환됩니다.'}</p>
+    <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 취소'}`
+      : '현재는 공유 링크로 이용합니다. 관리자를 지정하면 관리자와 초대받은 계정만 이용할 수 있습니다.'}</p>
     {!access.accountAccessEnabled && (access.memberId ? <form onSubmit={event => {
       event.preventDefault(); if (confirmed && recoveryKey && !mutation.isPending) mutation.mutate({ kind: 'activate' })
     }}>
-      <p>{mine?.memberName} 구성원과 연결된 현재 계정을 관리자로 지정합니다. 전환하면 기존 공유 링크 접근이 종료되고 다른 계정은 초대를 받아야 합니다.</p>
+      <p>{mine?.memberName}님으로 연결된 내 계정을 팀 관리자로 지정합니다. 이후에는 기존 공유 링크를 사용할 수 없고, 다른 사람은 초대를 받아 로그인해야 합니다.</p>
       <label>운영자 복구 키<input type="password" autoComplete="off" value={recoveryKey} onChange={event => setRecoveryKey(event.target.value)} required /></label>
-      <label className="team-access-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required />공유 링크 접근 종료와 현재 계정의 관리자 지정을 확인했습니다.</label>
-      <button type="submit" disabled={mutation.isPending || !confirmed || !recoveryKey}>관리자 지정 후 계정 권한으로 전환</button>
-    </form> : <p>위의 내 계정 연결에서 본인 구성원을 먼저 연결해 주세요. 전환에는 운영자 복구 키가 필요합니다.</p>)}
+      <label className="team-access-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required />기존 공유 링크를 막고 내 계정을 관리자로 지정하는 데 동의합니다.</label>
+      <button type="submit" disabled={mutation.isPending || !confirmed || !recoveryKey}>계정 로그인으로 전환</button>
+    </form> : <p>먼저 ‘내 계정 연결’에서 본인 이름을 선택하세요. 전환하려면 운영자 복구 키가 필요합니다.</p>)}
     {access.permission === 'ADMIN' && <>
       <h4>구성원 권한</h4>
       <ul>{access.members.map(member => <li key={member.memberId}>
@@ -71,7 +71,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
               mutation.mutate({ kind: 'permission', id: member.memberId, permission: next || null })
           }}>
           <option value="">접근 취소</option>{Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select> : <span>계정 연결 대기</span>}
+        </select> : <span>연결된 계정 없음</span>}
       </li>)}</ul>
       <h4>구성원 초대</h4>
       <form onSubmit={event => { event.preventDefault(); if (memberId && !mutation.isPending) mutation.mutate({ kind: 'invite' }) }}>
@@ -82,11 +82,11 @@ function AccessContent({ scope }: { scope: AccessScope }) {
           {Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
         <p>열람자는 조회, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리를 할 수 있습니다.</p>
-        <button type="submit" disabled={!memberId || mutation.isPending}>7일 유효 초대 링크 만들기</button>
+        <button type="submit" disabled={!memberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
       {invitationUrl && <div><label>생성한 초대 링크<input readOnly value={invitationUrl} /></label>
         <button type="button" onClick={() => void navigator.clipboard.writeText(invitationUrl).then(() => setCopied(true)).catch(() => setCopied(false))}>{copied ? '복사했습니다' : '초대 링크 복사'}</button>
-        <p>원하는 구성원에게 이 링크를 전달하세요. 새 초대를 만들면 같은 구성원의 이전 미수락 링크가 취소됩니다.</p>
+        <p>초대한 구성원에게 전달하세요. 7일 동안 사용할 수 있습니다. 새 링크를 만들면 같은 구성원의 미수락 초대는 취소됩니다.</p>
       </div>}
       <h4>초대 목록</h4>
       <ul>{access.invitations.map(invite => <li key={invite.id}><span>{access.members.find(member => member.memberId === invite.memberId)?.memberName} · {permissionNames[invite.permission]}<small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>

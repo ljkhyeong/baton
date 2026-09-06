@@ -146,7 +146,7 @@ export function RoundRoomResourceActions({
         className="round-room-text-action"
         onClick={onManageMembership}
       >
-        계정 연결 후 ROUND 시작
+        내 이름 선택 후 ROUND 시작
       </button>
     )
   }
@@ -204,7 +204,7 @@ export function RoundRoomResourceActions({
           className="round-room-text-action"
           disabled={changesDisabled || busy}
           onClick={() => {
-            if (!window.confirm('이 ROUND 방을 종료할까요? 종료하면 같은 방 ID로 다시 입장할 수 없습니다.')) return
+            if (!window.confirm('이 ROUND 방을 종료할까요? 종료하면 이 방에 다시 입장할 수 없습니다.')) return
             endMutation.mutate(currentMapping.roomId)
           }}
         >

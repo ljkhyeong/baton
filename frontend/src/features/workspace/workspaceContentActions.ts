@@ -211,7 +211,7 @@ export function createWorkspaceContentActions({
   const updateExistingRole = (request: RoleFormRequest) => {
     if (!ensureFreshWorkspace() || !editingRole) return false
     if (isRoleHandoffLocked(roleHandoffs, editingRole.id)) {
-      notify('전달한 역할은 수락하거나 취소한 뒤 수정할 수 있어요.', 'error')
+      notify('인수인계 전달 후에는 수락하거나 취소해야 수정할 수 있어요.', 'error')
       return false
     }
     const roleId = editingRole.id
@@ -304,8 +304,8 @@ export function createWorkspaceContentActions({
       }),
       '반복 업무 수정',
       [
-        ['반복 업무 이름', request.title], ['운영 단계', phaseCopy[request.phase]],
-        ['언제까지', request.dueLabel], ['세부 설명', request.detail],
+        ['반복 업무 이름', request.title], ['업무 시점', phaseCopy[request.phase]],
+        ['마감 안내', request.dueLabel], ['세부 설명', request.detail],
         ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
         ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
       ],
@@ -318,7 +318,7 @@ export function createWorkspaceContentActions({
       .then((updatedRoutine) => {
         setView('rhythm')
         notify(archived
-          ? '반복 업무 정의를 보관했어요. 이미 만든 회차의 실행 기록은 그대로 유지됩니다.'
+          ? '반복 업무를 보관했어요. 이미 만든 회차의 기록은 유지됩니다.'
           : '반복 업무를 복원했습니다. 새 회차부터 포함됩니다.')
         focusRoutineArchiveResult(updatedRoutine.id, archived)
       })
@@ -335,7 +335,7 @@ export function createWorkspaceContentActions({
       selectRound(createdRound.id)
       closeModal()
       setView('rhythm')
-      notify(`${createdRound.name} 운영 회차를 만들었어요.`)
+      notify(`${createdRound.name} 회차를 만들었어요.`)
     },
   )
 
@@ -389,7 +389,7 @@ export function createWorkspaceContentActions({
     const completed = execution.status !== 'DONE'
     void mutations.routineExecutionCompletion
       .mutateAsync({ roundId, executionId: execution.id, completed })
-      .then(() => notify(completed ? '이번 인수인계를 넘겼어요.' : '완료 표시를 되돌렸어요.'))
+      .then(() => notify(completed ? '이 업무를 완료로 표시했어요.' : '완료 표시를 되돌렸어요.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`완료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -488,7 +488,7 @@ export function createWorkspaceContentActions({
     if (!beginHandoffItemOperation(item.id)) return
     void mutations.handoffItemArchive.mutateAsync({ id: item.id, archived })
       .then(() => notify(
-        archived ? '인수인계 항목을 보관함으로 옮겼어요.' : '인수인계 항목을 다시 체크리스트에 꺼냈어요.',
+        archived ? '인수인계 항목을 보관함으로 옮겼어요.' : '인수인계 항목을 복원했어요.',
       ))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
@@ -507,7 +507,7 @@ export function createWorkspaceContentActions({
     if (!item || !beginHandoffItemOperation(id)) return
     const completed = !item.completed
     void mutations.handoffCompletion.mutateAsync({ id, completed })
-      .then(() => notify(completed ? '인수인계 항목을 준비했어요.' : '인수인계 항목을 다시 열었어요.'))
+      .then(() => notify(completed ? '인수인계 항목을 완료로 표시했어요.' : '인수인계 항목의 완료 표시를 취소했어요.'))
       .catch((error: unknown) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`인수인계 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')

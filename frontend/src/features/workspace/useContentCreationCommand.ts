@@ -76,14 +76,14 @@ const contentCreationJournalPolicy = {
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
 }
 
-export const pendingStorageRequiredMessage = '요청을 안전하게 저장할 수 없습니다. 시크릿 창이 아닌 일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const pendingCreationLimitMessage = '확인되지 않은 생성 요청이 20개 남아 새 요청을 시작할 수 없습니다. 이전에 제출했던 같은 내용을 다시 제출해 결과를 확인한 뒤 시도해 주세요.'
-const contentCreationBusyMessage = '다른 탭에서 콘텐츠 생성 요청을 처리 중입니다. 그 탭의 결과를 확인한 뒤 다시 시도해 주세요.'
+export const pendingStorageRequiredMessage = '입력을 브라우저에 저장할 수 없어 새 항목을 추가하지 않았습니다. 일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.'
+const pendingCreationLimitMessage = '저장 여부를 확인하지 못한 항목이 20개 있습니다. 이전과 같은 내용을 다시 제출해 저장됐는지 확인한 뒤 새 항목을 추가하세요.'
+const contentCreationBusyMessage = '다른 탭에서 새 항목을 추가하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도하세요.'
 const contentCreationLockUnsupportedMessage = '이 브라우저에서는 새 항목을 만들 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const contentCreationLockFailedMessage = '새 항목을 만들 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
 const contentCreationCleanupRequiredMessage = '브라우저의 임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
 const contentCreationCleanupCompletedMessage = '브라우저의 임시 기록을 정리했습니다. 목록과 입력을 확인한 뒤 다시 제출해 주세요.'
-const guardedContentCreationMessage = '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다. 이전에 제출한 같은 작업과 내용을 다시 제출해 결과를 확인해 주세요.'
+const guardedContentCreationMessage = '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다. 이전과 같은 내용을 다시 제출해 저장 여부를 확인하세요.'
 
 export function isTerminalContentCreationError(error: unknown) {
   return resolveIdempotencyJournalFailure(error, contentCreationJournalPolicy) !== 'retrySameRequest'

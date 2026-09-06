@@ -76,7 +76,7 @@ export function SeasonSwitcherModal({
       className="season-modal"
       kicker="시즌"
       title={`${teamName} 시즌`}
-      description="과거 기록은 그대로 읽고, 운영할 시즌을 선택하거나 다음 시즌을 준비하세요."
+      description="확인할 시즌을 선택하세요. 새 활동을 시작할 때는 다음 시즌을 만드세요."
       closeDisabled={endingPending}
       onClose={onClose}
     >
@@ -111,7 +111,7 @@ export function SeasonSwitcherModal({
           <small>
             {currentSeason.endedAt
               ? `${formatEndedAt(currentSeason.endedAt)}에 종료`
-              : '현재 기록을 보존한 채 시즌 상태를 관리합니다.'}
+              : '시즌을 종료하면 기록을 수정할 수 없습니다.'}
           </small>
         </div>
         <div className="season-action-grid">
@@ -183,7 +183,7 @@ export function SeasonEditModal({
       className="season-modal"
       kicker="시즌"
       title="시즌 정보 수정"
-      description="기존 회차와 담당 기간을 포함할 수 있는 범위 안에서 이름과 기간을 바꿀 수 있습니다."
+      description="시즌 이름과 기간을 바꿉니다. 기존 모임 날짜와 담당 기간은 새 기간 안에 있어야 합니다."
       closeDisabled={pending}
       onClose={onClose}
     >
@@ -346,7 +346,7 @@ export function NextSeasonModal({
       className="season-modal"
       kicker="시즌"
       title="다음 시즌 시작"
-      description="가져올 역할과 반복 업무만 고르고, 과거 실행과 결정은 현재 시즌에 그대로 보존합니다."
+      description="다음 시즌에 다시 사용할 역할과 반복 업무를 선택하세요."
       closeDisabled={pending}
       onClose={onClose}
     >
@@ -354,8 +354,7 @@ export function NextSeasonModal({
         <div className="season-copy-boundary">
           <Icon name="spark" size={17} />
           <p>
-            역할의 목적·책임과 선택한 반복 업무 정의를 복사합니다.
-            담당자·담당 기간은 비워 두며, 회차 실행·결정·인수인계 기록은 복사하지 않습니다.
+            역할 설명과 반복 업무를 복사합니다. 담당자와 담당 기간은 새로 정해야 합니다. 이전 회차·결정·인수인계 기록은 복사하지 않습니다.
           </p>
         </div>
         <div className="form-grid">
@@ -430,7 +429,7 @@ export function NextSeasonModal({
           <button type="submit" className="primary-button" disabled={pending}>
             {pending
               ? cleanupRequired ? '임시 기록 정리 중…' : '다음 시즌 만드는 중…'
-              : cleanupRequired ? '임시 기록 정리 재시도' : '현재 시즌을 닫고 시작'}
+              : cleanupRequired ? '임시 기록 삭제 재시도' : '현재 시즌 종료하고 만들기'}
           </button>
         </div>
       </form>
@@ -454,8 +453,8 @@ export function SeasonSuccessorCleanupBanner({
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>이전 시즌 시작은 완료됐습니다.</strong>
-          <small>임시 기록은 브라우저에 남은 시즌 시작 요청 정보입니다. 정리한 뒤 다음 시즌을 시작할 수 있습니다.</small>
+          <strong>다음 시즌은 이미 만들어졌습니다.</strong>
+          <small>브라우저에 남은 임시 기록을 지워야 새 시즌을 만들 수 있습니다.</small>
         </span>
       </div>
       <div>
@@ -465,7 +464,7 @@ export function SeasonSuccessorCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '임시 기록 정리 중…' : '임시 기록 정리 재시도'}
+          {pending ? '임시 기록 정리 중…' : '임시 기록 삭제 재시도'}
         </button>
       </div>
     </section>

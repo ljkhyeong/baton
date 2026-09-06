@@ -36,10 +36,10 @@ export function useSubmissionLock(pending: boolean) {
 export function contentCreationError(error: unknown) {
   if (error instanceof ApiError
     && (error.code === 'IDEMPOTENCY_KEY_REUSED' || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED')) {
-    return '이전 생성 요청을 더 재생할 수 없습니다. 목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.'
+    return '이전에 추가한 항목을 다시 확인할 수 없습니다. 목록에 이미 있는지 확인한 뒤, 없으면 다시 추가하세요.'
   }
   if (isTerminalContentCreationError(error)) return mutationError(error)
-  return `${mutationError(error)} 입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.`
+  return `${mutationError(error)} 같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.`
 }
 
 export function ModalShell({
