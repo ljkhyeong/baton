@@ -213,5 +213,5 @@ log "실제 브라우저 → Vite → Spring → MySQL 흐름을 검증합니다
   BATON_FULLSTACK_ACCOUNT_PASSWORD="$ACCOUNT_PASSWORD" \
   BATON_FULLSTACK_ROUND_ISSUER="$ROUND_ISSUER" \
   BATON_FULLSTACK_ROUND_KID="$ROUND_KID" \
-  npm run e2e:fullstack:test
+  npm run e2e:fullstack:test -- "$@"
 )
