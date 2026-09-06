@@ -175,7 +175,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 회차의 `meetingDate`는 필수지만, V5 이전의 반복 업무 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
 
-결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 인수인계 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC 시각을 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 마이그레이션 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정, 인수인계 항목과 역할 자료의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 인수인계 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `null` 허용 `createdAt`, `null` 허용 `archivedAt`을 가진다.
+결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 인수인계 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC 시각을 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 마이그레이션 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정, 인수인계 항목과 역할 자료의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 인수인계 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `thumbnailUrl`, `createdAt`, `archivedAt`을 가진다.
 
 통합 탐색은 기존 시즌별 워크스페이스 프로젝션을 프런트에서 필터링하며 별도 검색 엔드포인트나 페이지네이션 계약을 추가하지 않는다. 기본은 현재 시즌이며 모든 시즌을 선택하면 팀의 서버에서 관리하는 시즌 목록에 있는 다른 시즌도 기존 접근 검증으로 조회한다. 결정은 제목·이유·대안·작성자·관련 역할, 인수인계 항목은 내용·분류·역할, 자료는 제목·설명·역할을 검색 대상으로 사용한다. 자료 URL 문자열과 외부 문서 본문은 검색하지 않는다.
 
@@ -588,7 +588,20 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 `roleId`는 요청한 시즌의 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료와 서버가 기록한 `null` 허용 `createdAt`을 반환한다. 새 자료에서는 `createdAt`이 항상 존재하고, `null` 허용은 V14 이전 자료를 같은 응답 형태로 조회하기 위한 호환 계약이다.
 
-BATON 서버는 URL 대상을 요청하거나 내용·가용성·신뢰성을 확인하지 않는다. 프런트엔드는 링크를 새 탭에서 열고 `noopener noreferrer`를 적용한다. 링크 대상의 접근 권한과 안전성은 사용자가 확인해야 한다.
+자료 생성·수정은 외부 조회 없이 입력값을 저장한다. `thumbnailUrl`은 선택이며 최대 2048자의 HTTPS 이미지 주소다. 허용 호스트는 `i.ytimg.com`, `i.vimeocdn.com`, `secure-b.vimeocdn.com`이고 사용자 정보와 비표준 포트는 허용하지 않는다. 생략하거나 `null`로 수정하면 썸네일을 비운다. 기존 자료에는 `null`이 적용된다. 링크는 새 탭에서 `noopener noreferrer`로 열고 이미지는 `no-referrer`로 표시한다.
+
+등록 전 제목·썸네일 조회:
+
+```http
+GET /api/v1/teams/{teamId}/seasons/{seasonId}/resource-link-preview?url=<등록할 링크>
+X-Baton-Access-Key: <워크스페이스 접근 키>
+```
+
+시즌 읽기 권한이 필요하며 계정 팀은 로그인 세션을 사용한다. `url`은 필수이고 최대 2048자다. 공개 YouTube 영상의 watch·짧은 링크·shorts·embed 형식과 Vimeo 영상 번호·player 형식을 지원한다. 입력에서 영상 번호만 추출해 공급자의 고정 HTTPS oEmbed API를 호출한다. API 키나 유료 중계 서비스는 사용하지 않는다. 다른 웹페이지나 리다이렉트는 요청하지 않으며 외부 호출은 DB 트랜잭션 밖에서 수행한다. 연결 2초·응답 3초, 응답 본문 32KiB, 동시 요청 4건으로 제한한다.
+
+응답은 `200 OK`, `Cache-Control: no-store`와 `{ "title": "소개 영상", "thumbnailUrl": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg" }` 형태다. 미지원 링크·외부 오류·요청 한도 초과 시 두 필드를 `null`로 반환하며 수동 등록을 계속할 수 있다. 제목은 최대 200자이고 허용하지 않는 이미지 주소는 버린다. oEmbed의 HTML은 사용하지 않는다. 조회 성공은 영상의 접근 권한이나 내용의 신뢰성을 보증하지 않는다.
+
+화면은 링크 입력이 멈춘 뒤 조회하고, 직접 입력한 자료 이름을 덮어쓰지 않는다. 링크를 바꾸면 이전 자동 제목과 썸네일을 비우고 늦게 도착한 이전 응답을 적용하지 않는다. 제목과 썸네일은 자료에 함께 저장하며 목록 조회와 변경 없는 수정에서는 외부 API를 다시 호출하지 않는다.
 
 수정:
 
@@ -597,7 +610,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `null` 허용 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 인수인계가 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있다.
+요청은 생성과 같은 `roleId`, `title`, `url`, `description`, 선택 항목 `thumbnailUrl`을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `null` 허용 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 인수인계가 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있다.
 
 보관·복원:
 
