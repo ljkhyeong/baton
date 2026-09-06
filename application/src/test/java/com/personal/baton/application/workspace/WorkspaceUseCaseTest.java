@@ -246,11 +246,13 @@ class WorkspaceUseCaseTest {
                 created.teamId(), created.seasonId(), contentIdempotencyKey("exception-routine"), created.accessKey(),
                 new CreateRoutineCommand("질문 모으기", RoutinePhase.BEFORE, "모임 전날", role.id(),
                         "질문을 정리합니다", -1, LocalTime.of(22, 0)));
+        ScheduledSeasonCandidate candidate = new ScheduledSeasonCandidate(created.teamId(), created.seasonId());
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
         lifecycleUseCase.updateRoundSchedule(
                 created.teamId(), created.seasonId(), created.accessKey(),
                 new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 7, 27),
                         LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, true));
-        ScheduledSeasonCandidate candidate = new ScheduledSeasonCandidate(created.teamId(), created.seasonId());
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).contains(candidate);
         assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isTrue();
         SeasonRoundResult original = lifecycleUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey()).rounds().getFirst();
@@ -303,6 +305,16 @@ class WorkspaceUseCaseTest {
                     assertThat(round.archivedAt()).isNull();
                     assertThat(round.routineExecutions().getFirst().status()).isEqualTo(RoutineStatus.DONE);
                 });
+
+        lifecycleUseCase.updateRoundSchedule(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 7, 27),
+                        LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, false));
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
+        lifecycleUseCase.updateRoundSchedule(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 7, 27),
+                        LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, true));
+        lifecycleUseCase.updateSeasonEnding(created.teamId(), created.seasonId(), created.accessKey(), true);
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
     }
 
     @Nested

@@ -80,10 +80,7 @@ public class WorkspaceSeasonPersistenceAdapter implements WorkspaceSeasonReposit
 
     @Override
     public List<ScheduledSeasonCandidate> findScheduledSeasonCandidates() {
-        return seasonRepository.findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc()
-                .stream()
-                .map(season -> new ScheduledSeasonCandidate(season.getTeamId(), season.getId()))
-                .toList();
+        return seasonRepository.findScheduledSeasonCandidates();
     }
 
     @Override
