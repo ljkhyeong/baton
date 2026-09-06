@@ -97,13 +97,13 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 .thenReturn(Optional.empty());
         when(seasonRepository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
         when(peopleRepository.findRolesByTeamIdAndSeasonId(eq(teamId), any(UUID.class)))
-                .thenAnswer(invocation -> sourceSeasonId.equals(invocation.getArgument(1))
-                        ? sourceRoles
-                        : savedRoles.get());
+                .thenAnswer(invocation -> savedRoles.get());
+        when(peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(eq(teamId), eq(sourceSeasonId), anyList()))
+                .thenReturn(sourceRoles);
         when(operationsRepository.findRoutinesBySeasonId(any(UUID.class)))
-                .thenAnswer(invocation -> sourceSeasonId.equals(invocation.getArgument(0))
-                        ? sourceRoutines
-                        : savedRoutines.get());
+                .thenAnswer(invocation -> savedRoutines.get());
+        when(operationsRepository.findActiveRoutinesBySeasonIdAndIds(eq(sourceSeasonId), anyList()))
+                .thenReturn(sourceRoutines);
         when(seasonRepository.saveSeason(any(Season.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(accessRepository.saveContentCreationIdempotency(any(ContentCreationIdempotency.class)))
@@ -179,9 +179,9 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
         assertThat(result.copiedRoutines()).hasSize(2);
     }
 
-    @DisplayName("보관된 반복 업무는 다음 시즌 복사 대상으로 선택할 수 없다")
+    @DisplayName("복사할 반복 업무가 조회되지 않으면 다음 시즌을 저장하지 않는다")
     @Test
-    void excludesArchivedRoutineFromNextSeasonSelection() {
+    void rejectsMissingRoutineBeforeSavingNextSeason() {
         UUID teamId = UUID.randomUUID();
         UUID sourceSeasonId = UUID.randomUUID();
         Season sourceSeason = Season.create(
@@ -192,15 +192,14 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 LocalDate.of(2026, 8, 31)
         );
         Role sourceRole = role(teamId, sourceSeasonId, "진행자");
-        Routine archivedRoutine = routine(sourceSeasonId, sourceRole.getId(), "질문 모으기");
-        archivedRoutine.updateArchive(true, CLOCK.instant());
+        UUID missingRoutineId = UUID.randomUUID();
         when(accessRepository.findContentCreationIdempotency(eq(teamId), anyString()))
                 .thenReturn(Optional.empty());
         when(seasonRepository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
-        when(peopleRepository.findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId))
+        when(peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, sourceSeasonId, List.of(sourceRole.getId())))
                 .thenReturn(List.of(sourceRole));
-        when(operationsRepository.findRoutinesBySeasonId(sourceSeasonId))
-                .thenReturn(List.of(archivedRoutine));
+        when(operationsRepository.findActiveRoutinesBySeasonIdAndIds(sourceSeasonId, List.of(missingRoutineId)))
+                .thenReturn(List.of());
         WorkspaceSeasonSuccessorCoordinator coordinator =
                 new WorkspaceSeasonSuccessorCoordinator(
                         seasonRepository,
@@ -218,13 +217,13 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
         assertThatThrownBy(() -> coordinator.createNext(
                 teamId,
                 sourceSeason,
-                "next-season-archived-routine-key-001",
+                "next-season-missing-routine-key-001",
                 new CreateNextSeasonCommand(
                         "가을 시즌",
                         LocalDate.of(2026, 9, 1),
                         LocalDate.of(2026, 10, 31),
                         List.of(sourceRole.getId()),
-                        List.of(archivedRoutine.getId())
+                        List.of(missingRoutineId)
                 )
         ))
                 .isInstanceOf(WorkspaceNotFoundException.class)

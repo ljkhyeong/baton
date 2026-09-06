@@ -44,13 +44,11 @@ final class TeamAccountAccessPolicy {
     }
     void requireOtherAdministrator(Team team, UUID memberId) {
         if (!team.isAccountAccessEnabled()) return;
-        var memberships = access.findMemberships(team.getId());
-        boolean removesAdmin = memberships.stream().anyMatch(value -> value.getMemberId().equals(memberId)
-                && value.getPermission() == TeamPermission.ADMIN);
+        boolean removesAdmin = access.findMembershipByMemberId(memberId)
+                .filter(value -> value.getTeamId().equals(team.getId()))
+                .filter(value -> value.getPermission() == TeamPermission.ADMIN).isPresent();
         if (!removesAdmin) return;
-        var activeMembers = people.findMembersByTeamId(team.getId()).stream().filter(Member::isActive).map(Member::getId).toList();
-        if (memberships.stream().noneMatch(value -> !value.getMemberId().equals(memberId)
-                && value.getPermission() == TeamPermission.ADMIN && activeMembers.contains(value.getMemberId()))) {
+        if (!access.existsOtherActiveAdministrator(team.getId(), memberId)) {
             throw new DomainValidationException("다른 활성 관리자를 지정한 뒤 마지막 관리자의 권한이나 활동 상태를 바꿔 주세요");
         }
     }

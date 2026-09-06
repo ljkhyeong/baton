@@ -132,7 +132,7 @@ export default function WorkspacePage() {
         <title>{workspaceTitle}</title>
         <main className="remote-state-page">
           <section className="remote-state" role="alert">
-            <span className="section-kicker">접근 키 필요</span>
+            <span className="section-kicker">로그인 또는 공유 링크 필요</span>
             <strong>이 작업 공간을 열 수 없어요.</strong>
             <p>{session.isPending ? '로그인 상태를 확인하고 있습니다.' : '팀의 초대를 수락한 계정으로 로그인하거나 공유 링크로 다시 접속해 주세요.'}</p>
             <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="primary-button">로그인</Link>
@@ -147,8 +147,8 @@ export default function WorkspacePage() {
   const storedKeyFallback = candidateIsActive && storedAccessKey && storedAccessKey !== hashAccessKey
     ? (
         <div className="workspace-key-fallback">
-          <p>이 브라우저에 이전에 확인된 접근 키가 남아 있습니다.</p>
-          <button type="button" className="primary-button" onClick={reopenWithStoredKey}>저장된 키로 다시 열기</button>
+          <p>이 브라우저에 이전에 사용한 공유 링크가 남아 있습니다.</p>
+          <button type="button" className="primary-button" onClick={reopenWithStoredKey}>저장된 공유 링크로 열기</button>
         </div>
       )
     : undefined

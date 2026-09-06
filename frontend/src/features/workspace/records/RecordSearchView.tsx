@@ -33,7 +33,7 @@ const kindCopy = {
 } satisfies Record<RecordSearchResult['kind'], string>
 
 function formatRecordTime(value: string | null, timeZone: string) {
-  if (!value) return '기록 시각 미상'
+  if (!value) return '작성일을 알 수 없음'
   const date = new Date(value)
   return new Intl.DateTimeFormat('ko-KR', {
     day: 'numeric',
@@ -138,7 +138,7 @@ export function RecordSearchView({
               data-record-search-input
               type="search"
               value={filters.query}
-              placeholder="예: 질문 마감 이유, 진행자 조언, 운영 문서"
+              placeholder="예: 모임 시간 변경, 인수인계 주의사항, 회의록"
               onChange={(event) => updateFilter('query', event.target.value)}
             />
           </span>
@@ -203,7 +203,7 @@ export function RecordSearchView({
         </div>
         <div className="record-search-footer">
           <span>
-            기간은 각 기록이 속한 시즌 시간대의 날짜로 계산합니다. 현재 시즌은 <strong>{season.timeZone}</strong>입니다.
+            날짜는 각 시즌의 시간대를 기준으로 검색합니다. 현재 시즌의 시간대는 <strong>{season.timeZone}</strong>입니다.
           </span>
           <button
             type="button"
@@ -230,7 +230,7 @@ export function RecordSearchView({
             <p aria-live="polite" aria-atomic="true">
               검색 결과 {results.length}개.{' '}
               {matchingUnknownTimeCount > 0
-                ? `생성 시각을 알 수 없는 이전 기록 ${matchingUnknownTimeCount}개는 기간 검색에서 제외했습니다.`
+                ? `작성일을 알 수 없는 이전 기록 ${matchingUnknownTimeCount}개는 날짜 검색에서 제외했습니다.`
                 : '최신 기록부터 표시합니다.'}
             </p>
           </div>

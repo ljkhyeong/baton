@@ -20,9 +20,6 @@ final class RoutineExecutionSnapshotFactory {
     ) {
         List<RoutineExecution> executions = new ArrayList<>(routines.size());
         for (Routine routine : routines) {
-            if (routine.getArchivedAt() != null) {
-                continue;
-            }
             executions.add(RoutineExecution.snapshot(
                     UUID.randomUUID(),
                     roundId,

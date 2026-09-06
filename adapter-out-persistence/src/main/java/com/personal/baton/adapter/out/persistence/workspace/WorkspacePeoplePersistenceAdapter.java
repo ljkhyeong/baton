@@ -10,6 +10,7 @@ import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -202,8 +203,23 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     }
 
     @Override
+    public boolean existsRoleAssignmentOutsideRange(UUID teamId, UUID seasonId, LocalDate startDate, LocalDate endDate) {
+        return roleRepository.existsAssignmentOutsideRange(teamId, seasonId, startDate, endDate);
+    }
+
+    @Override
+    public List<Role> findRolesByTeamIdAndSeasonIdAndIds(UUID teamId, UUID seasonId, List<UUID> roleIds) {
+        return roleRepository.findAllByTeamIdAndSeasonIdAndIdIn(teamId, seasonId, roleIds);
+    }
+
+    @Override
     public List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds) {
         return roleRepository.findExistingIds(teamId, seasonId, roleIds);
+    }
+
+    @Override
+    public List<String> findRoleNames(UUID teamId, UUID seasonId, List<UUID> roleIds) {
+        return roleRepository.findNamesByTeamIdAndSeasonIdAndIdIn(teamId, seasonId, roleIds);
     }
 
     @Override
@@ -214,11 +230,22 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     }
 
     @Override
+    public List<TransferredHandoff> findTransferredHandoffs(UUID teamId, UUID seasonId, UUID memberId) {
+        return roleHandoffRepository.findTransferredHandoffs(teamId, seasonId, memberId);
+    }
+
+    @Override
     public boolean existsOpenRoleHandoffBySeasonId(UUID seasonId) {
         return roleHandoffRepository.existsBySeasonIdAndStatusIn(
                 seasonId,
                 OPEN_ROLE_HANDOFF_STATUSES
         );
     }
-}
 
+    @Override
+    public boolean existsOpenRoleHandoffOutsideRange(UUID teamId, UUID seasonId, LocalDate startDate, LocalDate endDate) {
+        return roleHandoffRepository.existsOutsideRangeByStatusIn(
+                teamId, seasonId, startDate, endDate, OPEN_ROLE_HANDOFF_STATUSES
+        );
+    }
+}

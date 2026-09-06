@@ -86,8 +86,11 @@ final class WorkspaceScopeAuthorizer {
                 .orElseThrow(() -> notFound("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"));
         Season season = seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId)
                 .orElseThrow(() -> notFound("SEASON_NOT_FOUND", "시즌을 찾을 수 없습니다"));
-        verifyWrite(team, accessKey);
-        accountAccess.requireAdministrator(team);
+        if (team.isAccountAccessEnabled()) {
+            accountAccess.requireAdministrator(team);
+        } else {
+            accessControl.verifyAccessKey(team, accessKey);
+        }
         return new WorkspaceScope(team, season);
     }
 

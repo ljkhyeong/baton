@@ -146,7 +146,7 @@ export default function LoginForm() {
     },
     onSuccess: () => {
       setDeviceStateCleanupError('')
-      setDeviceStateCleanupSuccess('저장된 접근 키와 최근 작업 공간, ROUND 입장 정보를 지웠습니다.')
+      setDeviceStateCleanupSuccess('저장된 공유 링크, 최근 방문 목록, ROUND 접속 정보를 지웠습니다.')
     },
     onError: () => {
       setDeviceStateCleanupError(deviceStateCleanupRetryFailureMessage)
@@ -226,7 +226,7 @@ export default function LoginForm() {
 
       {accountNotice && (
         <div className="auth-capability-state" role="status">
-          <strong>계정 보안 변경을 완료했습니다.</strong>
+          <strong>계정 설정을 변경했습니다.</strong>
           <p>{accountNotice}</p>
         </div>
       )}
@@ -236,10 +236,10 @@ export default function LoginForm() {
           className="auth-capability-state auth-capability-state-error"
           role={deviceStateCleanupMutation.isPending ? 'status' : 'alert'}
         >
-          <strong>이 기기의 접근 정보 정리가 필요합니다.</strong>
+          <strong>이 기기에 저장된 팀 접속 정보를 지워야 합니다.</strong>
           <p>
             {deviceStateCleanupMutation.isPending
-              ? '저장된 작업 공간과 ROUND 입장 정보를 다시 지우고 있습니다.'
+              ? '이 기기에 저장된 팀과 ROUND 접속 정보를 지우고 있습니다.'
               : deviceStateCleanupError}
           </p>
           <button
@@ -257,7 +257,7 @@ export default function LoginForm() {
 
       {deviceStateCleanupSuccess && (
         <div className="auth-capability-state" role="status">
-          <strong>이 기기의 접근 정보를 정리했습니다.</strong>
+          <strong>이 기기에 저장된 팀 접속 정보를 지웠습니다.</strong>
           <p>{deviceStateCleanupSuccess}</p>
         </div>
       )}

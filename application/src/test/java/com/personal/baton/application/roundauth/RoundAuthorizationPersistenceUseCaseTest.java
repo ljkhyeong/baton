@@ -819,6 +819,11 @@ class RoundAuthorizationPersistenceUseCaseTest {
         }
 
         @Override
+        public boolean existsActiveTeamMembership(UUID accountId, UUID teamId) {
+            return delegate.existsActiveTeamMembership(accountId, teamId);
+        }
+
+        @Override
         public RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone) {
             return delegate.saveTombstone(tombstone);
         }

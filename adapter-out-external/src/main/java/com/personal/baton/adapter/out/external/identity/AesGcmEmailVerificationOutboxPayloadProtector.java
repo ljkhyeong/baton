@@ -81,9 +81,7 @@ public final class AesGcmEmailVerificationOutboxPayloadProtector
         } catch (IllegalArgumentException exception) {
             throw invalidPayload(exception);
         }
-        if (!isCanonicalBase64Url(payload.nonce(), nonce)
-                || !isCanonicalBase64Url(payload.ciphertext(), ciphertext)
-                || nonce.length != GCM_NONCE_BYTES
+        if (!isCanonicalBase64Url(payload.ciphertext(), ciphertext)
                 || ciphertext.length < 16
                 || ciphertext.length > MAXIMUM_CIPHERTEXT_BYTES) {
             Arrays.fill(nonce, (byte) 0);

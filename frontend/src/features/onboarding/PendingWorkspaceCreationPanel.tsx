@@ -32,7 +32,7 @@ function formatLocalDate(value: string) {
   return value.replaceAll('-', '.')
 }
 
-const loadedNoticeMessage = '저장된 입력을 불러왔습니다. 필요한 생성 코드를 입력한 뒤 같은 생성 결과를 확인해 주세요.'
+const loadedNoticeMessage = '입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘작업 공간 다시 확인’을 누르세요.'
 const discardBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
 
 export default function PendingWorkspaceCreationPanel({
@@ -103,8 +103,8 @@ export default function PendingWorkspaceCreationPanel({
     if (result === 'discarded' || result === 'missing') {
       setConfirmingId(null)
       setNotice(result === 'discarded'
-        ? '복구 목록에서 삭제했습니다. 서버의 작업 공간은 유지됩니다.'
-        : '다른 탭에서 이미 정리한 복구 기록입니다.')
+        ? '확인 대기 목록에서 삭제했습니다. 생성된 작업 공간은 삭제하지 않습니다.'
+        : '다른 탭에서 이미 정리한 임시 기록입니다.')
       onRefresh()
       requestAnimationFrame(() => {
         if (nextItem) {
@@ -121,15 +121,15 @@ export default function PendingWorkspaceCreationPanel({
       return
     }
     if (result === 'unsupported') {
-      setError('이 브라우저에서는 복구 기록을 처리할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.')
+      setError('이 브라우저에서는 임시 기록을 처리할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.')
       return
     }
     if (result === 'changed') {
-      setError('다른 탭에서 복구 기록이 변경됐습니다. 최신 목록을 확인해 주세요.')
+      setError('다른 탭에서 임시 기록이 변경됐습니다. 최신 목록을 확인해 주세요.')
       onRefresh()
       return
     }
-    setError('복구 목록에서 삭제하지 못했습니다. 저장소 권한을 확인해 주세요.')
+    setError('확인 대기 목록에서 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')
   }
 
   const load = (item: PendingWorkspaceCreationItem) => {
@@ -142,7 +142,7 @@ export default function PendingWorkspaceCreationPanel({
   return (
     <section
       className="pending-workspaces-region"
-      aria-label="확인되지 않은 작업 공간 생성 요청"
+      aria-label="완료 여부를 확인할 작업 공간"
     >
       {items.length > 0 && (
         <details
@@ -151,12 +151,11 @@ export default function PendingWorkspaceCreationPanel({
           onToggle={(event) => setOpen(event.currentTarget.open)}
         >
           <summary>
-            <span>확인하지 못한 생성 요청 <strong>{items.length}개</strong></span>
-            <small>생성 결과 미확인</small>
+            <span>완료 여부를 확인할 작업 공간 <strong>{items.length}개</strong></span>
+            <small>작업 공간이 만들어졌는지 확인해 주세요</small>
           </summary>
           <p className="pending-workspaces-intro">
-            완료 여부를 확인하지 못한 요청입니다. 저장된 입력과 같은 키로 다시 제출하면
-            아직 처리 전인 생성을 계속하거나 이미 처리된 결과를 확인합니다.
+            작업 공간이 만들어졌는지 확인하지 못했습니다. 저장된 입력을 불러와 다시 제출하세요. 이미 만들어졌다면 같은 작업 공간을 엽니다.
           </p>
           <ul>
             {items.map((item) => {
@@ -169,7 +168,7 @@ export default function PendingWorkspaceCreationPanel({
                   <div className="pending-workspace-copy">
                     <strong>{item.request.teamName}</strong>
                     <span>{item.request.seasonName}</span>
-                    <span>{item.request.template ? workspaceTemplates[item.request.template].name : '빈 구성'}</span>
+                    <span>{item.request.template ? workspaceTemplates[item.request.template].name : '템플릿 없음'}</span>
                     <small>
                       {formatLocalDate(item.request.startDate)}–{formatLocalDate(item.request.endDate)}
                       {' · '}
@@ -195,13 +194,13 @@ export default function PendingWorkspaceCreationPanel({
                       onClick={() => openConfirmation(item)}
                       aria-expanded={confirming}
                       aria-controls={confirming ? confirmationId : undefined}
-                      aria-label={`${label} 복구 목록에서 삭제`}
+                      aria-label={`${label} 확인 대기 목록에서 삭제`}
                       ref={(element) => {
                         if (element) discardButtonRefs.current.set(item.idempotencyKey, element)
                         else discardButtonRefs.current.delete(item.idempotencyKey)
                       }}
                     >
-                      복구 목록에서 삭제
+                      확인 대기 목록에서 삭제
                     </button>
                   </div>
 
@@ -212,10 +211,9 @@ export default function PendingWorkspaceCreationPanel({
                       role="group"
                       aria-labelledby={confirmationTitleId}
                     >
-                      <strong id={confirmationTitleId}>복구 목록에서 삭제할까요?</strong>
+                      <strong id={confirmationTitleId}>확인 대기 목록에서 삭제할까요?</strong>
                       <p>
-                        작업 공간이 이미 생성됐다면 공유 키를 이 브라우저에서 복구하지 못할 수 있습니다.
-                        서버의 작업 공간 자체는 삭제되지 않습니다.
+                        작업 공간이 이미 생성됐다면 공유 링크를 이 브라우저에서 다시 찾지 못할 수 있습니다. 작업 공간의 내용은 삭제되지 않습니다.
                       </p>
                       <div>
                         <button

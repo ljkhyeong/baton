@@ -116,7 +116,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
               event.preventDefault()
               setValidationError('')
               if (newPassword !== newPasswordConfirmation) {
-                setValidationError('새 비밀번호 확인이 일치하지 않습니다.')
+                setValidationError('새 비밀번호를 두 칸에 똑같이 입력해 주세요.')
                 return
               }
               passwordMutation.mutate()
@@ -184,7 +184,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
           <p>현재 기기를 포함해 모든 기기에서 로그아웃합니다.</p>
         </header>
         <p className="account-security-note">
-          로그아웃해도 팀 공유 접근 키와 이미 발급된 ROUND 입장 권한은 유지됩니다.
+          로그아웃해도 팀 공유 링크와 이미 발급된 ROUND 입장 권한은 유지됩니다.
         </p>
         {sessionRevocationMutation.isError && (
           <p className="form-error" role="alert">
@@ -210,7 +210,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
         <header><h3 id="account-deactivation-title">계정 비활성화</h3>
           <p>모든 기기에서 로그아웃하고, 이 계정의 로그인과 팀 접근을 중지합니다. 사용자가 직접 복구할 수 없습니다.</p>
         </header>
-        <p className="account-security-note">팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다. 구성원 활동 상태와 공유 접근 키는 바뀌지 않습니다. 개인 캘린더 구독 해제를 요청합니다. 해제 전까지 기존 주소를 사용할 수 있습니다. 앱에 저장된 일정은 직접 삭제해 주세요.</p>
+        <p className="account-security-note">팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다. 구성원 활동 상태와 공유 링크는 바뀌지 않습니다. 개인 캘린더 구독 해제를 요청합니다. 해제 전까지 기존 주소를 사용할 수 있습니다. 앱에 저장된 일정은 직접 삭제해 주세요.</p>
         <p>팀의 마지막 관리자라면 <Link to="/my-teams">내 팀</Link>에서 활동 중인 다른 관리자를 먼저 지정해 주세요.</p>
         <form className="auth-form" onSubmit={event => {
           event.preventDefault()

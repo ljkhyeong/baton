@@ -61,7 +61,7 @@ test('공유 링크 fragment를 지울 때 React Router history 상태를 보존
     expect(await page.evaluate(() => window.history.state)).toEqual(expectedHistoryState)
 
     await page.goto('/')
-    await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: /담당 업무부터/ })).toBeVisible()
     await page.goBack()
     await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
     await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
@@ -89,11 +89,11 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
-  await expect(keyDialog.getByText('이전 공유 링크는 즉시 열리지 않습니다.')).toBeVisible()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
+  await expect(keyDialog.getByText('이전 공유 링크는 즉시 사용할 수 없습니다.')).toBeVisible()
   page.once('dialog', (dialog) => dialog.accept())
-  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
 
   const rotateCall = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   expectScopedCall(rotateCall)
@@ -115,18 +115,18 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
 })
 
-test('@smoke 키 변경 중 화면을 떠나면 복구 기록을 유지하고 돌아와 같은 요청으로 새 키를 받는다', async ({ page }, testInfo) => {
+test('@smoke 키 변경 중 화면을 떠나면 임시 기록을 유지하고 돌아와 같은 요청으로 새 키를 받는다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await page.goto('/')
   await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
   const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
-  await chrome.getByRole('button', { name: '키 관리' }).click()
+  await chrome.getByRole('button', { name: '링크 관리' }).click()
   api.holdAccessKeyRotations()
   try {
     page.once('dialog', (dialog) => dialog.accept())
-    await page.getByRole('dialog', { name: '공유 접근 키 관리' })
-      .getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await page.getByRole('dialog', { name: '공유 링크 관리' })
+      .getByRole('button', { name: '공유 링크 재발급' }).click()
     const rotation = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
     await page.goBack()
     const rotationResponse = page.waitForResponse(`**${SCOPE_PATH}/access-key/rotate`)
@@ -138,7 +138,7 @@ test('@smoke 키 변경 중 화면을 떠나면 복구 기록을 유지하고 �
     expect(JSON.parse(await page.evaluate((key) => localStorage.getItem(key) ?? 'null', PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY))?.idempotencyKey)
       .toBe(rotation.headers['idempotency-key'])
     await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
-    await page.getByRole('button', { name: '접근 키 변경 결과 확인' }).click()
+    await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
     await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
     expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBe(ROTATED_ACCESS_KEY)
     const rotations = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
@@ -165,10 +165,10 @@ test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 journal을 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   page.once('dialog', (dialog) => dialog.accept())
-  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
 
   await expect(keyDialog.getByRole('alert')).toContainText(
     '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
@@ -203,8 +203,8 @@ test('접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막�
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   const rotationPath = `${SCOPE_PATH}/access-key/rotate`
   const rotationCallCount = () => api.calls.filter(
     (call) => call.method === 'POST' && call.path === rotationPath,
@@ -218,7 +218,7 @@ test('접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막�
   api.holdAccessKeyRotations()
 
   try {
-    await keyDialog.getByRole('button', { name: '접근 키 바꾸기' })
+    await keyDialog.getByRole('button', { name: '공유 링크 재발급' })
       .evaluate((button: HTMLButtonElement) => {
         button.click()
         button.click()
@@ -243,7 +243,7 @@ test('접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막�
     const closeButton = keyDialog.getByRole('button', { name: '닫기' })
     await expect(closeButton).toBeDisabled()
     await expect(keyDialog.getByRole('button', { name: '현재 링크 복사' })).toBeDisabled()
-    await expect(keyDialog.getByRole('button', { name: '접근 키 바꾸는 중…' })).toBeDisabled()
+    await expect(keyDialog.getByRole('button', { name: '공유 링크 발급 중…' })).toBeDisabled()
     expect(await page.evaluate(() =>
       document.documentElement.dataset.batonShareAttempted)).toBeUndefined()
 
@@ -289,8 +289,8 @@ test('접근 키 회전 journal은 탭 간 요청 완료까지 같은 임계 구
     const workspaceChrome = testInfo.project.name === 'mobile'
       ? target.locator('.mobile-topbar')
       : target.locator('.sidebar')
-    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-    return target.getByRole('dialog', { name: '공유 접근 키 관리' })
+    await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+    return target.getByRole('dialog', { name: '공유 링크 관리' })
   }
   const rotationCalls = () => api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
@@ -300,15 +300,15 @@ test('접근 키 회전 journal은 탭 간 요청 완료까지 같은 임계 구
   try {
     const firstDialog = await openKeyManagement(page)
     page.once('dialog', (dialog) => dialog.accept())
-    await firstDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await firstDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
     const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
 
     const peerDialog = await openKeyManagement(peerPage)
     peerPage.once('dialog', (dialog) => dialog.accept())
-    await peerDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+    await peerDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
 
     await expect(peerDialog.getByRole('alert')).toContainText(
-      '다른 탭에서 접근 키 변경 결과를 확인 중입니다.',
+      '다른 탭에서 새 공유 링크를 확인하고 있습니다.',
     )
     expect(rotationCalls()).toHaveLength(1)
     expect(JSON.parse(await page.evaluate(
@@ -341,14 +341,14 @@ test('Web Locks를 사용할 수 없으면 접근 키 회전 요청을 보내지
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
 
   page.once('dialog', (dialog) => dialog.accept())
-  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
 
   await expect(keyDialog.getByRole('alert')).toContainText(
-    '이 브라우저에서는 접근 키를 바꿀 수 없습니다.',
+    '이 브라우저에서는 공유 링크를 재발급할 수 없습니다.',
   )
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
@@ -367,15 +367,15 @@ test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 �
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   const acceptConfirmation = (dialog: Dialog) => dialog.accept()
   page.on('dialog', acceptConfirmation)
 
   try {
-    const rotateButton = () => keyDialog.getByRole('button', { name: '접근 키 바꾸기' })
+    const rotateButton = () => keyDialog.getByRole('button', { name: '공유 링크 재발급' })
     await rotateButton().click()
-    await expect(keyDialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제하지 못했습니다.')
+    await expect(keyDialog.getByRole('alert')).toContainText('임시 기록을 지우지 못했습니다.')
     const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
     expect(JSON.parse(await page.evaluate(
       (key) => localStorage.getItem(key) ?? 'null',
@@ -389,10 +389,10 @@ test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 �
     await keyDialog.getByRole('button', { name: '닫기' }).click()
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
-    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+    await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
 
     await rotateButton().click()
-    await expect(keyDialog.getByRole('alert')).toContainText('접근 키는 이번 요청에서 새로 바뀌지 않았습니다.')
+    await expect(keyDialog.getByRole('alert')).toContainText('새 링크는 아직 발급하지 않았습니다.')
     const replayAttempts = api.calls.filter(
       (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`,
     )
@@ -443,10 +443,10 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '공유 접근 키 관리' })
-    .getByRole('button', { name: '접근 키 바꾸기' })
+  await page.getByRole('dialog', { name: '공유 링크 관리' })
+    .getByRole('button', { name: '공유 링크 재발급' })
     .click()
 
   await expect.poll(() =>
@@ -457,7 +457,7 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
     document.documentElement.dataset.batonSameDocument = 'true'
   })
   await page.goBack()
-  await expect(page.getByRole('heading', { level: 1, name: /사람이 바뀌어도/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /담당 업무부터/ })).toBeVisible()
   await page.goForward()
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
 
@@ -496,9 +496,9 @@ test('접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragm
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
 
   await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ROTATED_ACCESS_KEY}`)
@@ -520,10 +520,10 @@ test('회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 �
     const workspaceChrome = page.viewportSize()?.width === 390
       ? page.locator('.mobile-topbar')
       : page.locator('.sidebar')
-    await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+    await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
     page.once('dialog', (dialog) => dialog.accept())
-    await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
-    await expect(page.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+    await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
+    await expect(page.getByRole('alert')).toContainText('일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.')
   }
 
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
@@ -548,13 +548,13 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
-  const keyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
+  const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
 
   page.once('dialog', (dialog) => dialog.accept())
-  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
-  await expect(keyDialog.getByText(/새 요청으로 다시 시도해 주세요/)).toBeVisible()
-  await expect(keyDialog.getByText(/브라우저의 임시 요청 기록을 삭제하지 못했습니다/)).toBeVisible()
+  await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
+  await expect(keyDialog.getByText(/이전 링크를 받을 수 없습니다/)).toBeVisible()
+  await expect(keyDialog.getByText(/이전 공유 링크의 임시 기록을 지우지 못했습니다/)).toBeVisible()
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   expect(JSON.parse(await page.evaluate(
     (key) => localStorage.getItem(key) ?? 'null',
@@ -562,8 +562,8 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
   ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
   page.once('dialog', (dialog) => dialog.accept())
-  await keyDialog.getByRole('button', { name: '접근 키 바꾸기' }).click()
-  await expect(page.locator('.toast[role="status"]')).toContainText('접근 키를 바꿨어요.')
+  await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
+  await expect(page.locator('.toast[role="status"]')).toContainText('공유 링크를 재발급했어요.')
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()
@@ -585,9 +585,9 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
   await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   expect(firstAttempt.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
@@ -595,7 +595,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 결과 확인' })
+  await page.getByRole('button', { name: '변경된 공유 링크 확인' })
     .evaluate((button: HTMLButtonElement) => {
       button.click()
       button.click()
@@ -620,9 +620,9 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
 
   await expect(page.getByRole('alert')).toContainText('다른 접근 키 변경을 처리하고 있습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
@@ -632,20 +632,20 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
   api.rotateAccessKeyFromAnotherDevice()
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 결과 확인' }).click()
+  await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
 
-  await expect(page.getByText('다른 기기에서 더 최신 접근 키 변경이 완료된 것으로 보입니다.')).toBeVisible()
-  await expect(page.getByText('브라우저의 임시 요청 기록을 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')).toBeVisible()
+  await expect(page.getByText('다른 기기에서 공유 링크를 변경한 것으로 보입니다.')).toBeVisible()
+  await expect(page.getByText('이전 공유 링크의 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')).toBeVisible()
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
-  await expect(page.getByRole('button', { name: '접근 키 변경 결과 확인' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '변경된 공유 링크 확인' })).toHaveCount(0)
   expect(JSON.parse(await page.evaluate(
     (key) => localStorage.getItem(key) ?? 'null',
     PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
-  await page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' }).click()
-  await expect(page.getByRole('button', { name: '임시 요청 기록 삭제 재시도' })).toHaveCount(0)
-  await expect(page.getByText('브라우저의 임시 요청 기록을 삭제했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
+  await page.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
+  await expect(page.getByRole('button', { name: '임시 기록 삭제 재시도' })).toHaveCount(0)
+  await expect(page.getByText('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()
@@ -655,7 +655,7 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('만료된 접근 키 복구 기록을 지우고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+test('만료된 접근 키 임시 기록을 지우고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
   const api = await installApi(page)
   api.commitNextAccessKeyRotationThenTimeout()
   await openSharedWorkspace(page)
@@ -663,17 +663,17 @@ test('만료된 접근 키 복구 기록을 지우고 최신 공유 링크 확�
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('dialog', { name: '공유 접근 키 관리' }).getByRole('button', { name: '접근 키 바꾸기' }).click()
+  await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
   await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
   api.expireAccessKeyRotationHistory()
 
   await page.reload()
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
-  await page.getByRole('button', { name: '접근 키 변경 결과 확인' }).click()
+  await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('더 최신 접근 키 변경이 완료되어 이전 결과를 자동 복구할 수 없습니다.')
+  await expect(page.getByRole('alert')).toContainText('공유 링크가 다시 변경되어 이전 링크를 복구할 수 없습니다.')
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `baton-pending-access-key-change:v1:${TEAM_ID}`)).toBeNull()
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/access-key/rotate`)
@@ -694,11 +694,11 @@ test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 re
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
     : page.locator('.sidebar')
-  await workspaceChrome.getByRole('button', { name: '키 관리' }).click()
+  await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
 
   const rotate = async () => {
-    const rotateButton = page.getByRole('dialog', { name: '공유 접근 키 관리' })
-      .getByRole('button', { name: '접근 키 바꾸기' })
+    const rotateButton = page.getByRole('dialog', { name: '공유 링크 관리' })
+      .getByRole('button', { name: '공유 링크 재발급' })
     await rotateButton.focus()
     page.once('dialog', (dialog) => dialog.accept())
     await page.keyboard.press('Enter')
@@ -799,7 +799,7 @@ test('@smoke @responsive @continuity 운영 점검은 이유와 다음 행동을
   }
 })
 
-test('@continuity 반복 지연 신호는 해당 반복 업무가 있는 운영 화면으로 초점을 옮긴다', async ({ page }) => {
+test('@continuity 반복 지연 신호는 해당 반복 업무가 있는 일정 화면으로 초점을 옮긴다', async ({ page }) => {
   const projection = makeProjection()
   projection.continuitySignals = [{
     type: 'ROUTINE_REPEATEDLY_OVERDUE',
@@ -870,8 +870,8 @@ test('@operations @responsive 자동 회차 하나를 연기하고 건너뛴 뒤
   await expect(overdueItem).toContainText('지연')
   await expect(overdueItem.getByRole('button', { name: /풀이 노트 정리/ })).toBeVisible()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
   await page.getByRole('button', { name: '회차 수정' }).click()
   const dialog = page.getByRole('dialog', { name: '회차 정보 수정' })
   await expect(dialog).toContainText('이 회차만 날짜를 바꾸며')
@@ -892,11 +892,11 @@ test('@operations @responsive 자동 회차 하나를 연기하고 건너뛴 뒤
   await page.getByText('보관한 회차 1개', { exact: true }).click()
   await expect(page.getByRole('button', { name: '연기한 모임 회차 복원' })).toBeVisible()
   await page.getByRole('button', { name: '연기한 모임 회차 복원' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
   await page.reload()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await page.getByLabel('운영 회차').selectOption(ROUND_TWO_ID)
-  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('연기한 모임')
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await page.getByLabel('회차', { exact: true }).selectOption(ROUND_TWO_ID)
+  await expect(page.getByLabel('회차', { exact: true }).locator('option:checked')).toContainText('연기한 모임')
 })
 
 test('@operations 새 자동 회차는 관련 기본 선택을 갱신하되 사용자가 고른 회차는 보존한다', async ({ page }) => {
@@ -925,9 +925,9 @@ test('@operations 새 자동 회차는 관련 기본 선택을 갱신하되 사�
   }
   api.addRoundFromAnotherDevice(automaticRound)
 
-  await expect(page.getByLabel('운영 회차')).toHaveValue(AUTOMATIC_ROUND_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(AUTOMATIC_ROUND_ID)
 
-  await page.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+  await page.getByLabel('회차', { exact: true }).selectOption(ROUND_ONE_ID)
   const workspaceGetCount = () => api.calls.filter(
     (call) => call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
   ).length
@@ -936,13 +936,13 @@ test('@operations 새 자동 회차는 관련 기본 선택을 갱신하되 사�
   await expect(refreshButton).toBeEnabled()
   await refreshButton.click()
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRefresh)
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_ONE_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_ONE_ID)
 })
 
 test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 운영 카드를 갱신한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
 
   await expect(page.getByRole('heading', { name: '자동 회차가 꺼져 있어요' })).toBeVisible()
   await page.getByRole('button', { name: '설정하기' }).click()
@@ -957,7 +957,7 @@ test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 �
 
   await expect(page.getByRole('heading', { name: '격주 20:30' })).toBeVisible()
   await expect(page.locator('.round-schedule-card')).toContainText(
-    'Asia/Seoul · 자동 생성 중 · 다음 예정일 2026. 8. 6.',
+    'Asia/Seoul · 자동 생성 켜짐 · 다음 예정일 2026. 8. 6.',
   )
   const scheduleCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/round-schedule`)
   expectScopedCall(scheduleCall, {
@@ -973,15 +973,15 @@ test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 �
 test('@operations 반복 업무와 회차를 내구 생성하고 선택한 회차의 완료 상태를 독립적으로 저장한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
 
   const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await dialog.getByLabel('반복 업무 이름').fill('회고 질문 준비')
-  await dialog.getByLabel('운영 단계').selectOption({ label: '모임 전' })
+  await dialog.getByLabel('업무 시점').selectOption({ label: '모임 전' })
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('기한 설명').fill('목요일 19:00')
+  await dialog.getByLabel('마감 안내').fill('목요일 19:00')
   await dialog.getByLabel('세부 설명').fill('지난 회차에서 이어갈 질문 두 개를 고릅니다.')
   await dialog.getByRole('button', { name: '반복 업무 만들기' }).click()
 
@@ -1009,7 +1009,7 @@ test('@operations 반복 업무와 회차를 내구 생성하고 선택한 회�
   await roundDialog.getByLabel('모임 날짜').fill('2026-07-24')
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
 
-  await expect(roundDialog.getByRole('alert')).toContainText('입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.')
+  await expect(roundDialog.getByRole('alert')).toContainText('같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.')
   const firstRoundAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/rounds`)
   expectScopedCall(firstRoundAttempt, { name: '3회차', meetingDate: '2026-07-24' })
   expect(await pendingContentCreationEntries(page)).toEqual([
@@ -1022,7 +1022,7 @@ test('@operations 반복 업무와 회차를 내구 생성하고 선택한 회�
   ])
 
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(CREATED_ROUND_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(CREATED_ROUND_ID)
   const roundAttempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/rounds`)
   expect(roundAttempts).toHaveLength(2)
   expect(roundAttempts[1]?.headers['idempotency-key']).toBe(firstRoundAttempt.headers['idempotency-key'])
@@ -1035,15 +1035,15 @@ test('@operations 반복 업무와 회차를 내구 생성하고 선택한 회�
   const completionCall = await recordedCall(api, 'PATCH', `${SCOPE_PATH}/rounds/${CREATED_ROUND_ID}/routine-executions/${CREATED_ROUND_NEW_ROUTINE_EXECUTION_ID}/completion`)
   expectScopedCall(completionCall, { completed: true })
 
-  await page.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+  await page.getByLabel('회차', { exact: true }).selectOption(ROUND_ONE_ID)
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeVisible()
   await expect(page.locator('.routine-row').filter({ hasText: '회고 질문 준비' })).toContainText('다음 회차부터')
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toHaveCount(0)
 
   await page.reload()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
-  await page.getByLabel('운영 회차').selectOption(CREATED_ROUND_ID)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
+  await page.getByLabel('회차', { exact: true }).selectOption(CREATED_ROUND_ID)
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 })
 
@@ -1063,7 +1063,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
   }))
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
 
   const archiveButton = page.getByRole('button', { name: '문제 5개 선정 반복 업무 보관' })
   if (testInfo.project.name === 'mobile') {
@@ -1082,7 +1082,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
   const archiveSummary = page.getByText('보관한 반복 업무 1개', { exact: true })
   await expect(archiveSummary).toBeFocused()
   const historicalRow = page.locator('.routine-row').filter({ hasText: '문제 5개 선정' })
-  await expect(historicalRow).toContainText('정의 보관됨')
+  await expect(historicalRow).toContainText('반복 업무 보관됨')
   await expect(historicalRow.getByRole('button', { name: '문제 5개 선정 완료 취소' }))
     .toBeEnabled()
   await historicalRow.getByRole('button', { name: '문제 5개 선정 완료 취소' }).click()
@@ -1108,7 +1108,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
   await expect(routineSection).not.toContainText('문제 5개 선정')
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '풀이 노트 정리 반복 업무 보관' }).click()
   await expect(page.getByText('보관한 반복 업무 2개', { exact: true })).toBeFocused()
   await expect(page.getByRole('button', { name: '회차 만들기' })).toBeDisabled()
@@ -1121,7 +1121,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
   const roundDialog = page.getByRole('dialog', { name: '회차 만들기' })
   await roundDialog.getByLabel('모임 날짜').fill('2026-07-24')
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(CREATED_ROUND_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(CREATED_ROUND_ID)
   expect(api.projection().rounds.find((round) => round.id === CREATED_ROUND_ID)
     ?.routineExecutions.map((execution) => execution.routineId))
     .toEqual([SECOND_ROUTINE_ID])
@@ -1151,7 +1151,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
 test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기록과 선택 회차를 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
 
   const executionSnapshot = structuredClone(
     api.projection().rounds
@@ -1176,12 +1176,12 @@ test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기�
 
   const updateCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}`)
   expectScopedCall(updateCall, { name: '심화 풀이 모임', meetingDate: '2026-07-18' })
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
-  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('심화 풀이 모임')
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('회차', { exact: true }).locator('option:checked')).toContainText('심화 풀이 모임')
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
 
   await page.getByRole('button', { name: '심화 풀이 모임 회차 보관' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_ONE_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_ONE_ID)
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeVisible()
   const archiveCall = await recordedCall(
     api,
@@ -1195,7 +1195,7 @@ test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기�
   await expect(archivedRow).toContainText('1/2 완료')
   await archivedRow.getByRole('button', { name: '심화 풀이 모임 회차 복원' }).click()
 
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
   const restoreCall = api.calls.filter((call) =>
     call.method === 'PATCH' && call.path === `${SCOPE_PATH}/rounds/${ROUND_TWO_ID}/archive`,
@@ -1207,9 +1207,9 @@ test('@operations 회차 정보를 정정하고 보관·복원해도 실행 기�
     .toEqual(executionSnapshot)
 
   await page.reload()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-  await expect(page.getByLabel('운영 회차')).toHaveValue(ROUND_TWO_ID)
-  await expect(page.getByLabel('운영 회차').locator('option:checked')).toContainText('심화 풀이 모임')
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
+  await expect(page.getByLabel('회차', { exact: true }).locator('option:checked')).toContainText('심화 풀이 모임')
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 취소' })).toBeVisible()
 })
 
@@ -1249,7 +1249,7 @@ test('@operations 오늘 화면에서 선택한 회차의 반복 업무를 완�
 test('@operations 완료 저장 중에는 같은 회차 관리만 잠근다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
 
   api.holdNextRoutineCompletion()
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
@@ -1259,7 +1259,7 @@ test('@operations 완료 저장 중에는 같은 회차 관리만 잠근다', as
   await expect(page.getByRole('button', { name: '회차 수정' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '2회차 회차 보관' })).toBeDisabled()
 
-  await page.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+  await page.getByLabel('회차', { exact: true }).selectOption(ROUND_ONE_ID)
   await expect(page.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '회차 수정' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '1회차 회차 보관' })).toBeEnabled()
@@ -1271,7 +1271,7 @@ test('@operations 완료 저장 중에는 같은 회차 관리만 잠근다', as
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
     .find((execution) => execution.id === ROUND_TWO_ROUTINE_TWO_EXECUTION_ID)?.status)
     .toBe('DONE')
-  await page.getByLabel('운영 회차').selectOption(ROUND_TWO_ID)
+  await page.getByLabel('회차', { exact: true }).selectOption(ROUND_TWO_ID)
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
 })
 
@@ -1291,8 +1291,8 @@ test('@operations 다른 기기의 반복 업무 완료 변경을 열린 화면�
     await openSharedWorkspace(peerPage)
 
     for (const clientPage of [page, peerPage]) {
-      await navigation(clientPage, testInfo.project.name).getByRole('button', { name: '운영' }).click()
-      await clientPage.getByLabel('운영 회차').selectOption(ROUND_ONE_ID)
+      await navigation(clientPage, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+      await clientPage.getByLabel('회차', { exact: true }).selectOption(ROUND_ONE_ID)
       await expect(clientPage.getByRole('button', { name: '문제 5개 선정 완료 처리' })).toBeVisible()
     }
 
@@ -1340,14 +1340,14 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
     (call) => call.method === 'PATCH' && call.path === path,
   ).length
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   api.conflictNextRoutineCompletion(false)
   const getsBeforeRoutineConflict = workspaceGetCount()
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
 
   await expect.poll(() => completionPatchCount(routineCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRoutineConflict)
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요.')
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
@@ -1364,7 +1364,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(handoffCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeHandoffConflict)
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요.')
   await expect(handoffCheckbox).not.toBeChecked()
   expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_TWO_ID)?.completed).toBe(false)
   expectScopedCall(await recordedCall(api, 'PATCH', handoffCompletionPath), { completed: true })
@@ -1379,7 +1379,7 @@ test('동기화 실패에도 기존 내용을 유지하고 수동으로 다시 �
   await page.getByRole('button', { name: '지금 새로고침' }).click()
 
   const syncStatus = page.locator('.workspace-sync-status')
-  await expect(syncStatus).toContainText('최신 내용을 확인하지 못했어요')
+  await expect(syncStatus).toContainText('최신 내용을 불러오지 못했습니다.')
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
 
   api.restoreWorkspaceGets()

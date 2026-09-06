@@ -40,7 +40,7 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
     <header>
       <span className="section-kicker">MY CALENDARS</span>
       <h3 id="my-calendar-title">내 캘린더 구독</h3>
-      <p>팀과 시즌별 구독을 확인하고 해제합니다. 팀 접근 권한이 없어도 본인 구독을 정리할 수 있습니다.</p>
+      <p>내 캘린더 구독을 확인하거나 해제하세요. 팀을 떠난 뒤에도 해제할 수 있습니다.</p>
     </header>
     <form className="calendar-search" role="search" aria-label="내 캘린더 구독 검색" onSubmit={event => {
       event.preventDefault()

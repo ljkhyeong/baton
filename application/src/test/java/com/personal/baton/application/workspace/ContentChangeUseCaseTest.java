@@ -8,6 +8,7 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
 import com.personal.baton.domain.identity.Account;
@@ -105,5 +106,42 @@ class ContentChangeUseCaseTest {
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         lifecycle.updateSeasonEnding(team, season, key, true);
         assertThat(changes.getHistory(team, season, ContentRecordKind.DECISION, decision.id(), key).changes()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("결정 이력은 작성자와 관련 역할의 변경을 기록하고 역할 순서 변경은 제외한다")
+    void recordsChangedAuthorAndSelectedRoles() {
+        var workspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
+                new CreateWorkspaceCommand("관련 역할 이력 팀", "시즌", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31), List.of("민서")));
+        var team = workspace.teamId(); var season = workspace.seasonId(); var key = workspace.accessKey();
+        var author = lifecycle.getWorkspace(team, season, key).members().getFirst();
+        var nextAuthor = people.createMember(team, season, UUID.randomUUID().toString(), key, new CreateMemberCommand("준호"));
+        var recordRole = people.createRole(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleCommand("기록 담당", "회의를 기록합니다", null, null, null, null, List.of("회의록 작성"), null));
+        var operationsRole = people.createRole(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleCommand("운영 담당", "일정을 관리합니다", null, null, null, null, List.of(), null));
+        people.createRole(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleCommand("발표 담당", "발표를 준비합니다", null, null, null, null, List.of(), null));
+        var decision = records.createDecision(team, season, UUID.randomUUID().toString(), key,
+                new CreateDecisionCommand("회의", "운영 방식", null, author.id(), List.of(recordRole.id())));
+
+        records.updateDecision(team, season, decision.id(), key,
+                new UpdateDecisionCommand("회의", "운영 방식", null, nextAuthor.id(), List.of(operationsRole.id(), recordRole.id())));
+        var change = changes.getHistory(team, season, ContentRecordKind.DECISION, decision.id(), key).changes().getFirst();
+        assertThat(change.fields()).extracting(ContentChangeUseCase.FieldChangeResult::fieldName,
+                        ContentChangeUseCase.FieldChangeResult::beforeValue, ContentChangeUseCase.FieldChangeResult::afterValue)
+                .containsExactly(tuple("작성자", "민서", "준호"), tuple("관련 역할", "기록 담당", "기록 담당, 운영 담당"));
+
+        records.updateDecision(team, season, decision.id(), key,
+                new UpdateDecisionCommand("회의", "운영 방식", null, nextAuthor.id(), List.of(recordRole.id(), operationsRole.id())));
+        assertThat(changes.getHistory(team, season, ContentRecordKind.DECISION, decision.id(), key).changes()).hasSize(1);
+        records.updateDecision(team, season, decision.id(), key,
+                new UpdateDecisionCommand("회의", "운영 방식", null, nextAuthor.id(), List.of(operationsRole.id())));
+        assertThat(changes.getHistory(team, season, ContentRecordKind.DECISION, decision.id(), key).changes().getFirst().fields())
+                .containsExactly(new ContentChangeUseCase.FieldChangeResult("관련 역할", "기록 담당, 운영 담당", "운영 담당"));
+
+        records.updateDecisionArchive(team, season, decision.id(), key, true);
+        assertThat(changes.getHistory(team, season, ContentRecordKind.DECISION, decision.id(), key).changes().getFirst().fields())
+                .containsExactly(new ContentChangeUseCase.FieldChangeResult("보관 상태", "사용 중", "보관"));
     }
 }

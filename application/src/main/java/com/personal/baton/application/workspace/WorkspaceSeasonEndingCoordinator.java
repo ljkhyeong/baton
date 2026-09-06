@@ -8,12 +8,9 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract.Season
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
-import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -66,20 +63,11 @@ final class WorkspaceSeasonEndingCoordinator {
         Season savedSeason = seasonRepository.saveSeason(season);
         if (endingChanged) {
             watchMonitorChangeRecorder.recordSeasonState(
-                    findSeasonResources(teamId, seasonId),
+                    recordsRepository.findRoleResourcesByTeamIdAndSeasonId(teamId, seasonId),
                     ended
             );
         }
         return resultMapper.toSeasonResult(savedSeason);
     }
 
-    private List<RoleResource> findSeasonResources(UUID teamId, UUID seasonId) {
-        List<UUID> roleIds = peopleRepository.findRolesByTeamIdAndSeasonId(teamId, seasonId).stream()
-                .map(Role::getId)
-                .toList();
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-        return recordsRepository.findRoleResourcesByRoleIds(roleIds);
-    }
 }

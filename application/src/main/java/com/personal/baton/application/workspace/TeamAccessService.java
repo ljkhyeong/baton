@@ -22,17 +22,15 @@ import com.personal.baton.domain.workspace.Team;
 import com.personal.baton.domain.workspace.TeamAccessAudit;
 import com.personal.baton.domain.workspace.TeamInvitation;
 import com.personal.baton.domain.workspace.TeamPermission;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,10 +48,11 @@ public class TeamAccessService implements TeamAccessUseCase {
     private final IdentityRepository identities;
     private final Clock clock;
     private final CalendarSubscriptionStore calendarSubscriptions;
-    private final SecureRandom random = new SecureRandom();
+    private final StringKeyGenerator tokenGenerator;
     public TeamAccessService(WorkspaceAccessRepository teams, WorkspacePeopleRepository people,
             WorkspaceSeasonRepository seasons, RoundAuthorizationRepository memberships, TeamAccessRepository access,
-            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities) {
+            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities,
+            StringKeyGenerator tokenGenerator) {
         this.teams = teams;
         this.people = people;
         this.seasons = seasons;
@@ -65,6 +64,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         this.clock = clock;
         this.identities = identities;
         this.calendarSubscriptions = calendarSubscriptions;
+        this.tokenGenerator = tokenGenerator;
     }
     @Override
     public MyTeamsResult getMyTeams(UUID accountId) {
@@ -105,11 +105,11 @@ public class TeamAccessService implements TeamAccessUseCase {
         requireActor(accountId);
         Team team = requireAdministrator(teamId);
         requireActiveMember(teamId, memberId);
-        if (access.findMemberships(teamId).stream().anyMatch(value -> value.getMemberId().equals(memberId) && value.getPermission() != null))
+        if (access.findMembershipByMemberId(memberId).filter(value -> value.getTeamId().equals(teamId))
+                .filter(value -> value.getPermission() != null).isPresent())
             throw new DomainValidationException("이미 접근 권한이 있는 구성원은 권한 목록에서 변경해 주세요");
         revokePending(teamId, memberId);
-        byte[] bytes = new byte[32]; random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String token = tokenGenerator.generateKey();
         Instant now = clock.instant();
         TeamInvitation invitation = access.saveInvitation(TeamInvitation.create(teamId, memberId, tokenHash(token),
                 permission, accountId, now, now.plus(Duration.ofDays(7))));
@@ -135,8 +135,8 @@ public class TeamAccessService implements TeamAccessUseCase {
     public TeamAccessResult changePermission(UUID teamId, UUID accountId, UUID memberId, TeamPermission permission) {
         requireActor(accountId);
         Team team = requireAdministrator(teamId);
-        var membership = access.findMemberships(teamId).stream().filter(value -> value.getMemberId().equals(memberId))
-                .findFirst().orElseThrow(() -> new WorkspaceNotFoundException("MEMBERSHIP_NOT_FOUND", "연결된 계정을 찾을 수 없습니다"));
+        var membership = access.findMembershipByMemberId(memberId).filter(value -> value.getTeamId().equals(teamId))
+                .orElseThrow(() -> new WorkspaceNotFoundException("MEMBERSHIP_NOT_FOUND", "연결된 계정을 찾을 수 없습니다"));
         if (permission != null) {
             requireActiveMember(teamId, memberId);
             requireActiveAccount(membership.getAccountId());
@@ -187,9 +187,9 @@ public class TeamAccessService implements TeamAccessUseCase {
             return accepted(team, membership);
         }
         if (!invitation.isPending(clock.instant())) throw invitationNotFound();
-        AccountTeamMembership membership = access.findMemberships(teamId).stream()
-                .filter(value -> value.getAccountId().equals(accountId) || value.getMemberId().equals(member.getId()))
-                .findFirst().orElseGet(() -> AccountTeamMembership.create(UUID.randomUUID(), accountId, teamId,
+        AccountTeamMembership membership = memberships.findMembership(accountId, teamId)
+                .or(() -> access.findMembershipByMemberId(member.getId()))
+                .orElseGet(() -> AccountTeamMembership.create(UUID.randomUUID(), accountId, teamId,
                         member.getId(), clock.instant()));
         if (!membership.getAccountId().equals(accountId) || !membership.getMemberId().equals(member.getId()))
             throw new AccountMembershipConflictException("이미 다른 계정 또는 구성원으로 연결되어 있습니다");
@@ -202,8 +202,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         return accepted(team, membership);
     }
     private InvitationAcceptedResult accepted(Team team, AccountTeamMembership membership) {
-        var season = seasons.findSeasonsByTeamId(team.getId()).stream()
-                .max(Comparator.comparing(value -> value.getStartDate())).orElseThrow(this::teamNotFound);
+        var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(this::teamNotFound);
         return new InvitationAcceptedResult(membership.getAccountId(), team.getId(), season.getId(),
                 membership.getMemberId(), membership.getPermission());
     }
@@ -224,11 +223,9 @@ public class TeamAccessService implements TeamAccessUseCase {
                 .orElseThrow(() -> new DomainValidationException("활동 중인 팀 구성원을 선택해 주세요"));
     }
     private void revokePending(UUID teamId, UUID memberId) {
-        for (TeamInvitation invitation : access.findInvitations(teamId)) {
-            if (invitation.getMemberId().equals(memberId) && invitation.getAcceptedAt() == null && invitation.getRevokedAt() == null) {
-                invitation.revoke(clock.instant());
-                access.saveInvitation(invitation);
-            }
+        for (TeamInvitation invitation : access.findUnacceptedInvitations(teamId, memberId)) {
+            invitation.revoke(clock.instant());
+            access.saveInvitation(invitation);
         }
     }
     private void audit(UUID teamId, UUID actor, UUID memberId, String action, TeamPermission previous, TeamPermission permission) {
@@ -237,14 +234,16 @@ public class TeamAccessService implements TeamAccessUseCase {
     private TeamAccessResult result(Team team, UUID accountId) {
         var mine = memberships.findMembership(accountId, team.getId()).orElse(null);
         boolean administrator = mine != null && mine.getPermission() == TeamPermission.ADMIN;
-        Map<UUID, AccountTeamMembership> byMember = access.findMemberships(team.getId()).stream()
-                .collect(Collectors.toMap(AccountTeamMembership::getMemberId, Function.identity()));
-        List<MemberAccessResult> members = administrator || !team.isAccountAccessEnabled()
-                ? people.findMembersByTeamId(team.getId()).stream().map(member -> {
-                    var claim = byMember.get(member.getId());
-                    return new MemberAccessResult(member.getId(), member.getName(), member.isActive(),
-                            claim == null ? null : claim.getAccountId(), claim == null ? null : claim.getPermission());
-                }).toList() : List.of();
+        List<MemberAccessResult> members = List.of();
+        if (administrator || !team.isAccountAccessEnabled()) {
+            Map<UUID, AccountTeamMembership> byMember = access.findMemberships(team.getId()).stream()
+                    .collect(Collectors.toMap(AccountTeamMembership::getMemberId, Function.identity()));
+            members = people.findMembersByTeamId(team.getId()).stream().map(member -> {
+                var claim = byMember.get(member.getId());
+                return new MemberAccessResult(member.getId(), member.getName(), member.isActive(),
+                        claim == null ? null : claim.getAccountId(), claim == null ? null : claim.getPermission());
+            }).toList();
+        }
         return new TeamAccessResult(team.getId(), accountId, team.isAccountAccessEnabled(), mine == null ? null : mine.getMemberId(),
                 mine == null ? null : mine.getPermission(), members,
                 administrator ? access.findInvitations(team.getId()).stream().map(this::invitationResult).toList() : List.of(),

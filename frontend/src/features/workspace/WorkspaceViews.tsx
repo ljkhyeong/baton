@@ -126,16 +126,16 @@ export function RoundControl({
   return (
     <section className="round-control" aria-label="회차 전환 도구">
       <label>
-        <span>운영 회차</span>
+        <span>회차</span>
         <select
-          aria-label="운영 회차"
+          aria-label="회차"
           value={selectedRound?.id ?? ''}
           disabled={!rounds.length}
           onChange={(event) => onSelect(event.target.value)}
         >
           {!rounds.length && (
             <option value="">
-              {archivedRoundCount ? '현재 운영할 회차가 없습니다' : '아직 만든 회차가 없습니다'}
+              {archivedRoundCount ? '진행할 회차가 없습니다' : '아직 만든 회차가 없습니다'}
             </option>
           )}
           {rounds.map((round) => (
@@ -181,7 +181,7 @@ export function RoundControl({
         </button>
       </div>
       {!hasRoutines && (
-        <p id="round-create-hint">반복 업무를 하나 이상 만든 뒤 운영 회차를 만들 수 있어요.</p>
+        <p id="round-create-hint">반복 업무를 하나 이상 만든 뒤 회차를 만들 수 있어요.</p>
       )}
     </section>
   )
@@ -222,7 +222,7 @@ export function RoutineRow({ routine, execution, role, members, timeZone, onTogg
           )}
         </span>
       ) : (
-        <span className="routine-definition-note">정의 보관됨</span>
+        <span className="routine-definition-note">반복 업무 보관됨</span>
       )}
     </div>
   )

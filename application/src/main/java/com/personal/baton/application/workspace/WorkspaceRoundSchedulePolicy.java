@@ -4,10 +4,8 @@ import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundSchedule;
-import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -20,16 +18,10 @@ final class WorkspaceRoundSchedulePolicy {
     }
 
     void requireDeadlineRulesForScheduleActivation(UUID seasonId) {
-        List<Routine> routines = repository.findRoutinesBySeasonId(seasonId);
-        for (Routine routine : routines) {
-            if (routine.getArchivedAt() != null) {
-                continue;
-            }
-            if (routine.getDeadlineDayOffset() == null || routine.getDeadlineTime() == null) {
-                throw new DomainValidationException(
-                        "자동 회차를 사용하려면 모든 반복 업무에 실제 마감 규칙이 필요합니다"
-                );
-            }
+        if (repository.existsActiveRoutineWithoutDeadlineRule(seasonId)) {
+            throw new DomainValidationException(
+                    "자동 회차를 사용하려면 모든 반복 업무에 실제 마감 규칙이 필요합니다"
+            );
         }
     }
 

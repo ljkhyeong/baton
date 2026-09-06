@@ -1154,7 +1154,9 @@ DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면
 `POST /round/rooms/{roomId}/participation-grant/refresh`는 `Account` 세션, CSRF와 정확히 일치하는
 동일 출처를 요구한다. 요청 본문은 생략하거나 서버 권위 매핑을 재확인할
 `{teamId,seasonId,resourceId}` 세 필드만 보낼 수 있다. 본문을 생략하면 `Content-Type`도 보내지
-않는다. 성공은 `200 {expiresAt,refreshAfterSeconds}`와 방 경로에만 적용되는
+않는다. 세 식별자는 소문자 UUID 문자열이어야 하며 누락·잘못된 형식·추가 필드는
+`400 INVALID_INPUT`으로 거부하고 기존 참여권 쿠키를 유지한다.
+성공은 `200 {expiresAt,refreshAfterSeconds}`와 방 경로에만 적용되는
 `__Secure-round_access` `Secure`·`HttpOnly`·`SameSite=Strict` 쿠키를 반환한다. JWT는 본문에 노출하지
 않으며 수명은 300초, 갱신 지연은 240초다.
 

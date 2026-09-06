@@ -15,6 +15,8 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateRoleCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
 import com.personal.baton.domain.identity.Account;
@@ -77,9 +79,16 @@ class ResourceVerificationUseCaseTest {
         var plan = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
                 new ConfigureReviewScheduleCommand(-1, 30, emptySchedule.today()));
         assertThat(plan.reviewDue()).isTrue();
+        assertThat(verifications.getSchedule(team, season, resource.id(), key)).isEqualTo(plan);
         var due = verifications.getDueReviews(team, season, key);
         assertThat(due.resources()).extracting(ResourceVerificationUseCase.DueReviewResult::resourceId).containsExactly(resource.id());
         assertThat(due.resources().getFirst().memberId()).isNull();
+        people.updateRole(team, season, role.id(), key, new UpdateRoleCommand(role.name(), role.purpose(),
+                member.id(), null, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31), List.of(), null));
+        assertThat(verifications.getDueReviews(team, season, key).resources()).singleElement().satisfies(value -> {
+            assertThat(value.memberId()).isEqualTo(member.id());
+            assertThat(value.memberName()).isEqualTo(member.name());
+        });
         assertThatThrownBy(() -> verifications.getDueReviews(team, season, "wrong-key"))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         assertThatThrownBy(() -> verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
@@ -108,12 +117,20 @@ class ResourceVerificationUseCaseTest {
         var disabled = verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
                 new ConfigureReviewScheduleCommand(nextPlan.version(), null, null));
         assertThat(disabled.nextReviewOn()).isNull(); assertThat(disabled.reviewDue()).isFalse();
+        assertThat(disabled.version()).isGreaterThan(nextPlan.version());
+        assertThat(verifications.getSchedule(team, season, resource.id(), key)).isEqualTo(disabled);
+        assertThat(verifications.getDueReviews(team, season, key).resources()).isEmpty();
+        verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(disabled.version(), 7, plan.today()));
         people.updateMemberDeactivation(team, season, member.id(), key, true);
+        assertThat(verifications.getDueReviews(team, season, key).resources()).singleElement().satisfies(value -> {
+            assertThat(value.resourceId()).isEqualTo(resource.id());
+            assertThat(value.memberId()).isNull();
+            assertThat(value.memberName()).isNull();
+        });
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), current))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         people.updateMemberDeactivation(team, season, member.id(), key, false);
-        verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
-                new ConfigureReviewScheduleCommand(disabled.version(), 7, plan.today()));
         records.updateRoleResourceArchive(team, season, resource.id(), key, true);
         assertThat(verifications.getDueReviews(team, season, key).resources()).isEmpty();
         assertThatThrownBy(() -> verifications.verify(team, season, resource.id(), key, account.getId(), current))
@@ -121,5 +138,16 @@ class ResourceVerificationUseCaseTest {
         assertThat(verifications.getHistory(team, season, resource.id(), key).verifications()).hasSize(2);
         assertThatThrownBy(() -> verifications.getHistory(team, season, resource.id(), "wrong-key"))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
+        records.updateRoleResourceArchive(team, season, resource.id(), key, false);
+        lifecycle.updateSeasonEnding(team, season, key, true);
+        assertThat(verifications.getDueReviews(team, season, key).resources()).isEmpty();
+        var next = lifecycle.createNextSeason(team, season, UUID.randomUUID().toString(), key,
+                new CreateNextSeasonCommand("다음 시즌", LocalDate.of(2027, 1, 1), LocalDate.of(2027, 6, 30),
+                        List.of(), List.of()));
+        assertThat(verifications.getDueReviews(team, next.season().id(), key).resources()).isEmpty();
+        var otherWorkspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
+                new CreateWorkspaceCommand("다른 팀", "시즌", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31), List.of("다른 구성원")));
+        assertThat(verifications.getDueReviews(otherWorkspace.teamId(), otherWorkspace.seasonId(),
+                otherWorkspace.accessKey()).resources()).isEmpty();
     }
 }

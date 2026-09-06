@@ -38,13 +38,23 @@ public interface WorkspaceOperationsRepository {
 
     List<Routine> findRoutinesBySeasonId(UUID seasonId);
 
+    List<Routine> findActiveRoutinesBySeasonId(UUID seasonId);
+
+    boolean existsActiveRoutineWithoutDeadlineRule(UUID seasonId);
+
+    List<Routine> findActiveRoutinesBySeasonIdAndIds(UUID seasonId, List<UUID> routineIds);
+
     List<SeasonRound> findSeasonRoundsBySeasonId(UUID seasonId);
 
     List<RoutineExecution> findRoutineExecutionsBySeasonRoundIds(List<UUID> seasonRoundIds);
 
+    List<RoutineExecution> findPendingDeadlineExecutions(UUID teamId, UUID seasonId, UUID memberId);
+
     List<RoutineExecution> findRoutineExecutionsBySeasonRoundIdWithSharedLock(UUID seasonRoundId);
 
     boolean existsSeasonRoundBySeasonId(UUID seasonId);
+
+    boolean existsSeasonRoundOutsideRange(UUID seasonId, LocalDate startDate, LocalDate endDate);
 
     boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name);
 

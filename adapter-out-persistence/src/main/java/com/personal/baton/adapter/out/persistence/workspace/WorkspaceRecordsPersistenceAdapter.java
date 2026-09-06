@@ -82,8 +82,22 @@ public class WorkspaceRecordsPersistenceAdapter implements WorkspaceRecordsRepos
     }
 
     @Override
+    public HandoffItemCounts countActiveHandoffItems(UUID roleId) {
+        return handoffItemRepository.countActiveByRoleId(roleId);
+    }
+
+    @Override
+    public int countActiveRoleResources(UUID roleId) {
+        return roleResourceRepository.countByRoleIdAndArchivedAtIsNull(roleId);
+    }
+
+    @Override
     public List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds) {
         return roleResourceRepository.findAllByRoleIdInOrderByRoleIdAscIdAsc(roleIds);
     }
-}
 
+    @Override
+    public List<RoleResource> findRoleResourcesByTeamIdAndSeasonId(UUID teamId, UUID seasonId) {
+        return roleResourceRepository.findAllByTeamIdAndSeasonId(teamId, seasonId);
+    }
+}

@@ -16,20 +16,18 @@ import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -143,7 +141,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
         Season savedSourceSeason = seasonRepository.saveSeason(sourceSeason);
         if (sourceSeasonEndingChanged) {
             watchMonitorChangeRecorder.recordSeasonState(
-                    findSeasonResources(teamId, sourceSeasonId),
+                    recordsRepository.findRoleResourcesByTeamIdAndSeasonId(teamId, sourceSeasonId),
                     true
             );
         }
@@ -182,16 +180,6 @@ final class WorkspaceSeasonSuccessorCoordinator {
         return toNextSeasonResult(savedSourceSeason, savedTargetSeason);
     }
 
-    private List<RoleResource> findSeasonResources(UUID teamId, UUID seasonId) {
-        List<UUID> roleIds = peopleRepository.findRolesByTeamIdAndSeasonId(teamId, seasonId).stream()
-                .map(Role::getId)
-                .toList();
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-        return recordsRepository.findRoleResourcesByRoleIds(roleIds);
-    }
-
     private List<UUID> normalizedCopyIds(List<UUID> ids, String field) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
@@ -219,45 +207,22 @@ final class WorkspaceSeasonSuccessorCoordinator {
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Role> rolesById = peopleRepository
-                .findRolesByTeamIdAndSeasonId(teamId, sourceSeasonId)
-                .stream()
-                .collect(Collectors.toMap(Role::getId, Function.identity()));
-        List<Role> selected = new ArrayList<>();
-        for (UUID roleId : roleIds) {
-            Role role = rolesById.get(roleId);
-            if (role == null) {
-                throw new WorkspaceNotFoundException(
-                        "ROLE_NOT_FOUND",
-                        "복사할 역할을 찾을 수 없습니다"
-                );
-            }
-            selected.add(role);
+        List<Role> selected = peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, sourceSeasonId, roleIds);
+        if (selected.size() != roleIds.size()) {
+            throw new WorkspaceNotFoundException("ROLE_NOT_FOUND", "복사할 역할을 찾을 수 없습니다");
         }
-        return selected;
+        return selected.stream().sorted(Comparator.comparing(Role::getId)).toList();
     }
 
     private List<Routine> selectSourceRoutines(UUID sourceSeasonId, List<UUID> routineIds) {
         if (routineIds.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Routine> routinesById = operationsRepository
-                .findRoutinesBySeasonId(sourceSeasonId)
-                .stream()
-                .filter(routine -> routine.getArchivedAt() == null)
-                .collect(Collectors.toMap(Routine::getId, Function.identity()));
-        List<Routine> selected = new ArrayList<>();
-        for (UUID routineId : routineIds) {
-            Routine routine = routinesById.get(routineId);
-            if (routine == null) {
-                throw new WorkspaceNotFoundException(
-                        "ROUTINE_NOT_FOUND",
-                        "복사할 반복 업무를 찾을 수 없습니다"
-                );
-            }
-            selected.add(routine);
+        List<Routine> selected = operationsRepository.findActiveRoutinesBySeasonIdAndIds(sourceSeasonId, routineIds);
+        if (selected.size() != routineIds.size()) {
+            throw new WorkspaceNotFoundException("ROUTINE_NOT_FOUND", "복사할 반복 업무를 찾을 수 없습니다");
         }
-        return selected;
+        return selected.stream().sorted(Comparator.comparing(Routine::getId)).toList();
     }
 
     private NextSeasonResult toNextSeasonResult(Season sourceSeason, Season targetSeason) {

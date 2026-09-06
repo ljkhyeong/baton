@@ -74,9 +74,8 @@ class RoundAutomationApplicationTest {
                     LocalDate.of(2026, 8, 1), LocalTime.of(20, 0), RoundRecurrence.WEEKLY, 7, false
             );
         }
-        Routine routine = routine(seasonId, null, null);
         stubScheduleAuthorization(team, season);
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
+        when(operationsRepository.existsActiveRoutineWithoutDeadlineRule(seasonId)).thenReturn(true);
 
         WorkspaceServiceTestFactory.Services service = workspaceService();
 
@@ -99,9 +98,7 @@ class RoundAutomationApplicationTest {
         Team team = team(teamId);
         Season season = season(teamId, seasonId);
         stubScheduleAuthorization(team, season);
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(
-                routine(seasonId, -1, LocalTime.of(23, 0))
-        ));
+        when(operationsRepository.existsActiveRoutineWithoutDeadlineRule(seasonId)).thenReturn(false);
         when(seasonRepository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         WorkspaceServiceTestFactory.Services service = workspaceService();
@@ -135,9 +132,7 @@ class RoundAutomationApplicationTest {
         );
         season.advanceRoundSchedule();
         stubScheduleAuthorization(team, season);
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(
-                routine(seasonId, -1, LocalTime.of(23, 0))
-        ));
+        when(operationsRepository.existsActiveRoutineWithoutDeadlineRule(seasonId)).thenReturn(false);
         when(seasonRepository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
         WorkspaceServiceTestFactory.Services service = workspaceService();
 
@@ -160,7 +155,7 @@ class RoundAutomationApplicationTest {
         assertThat(resumed.roundSchedule().enabled()).isTrue();
         assertThat(resumed.roundSchedule().nextOccurrenceDate())
                 .isEqualTo(LocalDate.of(2026, 8, 8));
-        verify(operationsRepository).findRoutinesBySeasonId(seasonId);
+        verify(operationsRepository).existsActiveRoutineWithoutDeadlineRule(seasonId);
     }
 
     @Test
@@ -186,7 +181,7 @@ class RoundAutomationApplicationTest {
         assertThat(result.roundSchedule().meetingTime()).isEqualTo(LocalTime.of(21, 0));
         assertThat(result.roundSchedule().recurrence()).isEqualTo(RoundRecurrence.BIWEEKLY);
         assertThat(result.roundSchedule().generationLeadDays()).isEqualTo(14);
-        verify(operationsRepository, never()).findRoutinesBySeasonId(any());
+        verify(operationsRepository, never()).existsActiveRoutineWithoutDeadlineRule(any());
         verifyNoInteractions(briefRecorder);
     }
 
@@ -281,7 +276,7 @@ class RoundAutomationApplicationTest {
         when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
                 .thenReturn(Optional.of(season));
         when(accessRepository.findContentCreationIdempotency(any(), any())).thenReturn(Optional.empty());
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
+        when(operationsRepository.findActiveRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
         when(operationsRepository.saveSeasonRound(any())).thenAnswer(invocation -> {
             SeasonRound round = invocation.getArgument(0);
             savedRound.set(round);
@@ -349,7 +344,7 @@ class RoundAutomationApplicationTest {
         )).thenReturn(false);
         when(operationsRepository.existsSeasonRoundBySeasonIdAndName(seasonId, "자동 회차 2026-08-01"))
                 .thenReturn(false);
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
+        when(operationsRepository.findActiveRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
         when(operationsRepository.saveSeasonRound(any())).thenAnswer(invocation -> {
             SeasonRound round = invocation.getArgument(0);
             savedRound.set(round);
@@ -447,8 +442,6 @@ class RoundAutomationApplicationTest {
                 7,
                 true
         );
-        Routine archived = routine(seasonId, -1, LocalTime.of(23, 0));
-        archived.updateArchive(true, NOW);
         when(accessRepository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
         when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
                 .thenReturn(Optional.of(season));
@@ -456,7 +449,7 @@ class RoundAutomationApplicationTest {
                 seasonId,
                 LocalDate.of(2026, 8, 1)
         )).thenReturn(false);
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(archived));
+        when(operationsRepository.findActiveRoutinesBySeasonId(seasonId)).thenReturn(List.of());
         when(seasonRepository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         boolean processed = new ScheduledRoundGenerationWorker(

@@ -74,11 +74,13 @@ public class WorkspaceSeasonPersistenceAdapter implements WorkspaceSeasonReposit
     }
 
     @Override
+    public Optional<Season> findLatestSeasonByTeamId(UUID teamId) {
+        return seasonRepository.findFirstByTeamIdOrderByStartDateDescIdDesc(teamId);
+    }
+
+    @Override
     public List<ScheduledSeasonCandidate> findScheduledSeasonCandidates() {
-        return seasonRepository.findAllByEndedAtIsNullAndRoundScheduleEnabledTrueOrderByIdAsc()
-                .stream()
-                .map(season -> new ScheduledSeasonCandidate(season.getTeamId(), season.getId()))
-                .toList();
+        return seasonRepository.findScheduledSeasonCandidates();
     }
 
     @Override
@@ -91,4 +93,3 @@ public class WorkspaceSeasonPersistenceAdapter implements WorkspaceSeasonReposit
         return seasonRepository.existsByPreviousSeasonId(previousSeasonId);
     }
 }
-

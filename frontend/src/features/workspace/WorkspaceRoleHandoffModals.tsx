@@ -38,8 +38,8 @@ import type {
 
 function roleHandoffIdentityCopy(member: Member | undefined, action: string, accountAccessEnabled: boolean) {
   const memberName = member ? memberDisplayName(member) : '지정된 구성원'
-  if (accountAccessEnabled) return `${memberName} 구성원과 연결된 계정으로만 ${action}할 수 있습니다.`
-  return `공유 링크는 사람을 인증하지 않습니다. 이 작업은 ${memberName} 명의로 ${action}했다고 기록됩니다.`
+  if (accountAccessEnabled) return `${memberName}님의 계정으로 로그인해야 ${action}할 수 있습니다.`
+  return `공유 링크로 접속하면 본인 확인 없이 ${memberName}님이 ${action}한 것으로 기록됩니다.`
 }
 
 export function RoleHandoffModal({
@@ -140,7 +140,7 @@ export function RoleHandoffModal({
   const modalCopy = {
     prepare: {
       title: '역할 인수인계 준비 시작',
-      description: '다음 담당자와 수락 뒤 적용할 담당 기간을 먼저 확정합니다.',
+      description: '누가 언제부터 이 역할을 맡을지 정하세요.',
       submit: '인수인계 준비 시작',
       pending: '인수인계 준비하는 중…',
     },
@@ -152,14 +152,14 @@ export function RoleHandoffModal({
     },
     accept: {
       title: '역할 인수인계 수락',
-      description: '수락하면 역할의 현재 담당자와 담당 기간이 다음 담당자 정보로 바뀝니다.',
-      submit: `${toMember?.name ?? '다음 담당자'}님 명의로 수락 기록`,
+      description: '수락하면 다음 담당자로 교체되고 아래 담당 기간이 적용됩니다.',
+      submit: `${toMember?.name ?? '다음 담당자'}님으로 인수인계 수락`,
       pending: '인수인계 수락하는 중…',
     },
     cancel: {
       title: '역할 인수인계 취소',
-      description: '수락 전 인수인계를 취소하고 역할과 인수인계 문서를 다시 편집할 수 있게 합니다.',
-      submit: '인수인계 전달 취소',
+      description: '인수인계를 취소하면 역할과 인수인계 문서를 다시 수정할 수 있습니다.',
+      submit: '인수인계 취소',
       pending: '인수인계 취소하는 중…',
     },
   }[mode]
@@ -212,7 +212,7 @@ export function RoleHandoffModal({
               </label>
             </div>
             <p className="handoff-identity-note">
-              준비를 시작해도 현재 담당자는 바뀌지 않습니다. 전달 뒤 다음 담당자가 수락할 때 역할 배정이 갱신됩니다.
+              현재 담당자는 그대로입니다. 다음 담당자가 내용을 확인하고 수락하면 담당자가 바뀝니다.
             </p>
           </>
         ) : (
@@ -309,7 +309,7 @@ export function HandoffPreview({
     <ModalShell
       className="handoff-book"
       title={`${role.name} 인수인계 문서`}
-      description={`${workspaceLabel} · ${owner ? memberDisplayName(owner) : '이전 담당자'}에서 ${next ? memberDisplayName(next) : '다음 담당자'}에게 이어질 역할 기록입니다.`}
+      description={`${workspaceLabel} · ${owner ? memberDisplayName(owner) : '이전 담당자'} → ${next ? memberDisplayName(next) : '다음 담당자'} · 전달할 업무와 자료입니다.`}
       onClose={onClose}
     >
       <div className="book-preview">
@@ -389,7 +389,7 @@ export function HandoffPreview({
             : <p>등록된 인수인계 항목이 없습니다.</p>}
         </section>
         <div className="book-actions">
-          <p>현재 화면의 기록을 출력하거나 PDF로 저장합니다. 주소의 접근 키가 출력되지 않도록 브라우저 인쇄 메뉴 대신 아래 버튼을 사용해 주세요.</p>
+          <p>현재 화면의 기록을 출력하거나 PDF로 저장합니다. 공유 링크가 인쇄물에 남지 않도록 아래 버튼으로 인쇄해 주세요.</p>
           <button type="button" className="primary-button full-button" onClick={printBook}>
             인쇄 / PDF 저장
           </button>

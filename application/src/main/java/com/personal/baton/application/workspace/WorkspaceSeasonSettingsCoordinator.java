@@ -9,13 +9,9 @@ import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepo
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
-import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoundSchedule;
 import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -102,45 +98,16 @@ final class WorkspaceSeasonSettingsCoordinator {
         if (validatedStartDate.isAfter(validatedEndDate)) {
             throw new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다");
         }
-        for (SeasonRound round : operationsRepository.findSeasonRoundsBySeasonId(seasonId)) {
-            LocalDate meetingDate = round.getMeetingDate();
-            if (meetingDate != null
-                    && (meetingDate.isBefore(validatedStartDate)
-                    || meetingDate.isAfter(validatedEndDate))) {
-                throw new DomainValidationException("기존 회차 날짜를 제외하도록 시즌 기간을 줄일 수 없습니다");
-            }
+        if (operationsRepository.existsSeasonRoundOutsideRange(seasonId, validatedStartDate, validatedEndDate)) {
+            throw new DomainValidationException("기존 회차 날짜를 제외하도록 시즌 기간을 줄일 수 없습니다");
         }
-        List<Role> roles = peopleRepository.findRolesByTeamIdAndSeasonId(teamId, seasonId);
-        for (Role role : roles) {
-            LocalDate assignmentStartDate = role.getAssignmentStartDate();
-            LocalDate assignmentEndDate = role.getAssignmentEndDate();
-            if ((assignmentStartDate != null
-                    && (assignmentStartDate.isBefore(validatedStartDate)
-                    || assignmentStartDate.isAfter(validatedEndDate)))
-                    || (assignmentEndDate != null
-                    && (assignmentEndDate.isBefore(validatedStartDate)
-                    || assignmentEndDate.isAfter(validatedEndDate)))) {
-                throw new DomainValidationException("기존 역할 배정 기간을 제외하도록 시즌 기간을 줄일 수 없습니다");
-            }
+        if (peopleRepository.existsRoleAssignmentOutsideRange(teamId, seasonId, validatedStartDate, validatedEndDate)) {
+            throw new DomainValidationException("기존 역할 배정 기간을 제외하도록 시즌 기간을 줄일 수 없습니다");
         }
-        List<UUID> roleIds = roles.stream().map(Role::getId).toList();
-        if (!roleIds.isEmpty()) {
-            for (RoleHandoff handoff : peopleRepository.findRoleHandoffsByRoleIds(roleIds)) {
-                if (!handoff.isOpen()) {
-                    continue;
-                }
-                LocalDate incomingStartDate = handoff.getIncomingAssignmentStartDate();
-                LocalDate incomingEndDate = handoff.getIncomingAssignmentEndDate();
-                if (incomingStartDate.isBefore(validatedStartDate)
-                        || incomingStartDate.isAfter(validatedEndDate)
-                        || (incomingEndDate != null
-                        && (incomingEndDate.isBefore(validatedStartDate)
-                        || incomingEndDate.isAfter(validatedEndDate)))) {
-                    throw new DomainValidationException(
-                            "준비 중인 인수인계의 다음 담당 기간을 제외하도록 시즌 기간을 줄일 수 없습니다"
-                    );
-                }
-            }
+        if (peopleRepository.existsOpenRoleHandoffOutsideRange(teamId, seasonId, validatedStartDate, validatedEndDate)) {
+            throw new DomainValidationException(
+                    "준비 중인 인수인계의 다음 담당 기간을 제외하도록 시즌 기간을 줄일 수 없습니다"
+            );
         }
     }
 }

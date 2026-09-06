@@ -66,7 +66,7 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
   api.commitNextContentCreationThenTimeout('member')
   await nameInput.fill('이서준(응답 복구)')
   await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
-  await expect(dialog.getByRole('alert')).toContainText('같은 요청으로 안전하게 확인합니다.')
+  await expect(dialog.getByRole('alert')).toContainText('중복으로 만들지 않고 저장 여부를 확인합니다.')
   await expect(dialog.getByText(/이전에 저장 결과를 확인하지 못한 요청/)).toHaveCount(0)
 
   await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
@@ -190,7 +190,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
   })
   await reactivateMemberButton.focus()
   await reactivateMemberButton.press('Enter')
-  await expect(page.locator('.toast[role="status"]')).toContainText('박민서(리드)님의 활동을 재개했습니다.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('박민서(리드)님의 활동을 재개했어요.')
   await expect(managementDialog.getByRole('button', {
     name: '박민서(리드) 활동 종료',
   })).toBeFocused()
@@ -229,11 +229,11 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   await expect(shareButton).toBeFocused()
 
   const manageAccessButton = testInfo.project.name === 'mobile'
-    ? page.locator('.mobile-topbar').getByRole('button', { name: '키 관리' })
-    : page.locator('.sidebar').getByRole('button', { name: '키 관리' })
+    ? page.locator('.mobile-topbar').getByRole('button', { name: '링크 관리' })
+    : page.locator('.sidebar').getByRole('button', { name: '링크 관리' })
   await manageAccessButton.focus()
   await manageAccessButton.press('Enter')
-  const accessKeyDialog = page.getByRole('dialog', { name: '공유 접근 키 관리' })
+  const accessKeyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   await expect.poll(() => accessKeyDialog.evaluate((element) =>
     element.contains(document.activeElement))).toBe(true)
   await accessKeyDialog.getByRole('button', { name: '현재 링크 복사' }).click()
@@ -326,15 +326,15 @@ test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차�
     risk: '선정 기준이 오래된 문서에 남아 있어요.',
   })
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
 
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
   await expect(routineDialog.getByLabel('반복 업무 이름')).toHaveValue('문제 5개 선정')
   await expect(routineDialog.getByLabel('담당 역할')).toHaveValue(ROLE_ID)
   await routineDialog.getByLabel('반복 업무 이름').fill('문제 6개 선정')
-  await routineDialog.getByLabel('운영 단계').selectOption('DURING')
-  await routineDialog.getByLabel('기한 설명').fill('목요일 20:00')
+  await routineDialog.getByLabel('업무 시점').selectOption('DURING')
+  await routineDialog.getByLabel('마감 안내').fill('목요일 20:00')
   await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
@@ -359,7 +359,7 @@ test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차�
   await page.reload()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await expect(page.locator('.role-row-open').filter({ hasText: '문제 운영 큐레이터' })).toBeVisible()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await expect(page.locator('.rhythm-phase').filter({ has: page.getByRole('heading', { name: '모임 전' }) }).locator('.routine-row').filter({ hasText: '문제 5개 선정' })).toBeVisible()
   await expect(page.getByRole('button', { name: '문제 6개 선정 반복 업무 수정' })).toBeVisible()
 })
@@ -383,7 +383,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(roleDialog).toBeHidden()
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요')
   const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
   await expect(draft).toHaveValue(/내 화면의 낡은 역할 수정/)
   await expect(draft).toHaveValue(/담당 업무\n문제 5개 선정\n난이도 균형 확인/)
@@ -412,7 +412,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
     .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
   await reopenedRoleDialog.getByRole('button', { name: '닫기' }).click()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
   await routineDialog.getByLabel('반복 업무 이름').fill('내 화면의 낡은 반복 업무 수정')
@@ -427,14 +427,14 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(routineDialog).toBeHidden()
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요')
   await expect(draft).toHaveValue(/내 화면의 낡은 반복 업무 수정/)
   await expect(draft).not.toHaveValue(/내 화면의 낡은 역할 수정/)
   await page.getByRole('button', { name: '다른 구성원이 갱신한 반복 업무 반복 업무 수정' }).click()
   const reopenedRoutineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
   await expect(reopenedRoutineDialog.getByLabel('반복 업무 이름')).toHaveValue('다른 구성원이 갱신한 반복 업무')
-  await expect(reopenedRoutineDialog.getByLabel('운영 단계')).toHaveValue('AFTER')
-  await expect(reopenedRoutineDialog.getByLabel('기한 설명')).toHaveValue('금요일 22:00')
+  await expect(reopenedRoutineDialog.getByLabel('업무 시점')).toHaveValue('AFTER')
+  await expect(reopenedRoutineDialog.getByLabel('마감 안내')).toHaveValue('금요일 22:00')
   await expect(reopenedRoutineDialog.getByLabel('세부 설명'))
     .toHaveValue('서버에서 먼저 갱신한 최신 반복 업무 설명입니다.')
 
@@ -557,7 +557,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await expect.poll(rolePutCount).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeConflict)
   const syncStatus = page.locator('.workspace-sync-status')
-  await expect(syncStatus).toContainText('최신 기록을 확인해야 다시 수정할 수 있어요.')
+  await expect(syncStatus).toContainText('최신 내용을 확인한 뒤 다시 수정하세요.')
   await expect(page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')).toHaveValue(/내 화면의 낡은 역할 수정/)
   await expect(page.getByRole('button', { name: '입력 내용 복사' })).toBeEnabled()
   await expect(page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }))
@@ -612,11 +612,11 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
   api.releaseRoleUpdate()
   await expect(roleDialog).toHaveCount(0)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   api.holdNextRoutineUpdate()
   await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
-  await routineDialog.getByLabel('기한 설명').fill('저장 완료 후 공개')
+  await routineDialog.getByLabel('마감 안내').fill('저장 완료 후 공개')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
   await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
 
@@ -660,7 +660,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
     await page.locator('.role-row-open').filter({ hasText: '생성 잠금 역할' }).click()
   }
   await page.getByRole('button', { name: '자료 추가' }).click()
-  const resourceDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  const resourceDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await resourceDialog.getByLabel('자료 이름').fill('생성 잠금 자료')
   await resourceDialog.getByLabel('링크').fill('https://docs.example.com/pending-lock')
   await expectPendingCreationDialogLocked({
@@ -676,11 +676,11 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
       .click()
   }
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await routineDialog.getByLabel('반복 업무 이름').fill('생성 잠금 반복 업무')
-  await routineDialog.getByLabel('기한 설명').fill('모임 하루 전')
+  await routineDialog.getByLabel('마감 안내').fill('모임 하루 전')
   await routineDialog.getByLabel('세부 설명').fill('서버 응답을 받은 뒤에만 생성 화면을 닫습니다.')
   await expectPendingCreationDialogLocked({
     api,
@@ -704,7 +704,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
   await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
   await page.getByRole('button', { name: '결정 남기기' }).click()
   const decisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
-  await decisionDialog.getByLabel('무엇을 바꾸기로 했나요?').fill('생성 요청은 응답까지 한 화면에서 기다린다')
+  await decisionDialog.getByLabel('무엇을 결정했나요?').fill('생성 요청은 응답까지 한 화면에서 기다린다')
   await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('중복 요청과 완료 callback 유실을 막기 위해서입니다.')
   await expectPendingCreationDialogLocked({
     api,
@@ -751,7 +751,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
 
   const expectStorageBlock = async (dialog: Locator, submitLabel: string) => {
     await dialog.getByRole('button', { name: submitLabel }).click()
-    await expect(dialog.getByRole('alert')).toContainText('일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.')
+    await expect(dialog.getByRole('alert')).toContainText('일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.')
     await dialog.getByRole('button', { name: '닫기' }).click()
   }
 
@@ -769,7 +769,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
   const roleInspector = page.getByLabel('선택한 역할 상세')
   await roleInspector.getByRole('button', { name: '자료 추가' }).click()
-  const resourceDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  const resourceDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await resourceDialog.getByLabel('자료 이름').fill('저장 차단 자료')
   await resourceDialog.getByLabel('링크').fill('https://docs.example.com/storage-blocked')
   await expectStorageBlock(resourceDialog, '자료 연결하기')
@@ -777,11 +777,11 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
     await roleInspector.getByRole('button', { name: '상세 닫기' }).click()
   }
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await routineDialog.getByLabel('반복 업무 이름').fill('저장 차단 반복 업무')
-  await routineDialog.getByLabel('기한 설명').fill('수요일 18:00')
+  await routineDialog.getByLabel('마감 안내').fill('수요일 18:00')
   await routineDialog.getByLabel('세부 설명').fill('저장 가능한 경우에만 전송합니다.')
   await expectStorageBlock(routineDialog, '반복 업무 만들기')
 
@@ -793,7 +793,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
   await page.getByRole('button', { name: '결정 남기기' }).click()
   const decisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
-  await decisionDialog.getByLabel('무엇을 바꾸기로 했나요?').fill('저장 가능한 요청만 보낸다')
+  await decisionDialog.getByLabel('무엇을 결정했나요?').fill('저장 가능한 요청만 보낸다')
   await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('응답 유실 뒤 중복 생성을 막기 위해서입니다.')
   await expectStorageBlock(decisionDialog, '결정 기록하기')
 
@@ -850,7 +850,7 @@ test('legacy 콘텐츠 pending의 request guard를 저장하지 못하면 replay
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(dialog.getByRole('alert')).toContainText(
-    '일반 브라우저 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.',
   )
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
@@ -892,11 +892,11 @@ test('콘텐츠 생성 성공 뒤 cleanup이 실패하면 다음 POST 전에 기
 
   const secondDialog = await openRoleCreation('cleanup 성공 둘째 역할')
   await expect(secondDialog.getByRole('alert')).toContainText(
-    '임시 요청 기록을 삭제하지 못해 요청을 다시 보내지 않았습니다.',
+    '임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.',
   )
   await secondDialog.getByRole('button', { name: '역할 만들기' }).click()
 
-  await expect(secondDialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제했습니다.')
+  await expect(secondDialog.getByRole('alert')).toContainText('임시 기록을 정리했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
@@ -925,8 +925,8 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await expect(roleDialog).toHaveCount(0)
 
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
-  const cleanupBanner = page.getByRole('alert', { name: '임시 요청 기록 삭제' })
-  await expect(cleanupBanner).toContainText('브라우저의 임시 요청 기록을 삭제해야 합니다.')
+  const cleanupBanner = page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' })
+  await expect(cleanupBanner).toContainText('새 항목을 추가하려면 브라우저의 임시 기록을 지워야 합니다.')
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
       operation: 'role',
@@ -946,7 +946,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await handoffDialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(handoffDialog.getByRole('alert')).toContainText(
-    '임시 요청 기록을 삭제하지 못해 요청을 다시 보내지 않았습니다.',
+    '임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.',
   )
   expect(api.calls.filter((call) =>
     call.method === 'POST' && Object.values(CONTENT_CREATION_PATHS).includes(call.path),
@@ -960,9 +960,9 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   await api.attachPage(peerPage)
   await openSharedWorkspace(peerPage)
   const peerCleanupBanner = peerPage.getByRole('alert', {
-    name: '임시 요청 기록 삭제',
+    name: '새 항목 추가를 위한 임시 기록 삭제',
   })
-  await peerCleanupBanner.getByRole('button', { name: '임시 요청 기록 삭제 재시도' }).click()
+  await peerCleanupBanner.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
   await expect(peerCleanupBanner).toHaveCount(0)
   await expect(cleanupBanner).toHaveCount(0)
   await peerPage.close()
@@ -1013,7 +1013,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
     }),
   ])
   expect(pendingAfterFailure[0]?.cleanupRequired).toBeUndefined()
-  await expect(page.getByRole('alert', { name: '임시 요청 기록 삭제' }))
+  await expect(page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' }))
     .toBeVisible()
 
   await page.evaluate((releaseKey) => {
@@ -1021,7 +1021,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
   }, CONTENT_CREATION_GUARD_FAILURE_RELEASE_KEY)
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
-  await expect(page.getByRole('alert', { name: '임시 요청 기록 삭제' }))
+  await expect(page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' }))
     .toHaveCount(0)
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
@@ -1033,7 +1033,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
   await otherOperationDialog.getByRole('button', { name: '역할 만들기' }).click()
 
   await expect(otherOperationDialog.getByRole('alert')).toContainText(
-    '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다.',
+    '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다.',
   )
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
@@ -1076,7 +1076,7 @@ test('콘텐츠 생성 성공 응답이 손상되면 journal을 유지하고 같
   const alert = dialog.getByRole('alert')
   await expect(alert).toContainText('서버 응답을 확인할 수 없습니다.')
   await expect(alert).toContainText(
-    '입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.',
+    '같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.',
   )
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
   expect(await pendingContentCreationEntries(page)).toEqual([
@@ -1111,11 +1111,11 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
   await openSharedWorkspace(page)
 
   const openAndFillRoutine = async (deadlineDayOffset: string, deadlineTime: string) => {
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
     await page.getByRole('button', { name: '반복 업무 추가' }).click()
     const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
     await dialog.getByLabel('반복 업무 이름').fill('마감 journal 경계 확인')
-    await dialog.getByLabel('기한 설명').fill('모임 전에 확인')
+    await dialog.getByLabel('마감 안내').fill('모임 전에 확인')
     await dialog.getByLabel('마감 기준일').selectOption(deadlineDayOffset)
     await dialog.getByLabel('마감 시각').fill(deadlineTime)
     await dialog.getByLabel('세부 설명').fill('마감 규칙도 요청 동일성에 포함합니다.')
@@ -1125,7 +1125,7 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
   const firstDialog = await openAndFillRoutine('-3', '19:00')
   await firstDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(firstDialog.getByRole('alert')).toContainText(
-    '입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.',
+    '같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.',
   )
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/routines`)
 
@@ -1133,7 +1133,7 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
   await firstDialog.getByLabel('마감 시각').fill('20:00')
   await firstDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(firstDialog.getByRole('alert')).toContainText(
-    '응답을 확인하지 못한 이전 생성 요청이 남아 새 요청을 시작하지 않았습니다.',
+    '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다.',
   )
 
   let attempts = api.calls.filter(
@@ -1204,7 +1204,7 @@ test('확인되지 않은 생성 요청이 한도에 이르면 기존 요청 정
   await dialog.getByLabel('역할 목적').fill('한도 안내를 확인합니다.')
   await dialog.getByRole('button', { name: '역할 만들기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('확인되지 않은 생성 요청이 20개 남아 새 요청을 시작할 수 없습니다.')
-  await expect(dialog.getByRole('alert')).toContainText('이전에 제출했던 같은 내용을 다시 제출해 결과를 확인한 뒤 시도해 주세요.')
+  await expect(dialog.getByRole('alert')).toContainText('저장 여부를 확인하지 못한 항목이 20개 있습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('이전과 같은 내용을 다시 제출해 저장됐는지 확인한 뒤 새 항목을 추가하세요.')
   expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`)).toHaveLength(0)
 })

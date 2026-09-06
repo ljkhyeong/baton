@@ -27,7 +27,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
     month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
   return <details className="notification-inbox">
     <summary>내 알림 {inbox.data ? `· 안 읽음 ${unread}건` : ''}</summary>
-    <p>내 설정에 맞는 마감·지연 업무와 수락할 인수인계입니다. 완료된 업무는 목록에서 빠집니다.</p>
+    <p>마감이 다가오거나 지난 업무, 내가 넘겨받을 업무를 알려드립니다. 완료한 업무는 표시하지 않습니다.</p>
     <button type="button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>알림 설정</button>
     {settingsOpen && <NotificationPreferencesPanel key={scope.accountId} accountId={scope.accountId} />}
     {inbox.isPending ? <p role="status">알림을 불러오고 있습니다.</p>

@@ -79,7 +79,7 @@ export function MemoryView({
                     </button>
                   </div>
                 </div>
-                <div className="decision-reason"><span>이유</span><DecisionText text={decision.reason} format={decision.textFormat} /></div><div className="decision-alternative"><span>검토한 다른 선택</span><DecisionText text={decision.alternative} format={decision.textFormat} /></div>
+                <div className="decision-reason"><span>이유</span><DecisionText text={decision.reason} format={decision.textFormat} /></div><div className="decision-alternative"><span>검토한 대안</span><DecisionText text={decision.alternative} format={decision.textFormat} /></div>
                 <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} />
                 <div className="decision-tags">{decision.roleIds.map((roleId) => { const role = roles.find((item) => item.id === roleId); return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null })}</div>
               </div>
@@ -91,10 +91,10 @@ export function MemoryView({
           title={archivedDecisions.length ? '모든 결정이 보관되어 있습니다.' : '아직 결정 기록이 없어요'}
           description={archivedDecisions.length
             ? '아래 보관함에서 다시 필요한 결정을 복원하거나 새 결정을 남겨 보세요.'
-            : '운영 방식이 바뀌는 순간, 결과와 이유를 함께 남겨 보세요.'}
+            : '무엇을 결정했고 왜 그렇게 정했는지 남겨 보세요.'}
           actionLabel={canCreateDecision
             ? (archivedDecisions.length ? '새 결정 남기기' : '첫 결정 남기기')
-            : roles.length ? '활동 중 구성원 준비하기' : '첫 역할 만들기'}
+            : roles.length ? '구성원 관리' : '첫 역할 만들기'}
           onAction={canCreateDecision
             ? onOpenDecision
             : roles.length ? onManageMembers : onAddRole}

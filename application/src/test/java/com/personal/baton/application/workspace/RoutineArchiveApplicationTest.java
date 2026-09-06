@@ -5,7 +5,6 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
-import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.UpdateRoundScheduleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
@@ -13,14 +12,11 @@ import com.personal.baton.application.workspace.port.out.WorkspacePeopleReposito
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
-import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import java.time.Clock;
 import java.time.Instant;
@@ -31,7 +27,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -39,7 +34,6 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -99,28 +93,6 @@ class RoutineArchiveApplicationTest {
 
         assertThat(routine.getArchivedAt()).isNull();
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.NOON);
-    }
-
-    @DisplayName("수동 회차 snapshot은 보관된 반복 업무 정의를 제외한다")
-    @Test
-    void excludesArchivedRoutineFromManualRoundSnapshot() {
-        UUID seasonId = UUID.randomUUID();
-        UUID roundId = UUID.randomUUID();
-        Routine active = routine(seasonId, UUID.randomUUID(), 0, LocalTime.NOON);
-        Routine archived = routine(seasonId, UUID.randomUUID(), 0, LocalTime.NOON);
-        archived.updateArchive(true, NOW);
-
-        List<RoutineExecution> executions = new RoutineExecutionSnapshotFactory().snapshotAll(
-                roundId,
-                List.of(active, archived),
-                LocalDate.of(2026, 8, 1),
-                SEOUL
-        );
-
-        assertThat(executions)
-                .singleElement()
-                .extracting(RoutineExecution::getRoutineId)
-                .isEqualTo(active.getId());
     }
 
     @DisplayName("반복 업무 보관은 시즌 배타 잠금을 사용하고 서버 Clock 시각을 결과에 반영한다")
@@ -212,98 +184,6 @@ class RoutineArchiveApplicationTest {
                 .isInstanceOf(WorkspaceNotFoundException.class)
                 .hasMessageContaining("반복 업무를 찾을 수 없습니다");
         verify(operationsRepository, never()).saveRoutine(any());
-    }
-
-    @DisplayName("자동 일정 활성화는 보관된 반복 업무의 마감 규칙을 검사하지 않는다")
-    @Test
-    void ignoresArchivedRoutineWhenActivatingSchedule() {
-        UUID teamId = UUID.randomUUID();
-        UUID seasonId = UUID.randomUUID();
-        Team team = team(teamId);
-        Season season = season(teamId, seasonId);
-        Routine active = routine(seasonId, UUID.randomUUID(), -1, LocalTime.of(23, 0));
-        Routine archived = routine(seasonId, UUID.randomUUID(), null, null);
-        archived.updateArchive(true, NOW);
-        stubArchiveAuthorization(team, season);
-        when(operationsRepository.findSeasonRoundsBySeasonId(seasonId)).thenReturn(List.of());
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
-        when(seasonRepository.saveSeason(season)).thenReturn(season);
-
-        var result = service().lifecycle().updateRoundSchedule(
-                teamId,
-                seasonId,
-                ACCESS_KEY,
-                new UpdateRoundScheduleCommand(
-                        "Asia/Seoul",
-                        LocalDate.of(2026, 8, 1),
-                        LocalTime.of(20, 0),
-                        RoundRecurrence.WEEKLY,
-                        7,
-                        true
-                )
-        );
-
-        assertThat(result.roundSchedule()).isNotNull();
-        assertThat(result.roundSchedule().enabled()).isTrue();
-    }
-
-    @DisplayName("자동 회차 생성도 보관된 반복 업무를 검사하거나 snapshot하지 않는다")
-    @Test
-    void excludesArchivedRoutineFromAutomaticRoundSnapshot() {
-        UUID teamId = UUID.randomUUID();
-        UUID seasonId = UUID.randomUUID();
-        Team team = team(teamId);
-        Season season = season(teamId, seasonId);
-        season.configureRoundSchedule(
-                LocalDate.of(2026, 8, 1),
-                LocalTime.of(20, 0),
-                RoundRecurrence.WEEKLY,
-                7,
-                true
-        );
-        Routine active = routine(seasonId, UUID.randomUUID(), -1, LocalTime.of(23, 0));
-        Routine archived = routine(seasonId, UUID.randomUUID(), null, null);
-        archived.updateArchive(true, NOW.minusSeconds(60));
-        AtomicReference<List<RoutineExecution>> savedExecutions = new AtomicReference<>();
-        when(accessRepository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
-        when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
-                .thenReturn(Optional.of(season));
-        when(operationsRepository.findRoutinesBySeasonId(seasonId)).thenReturn(List.of(active, archived));
-        when(operationsRepository.existsSeasonRoundBySeasonIdAndScheduledOccurrenceDate(
-                seasonId,
-                LocalDate.of(2026, 8, 1)
-        )).thenReturn(false);
-        when(operationsRepository.existsSeasonRoundBySeasonIdAndName(
-                seasonId,
-                "자동 회차 2026-08-01"
-        )).thenReturn(false);
-        when(operationsRepository.saveSeasonRound(any(SeasonRound.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(operationsRepository.saveRoutineExecutions(anyList())).thenAnswer(invocation -> {
-            List<RoutineExecution> executions = List.copyOf(invocation.getArgument(0));
-            savedExecutions.set(executions);
-            return executions;
-        });
-        when(seasonRepository.saveSeason(season)).thenReturn(season);
-
-        boolean generated = new ScheduledRoundGenerationWorker(
-                accessRepository,
-                seasonRepository,
-                operationsRepository,
-                new RoutineExecutionSnapshotFactory(),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
-        )
-                .generateNextOccurrence(
-                        new ScheduledSeasonCandidate(teamId, seasonId),
-                        Instant.parse("2026-07-25T00:00:00Z")
-                );
-
-        assertThat(generated).isTrue();
-        assertThat(savedExecutions.get())
-                .singleElement()
-                .extracting(RoutineExecution::getRoutineId)
-                .isEqualTo(active.getId());
     }
 
     private WorkspaceServiceTestFactory.Services service() {

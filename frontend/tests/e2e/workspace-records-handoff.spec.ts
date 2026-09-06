@@ -36,9 +36,9 @@ test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ pa
   await page.getByRole('button', { name: '결정 남기기' }).click()
 
   const dialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
-  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('회고를 10분 먼저 시작한다')
+  await dialog.getByLabel('무엇을 결정했나요?').fill('회고를 10분 먼저 시작한다')
   await dialog.getByLabel('왜 이 선택을 했나요?').fill('다음 액션을 정리할 시간이 자주 부족했기 때문입니다.')
-  await dialog.getByLabel('검토한 다른 선택').fill('모임을 10분 연장한다')
+  await dialog.getByLabel('검토한 대안').fill('모임을 10분 연장한다')
   await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
   await expect(dialog.getByRole('checkbox', { name: '문제 큐레이터' })).toBeChecked()
   await dialog.getByRole('button', { name: '결정 기록하기' }).click()
@@ -69,9 +69,9 @@ test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 �
 
   const dialog = page.getByRole('dialog', { name: '결정 기록 수정' })
   await expect(dialog.getByLabel('작성자')).toHaveValue(MEMBER_ONE_ID)
-  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill(updatedTitle)
+  await dialog.getByLabel('무엇을 결정했나요?').fill(updatedTitle)
   await dialog.getByLabel('왜 이 선택을 했나요?').fill('각 풀이를 끝까지 설명할 시간을 확보하기 위해서입니다.')
-  await dialog.getByLabel('검토한 다른 선택').fill('문제 난이도를 낮춘다')
+  await dialog.getByLabel('검토한 대안').fill('문제 난이도를 낮춘다')
   await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
@@ -132,9 +132,9 @@ test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 �
     await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
     await page.getByRole('button', { name: '결정 남기기' }).click()
     const dialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
-    await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('응답 유실 재시도 규칙을 유지한다')
+    await dialog.getByLabel('무엇을 결정했나요?').fill('응답 유실 재시도 규칙을 유지한다')
     await dialog.getByLabel('왜 이 선택을 했나요?').fill('같은 결정이 두 번 저장되는 것을 막기 위해서입니다.')
-    await dialog.getByLabel('검토한 다른 선택').fill('사용자가 직접 중복을 정리한다')
+    await dialog.getByLabel('검토한 대안').fill('사용자가 직접 중복을 정리한다')
     await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
     await expect(dialog.getByRole('checkbox', { name: '문제 큐레이터' })).toBeChecked()
     return dialog
@@ -142,7 +142,7 @@ test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 �
 
   const firstDialog = await openAndFillDecision()
   await firstDialog.getByRole('button', { name: '결정 기록하기' }).click()
-  await expect(firstDialog.getByRole('alert')).toContainText('입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.')
+  await expect(firstDialog.getByRole('alert')).toContainText('같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.')
 
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/decisions`)
   const pendingAfterTimeout = await pendingContentCreationEntries(page)
@@ -185,15 +185,15 @@ test('@memory 결정 생성 연결이 끊겨도 같은 요청으로 안전하게
   await page.getByRole('button', { name: '결정 남기기' }).click()
 
   const dialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
-  await dialog.getByLabel('무엇을 바꾸기로 했나요?').fill('연결 오류에도 같은 결정을 다시 확인한다')
+  await dialog.getByLabel('무엇을 결정했나요?').fill('연결 오류에도 같은 결정을 다시 확인한다')
   await dialog.getByLabel('왜 이 선택을 했나요?').fill('응답을 모를 때 새 요청을 만들지 않기 위해서입니다.')
-  await dialog.getByLabel('검토한 다른 선택').fill('목록에서 수동으로 중복을 찾는다')
+  await dialog.getByLabel('검토한 대안').fill('목록에서 수동으로 중복을 찾는다')
   await dialog.getByLabel('작성자').selectOption(MEMBER_TWO_ID)
   await dialog.getByRole('button', { name: '결정 기록하기' }).click()
 
   const alert = dialog.getByRole('alert')
   await expect(alert).toContainText('서버에 연결하지 못해 요청 결과를 확인할 수 없습니다.')
-  await expect(alert).toContainText('입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.')
+  await expect(alert).toContainText('같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.')
   expect(firstIdempotencyKey).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
@@ -248,7 +248,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await installApi(page, initialProjection)
   await openSharedWorkspace(page)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   let search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeVisible()
   expect(await search.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
@@ -270,7 +270,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(decisionEntry).toBeVisible()
   await expect(decisionEntry).toBeFocused()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(search.getByLabel('무엇을 다시 찾고 있나요?'))
     .toHaveValue('풀이 비교 문제 큐레이터')
@@ -296,7 +296,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(handoffItem).toBeVisible()
   await expect(handoffItem).toBeFocused()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(search.getByLabel('무엇을 다시 찾고 있나요?')).toHaveValue('역할의 한 줄 목적')
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
@@ -305,12 +305,12 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   const archivedResult = page.getByRole('article').filter({
     has: page.getByRole('heading', { name: '자주 생기는 문제와 대응법' }),
   })
-  await expect(archivedResult).toContainText('기록 시각 미상')
+  await expect(archivedResult).toContainText('작성일을 알 수 없음')
   await expect(archivedResult.getByRole('button', { name: '인수인계 문서에서 보기' })).toHaveCount(0)
 
   await search.getByLabel('시작일').fill('2026-07-01')
   await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
-  await expect(page.getByText('생성 시각을 알 수 없는 이전 기록 1개는 기간 검색에서 제외했습니다.')).toBeVisible()
+  await expect(page.getByText('작성일을 알 수 없는 이전 기록 1개는 날짜 검색에서 제외했습니다.')).toBeVisible()
 
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('docs.example.com')
@@ -341,7 +341,7 @@ test('@records 보관한 역할 자료는 보관 기록으로만 탐색한다', 
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   const search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('보관한 문제 선정 기준')
   await search.getByLabel('기록 종류').selectOption('resource')
@@ -390,7 +390,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
   await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
   const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
   await expect(roleDialog).toContainText(
-    '인수인계 준비 중에는 담당자와 담당 기간이 전달 기록에 고정됩니다.',
+    '인수인계를 준비하는 동안 담당자와 담당 기간은 바꿀 수 없습니다.',
   )
   await expect(roleDialog.getByLabel('현재 담당자')).toBeDisabled()
   await expect(roleDialog.getByLabel('다음 담당자')).toBeDisabled()
@@ -416,14 +416,14 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
   )
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
-  await page.getByRole('button', { name: '인수인계 전달 검토' }).click()
+  await page.getByRole('button', { name: '내용 확인 후 전달' }).click()
   const transferDialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
   const readiness = transferDialog.getByLabel('전달 전 체크리스트와 자료 현황')
   await expect(readiness).toContainText('체크리스트 항목2')
   await expect(readiness).toContainText('미완료1')
   await expect(readiness).toContainText('참고 자료0')
-  await expect(transferDialog).toContainText('공유 링크는 사람을 인증하지 않습니다.')
-  await expect(transferDialog).toContainText('박민서 명의로 전달했다고 기록됩니다.')
+  await expect(transferDialog).toContainText('공유 링크로 접속하면 본인 확인 없이')
+  await expect(transferDialog).toContainText('박민서님이 전달한 것으로 기록됩니다.')
   const transferButton = transferDialog.getByRole('button', { name: '인수인계 전달하기' })
   await expect(transferButton).toBeDisabled()
   await transferDialog.getByLabel('미완료 항목과 자료 누락을 확인했습니다').check()
@@ -448,9 +448,9 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
 
   await page.getByRole('button', { name: '인수인계 수락', exact: true }).click()
   const acceptDialog = page.getByRole('dialog', { name: '역할 인수인계 수락' })
-  await expect(acceptDialog).toContainText('공유 링크는 사람을 인증하지 않습니다.')
-  await expect(acceptDialog).toContainText('김준호 명의로 수락했다고 기록됩니다.')
-  await acceptDialog.getByRole('button', { name: '김준호님 명의로 수락 기록' }).click()
+  await expect(acceptDialog).toContainText('공유 링크로 접속하면 본인 확인 없이')
+  await expect(acceptDialog).toContainText('본인 확인 없이 김준호님이 수락한 것으로 기록됩니다.')
+  await acceptDialog.getByRole('button', { name: '김준호님으로 인수인계 수락' }).click()
 
   await expect(acceptDialog).toBeHidden()
   await expect(page.getByText('최근 인수인계 수락 완료')).toBeVisible()
@@ -539,7 +539,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
 
   const inspector = page.getByLabel('선택한 역할 상세')
   await inspector.getByRole('button', { name: '자료 추가' }).click()
-  const createDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  const createDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await createDialog.getByLabel('역할').selectOption(ROLE_ID)
   await createDialog.getByLabel('링크').fill('https://docs.example.com/problem-selection')
   await createDialog.getByRole('button', { name: '자료 연결하기' }).click()
@@ -550,7 +550,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await createDialog.getByLabel('자료 이름').fill('문제 선정 기준 문서')
   await createDialog.getByLabel('자료 설명').fill('매주 문제 후보를 고를 때 확인하는 기준입니다.')
   await createDialog.getByRole('button', { name: '자료 연결하기' }).click()
-  await expect(createDialog.getByRole('alert')).toContainText('입력 내용을 바꾸지 않고 다시 제출하면 같은 요청으로 안전하게 확인합니다.')
+  await expect(createDialog.getByRole('alert')).toContainText('같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.')
 
   const firstCreateCall = await recordedCall(api, 'POST', `${SCOPE_PATH}/role-resources`)
   expectScopedCall(firstCreateCall, {
@@ -569,7 +569,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
   await inspector.getByRole('button', { name: '자료 추가' }).click()
-  const retryDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  const retryDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await retryDialog.getByLabel('역할').selectOption(ROLE_ID)
   await retryDialog.getByLabel('자료 이름').fill('문제 선정 기준 문서')
   await retryDialog.getByLabel('링크').fill('https://docs.example.com/problem-selection')
@@ -760,7 +760,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(dialog).toBeHidden()
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 구성원이 먼저 바꾼 최신 작업 공간을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요')
   const latestLink = inspector.getByRole('link', {
     name: '다른 구성원이 갱신한 기준 새 창에서 열기',
   })
@@ -783,7 +783,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다
   const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('재사용 종료 확인')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
-  await expect(dialog.getByRole('alert')).toContainText('목록에 항목이 이미 생겼는지 확인한 뒤, 필요하면 다시 제출해 주세요.')
+  await expect(dialog.getByRole('alert')).toContainText('목록에 이미 있는지 확인한 뒤, 없으면 다시 추가하세요.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 
@@ -811,7 +811,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
   await dialog.getByLabel('남길 내용').fill('terminal cleanup 재전송 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제하지 못해 요청을 다시 보내지 않았습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
@@ -822,7 +822,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
 
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('임시 요청 기록을 삭제했습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
@@ -870,7 +870,7 @@ test('@handoff 같은 인수인계 생성 요청의 탭 경합은 한 번만 전
 
     await peerDialog.getByRole('button', { name: '항목 추가하기' }).click()
     await expect(peerDialog.getByRole('alert'))
-      .toContainText('다른 탭에서 콘텐츠 생성 요청을 처리 중입니다.')
+      .toContainText('다른 탭에서 새 항목을 추가하고 있습니다.')
     expect(handoffCreateCalls()).toBe(1)
 
     api.releaseContentCreation()
@@ -1201,7 +1201,7 @@ test('@memory @records @responsive 결정 Markdown은 명시적으로 전환하�
   await expect(entry.locator('code', { hasText: '회의록' })).toBeVisible()
   await expect(entry.locator('img, iframe, a[href^="javascript:"]')).toHaveCount(0)
   await entry.screenshot({ path: testInfo.outputPath('decision-markdown.png') })
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '탐색' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   const search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('회고 준비 질문 수집')
   await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()

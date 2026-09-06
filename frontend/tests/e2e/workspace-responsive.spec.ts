@@ -34,7 +34,7 @@ test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역�
     const topbar = page.locator('.mobile-topbar')
     const workspaceActions = [
       topbar.getByRole('button', { name: '공유' }),
-      topbar.getByRole('button', { name: '키 관리' }),
+      topbar.getByRole('button', { name: '링크 관리' }),
     ]
     const navigationButtons = await primaryNavigation.getByRole('button').all()
 
@@ -116,7 +116,7 @@ test('@responsive 모바일 역할 상세는 닫힌 대화상자 접근을 차�
 
   const addResource = drawer.getByRole('button', { name: '자료 추가' })
   await addResource.click()
-  const resourceDialog = page.getByRole('dialog', { name: '역할에 참고 자료 연결' })
+  const resourceDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await expect(resourceDialog.getByLabel('자료 이름')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(resourceDialog).toHaveCount(0)
@@ -157,7 +157,7 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
   expect(contrastRatio(palette.focusRing, palette.canvas)).toBeGreaterThanOrEqual(3)
   expect(contrastRatio(palette.focusRing, palette.nav)).toBeGreaterThanOrEqual(3)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   const archiveSummary = page.getByText('보관한 회차 1개', { exact: true })
   await archiveSummary.focus()
   await page.keyboard.press('Tab')
@@ -232,15 +232,15 @@ test('@responsive 390x844에서 반복 업무 추가와 완료를 수행할 수 
   test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
   await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '운영' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
 
   const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await expect(dialog).toBeInViewport()
   await dialog.getByLabel('반복 업무 이름').fill('다음 문제 예고')
-  await dialog.getByLabel('운영 단계').selectOption('AFTER')
+  await dialog.getByLabel('업무 시점').selectOption('AFTER')
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('기한 설명').fill('금요일 20:00')
+  await dialog.getByLabel('마감 안내').fill('금요일 20:00')
   await dialog.getByLabel('세부 설명').fill('다음 주 주제를 한 줄로 공유합니다.')
   await dialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(page.locator('.routine-row').filter({ hasText: '다음 문제 예고' })).toContainText('다음 회차부터')

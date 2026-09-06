@@ -45,8 +45,8 @@ type RecordSearchSource = {
 }
 
 export const handoffCategoryLabel = {
-  RESPONSIBILITY: '책임',
-  ROUTINE: '반복 운영',
+  RESPONSIBILITY: '담당 업무',
+  ROUTINE: '반복 업무',
   RESOURCE: '자료',
   ADVICE: '조언',
 } satisfies Record<HandoffItem['category'], string>
@@ -93,7 +93,7 @@ function buildSearchResults({
       title: decision.title,
       primaryLabel: '이유',
       primaryText: reason,
-      secondaryLabel: decision.alternative ? '검토한 다른 선택' : undefined,
+      secondaryLabel: decision.alternative ? '검토한 대안' : undefined,
       secondaryText: alternative || undefined,
       createdAt: decision.createdAt,
       archivedAt: decision.archivedAt,

@@ -55,7 +55,7 @@ function PreviousRoleRecordContents({
       <p className="previous-role-copy">{role.purpose}</p>
       {role.responsibilities.length > 0 && <p className="previous-role-copy">당시 담당 업무: {role.responsibilities.join(', ')}</p>}
       {role.risk && <p className="previous-role-copy">주의할 점: {role.risk}</p>}
-      <p>이전 시즌의 기록입니다. 자료를 선택하면 현재 시즌의 추가 양식으로 이어집니다.</p>
+      <p>이전 시즌의 기록입니다. 자료를 선택하면 현재 시즌에 추가할 수 있습니다.</p>
       <h3>참고 자료</h3>
       {resources.length ? <ul>
         {resources.map((resource) => <li key={resource.id}>
@@ -73,7 +73,7 @@ function PreviousRoleRecordContents({
           <strong>{decision.title}</strong>
           {decision.archivedAt && <small>보관한 결정</small>}
           <DecisionText text={decision.reason} format={decision.textFormat} />
-          {decision.alternative && <div><small>검토한 다른 선택</small><DecisionText text={decision.alternative} format={decision.textFormat} /></div>}
+          {decision.alternative && <div><small>검토한 대안</small><DecisionText text={decision.alternative} format={decision.textFormat} /></div>}
           <small>작성자: {decision.authorName}</small>
         </li>)}
       </ul> : <p>이 역할에 연결한 결정이 없습니다.</p>}

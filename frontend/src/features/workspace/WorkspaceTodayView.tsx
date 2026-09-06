@@ -112,7 +112,7 @@ export function TodayView({
       />
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="section-heading">
-          <div><span className="section-kicker">이번 운영</span><h2 id="relay-title">이번 회차 업무</h2></div>
+          <div><span className="section-kicker">진행할 회차</span><h2 id="relay-title">이번 회차 업무</h2></div>
           <div className="round-meta">
             <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0}</strong>
             <span>
@@ -123,7 +123,7 @@ export function TodayView({
           </div>
         </div>
         {!orderedRoutines.length ? (
-          <ActionableEmpty title="아직 반복 업무가 없어요" description="첫 반복 업무를 역할과 연결해 보세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
+          <ActionableEmpty title="아직 반복 업무가 없어요" description="담당 역할을 정하고 반복할 업무를 등록하세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
           <div className="relay-line" role="list">
             {orderedRoutines.map(({ id, routine, execution }, index) => {
@@ -146,11 +146,11 @@ export function TodayView({
           <ActionableEmpty
             title={archivedRoundCount
               ? '모든 회차가 보관되어 있습니다.'
-              : '아직 운영 회차가 없어요'}
+              : '아직 만든 회차가 없어요'}
             description={archivedRoundCount
-              ? '운영 화면의 보관함에서 회차를 복원하거나 새 회차를 만들어 주세요.'
+              ? '일정 화면의 보관함에서 회차를 복원하거나 새 회차를 만들어 주세요.'
               : '회차를 만들면 등록한 반복 업무가 추가됩니다.'}
-            actionLabel={archivedRoundCount ? '운영에서 회차 관리하기' : '첫 회차 만들기'}
+            actionLabel={archivedRoundCount ? '일정에서 회차 관리하기' : '첫 회차 만들기'}
             onAction={archivedRoundCount ? () => onNavigate('rhythm') : onAddRound}
             disabled={!archivedRoundCount && changesDisabled}
           />
@@ -191,7 +191,7 @@ export function TodayView({
         <section className="plain-section" aria-labelledby="continuity-radar-title">
           <div className="section-heading compact">
             <div>
-              <span className="section-kicker">주의가 필요한 곳</span>
+              <span className="section-kicker">담당자와 마감 확인</span>
               <h2 id="continuity-radar-title">운영 점검</h2>
             </div>
             <span className="continuity-count">

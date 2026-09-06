@@ -49,7 +49,7 @@ final class RoleContinuitySignalAnalyzer {
                                 : ContinuitySignalSeverity.CRITICAL,
                         role.getId(),
                         null,
-                        role.getName() + " 담당자 공백",
+                        role.getName() + " 담당자 없음",
                         currentMemberGapReason(role, membersById.get(role.getCurrentMemberId())),
                         "활동 중인 구성원과 담당 기간을 지정하세요.",
                         null
@@ -71,7 +71,7 @@ final class RoleContinuitySignalAnalyzer {
                                 : ContinuitySignalSeverity.CRITICAL,
                         role.getId(),
                         null,
-                        role.getName() + " 후임 공백",
+                        role.getName() + " 다음 담당자 미정",
                         successorReason(role, nextMember, assignmentEndDate, today),
                         "현재 담당자와 다른 활동 중인 다음 담당자를 정하고 역할 인수인계 준비를 시작하세요.",
                         assignmentEndDate
@@ -114,15 +114,15 @@ final class RoleContinuitySignalAnalyzer {
 
         List<String> gaps = new ArrayList<>();
         if (role.getResponsibilities().isEmpty()) {
-            gaps.add("책임 목록");
+            gaps.add("담당 업무 없음");
         }
         if (activeItems.isEmpty()) {
-            gaps.add("활성 인수인계 항목");
+            gaps.add("인수인계 항목 없음");
         } else if (incompleteItemCount > 0) {
             gaps.add("미완료 인수인계 항목 " + incompleteItemCount + "개");
         }
         if (resourceCount == 0) {
-            gaps.add("역할 자료");
+            gaps.add("참고 자료 없음");
         }
 
         signals.add(new ContinuitySignalResult(
@@ -130,9 +130,9 @@ final class RoleContinuitySignalAnalyzer {
                 ContinuitySignalSeverity.WARNING,
                 role.getId(),
                 null,
-                role.getName() + " 준비 부족",
-                role.getRisk() + " 다음 준비 요소가 부족합니다: " + String.join(", ", gaps) + ".",
-                "역할 화면과 인수인계 문서에서 빠진 책임, 항목과 자료를 보완하세요.",
+                role.getName() + " 인수인계 준비 필요",
+                role.getRisk() + " 보완할 내용: " + String.join(", ", gaps) + ".",
+                "역할 화면과 인수인계 문서에서 담당 업무, 항목, 참고 자료를 보완하세요.",
                 null
         ));
     }

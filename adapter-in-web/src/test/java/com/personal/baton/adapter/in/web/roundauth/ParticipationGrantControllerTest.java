@@ -15,7 +15,9 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.IssueParticipationGrantCommand;
 import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.ParticipationGrantResult;
+import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase.RoundRoomHint;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -23,6 +25,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -97,6 +101,58 @@ class ParticipationGrantControllerTest {
                 .andExpect(status().isOk());
 
         verify(roundParticipationUseCase).issueParticipationGrant(any());
+    }
+
+    @Test
+    @DisplayName("소문자 UUID 세 필드를 검증하고 참여권 발급에 전달한다")
+    void bindsValidatedRoomHint() throws Exception {
+        var hint = new RoundRoomHint(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
+        when(roundParticipationUseCase.issueParticipationGrant(any()))
+                .thenReturn(new ParticipationGrantResult(
+                        "header.payload.signature", NOW.plusSeconds(300).getEpochSecond(), 240, ROOM_ID
+                ));
+
+        mockMvc.perform(post(PATH).with(authentication(accountAuthentication()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":"%s","seasonId":"%s","resourceId":"%s"}
+                                """.formatted(hint.teamId(), hint.seasonId(), hint.resourceId())))
+                .andExpect(status().isOk());
+
+        verify(roundParticipationUseCase).issueParticipationGrant(
+                new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, hint)
+        );
+    }
+
+    @DisplayName("UUID가 없거나 숫자·축약형·대문자이면 쿠키를 유지하고 요청을 거부한다")
+    @ParameterizedTest
+    @ValueSource(strings = {"null", "123", "\"1-1-1-1-1\"", "\"AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA\""})
+    void rejectsNonCanonicalUuid(String teamId) throws Exception {
+        mockMvc.perform(post(PATH).with(authentication(accountAuthentication()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":%s,"seasonId":"22222222-2222-4222-8222-222222222222",
+                                 "resourceId":"33333333-3333-4333-8333-333333333333"}
+                                """.formatted(teamId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verify(roundParticipationUseCase, never()).issueParticipationGrant(any());
+    }
+
+    @DisplayName("JSON 요청의 빈 본문·null·필드 누락·배열은 참여권을 발급하지 않는다")
+    @ParameterizedTest
+    @ValueSource(strings = {"", "null", "{}", "[]"})
+    void rejectsMissingOrNonObjectHint(String body) throws Exception {
+        mockMvc.perform(post(PATH).with(authentication(accountAuthentication()))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verify(roundParticipationUseCase, never()).issueParticipationGrant(any());
     }
 
     @Test

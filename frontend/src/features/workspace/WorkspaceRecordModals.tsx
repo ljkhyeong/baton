@@ -96,7 +96,7 @@ export function DecisionModal({
     <ModalShell
       title={editing ? '결정 기록 수정' : '결정과 이유 남기기'}
       description={editing
-        ? '잘못 적은 내용과 작성자, 관련 역할을 바로잡습니다. 처음 기록한 시각은 그대로 남아요.'
+        ? '내용, 작성자, 관련 역할을 수정합니다. 처음 작성한 시각은 유지됩니다.'
         : '결정한 내용과 이유, 검토한 대안을 적어 주세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
@@ -108,7 +108,7 @@ export function DecisionModal({
           setTextFormat(value.textFormat === 'MARKDOWN' ? 'MARKDOWN' : 'PLAIN_TEXT')
         }} />
         <label>
-          <span>무엇을 바꾸기로 했나요?</span>
+          <span>무엇을 결정했나요?</span>
           <input
             autoFocus
             required
@@ -130,13 +130,13 @@ export function DecisionModal({
             onClick={() => setPreview(!preview)}>{preview ? '본문 편집' : '미리보기'}</button>
           {preview ? <div className="decision-preview" aria-label="결정 본문 미리보기">
             <strong>이유</strong><DecisionText text={reason || '이유를 입력해 주세요.'} format={textFormat} />
-            <strong>검토한 다른 선택</strong><DecisionText text={alternative || '아직 대안을 입력하지 않았습니다.'} format={textFormat} />
+            <strong>검토한 대안</strong><DecisionText text={alternative || '아직 대안을 입력하지 않았습니다.'} format={textFormat} />
           </div> : <>
             <label><span>왜 이 선택을 했나요?</span>
               <textarea required maxLength={2000} value={reason} onChange={(event) => setReason(event.target.value)}
                 placeholder="반복된 문제나 관찰한 근거를 적어주세요" rows={4} />
             </label>
-            <label><span>검토한 다른 선택</span>
+            <label><span>검토한 대안</span>
               <textarea maxLength={2000} value={alternative} onChange={(event) => setAlternative(event.target.value)}
                 placeholder="예: 세션 시간을 30분 연장하기" rows={3} />
             </label>
@@ -258,7 +258,7 @@ export function RoleResourceModal({
       || !parsed.hostname
       || parsed.username
       || parsed.password) {
-      setUrlValidationMessage('사용자 정보 없이 http 또는 https로 시작하는 전체 링크를 입력해 주세요.')
+      setUrlValidationMessage('http:// 또는 https://로 시작하는 주소를 입력하세요. 아이디와 비밀번호가 포함된 주소는 사용할 수 없습니다.')
       return
     }
     setTitleValidationMessage('')
@@ -272,10 +272,10 @@ export function RoleResourceModal({
   }
   return (
     <ModalShell
-      title={editing ? '참고 자료 수정' : '역할에 참고 자료 연결'}
+      title={editing ? '참고 자료 수정' : '참고 자료 추가'}
       description={initialResource
         ? '이전 시즌 자료를 현재 역할에 새로 연결합니다. 제목과 링크를 확인해 저장해 주세요. 이전 시즌 기록은 유지됩니다.'
-        : '문서나 외부 링크를 역할에 연결해, 담당자가 바뀌어도 같은 자료를 바로 찾게 합니다.'}
+        : '담당자가 참고할 문서나 링크를 추가하세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       initialFocusRef={titleInputRef}
@@ -297,7 +297,7 @@ export function RoleResourceModal({
         </label>
         {lockedRoleIds.has(roleId) && (
           <p className="form-error" role="alert">
-            전달한 역할은 수락하거나 취소한 뒤 자료를 수정할 수 있어요.
+            인수인계 전달 후에는 수락하거나 취소해야 자료를 수정할 수 있어요.
           </p>
         )}
         <label>
@@ -420,8 +420,8 @@ export function HandoffItemModal({
     <ModalShell
       title={editing ? '인수인계 항목 수정' : '인수인계 항목 추가'}
       description={editing
-        ? '잘못 적은 역할, 내용이나 분류를 고칩니다. 준비 완료 표시는 그대로 유지돼요.'
-        : '다음 담당자가 바로 움직이려면 꼭 알아야 할 내용 하나를 남겨주세요.'}
+        ? '역할, 내용, 항목 종류를 수정합니다. 완료 표시는 유지됩니다.'
+        : '다음 담당자에게 알려줄 업무나 주의사항을 적으세요.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -440,7 +440,7 @@ export function HandoffItemModal({
         </label>
         {lockedRoleIds.has(roleId) && (
           <p className="form-error" role="alert">
-            전달한 역할은 수락하거나 취소한 뒤 인수인계 문서를 수정할 수 있어요.
+            인수인계 전달 후에는 수락하거나 취소해야 인수인계 문서를 수정할 수 있어요.
           </p>
         )}
         <label>

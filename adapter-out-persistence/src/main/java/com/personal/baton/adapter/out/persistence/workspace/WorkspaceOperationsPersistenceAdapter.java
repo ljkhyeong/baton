@@ -132,6 +132,21 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     }
 
     @Override
+    public List<Routine> findActiveRoutinesBySeasonId(UUID seasonId) {
+        return routineRepository.findAllBySeasonIdAndArchivedAtIsNullOrderByIdAsc(seasonId);
+    }
+
+    @Override
+    public boolean existsActiveRoutineWithoutDeadlineRule(UUID seasonId) {
+        return routineRepository.existsBySeasonIdAndArchivedAtIsNullAndDeadlineDayOffsetIsNull(seasonId);
+    }
+
+    @Override
+    public List<Routine> findActiveRoutinesBySeasonIdAndIds(UUID seasonId, List<UUID> routineIds) {
+        return routineRepository.findAllBySeasonIdAndIdInAndArchivedAtIsNull(seasonId, routineIds);
+    }
+
+    @Override
     public List<SeasonRound> findSeasonRoundsBySeasonId(UUID seasonId) {
         return seasonRoundRepository.findAllBySeasonIdOrderByMeetingDateAscNameAsc(seasonId);
     }
@@ -141,6 +156,11 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
         return routineExecutionRepository.findAllBySeasonRoundIdInOrderBySeasonRoundIdAscIdAsc(
                 seasonRoundIds
         );
+    }
+
+    @Override
+    public List<RoutineExecution> findPendingDeadlineExecutions(UUID teamId, UUID seasonId, UUID memberId) {
+        return routineExecutionRepository.findPendingDeadlineExecutions(teamId, seasonId, memberId);
     }
 
     @Override
@@ -161,6 +181,11 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     }
 
     @Override
+    public boolean existsSeasonRoundOutsideRange(UUID seasonId, LocalDate startDate, LocalDate endDate) {
+        return seasonRoundRepository.existsOutsideRange(seasonId, startDate, endDate);
+    }
+
+    @Override
     public boolean existsSeasonRoundBySeasonIdAndName(UUID seasonId, String name) {
         return seasonRoundRepository.existsBySeasonIdAndName(seasonId, name);
     }
@@ -176,4 +201,3 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
         );
     }
 }
-

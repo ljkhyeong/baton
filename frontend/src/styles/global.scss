@@ -1883,8 +1883,6 @@ dialog.inspector::backdrop {
 
 .inspector-close { display: none; }
 .inspector-topline { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 9px; font-weight: 680; letter-spacing: .05em; }
-.live-dot { display: inline-flex; align-items: center; gap: 6px; }
-.live-dot::before { width: 6px; height: 6px; border-radius: 50%; background: var(--success); content: ""; }
 .inspector h2 { margin: 22px 0 9px; font-size: 25px; letter-spacing: -.04em; }
 .inspector-purpose { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
 

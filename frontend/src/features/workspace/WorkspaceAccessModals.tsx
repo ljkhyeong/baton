@@ -62,8 +62,8 @@ export function AccessKeyModal({
 
   return (
     <ModalShell
-      title="공유 접근 키 관리"
-      description="공유 링크를 전달하거나, 링크가 외부에 알려졌을 때 접근 키를 새로 발급할 수 있습니다."
+      title="공유 링크 관리"
+      description="공유 링크를 복사하거나 새로 발급하세요."
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
@@ -72,7 +72,7 @@ export function AccessKeyModal({
         <div className="access-key-notice">
           <Icon name="alert" size={18} />
           <p>
-            <strong>키를 바꾸면 이전 공유 링크는 즉시 열리지 않습니다.</strong>
+            <strong>새로 발급하면 이전 공유 링크는 즉시 사용할 수 없습니다.</strong>
             구성원에게 새 공유 링크를 다시 전달해 주세요.
           </p>
         </div>
@@ -83,7 +83,7 @@ export function AccessKeyModal({
             현재 링크 복사
           </button>
           <button type="button" className="danger-button" onClick={rotate} disabled={submission.pending}>
-            {submission.pending ? '접근 키 바꾸는 중…' : '접근 키 바꾸기'}
+            {submission.pending ? '공유 링크 발급 중…' : '공유 링크 재발급'}
           </button>
         </div>
       </div>

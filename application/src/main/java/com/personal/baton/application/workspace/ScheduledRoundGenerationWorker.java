@@ -104,9 +104,7 @@ public class ScheduledRoundGenerationWorker {
             RoundSchedule schedule,
             LocalDate occurrenceDate
     ) {
-        List<Routine> routines = operationsRepository.findRoutinesBySeasonId(season.getId()).stream()
-                .filter(routine -> routine.getArchivedAt() == null)
-                .toList();
+        List<Routine> routines = operationsRepository.findActiveRoutinesBySeasonId(season.getId());
         if (routines.isEmpty()) {
             return false;
         }

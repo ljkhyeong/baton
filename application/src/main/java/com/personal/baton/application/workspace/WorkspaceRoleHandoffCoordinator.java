@@ -12,14 +12,12 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
-import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -181,18 +179,12 @@ final class WorkspaceRoleHandoffCoordinator {
                 handoff.getToMemberId()
         );
 
-        List<HandoffItem> activeItems = recordsRepository.findHandoffItemsByRoleIds(List.of(roleId))
-                .stream()
-                .filter(item -> item.getArchivedAt() == null)
-                .toList();
-        int incompleteItemCount = (int) activeItems.stream()
-                .filter(item -> !item.isCompleted())
-                .count();
-        int resourceCount = (int) recordsRepository.findRoleResourcesByRoleIds(List.of(roleId)).stream()
-                .filter(resource -> resource.getArchivedAt() == null)
-                .count();
+        var itemCounts = recordsRepository.countActiveHandoffItems(roleId);
+        int activeItemCount = itemCounts.getActiveCount();
+        int incompleteItemCount = itemCounts.getIncompleteCount();
+        int resourceCount = recordsRepository.countActiveRoleResources(roleId);
         boolean hasWarning = RoleHandoff.hasWarnings(
-                activeItems.size(),
+                activeItemCount,
                 incompleteItemCount,
                 resourceCount
         );
@@ -202,7 +194,7 @@ final class WorkspaceRoleHandoffCoordinator {
         handoff.transfer(
                 command.confirmedByMemberId(),
                 Instant.now(clock),
-                activeItems.size(),
+                activeItemCount,
                 incompleteItemCount,
                 resourceCount,
                 command.warningAcknowledged()

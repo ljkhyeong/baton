@@ -37,8 +37,6 @@ import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.roundauth.RoundRoomMapping;
 import com.personal.baton.domain.roundauth.RoundRoomTombstone;
 import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Team;
-import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
@@ -102,8 +100,7 @@ class RoundAuthorizationServicesTest {
         ActiveAccountTeamMembershipVerifier membershipVerifier =
                 new ActiveAccountTeamMembershipVerifier(
                         roundRepository,
-                        peopleRepository,
-                        sharedKeyTeams(), identities
+                        identities
                 );
         administrationService = new RoundAdministrationService(
                 roundRepository,
@@ -178,10 +175,7 @@ class RoundAuthorizationServicesTest {
     @Test
     @DisplayName("현재 ROUND 방 조회는 접근 키와 활성 멤버십을 한 번 확인하고 범위 매핑을 한 번에 반환한다")
     void findsCurrentRoomMappingsWithSingleAuthorityAndBatchLookup() {
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
         RoundRoomMapping secondMapping = RoundRoomMapping.create(
                 UUID.randomUUID(),
                 SECOND_ROOM_ID,
@@ -201,8 +195,7 @@ class RoundAuthorizationServicesTest {
         ));
 
         verify(workspaceAccess, times(1)).verifyTeamRead(TEAM_ID, "workspace-access-key");
-        verify(roundRepository, times(1)).findMembership(ACCOUNT_ID, TEAM_ID);
-        verify(peopleRepository, times(1)).findMemberById(MEMBER_ID);
+        verify(roundRepository, times(1)).existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID);
         verify(roundRepository, times(1))
                 .findMappingsByTeamIdAndSeasonId(TEAM_ID, SEASON_ID);
         verify(roundRepository, never()).findMappingByResourceId(any());
@@ -229,7 +222,7 @@ class RoundAuthorizationServicesTest {
                 "wrong-access-key"
         ))).isInstanceOf(WorkspaceAccessDeniedException.class);
 
-        verify(roundRepository, never()).findMembership(any(), any());
+        verify(roundRepository, never()).existsActiveTeamMembership(any(), any());
         verify(roundRepository, never()).findMappingsByTeamIdAndSeasonId(any(), any());
     }
 
@@ -293,10 +286,7 @@ class RoundAuthorizationServicesTest {
     void rejectsRoomMappingForArchivedResource() {
         RoleResource resource = resource();
         resource.updateArchive(true, NOW.minusSeconds(1));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
         when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource));
 
@@ -317,10 +307,7 @@ class RoundAuthorizationServicesTest {
     @Test
     @DisplayName("room ID insert 경쟁이 여덟 번 이어지면 안정적인 방 충돌로 종료한다")
     void failsAfterEightRoomIdConflicts() {
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
         when(recordsRepository.findRoleResourceById(RESOURCE_ID))
                 .thenReturn(Optional.of(resource()));
         when(peopleRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
@@ -358,7 +345,7 @@ class RoundAuthorizationServicesTest {
                 "wrong-access-key"
         ))).isInstanceOf(WorkspaceAccessDeniedException.class);
 
-        verify(roundRepository, never()).findMembership(any(), any());
+        verify(roundRepository, never()).existsActiveTeamMembership(any(), any());
         verify(roundRepository, never()).findMappingByRoomId(any());
     }
 
@@ -369,10 +356,7 @@ class RoundAuthorizationServicesTest {
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
         when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
         when(grantSigner.sign(any())).thenReturn("signed-participation-grant");
 
@@ -415,7 +399,7 @@ class RoundAuthorizationServicesTest {
                 )
         )).isInstanceOf(RoundRoomNotFoundException.class);
 
-        verify(roundRepository, never()).findMembership(any(), any());
+        verify(roundRepository, never()).existsActiveTeamMembership(any(), any());
         verify(grantSigner, never()).sign(any());
     }
 
@@ -427,10 +411,7 @@ class RoundAuthorizationServicesTest {
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
         when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(endedSeason));
 
         assertThatThrownBy(() -> participationService.issueParticipationGrant(
@@ -445,10 +426,7 @@ class RoundAuthorizationServicesTest {
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(activeMember()));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
         when(seasonRepository.findSeasonById(SEASON_ID)).thenReturn(Optional.of(activeSeason()));
 
         assertThatThrownBy(() -> participationService.issueParticipationGrant(
@@ -462,17 +440,12 @@ class RoundAuthorizationServicesTest {
     }
 
     @Test
-    @DisplayName("claim 뒤 비활성화된 구성원은 기존 membership으로 참여권을 갱신할 수 없다")
-    void rejectsGrantWhenClaimedMemberWasDeactivated() {
-        Member inactiveMember = activeMember();
-        inactiveMember.updateDeactivation(true, NOW.minusSeconds(10));
+    @DisplayName("활성 팀 구성원이 아니면 기존 방의 참여권을 갱신할 수 없다")
+    void rejectsGrantWithoutActiveMembership() {
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(tombstone()));
         when(roundRepository.findMappingByRoomId(ROOM_ID)).thenReturn(Optional.of(mapping()));
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership()));
-        when(peopleRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(inactiveMember));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> participationService.issueParticipationGrant(
                 new IssueParticipationGrantCommand(ACCOUNT_ID, ROOM_ID, null)
@@ -493,7 +466,7 @@ class RoundAuthorizationServicesTest {
         )).isInstanceOf(RoundRoomNotFoundException.class);
 
         verify(roundRepository, never()).findMappingByRoomId(any());
-        verify(roundRepository, never()).findMembership(any(), any());
+        verify(roundRepository, never()).existsActiveTeamMembership(any(), any());
         verify(grantSigner, never()).sign(any());
     }
 
@@ -505,10 +478,6 @@ class RoundAuthorizationServicesTest {
                 MEMBER_ID,
                 NOW.minusSeconds(30)
         );
-    }
-
-    private Member activeMember() {
-        return Member.create(MEMBER_ID, TEAM_ID, "스터디원");
     }
 
     private RoundRoomMapping mapping() {
@@ -567,11 +536,6 @@ class RoundAuthorizationServicesTest {
                 null,
                 NOW.minusSeconds(60)
         );
-    }
-    private WorkspaceAccessRepository sharedKeyTeams() {
-        WorkspaceAccessRepository result = mock(WorkspaceAccessRepository.class);
-        when(result.findTeamById(TEAM_ID)).thenReturn(Optional.of(mock(Team.class)));
-        return result;
     }
 
 }

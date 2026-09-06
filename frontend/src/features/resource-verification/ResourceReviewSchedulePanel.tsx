@@ -22,14 +22,14 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
     <h4>재확인 주기</h4>
     {query.isPending ? <p role="status">재확인 일정을 불러오고 있습니다.</p>
       : query.isError ? <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
-        : <p>{data!.nextReviewOn ? `${data!.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(data!.nextReviewOn)}${data!.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 재확인을 사용하지 않습니다.'}</p>}
+        : <p>{data!.nextReviewOn ? `${data!.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(data!.nextReviewOn)}${data!.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 확인이 꺼져 있습니다.'}</p>}
     {editable && data && <form onSubmit={event => { event.preventDefault(); if (!query.isError && !query.isFetching && !save.isPending) save.mutate() }}>
       <fieldset disabled={save.isPending || query.isError || query.isFetching}>
         <label className="review-toggle"><input type="checkbox" checked={values.enabled} onChange={event => setDraft({ ...values, enabled: event.target.checked })} />정기 재확인 사용</label>
         {values.enabled && <>
           <label>확인 간격(일)<input type="number" min={1} max={365} required value={values.intervalDays} onChange={event => setDraft({ ...values, intervalDays: event.target.value })} /></label>
           <label>다음 확인일<input type="date" required value={values.nextReviewOn} onChange={event => setDraft({ ...values, nextReviewOn: event.target.value })} /></label>
-          <p>사용 가능으로 확인하면 시즌 날짜 기준으로 다음 확인일을 갱신합니다. 수정 필요로 남기면 확인일을 유지합니다.</p>
+          <p>‘사용 가능’으로 기록한 날부터 설정한 일수 뒤가 다음 확인일이 됩니다. ‘수정 필요’이면 날짜를 유지합니다.</p>
         </>}
         <button type="submit">{save.isPending ? '주기 저장 중…' : '재확인 주기 저장'}</button>
       </fieldset>

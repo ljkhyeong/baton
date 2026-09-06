@@ -28,13 +28,13 @@ const seasonSuccessorJournalPolicy = {
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
 }
 
-const storageRequiredMessage = '다음 시즌 요청을 안전하게 저장할 수 없습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const differentRequestPendingMessage = '이 팀에 결과를 확인하지 못한 다른 시즌 시작 요청이 남아 있습니다. 처음 입력한 내용으로 다시 시도해 결과를 확인해 주세요.'
+const storageRequiredMessage = '입력을 브라우저에 저장할 수 없어 다음 시즌을 만들지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.'
+const differentRequestPendingMessage = '이전에 요청한 다음 시즌이 만들어졌는지 확인하지 못했습니다. 처음 입력한 내용으로 다시 시도하세요.'
 const busyMessage = '다른 탭에서 다음 시즌을 시작하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도해 주세요.'
 const lockUnsupportedMessage = '이 브라우저에서는 다음 시즌을 시작할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const lockFailedMessage = '다음 시즌을 시작할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
-const cleanupRequiredMessage = '브라우저의 임시 요청 기록을 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const cleanupCompletedMessage = '브라우저의 임시 요청 기록을 삭제했습니다. 입력을 확인한 뒤 다시 제출해 주세요.'
+const cleanupRequiredMessage = '다음 시즌을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
+const cleanupCompletedMessage = '브라우저의 임시 기록을 정리했습니다. 입력을 확인한 뒤 다시 제출해 주세요.'
 
 export function useSeasonSuccessorCommand(
   scope: WorkspaceScope,

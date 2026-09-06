@@ -17,6 +17,8 @@ public interface WorkspaceSeasonRepository {
 
     List<Season> findSeasonsByTeamId(UUID teamId);
 
+    Optional<Season> findLatestSeasonByTeamId(UUID teamId);
+
     List<ScheduledSeasonCandidate> findScheduledSeasonCandidates();
 
     Optional<Season> findActiveSeasonByTeamId(UUID teamId);

@@ -28,7 +28,7 @@ export default function WorkspaceLoginLink({
           {children} (새 탭)
         </Link>
         {' '}
-        <span>접근 키를 저장하지 못해 로그인을 새 탭에서 엽니다. 이 탭을 닫지 말고 로그인 후 돌아와 주세요.</span>
+        <span>공유 링크를 저장하지 못해 로그인을 새 탭에서 엽니다. 이 탭을 닫지 말고 로그인 후 돌아와 주세요.</span>
       </>
     )
   }

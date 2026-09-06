@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -28,14 +27,12 @@ class ContentChangeRecorder {
             IdentityRepository identities, WorkspacePeopleRepository people, Clock clock) {
         this.changes = changes; this.current = current; this.identities = identities; this.people = people; this.clock = clock;
     }
-    Map<String, String> snapshot(UUID teamId, Decision value) {
+    Map<String, String> snapshot(Decision value, String authorName, String roleNames) {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("제목", value.getTitle()); fields.put("이유", value.getReason()); fields.put("대안", value.getAlternative());
         fields.put("서식", value.getTextFormat().name().equals("MARKDOWN") ? "Markdown" : "일반 텍스트");
-        fields.put("작성자", people.findMemberById(value.getAuthorMemberId()).orElseThrow().getName());
-        fields.put("관련 역할", people.findRolesByTeamIdAndSeasonId(teamId, value.getSeasonId()).stream()
-                .filter(role -> value.getRoleIds().contains(role.getId())).map(role -> role.getName())
-                .sorted().collect(Collectors.joining(", ")));
+        fields.put("작성자", authorName);
+        fields.put("관련 역할", roleNames);
         fields.put("보관 상태", value.getArchivedAt() == null ? "사용 중" : "보관");
         return fields;
     }

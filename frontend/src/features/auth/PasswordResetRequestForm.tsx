@@ -74,7 +74,7 @@ export default function PasswordResetRequestForm() {
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
-      <p>이메일 계정만 재설정할 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
+      <p>이메일로 가입한 계정의 비밀번호만 바꿀 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
       {mutation.isError && (
         <p className="form-error" role="alert">
           {mutation.error instanceof Error ? mutation.error.message : '요청 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'}
