@@ -10,6 +10,8 @@ public interface RoleResourceJpaRepository extends JpaRepository<RoleResource, U
 
     List<RoleResource> findAllByRoleIdInOrderByRoleIdAscIdAsc(List<UUID> roleIds);
 
+    int countByRoleIdAndArchivedAtIsNull(UUID roleId);
+
     @Query("""
             select resource from RoleResource resource
             join Role role on role.id = resource.roleId

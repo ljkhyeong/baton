@@ -769,6 +769,25 @@ class WorkspaceUseCaseTest {
                 )
         );
 
+        HandoffItemResult completedItem = recordsUseCase.createHandoffItem(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("handoff-completed-item"), created.accessKey(),
+                new CreateHandoffItemCommand(role.id(), "권한 목록 확인", HandoffCategory.RESOURCE));
+        recordsUseCase.updateHandoffItemCompletion(created.teamId(), created.seasonId(),
+                completedItem.id(), created.accessKey(), true);
+        HandoffItemResult archivedItem = recordsUseCase.createHandoffItem(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("handoff-archived-item"), created.accessKey(),
+                new CreateHandoffItemCommand(role.id(), "이전 문서 확인", HandoffCategory.RESOURCE));
+        recordsUseCase.updateHandoffItemArchive(created.teamId(), created.seasonId(),
+                archivedItem.id(), created.accessKey(), true);
+        recordsUseCase.createRoleResource(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("handoff-active-resource"), created.accessKey(),
+                new CreateRoleResourceCommand(role.id(), "진행 안내", "https://docs.example.com/active", null));
+        RoleResourceResult archivedResource = recordsUseCase.createRoleResource(created.teamId(), created.seasonId(),
+                contentIdempotencyKey("handoff-archived-resource"), created.accessKey(),
+                new CreateRoleResourceCommand(role.id(), "이전 진행 안내", "https://docs.example.com/archived", null));
+        recordsUseCase.updateRoleResourceArchive(created.teamId(), created.seasonId(),
+                archivedResource.id(), created.accessKey(), true);
+
         String prepareKey = contentIdempotencyKey("handoff-lifecycle-prepare");
         RoleHandoffTransitionResult prepared = peopleUseCase.prepareRoleHandoff(
                 created.teamId(),
@@ -818,9 +837,9 @@ class WorkspaceUseCaseTest {
         );
 
         assertThat(transferred.handoff().status()).isEqualTo(RoleHandoffStatus.TRANSFERRED);
-        assertThat(transferred.handoff().activeItemCount()).isEqualTo(1);
+        assertThat(transferred.handoff().activeItemCount()).isEqualTo(2);
         assertThat(transferred.handoff().incompleteItemCount()).isEqualTo(1);
-        assertThat(transferred.handoff().resourceCount()).isZero();
+        assertThat(transferred.handoff().resourceCount()).isEqualTo(1);
         assertThat(transferred.handoff().warningAcknowledged()).isTrue();
         assertThatThrownBy(() -> peopleUseCase.updateRole(
                 created.teamId(),

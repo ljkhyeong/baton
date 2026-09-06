@@ -25,6 +25,15 @@ public interface WorkspaceRecordsRepository {
 
     List<HandoffItem> findHandoffItemsByRoleIds(List<UUID> roleIds);
 
+    HandoffItemCounts countActiveHandoffItems(UUID roleId);
+
+    interface HandoffItemCounts {
+        int getActiveCount();
+        int getIncompleteCount();
+    }
+
+    int countActiveRoleResources(UUID roleId);
+
     List<RoleResource> findRoleResourcesByRoleIds(List<UUID> roleIds);
 
     List<RoleResource> findRoleResourcesByTeamIdAndSeasonId(UUID teamId, UUID seasonId);
