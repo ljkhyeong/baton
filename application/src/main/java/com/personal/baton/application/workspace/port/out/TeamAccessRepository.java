@@ -20,6 +20,7 @@ public interface TeamAccessRepository {
     Optional<TeamInvitation> findInvitationByTokenHash(String tokenHash);
     Optional<TeamInvitation> findInvitation(UUID invitationId);
     List<TeamInvitation> findInvitations(UUID teamId);
+    List<TeamInvitation> findUnacceptedInvitations(UUID teamId, UUID memberId);
     TeamInvitation saveInvitation(TeamInvitation invitation);
     void saveAudit(TeamAccessAudit audit);
     List<TeamAccessAudit> findAudit(UUID teamId);

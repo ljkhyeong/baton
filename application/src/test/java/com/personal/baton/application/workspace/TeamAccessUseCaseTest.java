@@ -129,6 +129,11 @@ class TeamAccessUseCaseTest {
         assertThat(access.accept(viewer.getId(), invitation.token()).permission()).isEqualTo(TeamPermission.VIEWER);
         assertThat(access.preview(viewer.getId(), invitation.token()).teamId()).isEqualTo(team);
         assertThat(lifecycle.getWorkspace(team, season, null).team().permission()).isEqualTo(TeamPermission.VIEWER);
+        var viewerAccess = access.getAccess(team, viewer.getId(), null);
+        assertThat(viewerAccess.memberId()).isEqualTo(viewerMember);
+        assertThat(viewerAccess.members()).isEmpty();
+        assertThat(viewerAccess.invitations()).isEmpty();
+        assertThat(viewerAccess.audit()).isEmpty();
         assertThatThrownBy(() -> people.createMember(team, season, UUID.randomUUID().toString(), null, new CreateMemberCommand("새 구성원")))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         assertThatThrownBy(() -> records.createDecision(team, season, UUID.randomUUID().toString(), null,
@@ -180,6 +185,9 @@ class TeamAccessUseCaseTest {
         assertThatThrownBy(() -> access.accept(invited.getId(), expired.token())).isInstanceOf(WorkspaceNotFoundException.class);
         when(current.currentAccountId()).thenReturn(Optional.of(admin.getId()));
         var fresh = access.invite(team, admin.getId(), inviteMember, TeamPermission.ADMIN);
+        assertThat(access.getAccess(team, admin.getId(), null).invitations())
+                .filteredOn(value -> value.id().equals(expired.invitation().id()))
+                .singleElement().satisfies(value -> assertThat(value.revokedAt()).isEqualTo(clock.instant()));
         when(current.currentAccountId()).thenReturn(Optional.of(invited.getId()));
         assertThat(access.accept(invited.getId(), fresh.token()).memberId()).isEqualTo(inviteMember);
         access.changePermission(team, invited.getId(), adminMember, TeamPermission.VIEWER);

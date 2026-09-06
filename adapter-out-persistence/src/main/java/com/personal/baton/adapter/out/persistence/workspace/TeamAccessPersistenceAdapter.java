@@ -40,6 +40,9 @@ public class TeamAccessPersistenceAdapter implements TeamAccessRepository {
     @Override public Optional<TeamInvitation> findInvitationByTokenHash(String tokenHash) { return invitations.findByTokenHash(tokenHash); }
     @Override public Optional<TeamInvitation> findInvitation(UUID id) { return invitations.findById(id); }
     @Override public List<TeamInvitation> findInvitations(UUID teamId) { return invitations.findAllByTeamIdOrderByCreatedAtDesc(teamId); }
+    @Override public List<TeamInvitation> findUnacceptedInvitations(UUID teamId, UUID memberId) {
+        return invitations.findAllByTeamIdAndMemberIdAndAcceptedAtIsNullAndRevokedAtIsNull(teamId, memberId);
+    }
     @Override public TeamInvitation saveInvitation(TeamInvitation invitation) { return invitations.save(invitation); }
     @Override public void saveAudit(TeamAccessAudit audit) { audits.save(audit); }
     @Override public List<TeamAccessAudit> findAudit(UUID teamId) { return audits.findTop50ByTeamIdOrderByChangedAtDescIdDesc(teamId); }

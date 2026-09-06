@@ -223,11 +223,9 @@ public class TeamAccessService implements TeamAccessUseCase {
                 .orElseThrow(() -> new DomainValidationException("활동 중인 팀 구성원을 선택해 주세요"));
     }
     private void revokePending(UUID teamId, UUID memberId) {
-        for (TeamInvitation invitation : access.findInvitations(teamId)) {
-            if (invitation.getMemberId().equals(memberId) && invitation.getAcceptedAt() == null && invitation.getRevokedAt() == null) {
-                invitation.revoke(clock.instant());
-                access.saveInvitation(invitation);
-            }
+        for (TeamInvitation invitation : access.findUnacceptedInvitations(teamId, memberId)) {
+            invitation.revoke(clock.instant());
+            access.saveInvitation(invitation);
         }
     }
     private void audit(UUID teamId, UUID actor, UUID memberId, String action, TeamPermission previous, TeamPermission permission) {
@@ -236,14 +234,16 @@ public class TeamAccessService implements TeamAccessUseCase {
     private TeamAccessResult result(Team team, UUID accountId) {
         var mine = memberships.findMembership(accountId, team.getId()).orElse(null);
         boolean administrator = mine != null && mine.getPermission() == TeamPermission.ADMIN;
-        Map<UUID, AccountTeamMembership> byMember = access.findMemberships(team.getId()).stream()
-                .collect(Collectors.toMap(AccountTeamMembership::getMemberId, Function.identity()));
-        List<MemberAccessResult> members = administrator || !team.isAccountAccessEnabled()
-                ? people.findMembersByTeamId(team.getId()).stream().map(member -> {
-                    var claim = byMember.get(member.getId());
-                    return new MemberAccessResult(member.getId(), member.getName(), member.isActive(),
-                            claim == null ? null : claim.getAccountId(), claim == null ? null : claim.getPermission());
-                }).toList() : List.of();
+        List<MemberAccessResult> members = List.of();
+        if (administrator || !team.isAccountAccessEnabled()) {
+            Map<UUID, AccountTeamMembership> byMember = access.findMemberships(team.getId()).stream()
+                    .collect(Collectors.toMap(AccountTeamMembership::getMemberId, Function.identity()));
+            members = people.findMembersByTeamId(team.getId()).stream().map(member -> {
+                var claim = byMember.get(member.getId());
+                return new MemberAccessResult(member.getId(), member.getName(), member.isActive(),
+                        claim == null ? null : claim.getAccountId(), claim == null ? null : claim.getPermission());
+            }).toList();
+        }
         return new TeamAccessResult(team.getId(), accountId, team.isAccountAccessEnabled(), mine == null ? null : mine.getMemberId(),
                 mine == null ? null : mine.getPermission(), members,
                 administrator ? access.findInvitations(team.getId()).stream().map(this::invitationResult).toList() : List.of(),
