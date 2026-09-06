@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -19,10 +20,12 @@ public class JdbcNotificationReadReceiptAdapter implements NotificationReadRecei
     @Override
     public Set<UUID> findRead(UUID accountId, Collection<UUID> notificationIds) {
         if (notificationIds.isEmpty()) return Set.of();
+        var ids = notificationIds.stream().map(id -> ByteBuffer.allocate(16)
+                .putLong(id.getMostSignificantBits()).putLong(id.getLeastSignificantBits()).array()).toList();
         return new HashSet<>(jdbc.query("""
                 SELECT BIN_TO_UUID(notification_id) AS id FROM notification_read_receipts
-                WHERE account_id = UUID_TO_BIN(:accountId) AND BIN_TO_UUID(notification_id) IN (:ids)
-                """, Map.of("accountId", accountId.toString(), "ids", notificationIds.stream().map(UUID::toString).toList()),
+                WHERE account_id = UUID_TO_BIN(:accountId) AND notification_id IN (:ids)
+                """, Map.of("accountId", accountId.toString(), "ids", ids),
                 (row, index) -> UUID.fromString(row.getString("id"))));
     }
     @Override

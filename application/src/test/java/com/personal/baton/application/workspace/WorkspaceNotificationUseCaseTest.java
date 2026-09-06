@@ -118,6 +118,10 @@ class WorkspaceNotificationUseCaseTest {
         assertThat(notifications.markRead(team, season, key, account.getId(), initial.id()).notifications().getFirst().read()).isTrue();
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications().getFirst().read()).isTrue();
         assertThat(receipts.findRead(other.getId(), List.of(initial.id()))).isEmpty();
+        var otherReadId = UUID.fromString("fedcba98-7654-4321-8123-456789abcdef");
+        receipts.markRead(account.getId(), otherReadId, clock.instant());
+        assertThat(receipts.findRead(account.getId(), List.of(initial.id(), otherReadId, UUID.randomUUID())))
+                .containsExactlyInAnyOrder(initial.id(), otherReadId);
         assertThatThrownBy(() -> notifications.markRead(team, season, key, other.getId(), initial.id()))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
         var hidden = preferences.configure(account.getId(), new ConfigurePreferencesCommand(earlier.version(), false, true, true, 1));
