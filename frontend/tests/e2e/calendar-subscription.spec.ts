@@ -51,7 +51,7 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
   const { panel, calls } = await setup(page)
   await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
   await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ADDRESS)
-  await panel.getByText('캘린더 앱에 등록하는 방법', { exact: true }).click()
+  await expect(panel.getByRole('combobox', { name: '사용할 캘린더' })).toBeVisible()
   await panel.evaluate((element) => element.scrollIntoView({ block: 'start' }))
   await panel.screenshot({ path: testInfo.outputPath('calendar-panel.png') })
   const stored = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))
@@ -68,6 +68,47 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
   await panel.getByRole('group', { name: '구독 해제 확인', exact: true }).getByRole('button', { name: '구독 해제', exact: true }).click()
   await expect(panel.getByText('구독을 해제했습니다.', { exact: true })).toBeVisible()
   expect(calls.filter((call) => call.startsWith('POST') || call.startsWith('DELETE'))).toEqual(['POST subscription', 'POST rotate', 'DELETE subscription'])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('앱별 등록 안내와 주소 복사는 재발급 없이 동작하고 외부 링크에 비밀값을 넣지 않는다 @smoke @responsive', async ({ page }) => {
+  const { panel, calls } = await setup(page)
+  await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
+  const writes: string[] = []
+  await page.exposeFunction('captureCalendarAddress', (value: string) => { writes.push(value) })
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: (value: string) => (window as unknown as { captureCalendarAddress: (text: string) => Promise<void> }).captureCalendarAddress(value),
+    } })
+  })
+  await panel.getByRole('button', { name: '구독 주소 복사', exact: true }).click()
+  await expect(panel.getByText('구독 주소를 복사했습니다.', { exact: true })).toBeVisible()
+  expect(writes).toEqual([ADDRESS])
+  const destinations = [
+    ['google', 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl'],
+    ['apple', 'https://support.apple.com/ko-kr/guide/iphone/iph3d1110d4/ios'],
+    ['outlook', 'https://outlook.live.com/calendar/'],
+    ['outlookWork', 'https://outlook.office.com/calendar/'],
+  ] as const
+  for (const [provider, href] of destinations) {
+    await panel.getByRole('combobox', { name: '사용할 캘린더' }).selectOption(provider)
+    const link = panel.locator('.calendar-guide a')
+    await expect(link).toHaveAttribute('href', href)
+    await expect(link).toHaveAttribute('target', '_blank')
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ADDRESS)
+  }
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async () => { throw new DOMException('Denied', 'NotAllowedError') },
+    } })
+  })
+  await panel.getByRole('button', { name: '구독 주소 복사', exact: true }).click()
+  await expect(panel.getByText('복사하지 못했습니다. 주소를 선택해 직접 복사해 주세요.', { exact: true })).toBeVisible()
+  const address = panel.getByLabel('내 구독 주소')
+  await address.focus()
+  expect(await address.evaluate((input: HTMLInputElement) => input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0))).toBe(ADDRESS)
+  expect(calls.filter(call => call.startsWith('POST'))).toEqual(['POST subscription'])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 

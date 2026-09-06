@@ -10,6 +10,8 @@
 .calendar-address p, .calendar-guide { color: var(--muted); font-size: 12px; }
 .calendar-guide { margin-top: 18px; }
 .calendar-guide summary { cursor: pointer; }
+.calendar-guide > label { display: grid; gap: 6px; margin-top: 12px; max-width: 280px; }
+.calendar-guide select { min-width: 0; padding: 8px; border: 1px solid var(--rule); color: var(--ink); background: var(--paper); font: inherit; }
 .calendar-panel [role="alert"] { color: var(--warning); }
 
 .calendar-subscription-list { margin-top: 26px; min-width: 0; color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
