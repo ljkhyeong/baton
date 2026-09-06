@@ -22,11 +22,6 @@ import com.personal.baton.application.brief.port.out.BriefEditionServiceClient.R
 import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
-import com.personal.baton.domain.roundauth.AccountTeamMembership;
-import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Team;
-import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
@@ -56,9 +51,6 @@ class BriefEditionApplicationServiceTest {
     private static final UUID SEASON_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002603"
     );
-    private static final UUID MEMBER_ID = UUID.fromString(
-            "00000000-0000-0000-0000-000000002604"
-    );
     private static final UUID EXECUTION_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002605"
     );
@@ -73,7 +65,6 @@ class BriefEditionApplicationServiceTest {
     private final VerifyWorkspaceAccessUseCase workspaceAccess = mock(
             VerifyWorkspaceAccessUseCase.class
     );
-    private final WorkspacePeopleRepository workspaceRepository = mock(WorkspacePeopleRepository.class);
     private final RoundAuthorizationRepository roundRepository = mock(
             RoundAuthorizationRepository.class
     );
@@ -90,7 +81,7 @@ class BriefEditionApplicationServiceTest {
         var account = Account.create(ACCOUNT_ID, "검증 계정", NOW);
         when(identities.findAccountById(ACCOUNT_ID)).thenReturn(Optional.of(account));
         ActiveAccountTeamMembershipVerifier membershipVerifier =
-                new ActiveAccountTeamMembershipVerifier(roundRepository, workspaceRepository, sharedKeyTeams(), identities);
+                new ActiveAccountTeamMembershipVerifier(roundRepository, identities);
         service = new BriefEditionApplicationService(
                 workspaceAccess,
                 membershipVerifier,
@@ -98,15 +89,7 @@ class BriefEditionApplicationServiceTest {
                 executionPort,
                 clock
         );
-        AccountTeamMembership membership = mock(AccountTeamMembership.class);
-        Member member = mock(Member.class);
-        when(membership.getMemberId()).thenReturn(MEMBER_ID);
-        when(member.getTeamId()).thenReturn(TEAM_ID);
-        when(member.isActive()).thenReturn(true);
-        when(roundRepository.findMembership(ACCOUNT_ID, TEAM_ID))
-                .thenReturn(Optional.of(membership));
-        when(workspaceRepository.findMemberById(MEMBER_ID))
-                .thenReturn(Optional.of(member));
+        when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
     }
 
     @DisplayName("시즌 시간대의 이번 주 월요일과 완료된 전달 watermark로 에디션을 생성한다")
@@ -304,11 +287,6 @@ class BriefEditionApplicationServiceTest {
                 1,
                 List.of()
         );
-    }
-    private WorkspaceAccessRepository sharedKeyTeams() {
-        WorkspaceAccessRepository result = mock(WorkspaceAccessRepository.class);
-        when(result.findTeamById(TEAM_ID)).thenReturn(Optional.of(mock(Team.class)));
-        return result;
     }
 
 }

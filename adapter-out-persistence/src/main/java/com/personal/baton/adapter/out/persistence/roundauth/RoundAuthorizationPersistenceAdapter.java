@@ -75,6 +75,11 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     }
 
     @Override
+    public boolean existsActiveTeamMembership(UUID accountId, UUID teamId) {
+        return membershipRepository.existsActiveTeamMembership(accountId, teamId);
+    }
+
+    @Override
     public RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone) {
         return tombstoneRepository.saveAndFlush(tombstone);
     }

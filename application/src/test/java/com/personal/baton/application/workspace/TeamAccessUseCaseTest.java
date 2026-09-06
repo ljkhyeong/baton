@@ -101,7 +101,9 @@ class TeamAccessUseCaseTest {
                 .isInstanceOf(WorkspaceRecoveryDeniedException.class);
         assertThat(lifecycle.getWorkspace(team, season, key).team().accountAccessEnabled()).isFalse();
         assertThat(access.getMyTeams(admin.getId()).teams()).isEmpty();
+        assertThat(activeMembership.hasActiveMembership(viewer.getId(), team)).isTrue();
         access.activate(team, admin.getId(), adminMember, RECOVERY);
+        assertThat(activeMembership.hasActiveMembership(viewer.getId(), team)).isFalse();
         assertThatThrownBy(() -> access.invite(team, admin.getId(), adminMember, TeamPermission.MEMBER))
                 .isInstanceOf(DomainValidationException.class);
         assertThatThrownBy(() -> access.invite(team, admin.getId(), otherMember.id(), TeamPermission.MEMBER))
@@ -125,6 +127,7 @@ class TeamAccessUseCaseTest {
         assertThat(access.getMyTeams(viewer.getId()).teams()).isEmpty();
         assertThat(access.preview(viewer.getId(), invitation.token()).memberId()).isEqualTo(viewerMember);
         access.accept(viewer.getId(), invitation.token());
+        assertThat(activeMembership.hasActiveMembership(viewer.getId(), team)).isTrue();
         assertThat(access.getMyTeams(viewer.getId()).teams()).hasSize(1);
         assertThat(access.accept(viewer.getId(), invitation.token()).permission()).isEqualTo(TeamPermission.VIEWER);
         assertThat(access.preview(viewer.getId(), invitation.token()).teamId()).isEqualTo(team);
