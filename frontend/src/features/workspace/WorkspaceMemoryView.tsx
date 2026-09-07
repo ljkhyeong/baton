@@ -42,7 +42,7 @@ export function MemoryView({
   const canCreateDecision = roles.length > 0 && members.some(isActiveMember)
   return (
     <>
-      <PageHeader eyebrow="팀 운영" title="결정 기록" description="결정한 내용과 이유, 검토한 대안을 기록합니다." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
+      <PageHeader title="결정 기록" description="결정한 내용과 이유, 검토한 대안을 기록합니다." action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !canCreateDecision}>결정 남기기</PrimaryButton>} />
       {decisions.length ? (
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>

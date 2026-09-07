@@ -862,13 +862,14 @@ test('@operations @responsive 자동 회차 하나를 연기하고 건너뛴 뒤
   await openSharedWorkspace(page)
 
   await expect(page.locator('.round-meta')).toContainText('자동 생성 · 지연 · 2회차')
-  await expect(page.locator('.relay-status').filter({ hasText: '지연' })).toBeVisible()
+  await expect(page.locator('.today-task-list .timing-label').filter({ hasText: '지연' })).toBeVisible()
   const relayList = page.getByRole('region', { name: '이번 회차 업무' }).getByRole('list')
   const relayItems = relayList.getByRole('listitem')
   await expect(relayItems).toHaveCount(2)
+  await expect(relayItems.first()).toContainText('풀이 노트 정리')
   const overdueItem = relayItems.filter({ hasText: '풀이 노트 정리' })
   await expect(overdueItem).toContainText('지연')
-  await expect(overdueItem.getByRole('button', { name: /풀이 노트 정리/ })).toBeVisible()
+  await expect(overdueItem.locator('.routine-copy')).toBeVisible()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
   await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
@@ -1219,13 +1220,13 @@ test('@operations 오늘 화면에서 선택한 회차의 반복 업무를 완�
 
   const checklist = page.getByRole('region', { name: '2회차 반복 업무 완료하기' })
   const completeButton = checklist.getByRole('button', { name: '풀이 노트 정리 완료 처리' })
-  await expect(checklist.getByText('1/2 완료')).toBeVisible()
+  await expect(checklist.getByRole('progressbar', { name: '이번 회차 업무 완료율' })).toHaveAttribute('value', '1')
   await completeButton.scrollIntoViewIfNeeded()
   await expect(completeButton).toBeInViewport()
   await completeButton.click()
 
   await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
-  await expect(checklist.getByText('2/2 완료')).toBeVisible()
+  await expect(checklist.getByRole('progressbar', { name: '이번 회차 업무 완료율' })).toHaveAttribute('value', '2')
   await expect(page.getByRole('heading', { level: 1, name: '이번 회차 미완료 업무 0개' })).toBeVisible()
 
   const completionPath =
@@ -1236,7 +1237,7 @@ test('@operations 오늘 화면에서 선택한 회차의 반복 업무를 완�
   await checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' }).click()
 
   await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeEnabled()
-  await expect(checklist.getByText('1/2 완료')).toBeVisible()
+  await expect(checklist.getByRole('progressbar', { name: '이번 회차 업무 완료율' })).toHaveAttribute('value', '1')
   await expect(page.getByRole('heading', { level: 1, name: '이번 회차 미완료 업무 1개' })).toBeVisible()
 
   const completionCalls = api.calls.filter(
