@@ -347,7 +347,7 @@ ROUND 시작 요청 뒤 해당 화면을 떠나면 늦은 응답으로 입장 �
 `POST /round/rooms/{roomId}/participation-grant/refresh`는 BATON이 직접 처리한다.
 
 - 정확히 일치하는 동일 출처 `Origin`, `Sec-Fetch-Site: same-origin`, 세션과 동적 CSRF를 요구한다.
-- 현재 `AccountMembership`, 활성 시즌과 권위 있는 방 매핑을 확인한다.
+- 현재 `AccountMembership`, 활성 시즌과 서버에 저장된 방 매핑을 확인한다.
 - v1 역할은 `participant`로 고정하고 `host`를 추측하지 않는다.
 - 성공마다 새로운 `jti`, 300초 수명의 RS256 JWT와 240초 갱신 지연을 발급한다.
 - JWT `sub`는 `Account.id`, `study_id`는 매핑의 `teamId`, `room_id`는 경로와 매핑의 `roomId`다.
@@ -385,7 +385,7 @@ ROUND 시작 요청 뒤 해당 화면을 떠나면 늦은 응답으로 입장 �
 - 완전 탈퇴·재활성화, 관리자에 의한 세션 강제 만료와 발급된 참여권의 조기 폐기
 
 격리된 `e2e:fullstack`은 테스트 전용 검증 자체 이메일 계정과 실제 브라우저 세션을 사용해
-로컬 로그인, `AccountMembership` 연결, 권위 있는 방 매핑,
+로컬 로그인, `AccountMembership` 연결, 서버에 저장된 방 매핑,
 참여권 갱신, 방 범위 쿠키와 공개 JWK 기반 JWT 서명·클레임·재발급을 검증한다.
 이 검증은 루프백 HTTP의 Vite 개발 프록시를 사용하며 Caddy TLS, ROUND 런타임,
 TURN·WebSocket과 실제 이메일 가입·외부 OAuth 공급자를 포함하지 않는다.

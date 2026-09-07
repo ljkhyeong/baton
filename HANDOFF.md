@@ -10,7 +10,7 @@
   확인해야 한다. 로컬 API 대역 검증을 공인 스테이징과 실기기 검증으로 확대하지 않는다.
 - 공인 HTTPS 검증 전 계약 핀 `2.0.0-rc.4`를 안정 버전으로 올리지 않는다. 전달 진단과 BRIEF
   지표를 실제 수집·경보 시스템에 연결하는 작업도 남아 있다.
-- 제품 동작은 [BRIEF 업무 점검](docs/PRD/0009_brief-current-attention/spec.md)과
+- 제품 동작은 [주간 업무 점검](docs/PRD/0009_brief-current-attention/spec.md)과
   [주간 요약 탐색·공유·출력](docs/PRD/0010_brief-navigation-and-readiness/spec.md)을 따른다.
 
 ## CAL 계약 채택의 남은 작업
@@ -33,7 +33,7 @@
 1. 실제 공개 URL을 `BATON_HEALTH_URL`에 설정하고 `외부 상태 감시` 워크플로의 수동 실행을 먼저 통과시킨다. 이후 `BATON_EXTERNAL_MONITOR_ENABLED=true`로 예약 검사를 켜고 첫 예약 실행과 담당 계정의 GitHub Actions 실패 알림 수신을 확인한다.
 2. 실제 파일럿 데이터를 넣기 전에 암호화 원격 저장소의 덤프와 보조 파일을 별도 환경에 복구한다. `last-restore-recovery-targets.tsv`에 따라 팀별 새 키 발급, 이전 링크의 `403` 응답과 복구 완료 뒤 재백업까지 실제 자격 증명으로 확인한다.
 3. CAL 전용 Bearer를 소유자 전용 파일에 저장하고 `BATON_CAL_BEARER_TOKEN_FILE`에 절대 경로를 설정해 프로덕션 사전점검을 통과시킨다. 기존 문자열의 NFC·제어 문자 적합성을 점검한 뒤 PRD-0006 순서대로 CAL 캡처와 보정을 먼저 활성화한다. `./ops/check-integration-delivery.sh`, `./ops/show-integration-metrics.sh`와 DB 상태가 정상이면 전달을 켜고 실제 시즌 피드를 확인한다. 복원 훈련에서는 같은 복구 ID로 준비·전달 두 단계를 실행하고 CAL의 전체 완료 로그 뒤에만 복구 모드를 해제한다.
-4. BRIEF 전용 Bearer 파일과 HTTPS origin을 준비하고 전달을 끈 상태에서 재조정 주기를 설정해 초기 신호와 아웃박스를 확인한다. 이후 전달을 켜 `./ops/check-integration-delivery.sh`와 `integration="brief"` 공통 지표가 정상인지 확인하고, 재시도·동일 이벤트 재전달·심각도 변경·해소가 실제 BRIEF 관심 항목에 수렴하는지 확인한 뒤 새 token과 직전 token의 중첩 교체를 검증한다.
+4. BRIEF 전용 Bearer 파일과 HTTPS origin을 준비하고 전달을 끈 상태에서 재조정 주기를 설정해 초기 신호와 아웃박스를 확인한다. 이후 전달을 켜 `./ops/check-integration-delivery.sh`와 `integration="brief"` 공통 지표가 정상인지 확인하고, 재시도·동일 이벤트 재전달·심각도 변경·해소가 실제 BRIEF 점검 항목에 반영되는지 확인한 뒤 새 token과 직전 token의 중첩 교체를 검증한다.
    BRIEF 조회·생성 서비스 API의 별도 Bearer·truststore도 배포하고, 실제 로그인·팀 구성원 연결을 거쳐
    오늘 화면의 주간 요약 조회·생성·기존 결과 재사용과 종료 시즌 조회를 원격 HTTPS에서 확인한다.
 5. 외부 전송용 WATCH 모니터 토큰과 이벤트 수신기 토큰을 서로 다르게 배포하고 로그에 인증값이 남지 않는지 확인한다. 실제 공개 HTTPS에서 최초 상태 변경 이벤트와 응답 유실 뒤 같은 `eventId` 재전송이 BATON 인박스 한 건으로 수렴하고 WATCH 전달 적체가 비는지 확인한 뒤에만 운영 수신을 활성화한다.

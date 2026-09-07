@@ -16,7 +16,7 @@
 - 서버 시각은 UTC를 기준으로 생성하고 응답에는 오프셋 또는 `Z`를 포함한다.
 - 서버가 생성해 저장하는 UTC 시각은 MySQL `DATETIME(6)`과 같은 마이크로초 정밀도를 사용해 최초 응답과 재조회·멱등 동일 재처리 응답을 일치시킨다.
 - 시즌의 모임 날짜와 로컬 시각은 해당 시즌의 IANA `timeZone`으로 해석하고, 계산을 마친 예정·마감 시각은 UTC 시각으로 반환한다.
-- 식별자는 클라이언트가 형식이나 정렬 의미를 추론하지 않는 불투명한 값으로 다룬다.
+- 클라이언트는 식별자의 내부 형식이나 정렬 의미를 해석하지 않는다.
 - HTTP DTO와 `application` 결과 타입을 분리한다.
 - 컨트롤러는 요청 검증과 변환을 담당하고 업무 규칙은 `application` 또는 `domain`에 둔다.
 - 기존 필드의 의미를 바꾸거나 제거하는 변경은 새 버전 또는 명시적 호환 전략 없이 진행하지 않는다.
@@ -24,7 +24,7 @@
 
 페이지네이션 형식은 이를 필요로 하는 실제 API가 설계될 때 확정한다. 워크스페이스·콘텐츠 생성과 접근 키 변경의 멱등 계약 및 동시 충돌은 아래 파일럿 API 절에서 정의한다.
 
-`X-Request-ID`는 서버가 요청마다 생성하는 UUID 형태의 진단 식별자다. 클라이언트는 값을 불투명하게 다루며 운영 문의와 서버 로그 상관관계에만 사용한다. 외부 요청의 같은 이름 헤더는 신뢰하거나 재사용하지 않고, 이 값으로 인증·권한·멱등성 판단 또는 메트릭 레이블을 만들지 않는다. Spring이 처리한 응답은 애플리케이션이 생성한 값을 유지하고, 요청 본문 제한이나 업스트림 장애처럼 Caddy가 직접 응답할 때만 Caddy가 누락된 헤더를 자체 UUID로 채운다.
+`X-Request-ID`는 서버가 요청마다 생성하는 UUID 형태의 진단 식별자다. 클라이언트는 값의 내부 구조를 해석하지 않고 운영 문의와 관련 로그를 찾는 데만 사용한다. 외부 요청의 같은 이름 헤더는 신뢰하거나 재사용하지 않고, 이 값으로 인증·권한·멱등성 판단 또는 메트릭 레이블을 만들지 않는다. Spring이 처리한 응답은 애플리케이션이 생성한 값을 유지하고, 요청 본문 제한이나 업스트림 장애처럼 Caddy가 직접 응답할 때만 Caddy가 누락된 헤더를 자체 UUID로 채운다.
 
 ## 3. 시스템 상태 API
 
@@ -112,7 +112,7 @@ POST /api/v1/workspaces
 }
 ```
 
-클라이언트는 식별자를 불투명한 값으로 다룬다. `accessKey` 원문은 아래의 동일 멱등 요청 재처리 외에는 다시 조회할 수 없으며 서버는 접근 키와 멱등 키의 SHA-256 기반 해시만 저장한다.
+클라이언트는 식별자의 내부 구조를 해석하지 않는다. `accessKey` 원문은 아래의 동일 멱등 요청 재처리 외에는 다시 조회할 수 없으며 서버는 접근 키와 멱등 키의 SHA-256 기반 해시만 저장한다.
 
 같은 `Idempotency-Key`와 의미가 같은 정규화 요청을 다시 보내면 새 팀을 만들지 않고 최초의 `teamId`, `seasonId`, `accessKey`를 같은 `201 Created` 응답으로 반환한다. 문자열 앞뒤 공백과 구성원 입력 순서는 정규화한다. 같은 키를 다른 요청에 사용하면 `409 IDEMPOTENCY_KEY_REUSED`를 반환한다. 동일 키가 동시에 처리되어 DB 고유 제약에서 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`를 반환하므로 클라이언트는 잠시 뒤 같은 키와 요청으로 재시도한다.
 
@@ -939,7 +939,7 @@ GET /actuator/health
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
 | `404` | `ROUND_ROOM_NOT_FOUND` | 서버 권위 활성 방 매핑을 찾지 못했거나 요청 힌트가 일치하지 않음 |
-| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 최신·선택 에디션이 없거나 단건·비교 대상이 요청 범위 밖임 |
+| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 최신·선택 생성본이 없거나 단건·비교 대상이 요청 범위 밖임 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP 메서드를 지원하지 않음 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -1109,7 +1109,7 @@ CSRF 없이 조회한다.
 뿐 조회 결과를 대체하지 않는다.
 종료한 방 ID의 삭제 표식은 영구 보존하고 재사용하지 않는다.
 
-### BRIEF 조회와 에디션 생성 API
+### BRIEF 조회와 생성본 생성 API
 
 다음 API는 활동 중인 `Account` 세션과 같은 팀의 활동 중 멤버십을 요구한다. 계정 권한을
 사용하는 팀은 기존 팀 읽기·변경 권한을 검사하며 공유 키가 필요하지 않다. 공유 키 방식의 팀은
@@ -1117,7 +1117,7 @@ CSRF 없이 조회한다.
 
 | 메서드 | 경로 | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 에디션 전체 표현 또는 일치하는 `304` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 생성본 전체 표현 또는 일치하는 `304` |
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions` | 같은 헤더, 함께 쓰는 선택적 `afterEventType`·`afterSourceReference`, `limit` 1~100(기본 20) | `200 {weekStart, zoneId, windowStart, windowEnd, evaluatedAt, resolvedCount, items, nextCursor}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {highCount, mediumCount, revisionGapCount}` |
@@ -1131,18 +1131,18 @@ CSRF 없이 조회한다.
 | --- | --- | --- | --- |
 | `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
 | `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
-| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 브리프와 같은 시간대의 지난주 마지막 불변 본문·ETag |
+| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 주간 요약과 같은 시간대의 지난주 마지막 불변 본문·ETag |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
 | `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
 | `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
 | `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
 
-단건·비교·추가 전달 확인에서 요청 범위 밖인 에디션은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
-`title`, `roleId`, nullable `routineId`, `archived`를 포함하며 불변 에디션 ETag에 포함하지 않는다.
+단건·비교·추가 전달 확인에서 요청 범위 밖인 생성본은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
+`title`, `roleId`, nullable `routineId`, `archived`를 포함하며 불변 생성본 ETag에 포함하지 않는다.
 준비 상태는 `READY`, `DELIVERY_PENDING`, `DELIVERY_FAILED`, `GENERATING`,
 `GENERATION_FAILED`, `SEASON_ENDED`, `DISABLED`이며 실제 생성에서는 기존 판정을 반복한다.
 추가 전달 상태는 `ADDITIONAL_DELIVERIES`, `NO_ADDITIONAL_DELIVERIES`, `UNKNOWN`이다.
-같은 에디션의 성공 생성·재사용 기록 중 최대 deliveryWatermark 뒤에 같은 팀·시즌의
+같은 생성본의 성공 생성·재사용 기록 중 최대 deliveryWatermark 뒤에 같은 팀·시즌의
 DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면 UNKNOWN이며 원본 전체
 반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
 
@@ -1248,8 +1248,8 @@ cd frontend && npm ci && cd ..
 - [역할 인수인계 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
 - [WATCH 트랜잭셔널 아웃박스와 현재 상태 재동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
-- [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
-- [BATON 경유 BRIEF 관심 항목 조회](../0009_brief-current-attention/spec.md)
+- [BATON 경유 BRIEF 생성본 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
+- [BATON 경유 BRIEF 점검 항목 조회](../0009_brief-current-attention/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
 
 ## 역할 자료 수동 확인
