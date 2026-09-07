@@ -447,6 +447,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   const browserStorage = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))
   expect(browserStorage).not.toContain('내 화면의 낡은')
   await page.reload()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await expect(page.getByRole('heading', { name: '내 담당 업무' })).toBeVisible()
   await expect(draft).toHaveCount(0)
 })
@@ -473,6 +474,7 @@ test('@operations @webkit 충돌 초안은 세션 조회 실패와 같은 계정
 
   sessionFails = true
   await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
   await expect(panel).toContainText('로그인 상태를 확인하지 못했습니다')
   await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
@@ -936,7 +938,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   ])
 
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   await expect(cleanupBanner).toBeVisible()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
@@ -1020,7 +1022,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
     sessionStorage.setItem(releaseKey, 'true')
   }, CONTENT_CREATION_GUARD_FAILURE_RELEASE_KEY)
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   await expect(page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' }))
     .toHaveCount(0)
 

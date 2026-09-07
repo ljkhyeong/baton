@@ -1014,12 +1014,19 @@ a {
 .round-completion-track::-moz-progress-bar { background: var(--success); border-radius: 4px; }
 .today-task-list > :last-child .routine-row { border-bottom: 0; }
 
-.today-lower {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(220px, .9fr);
-  gap: 28px;
-  margin-top: 28px;
-}
+.today-page .page-stage { width: min(100%, 900px); }
+.today-page .page-header p { max-width: 50ch; }
+.today-page .routine-actions,
+.today-page .routine-definition-note,
+.today-page .routine-copy > span > small:first-of-type,
+.today-page .routine-copy time { display: none; }
+.today-page .routine-row { grid-template-columns: 28px minmax(0, 1fr) minmax(130px, .3fr); min-height: 84px; }
+.today-page .routine-owner strong { display: none; }
+.today-page .routine-owner small { color: var(--ink); font-size: 13px; }
+.today-lower { margin-top: 28px; }
+.today-secondary { margin-top: 24px; border-top: 1px solid var(--rule); }
+.today-secondary > summary { padding: 16px 0; cursor: pointer; font-size: 14px; font-weight: 600; }
+.today-secondary .today-support { margin-top: 0; }
 
 .plain-section {
   min-width: 0;
@@ -2899,7 +2906,12 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .round-control p { grid-column: 1 / -1; margin: 0; }
   .round-meta { flex-direction: column; align-items: flex-end; gap: 2px; }
   .today-support { grid-template-columns: 1fr; gap: 24px; }
-  .today-lower { grid-template-columns: 1fr; gap: 28px; margin-top: 28px; }
+  .today-page .routine-row { grid-template-columns: 44px minmax(0, 1fr); }
+  .today-page .routine-copy > span > strong { font-size: 14px; }
+  .today-page .routine-owner { display: flex; grid-column: 2; min-height: 44px; padding: 0; gap: 6px; }
+  .today-page .routine-owner .avatar { flex-basis: 22px; width: 22px; height: 22px; }
+  .today-page .check-button { grid-row: 1 / span 2; }
+  .today-secondary > summary { min-height: 44px; }
   .decision-preview blockquote { font-size: 16px; }
   .directory-head { display: none; }
   .role-directory { border-top: 1px solid var(--rule); }

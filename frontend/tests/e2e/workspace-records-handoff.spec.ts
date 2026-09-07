@@ -1018,7 +1018,7 @@ test('@handoff @webkit 인수인계 문서 인쇄 중에는 주소의 접근 키
   await expect(page).toHaveURL(sharedPath)
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   await expect(page).toHaveURL(sharedPath)
 })
 

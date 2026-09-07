@@ -180,6 +180,7 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
     claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
   } })
   await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
   await expect(panel).toContainText('남은 업무 1건 · 넘겨받을 업무 1건')
   await expect(panel.getByText('다른 사람의 업무')).toHaveCount(0)
@@ -191,6 +192,7 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
   await expect(execution).toBeFocused()
   await expect(execution).toBeInViewport()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await panel.getByRole('button', { name: /진행 담당/ }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('tabpanel', { name: /진행 담당/ })).toBeFocused()
@@ -205,6 +207,7 @@ test('@operations 내 담당 업무는 활동 종료된 구성원의 업무를 �
     claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
   } })
   await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
   await expect(panel).toContainText('활동이 종료되었거나 현재 목록에 없습니다')
   await expect(panel.getByRole('listitem')).toHaveCount(0)
@@ -278,6 +281,7 @@ test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동
   await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
 
   await expect(dialog).toBeHidden()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await expect(page.getByRole('region', { name: '내 담당 업무' }).getByRole('link', { name: '로그인', exact: true })).toBeVisible()
   expect(membershipApi.calls.filter((call) => (
     call.method === 'POST' && call.path === '/api/v1/account-membership-claims'
@@ -365,6 +369,7 @@ test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시�
   await installApi(page)
   const membershipApi = await installMembershipApi(page, { authSessionFailures: Number.POSITIVE_INFINITY })
   await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await expect(page.getByRole('region', { name: '내 담당 업무' })).toContainText('로그인 상태를 확인하지 못했습니다')
   await navigation(page, testInfo.project.name)
     .getByRole('button', { name: '역할' })
@@ -377,6 +382,7 @@ test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시�
   membershipApi.restoreAuthSession()
   await dialog.getByRole('button', { name: '로그인 상태 다시 확인' }).click()
   await expect(dialog).toBeHidden()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await page.getByRole('region', { name: '내 담당 업무' }).getByRole('button', { name: '내 이름 선택하기' }).click()
   await expect(dialog.getByLabel('내 이름')).toBeVisible()
 })
@@ -533,12 +539,14 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
     } })
   })
   await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const inbox = page.locator('.notification-inbox')
   await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
   await inbox.locator('summary').click()
   await inbox.getByRole('button', { name: `${execution.title} 알림 읽음 처리` }).click()
   await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
   await page.reload()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
   await inbox.locator('summary').click()
   await inbox.locator('.notification-source').click()
@@ -575,6 +583,7 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
       occurredAt: '2026-09-05T03:00:00Z', read: true }] : [],
   } }))
   await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const inbox = page.locator('.notification-inbox')
   await inbox.locator('summary').click()
   await inbox.getByRole('button', { name: '알림 설정', exact: true }).click()
@@ -584,6 +593,7 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
   await expect(inbox.getByText('알림 설정을 저장했습니다.')).toBeVisible()
   await expect(inbox.locator('.notification-source')).toHaveCount(0)
   await page.reload()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await inbox.locator('summary').click()
   await inbox.getByRole('button', { name: '알림 설정', exact: true }).click()
   await expect(inbox.getByLabel('기한 지남', { exact: true })).not.toBeChecked()

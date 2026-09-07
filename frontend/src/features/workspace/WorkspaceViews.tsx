@@ -101,6 +101,7 @@ export function ActionableEmpty({ title, description, actionLabel, onAction, dis
 }
 
 export function RoundControl({
+  compact = false,
   rounds,
   selectedRound,
   archivedRoundCount = 0,
@@ -112,6 +113,7 @@ export function RoundControl({
   selectedRoundBusy = false,
   changesDisabled = false,
 }: {
+  compact?: boolean
   rounds: SeasonRound[]
   selectedRound?: SeasonRound
   archivedRoundCount?: number
@@ -140,13 +142,13 @@ export function RoundControl({
           )}
           {rounds.map((round) => (
             <option key={round.id} value={round.id}>
-              {round.name} · {roundOriginLabel(round)} · {roundTimingStatusCopy[round.timingStatus]}
+              {round.name}{!compact && ` · ${roundOriginLabel(round)} · ${roundTimingStatusCopy[round.timingStatus]}`}
               {' · '}{formatLocalDate(round.meetingDate)}
             </option>
           ))}
         </select>
       </label>
-      <div className="round-control-actions" role="group" aria-label="회차 관리">
+      {!compact && <div className="round-control-actions" role="group" aria-label="회차 관리">
         {onEdit && (
           <button
             type="button"
@@ -179,8 +181,8 @@ export function RoundControl({
         >
           <Icon name="plus" size={15} /> 회차 만들기
         </button>
-      </div>
-      {!hasRoutines && (
+      </div>}
+      {!hasRoutines && !compact && (
         <p id="round-create-hint">반복 업무를 하나 이상 만든 뒤 회차를 만들 수 있어요.</p>
       )}
     </section>

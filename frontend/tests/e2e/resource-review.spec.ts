@@ -55,6 +55,7 @@ test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 
   const closeInspector = page.getByRole('button', { name: '상세 닫기' })
   if (await closeInspector.isVisible()) await closeInspector.click()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘', exact: true }).click()
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const due = page.getByRole('region', { name: '재확인할 자료' })
   await expect(due.getByText('문제 큐레이터 · 박민서')).toBeVisible()
   await due.getByRole('button', { name: /운영 안내/ }).click()

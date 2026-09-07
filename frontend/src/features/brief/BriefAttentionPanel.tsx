@@ -21,7 +21,7 @@ type Props = { navigation: BriefNavigation; workspace: WorkspaceProjection; acce
 export function BriefAttentionPanel(props: Props) {
   const { selection, update } = props.navigation
   return <details className="brief-attention" open={selection.open} onToggle={(event) => update({ open: event.currentTarget.open })}>
-    <summary>BRIEF 업무 점검</summary>
+    <summary>주간 업무 점검</summary>
     {selection.open && <BriefAttentionAccess {...props} />}
   </details>
 }
@@ -32,14 +32,14 @@ function BriefAttentionAccess({ workspace, accessKey, changesDisabled, onManageM
   const membership = useCurrentAccountMembership({ accountId, teamId: workspace.team.id, accessKey })
   if (session.isPending) return <p role="status">로그인 상태를 확인하고 있습니다.</p>
   if (session.isError) return <p role="alert">로그인 상태를 확인하지 못했습니다. <button onClick={() => void session.refetch()}>다시 확인</button></p>
-  if (!accountId) return <p>로그인하고 팀 구성원과 계정을 연결하면 BRIEF 업무 점검을 볼 수 있습니다.{' '}
+  if (!accountId) return <p>로그인하고 팀 구성원과 계정을 연결하면 주간 업무 점검을 볼 수 있습니다.{' '}
     <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
   if (membership.isError) return <p role="alert">구성원 연결을 확인하지 못했습니다. <button onClick={() => void membership.refetch()}>다시 확인</button></p>
   if (!membership.data?.claimed) return <p>점검 항목을 보려면 계정을 팀 구성원과 연결해 주세요. <button onClick={onManageMembership}>구성원 연결하기</button></p>
   const memberId = membership.data.memberId
   const member = workspace.members.find((candidate) => isSameUuid(candidate.id, memberId))
-  if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 업무 점검을 볼 수 있습니다.</p>
+  if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 주간 업무 점검을 볼 수 있습니다.</p>
   return <BriefAttentionResults key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
     scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
     navigation={navigation} workspaceName={`${workspace.team.name} · ${workspace.season.name}`} onOpenSource={onOpenSource} timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} changesDisabled={changesDisabled} />

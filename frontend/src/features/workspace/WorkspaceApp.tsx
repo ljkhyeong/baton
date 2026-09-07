@@ -815,12 +815,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoutineArchive,
     updateSeasonRoundArchive,
   } = contentActions
-  const workspaceInactive = inspectorOverlay && inspectorOpen
+  const showRoleInspector = Boolean(selectedRole) && view !== 'today'
+  const workspaceInactive = showRoleInspector && inspectorOverlay && inspectorOpen
 
   return (
     <>
       <div
-        className={`app-shell ${selectedRole ? '' : 'no-inspector'}`}
+        className={`app-shell ${showRoleInspector ? '' : 'no-inspector'} ${view === 'today' ? 'today-page' : ''}`}
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
@@ -894,8 +895,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               completedCount={completedCount}
               onSelectRound={selectRound}
               onAddRound={openRoundModal}
-              onSelectRole={selectRole}
-              onOpenDecision={openDecisionModal}
+              onSelectRole={(roleId) => { setView('roles'); selectRole(roleId) }}
               onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
               onOpenContinuitySignal={openContinuitySignal}
@@ -1016,7 +1016,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <RecordSearchTarget workspace={workspace} onOpenResult={openRecordSearchResult} />
         </main>
 
-        {selectedRole && (
+        {showRoleInspector && selectedRole && (
           <RoleInspector
             role={selectedRole}
             members={members}

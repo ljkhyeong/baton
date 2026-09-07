@@ -50,6 +50,40 @@ test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역�
   }
 })
 
+test('@smoke @responsive 오늘은 업무에 집중하고 필요한 역할과 팀 정보를 열 수 있다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  await expect(page.locator('.inspector')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '회차 만들기', exact: true })).toHaveCount(0)
+  await expect(page.locator('.routine-actions:visible')).toHaveCount(0)
+  await page.getByRole('button', { name: '업무 추가', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
+  await expect(dialog.getByLabel('반복 업무 이름')).toBeFocused()
+  await dialog.getByRole('button', { name: '취소' }).click()
+
+  const details = page.locator('.today-secondary')
+  const summary = details.locator('summary')
+  await expect(details).not.toHaveAttribute('open')
+  await summary.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('region', { name: '내 담당 업무' })).toBeVisible()
+  await summary.click()
+  await expect(details).not.toHaveAttribute('open')
+
+  const owner = page.locator('.today-task-list .routine-owner').first()
+  await expect(owner).toBeVisible()
+  await expect(owner).toContainText('박민서')
+  await owner.click()
+  await expect(page.locator('.inspector')).toBeVisible()
+  if (testInfo.project.name === 'mobile') {
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.main-surface')).toBeFocused()
+  }
+  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }))
+    .toHaveAttribute('aria-current', 'page')
+})
+
 test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유지한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
   await installApi(page)
@@ -199,6 +233,8 @@ test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계
   await installApi(page)
   await openSharedWorkspace(page)
 
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+
   const inspector = page.locator('.inspector')
   const addResource = inspector.getByRole('button', { name: '자료 추가' })
   await expect(inspector).toHaveJSProperty('tagName', 'ASIDE')
@@ -266,5 +302,5 @@ test('@smoke 일시적인 조회 오류에서 다시 시도할 수 있다', asyn
   await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
   api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '다시 시도하기' }).click()
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
 })
