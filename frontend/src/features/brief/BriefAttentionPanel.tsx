@@ -82,7 +82,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
   return <div className="brief-attention-body">
     <p>BRIEF에 반영된 점검 항목입니다. 오늘 화면의 업무 위험 현황과 반영 시점이 다를 수 있습니다.</p>
-    <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>첫 페이지부터 새로고침</button>
+    <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>목록 새로고침</button>
     {summary.isPending && <p role="status">미해결 항목 요약을 불러오고 있습니다.</p>}
     {summary.isError && <p role="alert">요약을 불러오지 못했습니다. {summary.error.message}</p>}
     {summaryData && <div className="brief-summary" aria-label="미해결 항목 요약">
@@ -109,11 +109,14 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
               <strong>{attentionReasons[item.reasonCode]}</strong>
               <BriefSourceLink item={{ ...item, status: 'RESOLVED' }} readOnly={readOnly} />
               <small>해결 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
-              <details className="brief-evidence"><summary>해결 기록 보기</summary>
-                <small>원본 항목 ID <code>{item.sourceReference}</code></small>
-                <small>해결 시 변경 번호 {item.resolvedRevision}</small>
-              </details>
             </li>)}</ul>}
+          {resolutionData.items.length > 0 && <details key={resolutionData.items[0]?.sourceReference} className="brief-evidence" aria-label="해결 항목 연동 상세"><summary>연동 상세</summary>
+            <ul className="brief-evidence-list">{resolutionData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
+              <strong>{attentionReasons[item.reasonCode]}</strong>
+              <span>원본 항목 ID <code>{item.sourceReference}</code></span>
+              <span>해결 시 변경 번호 {item.resolvedRevision}</span>
+            </li>)}</ul>
+          </details>}
         </BriefSources>}
         <div className="brief-pagination">
           <button type="button" disabled={resolutions.isFetching} onClick={refreshResolutions}>해결 목록 새로고침</button>
@@ -143,10 +146,6 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
           <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}{item.revisionGap && ' · 누락 이력 있음'}</span></div>
           <BriefSourceLink item={item} readOnly={readOnly} />
           <small>상태 기록 {formatTime.format(new Date(item.observedAt))} ({timeZone})</small>
-          <details className="brief-evidence"><summary>원본 기록 보기</summary>
-            <small>원본 항목 ID <code>{item.sourceReference}</code></small>
-            <small>원본 변경 번호 {item.aggregateRevision}</small>
-          </details>
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
             onClick={() => { setSelected({ eventType: item.reasonCode, sourceReference: item.sourceReference }); setBefore(null) }}>
@@ -154,6 +153,13 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
           </button>
         </li>)}
       </ul>}
+      {pageData.items.length > 0 && <details key={pageData.items[0]?.sourceReference} className="brief-evidence" aria-label="점검 항목 연동 상세"><summary>연동 상세</summary>
+        <ul className="brief-evidence-list">{pageData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
+          <strong>{attentionReasons[item.reasonCode]}</strong>
+          <span>원본 항목 ID <code>{item.sourceReference}</code></span>
+          <span>원본 변경 번호 {item.aggregateRevision}</span>
+        </li>)}</ul>
+      </details>}
       <div className="brief-pagination">
         <button type="button" onClick={refresh} disabled={!cursor || page.isFetching}>첫 페이지</button>
         <button type="button" disabled={!pageData.nextCursor || page.isFetching}

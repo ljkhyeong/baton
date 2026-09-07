@@ -48,7 +48,7 @@ function assertClaimedMembershipScope(
     || !isSameUuid(membership.teamId, expectedTeamId)
     || (expectedMemberId !== undefined
       && !isSameUuid(membership.memberId, expectedMemberId))) {
-    throw new Error('계정과 구성원 연결 응답 범위가 요청과 일치하지 않습니다.')
+    throw new Error('내 계정의 구성원 정보를 확인하지 못했습니다. 다시 확인해 주세요.')
   }
 }
 

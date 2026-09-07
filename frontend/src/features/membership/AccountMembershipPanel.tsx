@@ -50,7 +50,7 @@ export default function AccountMembershipPanel({
   if (sessionQuery.isPending) {
     return (
       <section className="account-membership-panel" aria-busy="true">
-        <strong>내 계정 연결</strong>
+        <strong>내 이름 선택</strong>
         <p>로그인 상태를 확인하고 있습니다.</p>
       </section>
     )
@@ -59,7 +59,7 @@ export default function AccountMembershipPanel({
   if (sessionQuery.isError) {
     return (
       <section className="account-membership-panel">
-        <strong>내 계정 연결</strong>
+        <strong>내 이름 선택</strong>
         <div className="account-membership-error" role="alert">
           <p>로그인 상태를 확인하지 못했습니다. 다시 확인해 주세요.</p>
           <button
@@ -77,7 +77,7 @@ export default function AccountMembershipPanel({
   if (!sessionQuery.data?.authenticated) {
     return (
       <section className="account-membership-panel">
-        <strong>내 계정 연결</strong>
+        <strong>내 이름 선택</strong>
         <p>로그인한 뒤 팀에 등록된 본인 이름을 선택해 연결하세요.</p>
         <WorkspaceLoginLink teamId={teamId} seasonId={seasonId} accessKey={accessKey} className="secondary-button">
           로그인하고 연결하기
@@ -89,7 +89,7 @@ export default function AccountMembershipPanel({
   if (membershipQuery.isPending) {
     return (
       <section className="account-membership-panel" aria-busy="true">
-        <strong>내 계정 연결</strong>
+        <strong>내 이름 선택</strong>
         <p>이 팀의 계정 연결 상태를 확인하고 있습니다.</p>
       </section>
     )
@@ -115,7 +115,7 @@ export default function AccountMembershipPanel({
 
   return (
     <section className="account-membership-panel">
-      <strong>내 계정 연결</strong>
+      <strong>내 이름 선택</strong>
       {changesDisabled && (
         <p className="account-membership-warning">
           {seasonEnded

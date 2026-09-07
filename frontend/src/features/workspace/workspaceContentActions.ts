@@ -277,7 +277,7 @@ export function createWorkspaceContentActions({
       return
     }
     mutations.roleResourceArchive.mutate({ id: resource.id, archived }, {
-      onSuccess: () => notify(archived ? '자료를 보관함으로 옮겼어요.' : '자료를 다시 연결했어요.'),
+      onSuccess: () => notify(archived ? '자료를 보관함으로 옮겼어요.' : '자료를 복원했습니다.'),
       onError: (error) => {
         if (isWorkspaceContentConflict(error)) return
         notify(`자료 상태를 바꾸지 못했어요. ${mutationError(error)}`, 'error')
@@ -305,7 +305,7 @@ export function createWorkspaceContentActions({
       '반복 업무 수정',
       [
         ['반복 업무 이름', request.title], ['업무 시점', phaseCopy[request.phase]],
-        ['마감 안내', request.dueLabel], ['세부 설명', request.detail],
+        ['기한 설명', request.dueLabel], ['세부 설명', request.detail],
         ['담당 역할', roles.find((role) => role.id === request.ownerRoleId)?.name],
         ['모임일 기준 마감일 차이', request.deadlineDayOffset], ['마감 시각', request.deadlineTime],
       ],

@@ -355,9 +355,9 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -406,7 +406,7 @@ test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리�
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(await pendingCreationEntries(page)).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
+  await page.getByRole('button', { name: '임시 기록 정리' }).click()
 
   await expect(page.getByRole('alert')).toContainText('브라우저의 임시 요청 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -452,7 +452,7 @@ test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 �
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
+  await page.getByRole('button', { name: '임시 기록 정리' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -479,7 +479,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재�
   await fillOnboardingForm(page, request)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  const cleanupButton = page.getByRole('button', { name: '임시 기록 삭제 재시도' })
+  const cleanupButton = page.getByRole('button', { name: '임시 기록 정리' })
   await expect(cleanupButton).toBeVisible()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
 
@@ -487,9 +487,9 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재�
   await api.attachPage(peerPage)
   await peerPage.goto('/')
   const peerRegion = peerPage.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await peerRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await peerRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await peerRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -599,9 +599,9 @@ test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와�
 
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   const pendingRegion = page.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${otherRequest.teamName} ${otherRequest.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -797,9 +797,9 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await expect(pendingRegion.getByText(pendingRequest.teamName)).toBeVisible()
   await pendingRegion.getByRole('button', {
     name: `${pendingRequest.teamName} ${pendingRequest.seasonName} 저장된 입력 불러오기`,
@@ -849,9 +849,9 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await pendingRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -909,9 +909,9 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
 
   const pendingLabel = `${pendingRequest.teamName} ${pendingRequest.seasonName}`
   const pageRegion = page.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await pageRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await pageRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await pageRegion.getByRole('button', {
     name: `${pendingLabel} 저장된 입력 불러오기`,
   }).click()
@@ -921,19 +921,19 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
   ).toBe(1)
 
   const peerRegion = peerPage.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
-  await peerRegion.getByText('완료 여부를 확인할 작업 공간 1개').click()
+  await peerRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
   await peerRegion.getByRole('button', {
     name: `${pendingLabel} 저장된 입력 불러오기`,
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 다시 확인' })).toBeVisible()
   await peerRegion.getByRole('button', {
-    name: `${pendingLabel} 확인 대기 목록에서 삭제`,
+    name: `${pendingLabel} 목록에서 지우기`,
   }).click()
   await peerRegion.getByRole('group', {
-    name: '확인 대기 목록에서 삭제할까요?',
-  }).getByRole('button', { name: '목록에서 삭제' }).click()
+    name: '이 목록에서 지울까요?',
+  }).getByRole('button', { name: '지우기' }).click()
 
   await expect(peerRegion.getByRole('alert')).toContainText('다른 탭에서 작업 공간 생성 결과를 확인 중입니다.')
   expect(await pendingCreationEntries(peerPage)).toEqual([pendingEntry])
@@ -941,7 +941,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
   api.releaseWorkspaceCreation()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(peerPage)).length).toBe(0)
-  await expect(peerPage.getByText('다른 탭에서 이 요청의 결과를 확인했거나 확인 대기 목록에서 삭제했습니다.')).toBeVisible()
+  await expect(peerPage.getByText('다른 탭에서 이 요청의 결과를 확인했거나 목록에서 지웠습니다.')).toBeVisible()
   await expect(peerPage.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(peerPage.getByRole('link', { name: new RegExp(pendingRequest.teamName) })).toBeVisible()
   expect(api.calls.filter((call) =>
@@ -1017,7 +1017,7 @@ test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '완료 여부를 확인할 작업 공간',
+    name: '생성 확인이 필요한 작업 공간',
   })
   await expect(pendingRegion.getByRole('listitem')).toHaveCount(5)
 
@@ -1041,15 +1041,15 @@ test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 
 
   const firstRequest = pendingRequests[0]!
   const firstItem = pendingRegion.getByRole('listitem').filter({ hasText: firstRequest.teamName })
-  const discardButtonName = `${firstRequest.teamName} ${firstRequest.seasonName} 확인 대기 목록에서 삭제`
+  const discardButtonName = `${firstRequest.teamName} ${firstRequest.seasonName} 목록에서 지우기`
   await firstItem.getByRole('button', { name: discardButtonName }).click()
-  const confirmation = firstItem.getByRole('group', { name: '확인 대기 목록에서 삭제할까요?' })
+  const confirmation = firstItem.getByRole('group', { name: '이 목록에서 지울까요?' })
   await expect(confirmation).toBeVisible()
   await confirmation.getByRole('button', { name: '계속 보관' }).click()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(5)
 
   await firstItem.getByRole('button', { name: discardButtonName }).click()
-  await confirmation.getByRole('button', { name: '목록에서 삭제' }).click()
+  await confirmation.getByRole('button', { name: '지우기' }).click()
 
   const remainingKeys = seededKeys.filter((key) => key !== pendingEntries[0]?.idempotencyKey)
   await expect(pendingRegion.getByRole('listitem')).toHaveCount(4)

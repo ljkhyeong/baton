@@ -167,7 +167,7 @@ export function DecisionModal({
           )}
         </label>
         <fieldset className="modal-choice-group">
-          <legend>영향받는 역할</legend>
+          <legend>관련 역할</legend>
           <div className="modal-choice-list">
             {roles.map((role) => (
               <label key={role.id}>
@@ -368,8 +368,8 @@ export function RoleResourceModal({
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
           submitDisabled={lockedRoleIds.has(roleId)}
-          submitLabel={editing ? '변경 저장' : '자료 연결하기'}
-          pendingLabel={editing ? '자료 저장하는 중…' : '자료 연결하는 중…'}
+          submitLabel={editing ? '변경 저장' : '자료 추가'}
+          pendingLabel={editing ? '자료 저장하는 중…' : '자료 추가하는 중…'}
           onClose={onClose}
         />
       </form>

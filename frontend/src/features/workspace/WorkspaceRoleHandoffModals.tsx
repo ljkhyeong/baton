@@ -348,7 +348,7 @@ export function HandoffPreview({
                   <DecisionText text={decision.reason} format={decision.textFormat} />
                 </blockquote>
               ))
-            : <p>연결된 결정이 아직 없습니다.</p>}
+            : <p>관련 결정이 아직 없습니다.</p>}
         </section>
         <section>
           <span>04 · 참고 자료</span>

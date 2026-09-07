@@ -19,8 +19,8 @@ import type {
 } from './types'
 
 const continuitySeverityCopy = {
-  CRITICAL: '지금 확인',
-  WARNING: '미리 확인',
+  CRITICAL: '긴급',
+  WARNING: '주의',
 } satisfies Record<ContinuitySignal['severity'], string>
 
 export function TodayView({
@@ -155,7 +155,7 @@ export function TodayView({
         <div className="today-lower">
           <section className="plain-section" aria-labelledby="continuity-radar-title">
             <div className="section-heading compact">
-              <h2 id="continuity-radar-title">운영 점검</h2>
+              <h2 id="continuity-radar-title">확인할 항목</h2>
               <span className="continuity-count">
                 {workspace.continuitySignals.length}개
               </span>

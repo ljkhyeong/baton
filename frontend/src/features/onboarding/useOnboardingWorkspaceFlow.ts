@@ -104,7 +104,7 @@ function confirmationMessage(
 ) {
   switch (reason) {
     case 'pendingMissing':
-      return '다른 탭에서 이 요청의 결과를 확인했거나 확인 대기 목록에서 삭제했습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
+      return '다른 탭에서 이 요청의 결과를 확인했거나 목록에서 지웠습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
     case 'pendingChanged':
       return '다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다. ‘최근 작업 공간’이나 다른 탭에서 이미 만들어졌는지 확인하세요.'
     case 'concurrentAttempt':
@@ -382,7 +382,7 @@ export function useOnboardingWorkspaceFlow() {
             request: pendingToRecover!.request,
             reason: 'pendingMissing',
           })
-          setValidationMessage('다른 탭에서 이 요청을 확인했거나 확인 대기 목록에서 삭제했습니다. 새 작업 공간을 만들기 전에 최근 목록이나 기존 공유 링크를 확인해 주세요.')
+          setValidationMessage('다른 탭에서 이 요청을 확인했거나 목록에서 지웠습니다. 새 작업 공간을 만들기 전에 최근 목록이나 기존 공유 링크를 확인해 주세요.')
         } else if (lockResult.value.reason === 'changed') {
           setSelectedPendingCreation(null)
           setNewRequestConfirmation({

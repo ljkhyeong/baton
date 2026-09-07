@@ -103,7 +103,7 @@ export default function PendingWorkspaceCreationPanel({
     if (result === 'discarded' || result === 'missing') {
       setConfirmingId(null)
       setNotice(result === 'discarded'
-        ? '확인 대기 목록에서 삭제했습니다. 생성된 작업 공간은 삭제하지 않습니다.'
+        ? '목록에서 지웠습니다. 생성된 작업 공간은 삭제하지 않습니다.'
         : '다른 탭에서 이미 정리한 임시 기록입니다.')
       onRefresh()
       requestAnimationFrame(() => {
@@ -129,7 +129,7 @@ export default function PendingWorkspaceCreationPanel({
       onRefresh()
       return
     }
-    setError('확인 대기 목록에서 삭제하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')
+    setError('목록에서 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')
   }
 
   const load = (item: PendingWorkspaceCreationItem) => {
@@ -142,7 +142,7 @@ export default function PendingWorkspaceCreationPanel({
   return (
     <section
       className="pending-workspaces-region"
-      aria-label="완료 여부를 확인할 작업 공간"
+      aria-label="생성 확인이 필요한 작업 공간"
     >
       {items.length > 0 && (
         <details
@@ -151,7 +151,7 @@ export default function PendingWorkspaceCreationPanel({
           onToggle={(event) => setOpen(event.currentTarget.open)}
         >
           <summary>
-            <span>완료 여부를 확인할 작업 공간 <strong>{items.length}개</strong></span>
+            <span>생성 확인이 필요한 작업 공간 <strong>{items.length}개</strong></span>
             <small>작업 공간이 만들어졌는지 확인해 주세요</small>
           </summary>
           <p className="pending-workspaces-intro">
@@ -194,13 +194,13 @@ export default function PendingWorkspaceCreationPanel({
                       onClick={() => openConfirmation(item)}
                       aria-expanded={confirming}
                       aria-controls={confirming ? confirmationId : undefined}
-                      aria-label={`${label} 확인 대기 목록에서 삭제`}
+                      aria-label={`${label} 목록에서 지우기`}
                       ref={(element) => {
                         if (element) discardButtonRefs.current.set(item.idempotencyKey, element)
                         else discardButtonRefs.current.delete(item.idempotencyKey)
                       }}
                     >
-                      확인 대기 목록에서 삭제
+                      목록에서 지우기
                     </button>
                   </div>
 
@@ -211,7 +211,7 @@ export default function PendingWorkspaceCreationPanel({
                       role="group"
                       aria-labelledby={confirmationTitleId}
                     >
-                      <strong id={confirmationTitleId}>확인 대기 목록에서 삭제할까요?</strong>
+                      <strong id={confirmationTitleId}>이 목록에서 지울까요?</strong>
                       <p>
                         작업 공간이 이미 생성됐다면 공유 링크를 이 브라우저에서 다시 찾지 못할 수 있습니다. 작업 공간의 내용은 삭제되지 않습니다.
                       </p>
@@ -231,7 +231,7 @@ export default function PendingWorkspaceCreationPanel({
                           disabled={discardingId !== null}
                           onClick={() => void discard(item)}
                         >
-                          {discardingId === item.idempotencyKey ? '삭제하는 중…' : '목록에서 삭제'}
+                          {discardingId === item.idempotencyKey ? '삭제하는 중…' : '지우기'}
                         </button>
                       </div>
                     </div>

@@ -44,7 +44,7 @@ export function WorkspaceAccessKeyRecovery({
           <>
             <p>이전에 링크를 바꾸려던 임시 기록을 지웁니다.</p>
             <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-              임시 기록 삭제 재시도
+              임시 기록 정리
             </button>
           </>
         )}
@@ -62,7 +62,7 @@ export function WorkspaceAccessKeyRecovery({
           <>
             <p>이전에 링크를 바꾸려던 임시 기록을 지웁니다.</p>
             <button type="button" className="secondary-button" onClick={onRetryCleanup}>
-              임시 기록 삭제 재시도
+              임시 기록 정리
             </button>
           </>
         )}

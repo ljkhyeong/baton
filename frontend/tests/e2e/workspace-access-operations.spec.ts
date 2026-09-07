@@ -643,8 +643,8 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
     PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
-  await page.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
-  await expect(page.getByRole('button', { name: '임시 기록 삭제 재시도' })).toHaveCount(0)
+  await page.getByRole('button', { name: '임시 기록 정리' }).click()
+  await expect(page.getByRole('button', { name: '임시 기록 정리' })).toHaveCount(0)
   await expect(page.getByText('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
@@ -725,7 +725,7 @@ test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 re
   )).toBeTruthy()
 })
 
-test('@smoke @responsive @continuity 운영 점검은 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
+test('@smoke @responsive @continuity 확인할 항목은 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({
     previousRoleId: null,
@@ -765,7 +765,7 @@ test('@smoke @responsive @continuity 운영 점검은 이유와 다음 행동을
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  const radar = page.getByRole('region', { name: '운영 점검' })
+  const radar = page.getByRole('region', { name: '확인할 항목' })
   await expect(radar).toBeVisible()
   await expect(radar.locator('.continuity-count')).toHaveText('2개')
   const signals = radar.getByRole('listitem')
@@ -814,7 +814,7 @@ test('@continuity 반복 지연 신호는 해당 반복 업무가 있는 일정 
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '운영 점검' })
+  await page.getByRole('region', { name: '확인할 항목' })
     .getByRole('button')
     .click()
 
@@ -839,7 +839,7 @@ test('@continuity 미완료 인수인계 신호는 해당 역할의 인수인계
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '운영 점검' })
+  await page.getByRole('region', { name: '확인할 항목' })
     .getByRole('button')
     .click()
 
@@ -945,16 +945,16 @@ test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 �
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
 
-  await expect(page.getByRole('heading', { name: '자동 회차가 꺼져 있어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '회차 자동 생성이 꺼져 있습니다.' })).toBeVisible()
   await page.getByRole('button', { name: '설정하기' }).click()
 
-  const dialog = page.getByRole('dialog', { name: '자동 회차 설정' })
+  const dialog = page.getByRole('dialog', { name: '회차 자동 생성 설정' })
   await dialog.getByLabel('시즌 시간대').fill('Asia/Seoul')
-  await dialog.getByLabel('첫 자동 회차').fill('2026-08-06')
+  await dialog.getByLabel('첫 회차 날짜').fill('2026-08-06')
   await dialog.getByLabel('모임 시각').fill('20:30')
   await dialog.getByLabel('반복 주기').selectOption('BIWEEKLY')
-  await dialog.getByLabel('미리 만들 기간').selectOption('14')
-  await dialog.getByRole('button', { name: '자동 회차 저장' }).click()
+  await dialog.getByLabel('회차 생성 시점').selectOption('14')
+  await dialog.getByRole('button', { name: '설정 저장' }).click()
 
   await expect(page.getByRole('heading', { name: '격주 20:30' })).toBeVisible()
   await expect(page.locator('.round-schedule-card')).toContainText(
@@ -982,7 +982,7 @@ test('@operations 반복 업무와 회차를 내구 생성하고 선택한 회�
   await dialog.getByLabel('반복 업무 이름').fill('회고 질문 준비')
   await dialog.getByLabel('업무 시점').selectOption({ label: '모임 전' })
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('마감 안내').fill('목요일 19:00')
+  await dialog.getByLabel('기한 설명').fill('목요일 19:00')
   await dialog.getByLabel('세부 설명').fill('지난 회차에서 이어갈 질문 두 개를 고릅니다.')
   await dialog.getByRole('button', { name: '반복 업무 만들기' }).click()
 

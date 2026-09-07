@@ -63,8 +63,8 @@ function PreviousRoleRecordContents({
           {resource.archivedAt && <small>보관한 자료</small>}
           {resource.description && <p className="previous-role-copy">{resource.description}</p>}
           <button type="button" disabled={changesDisabled || query.isFetching}
-            aria-label={`${resource.title} 자료를 현재 시즌에 연결`}
-            onClick={() => onCopyResource(resource)}>현재 시즌에 연결</button>
+            aria-label={`${resource.title} 자료를 현재 시즌에 추가`}
+            onClick={() => onCopyResource(resource)}>현재 시즌에 추가</button>
         </li>)}
       </ul> : <p>이 역할에 남긴 자료가 없습니다.</p>}
       <h3>결정과 이유</h3>

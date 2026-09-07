@@ -82,11 +82,11 @@ export function RhythmView({
         aria-labelledby="round-schedule-title"
       >
         <div>
-          <span className="section-kicker">자동 회차</span>
+          <span className="section-kicker">회차 자동 생성</span>
           <h2 id="round-schedule-title">
             {season.roundSchedule
               ? `${season.roundSchedule.recurrence === 'WEEKLY' ? '매주' : '격주'} ${formatLocalTime(season.roundSchedule.meetingTime)}`
-              : '자동 회차가 꺼져 있어요'}
+              : '회차 자동 생성이 꺼져 있습니다.'}
           </h2>
           <p>
             {season.roundSchedule
@@ -105,7 +105,7 @@ export function RhythmView({
           disabled={changesDisabled}
           onClick={onConfigureRoundSchedule}
         >
-          {season.roundSchedule ? '자동 회차 설정' : '설정하기'}
+          {season.roundSchedule ? '회차 자동 생성 설정' : '설정하기'}
         </button>
       </section>
       <RoundControl

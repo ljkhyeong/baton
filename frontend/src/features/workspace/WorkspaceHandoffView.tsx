@@ -312,7 +312,7 @@ export function HandoffView({
       </section>
       {selectedArchivedItems.length > 0 && (
         <details className="archive-shelf">
-          <summary>보관한 인수인계 {selectedArchivedItems.length}개</summary>
+          <summary>보관한 체크리스트 항목 {selectedArchivedItems.length}개</summary>
           <div className="archive-list">
             {selectedArchivedItems.map((item) => (
               <div className="archive-row" key={item.id}>

@@ -169,18 +169,6 @@ a {
 .auth-story-copy h1 { margin: 15px 0 20px; font-size: clamp(32px, 3.5vw, 48px); font-weight: 720; letter-spacing: -.045em; line-height: 1.25; }
 .auth-story-copy > p { max-width: 520px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.8; word-break: keep-all; }
 
-.auth-identity-rail {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 46px;
-  padding-top: 22px;
-  border-top: 1px solid var(--rule-strong);
-}
-.auth-identity-rail::before { position: absolute; top: -2px; right: 0; width: 36%; height: 3px; background: var(--baton); content: ""; }
-.auth-identity-rail span { color: var(--muted); font-size: 12px; letter-spacing: .04em; }
-.auth-identity-rail strong { grid-column: 1 / -1; margin-top: 9px; color: var(--baton-dark); font-size: 13px; letter-spacing: .06em; }
 
 .auth-panel { display: grid; min-height: 100%; align-items: safe center; padding: 48px clamp(34px, 7vw, 92px); }
 .auth-panel-inner { width: min(100%, 470px); justify-self: center; }
@@ -1331,16 +1319,6 @@ a {
   transition: width 280ms ease;
 }
 
-.directory-note {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 18px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.directory-note svg { color: var(--baton-dark); }
 
 .rhythm-timeline {
   border-top: 1px solid var(--rule);
@@ -3005,7 +2983,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .auth-story { min-height: auto; padding: 24px 26px; border-right: 0; border-bottom: 1px solid var(--rule); }
   .auth-story-copy { margin: 26px 0 0; padding: 0; }
   .auth-story-copy h1 { margin: 6px 0 12px; font-size: 30px; }
-  .auth-identity-rail { display: none; }
   .auth-panel { min-height: auto; padding: 32px 24px 56px; }
 }
 
@@ -3035,7 +3012,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .onboarding-date-row { grid-template-columns: 1fr; }
   .auth-story-copy { margin-top: 24px; }
   .auth-story-copy h1 { font-size: 28px; }
-  .auth-identity-rail { margin-top: 36px; }
   .auth-panel { padding-right: 18px; padding-left: 18px; }
   .auth-loading,
   .auth-session-card,

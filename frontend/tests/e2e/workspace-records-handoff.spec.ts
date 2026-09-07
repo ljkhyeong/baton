@@ -281,8 +281,8 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
 
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
   await search.getByLabel('기록 종류').selectOption('resource')
-  await search.getByLabel('시작일').fill('2026-07-04')
-  await search.getByLabel('종료일').fill('2026-07-04')
+  await search.getByLabel('작성일(시작)').fill('2026-07-04')
+  await search.getByLabel('작성일(종료)').fill('2026-07-04')
   await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '회고 질문 가이드' })).toBeVisible()
 
@@ -308,7 +308,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(archivedResult).toContainText('작성일을 알 수 없음')
   await expect(archivedResult.getByRole('button', { name: '인수인계 문서에서 보기' })).toHaveCount(0)
 
-  await search.getByLabel('시작일').fill('2026-07-01')
+  await search.getByLabel('작성일(시작)').fill('2026-07-01')
   await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
   await expect(page.getByText('작성일을 알 수 없는 이전 기록 1개는 날짜 검색에서 제외했습니다.')).toBeVisible()
 
@@ -542,14 +542,14 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   const createDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await createDialog.getByLabel('역할').selectOption(ROLE_ID)
   await createDialog.getByLabel('링크').fill('https://docs.example.com/problem-selection')
-  await createDialog.getByRole('button', { name: '자료 연결하기' }).click()
+  await createDialog.getByRole('button', { name: '자료 추가' }).click()
   await expect(createDialog.getByRole('alert')).toContainText('자료 이름을 입력해 주세요.')
   await expect(createDialog.getByLabel('자료 이름')).toBeFocused()
   expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`)).toHaveLength(0)
 
   await createDialog.getByLabel('자료 이름').fill('문제 선정 기준 문서')
   await createDialog.getByLabel('자료 설명').fill('매주 문제 후보를 고를 때 확인하는 기준입니다.')
-  await createDialog.getByRole('button', { name: '자료 연결하기' }).click()
+  await createDialog.getByRole('button', { name: '자료 추가' }).click()
   await expect(createDialog.getByRole('alert')).toContainText('같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.')
 
   const firstCreateCall = await recordedCall(api, 'POST', `${SCOPE_PATH}/role-resources`)
@@ -575,7 +575,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await retryDialog.getByLabel('링크').fill('https://docs.example.com/problem-selection')
   await retryDialog.getByLabel('자료 설명').fill('매주 문제 후보를 고를 때 확인하는 기준입니다.')
   await expect(retryDialog.getByRole('status').filter({ hasText: '저장 결과를 확인하지 못했습니다.' })).toContainText('저장 결과를 확인하지 못했습니다.')
-  await retryDialog.getByRole('button', { name: '자료 연결하기' }).click()
+  await retryDialog.getByRole('button', { name: '자료 추가' }).click()
 
   await expect.poll(() => api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`,
@@ -1148,7 +1148,7 @@ test('@handoff 완료한 인수인계 항목을 수정하고 보관·복원해 �
     archivedAt: '2026-07-21T12:00:00Z',
   })
 
-  const archiveSummary = page.getByText('보관한 인수인계 1개', { exact: true })
+  const archiveSummary = page.getByText('보관한 체크리스트 항목 1개', { exact: true })
   await archiveSummary.scrollIntoViewIfNeeded()
   await archiveSummary.click()
   await page.getByRole('button', { name: `${updatedLabel} 복원` }).click()
@@ -1253,7 +1253,7 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   await expect(panel.getByText('아직 확인한 기록이 없습니다.')).toBeVisible()
   await panel.getByLabel('확인 결과').selectOption('NEEDS_UPDATE')
   await panel.getByLabel('확인 메모').fill('접근 권한을 요청해야 합니다')
-  await panel.getByRole('button', { name: '내 확인 기록 남기기' }).click()
+  await panel.getByRole('button', { name: '확인 결과 저장' }).click()
   await expect(panel.getByText('확인 기록을 저장했습니다.')).toBeVisible()
   await expect(panel.getByText('자료 수정이 필요합니다.')).toBeVisible()
   version = 1

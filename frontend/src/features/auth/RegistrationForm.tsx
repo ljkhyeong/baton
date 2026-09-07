@@ -32,7 +32,7 @@ export default function RegistrationForm() {
       }}
     >
       <label>
-        <span>표시 이름</span>
+        <span>이름</span>
         <input
           autoComplete="name"
           maxLength={100}

@@ -183,7 +183,7 @@ export function RecordSearchView({
             </select>
           </label>
           <label>
-            <span>시작일</span>
+            <span>작성일(시작)</span>
             <input
               type="date"
               value={filters.fromDate}
@@ -192,7 +192,7 @@ export function RecordSearchView({
             />
           </label>
           <label>
-            <span>종료일</span>
+            <span>작성일(종료)</span>
             <input
               type="date"
               value={filters.toDate}

@@ -63,7 +63,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
       </select></label>
       <label>확인 메모<textarea maxLength={500} rows={2} value={note} onChange={event => setNote(event.target.value)} /></label>
       <button type="submit" disabled={mutation.isPending || !history.data || history.isError || history.isFetching}>
-        {mutation.isPending ? '확인 기록 저장 중…' : '내 확인 기록 남기기'}
+        {mutation.isPending ? '확인 결과 저장 중…' : '확인 결과 저장'}
       </button>
     </form> : <button type="button" onClick={onManageMembership}>내 이름 선택 후 확인 기록 남기기</button>)}
     {mutation.isError && <p role="alert">{mutation.error.message} 최신 자료를 다시 확인한 뒤 기록해 주세요.</p>}

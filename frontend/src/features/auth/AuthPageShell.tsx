@@ -27,12 +27,6 @@ export default function AuthPageShell({
           <p>
             같은 이메일이어도 로그인 방법이 다르면 별도 계정입니다.
           </p>
-          <div className="auth-identity-rail" aria-label="로그인 방법마다 계정이 구분됩니다">
-            <span>Google</span>
-            <span>Naver</span>
-            <span>이메일</span>
-            <strong>방법별 별도 계정</strong>
-          </div>
         </div>
       </section>
 

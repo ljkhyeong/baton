@@ -83,7 +83,6 @@ export function RolesView({
           })}
         </section>
       ) : <ActionableEmpty title="아직 역할이 없어요" description="담당 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
-      <p className="directory-note"><Icon name="spark" size={15} /> 역할별 담당 업무를 정하고 담당자를 지정하세요.</p>
     </>
   )
 }

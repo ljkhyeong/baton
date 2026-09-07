@@ -401,7 +401,7 @@ test('로그인했지만 구성원 연결 전에는 ROUND 대신 계정 연결�
 
   await inspector.getByRole('button', { name: '내 이름 선택 후 ROUND 시작' }).click()
   await expect(page.getByRole('dialog', { name: '구성원 관리' }))
-    .toContainText('내 계정 연결')
+    .toContainText('내 이름 선택')
   expect(roundApi.calls.filter((call) => call.path === '/api/v1/round-room-mappings'))
     .toHaveLength(0)
 })

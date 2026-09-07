@@ -68,7 +68,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   await expect.poll(() => calls.at(-1)?.get('revisionGap')).toBe('false')
   await panel.getByRole('button', { name: '다음 페이지' }).click()
   await expect(panel.getByText('role:second', { exact: true })).toBeAttached()
-  await panel.getByText('원본 기록 보기', { exact: true }).click()
+  await panel.getByText('연동 상세', { exact: true }).click()
   await expect(panel.getByText('role:second', { exact: true })).toBeVisible()
   expect(calls.at(-1)?.get('afterSourceReference')).toBe('role:+& 한글')
   expect(calls.at(-1)?.get('severity')).toBe('HIGH')
@@ -81,7 +81,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   await panel.getByRole('combobox', { name: '상태', exact: true }).selectOption('RESOLVED')
   await expect(panel.getByText('선택한 조건에 해당하는 점검 항목이 없습니다.')).toBeVisible()
   unavailable = true
-  await panel.getByRole('button', { name: '첫 페이지부터 새로고침' }).click()
+  await panel.getByRole('button', { name: '목록 새로고침' }).click()
   await expect(panel.getByRole('alert')).toContainText('요약을 불러오지 못했습니다.')
   await expect(panel.getByRole('button', { name: '높은 심각도 0건' })).toHaveCount(0)
   unavailable = false

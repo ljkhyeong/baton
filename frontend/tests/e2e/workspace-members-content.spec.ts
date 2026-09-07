@@ -334,7 +334,7 @@ test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차�
   await expect(routineDialog.getByLabel('담당 역할')).toHaveValue(ROLE_ID)
   await routineDialog.getByLabel('반복 업무 이름').fill('문제 6개 선정')
   await routineDialog.getByLabel('업무 시점').selectOption('DURING')
-  await routineDialog.getByLabel('마감 안내').fill('목요일 20:00')
+  await routineDialog.getByLabel('기한 설명').fill('목요일 20:00')
   await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
@@ -434,7 +434,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   const reopenedRoutineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
   await expect(reopenedRoutineDialog.getByLabel('반복 업무 이름')).toHaveValue('다른 구성원이 갱신한 반복 업무')
   await expect(reopenedRoutineDialog.getByLabel('업무 시점')).toHaveValue('AFTER')
-  await expect(reopenedRoutineDialog.getByLabel('마감 안내')).toHaveValue('금요일 22:00')
+  await expect(reopenedRoutineDialog.getByLabel('기한 설명')).toHaveValue('금요일 22:00')
   await expect(reopenedRoutineDialog.getByLabel('세부 설명'))
     .toHaveValue('서버에서 먼저 갱신한 최신 반복 업무 설명입니다.')
 
@@ -618,7 +618,7 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
   api.holdNextRoutineUpdate()
   await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 수정' })
-  await routineDialog.getByLabel('마감 안내').fill('저장 완료 후 공개')
+  await routineDialog.getByLabel('기한 설명').fill('저장 완료 후 공개')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
   await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
 
@@ -670,7 +670,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
     dialog: resourceDialog,
     operation: 'roleResource',
     page,
-    submitLabel: '자료 연결하기',
+    submitLabel: '자료 추가',
   })
   if (testInfo.project.name === 'mobile') {
     await page.getByRole('dialog', { name: /선택한 역할 상세/ })
@@ -682,7 +682,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await routineDialog.getByLabel('반복 업무 이름').fill('생성 잠금 반복 업무')
-  await routineDialog.getByLabel('마감 안내').fill('모임 하루 전')
+  await routineDialog.getByLabel('기한 설명').fill('모임 하루 전')
   await routineDialog.getByLabel('세부 설명').fill('서버 응답을 받은 뒤에만 생성 화면을 닫습니다.')
   await expectPendingCreationDialogLocked({
     api,
@@ -774,7 +774,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   const resourceDialog = page.getByRole('dialog', { name: '참고 자료 추가' })
   await resourceDialog.getByLabel('자료 이름').fill('저장 차단 자료')
   await resourceDialog.getByLabel('링크').fill('https://docs.example.com/storage-blocked')
-  await expectStorageBlock(resourceDialog, '자료 연결하기')
+  await expectStorageBlock(resourceDialog, '자료 추가')
   if (testInfo.project.name === 'mobile') {
     await roleInspector.getByRole('button', { name: '상세 닫기' }).click()
   }
@@ -783,7 +783,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await routineDialog.getByLabel('반복 업무 이름').fill('저장 차단 반복 업무')
-  await routineDialog.getByLabel('마감 안내').fill('수요일 18:00')
+  await routineDialog.getByLabel('기한 설명').fill('수요일 18:00')
   await routineDialog.getByLabel('세부 설명').fill('저장 가능한 경우에만 전송합니다.')
   await expectStorageBlock(routineDialog, '반복 업무 만들기')
 
@@ -964,7 +964,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
   const peerCleanupBanner = peerPage.getByRole('alert', {
     name: '새 항목 추가를 위한 임시 기록 삭제',
   })
-  await peerCleanupBanner.getByRole('button', { name: '임시 기록 삭제 재시도' }).click()
+  await peerCleanupBanner.getByRole('button', { name: '임시 기록 정리' }).click()
   await expect(peerCleanupBanner).toHaveCount(0)
   await expect(cleanupBanner).toHaveCount(0)
   await peerPage.close()
@@ -1117,7 +1117,7 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
     await page.getByRole('button', { name: '반복 업무 추가' }).click()
     const dialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
     await dialog.getByLabel('반복 업무 이름').fill('마감 journal 경계 확인')
-    await dialog.getByLabel('마감 안내').fill('모임 전에 확인')
+    await dialog.getByLabel('기한 설명').fill('모임 전에 확인')
     await dialog.getByLabel('마감 기준일').selectOption(deadlineDayOffset)
     await dialog.getByLabel('마감 시각').fill(deadlineTime)
     await dialog.getByLabel('세부 설명').fill('마감 규칙도 요청 동일성에 포함합니다.')

@@ -43,7 +43,7 @@ function requireScope(
   if (!isSameUuid(mapping.teamId, scope.teamId)
     || !isSameUuid(mapping.seasonId, scope.seasonId)
     || !isSameUuid(mapping.resourceId, scope.resourceId)) {
-    throw new Error('ROUND 방 연결 응답 범위가 요청과 일치하지 않습니다.')
+    throw new Error('이 팀의 방 정보를 확인하지 못했습니다. 다시 확인해 주세요.')
   }
   return mapping
 }
@@ -54,7 +54,7 @@ function requireListScope(
 ) {
   if (!isSameUuid(mapping.teamId, scope.teamId)
     || !isSameUuid(mapping.seasonId, scope.seasonId)) {
-    throw new Error('ROUND 방 연결 응답 범위가 요청과 일치하지 않습니다.')
+    throw new Error('이 팀의 방 정보를 확인하지 못했습니다. 다시 확인해 주세요.')
   }
   return mapping
 }

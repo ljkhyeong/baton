@@ -50,7 +50,7 @@ function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembers
   const memberId = membership.data?.claimed ? membership.data.memberId : ''
   const active = workspace.members.some((member) => isSameUuid(member.id, memberId) && isActiveMember(member))
   return <>
-    {!memberId && <p>먼저 ‘내 계정 연결’에서 본인 이름을 선택하세요. <button type="button" className="secondary-button" onClick={onManageMembership}>구성원 연결하기</button></p>}
+    {!memberId && <p>먼저 ‘내 이름 선택’에서 본인 이름을 선택하세요. <button type="button" className="secondary-button" onClick={onManageMembership}>구성원 연결하기</button></p>}
     {!!memberId && !active && <p>활동 중인 구성원만 구독 주소를 발급할 수 있습니다. 기존 구독은 해제할 수 있습니다.</p>}
     <CalendarContent key={`${accountId}:${scope.teamId}:${scope.seasonId}:${accessKey}:${active}`}
       accountId={accountId} scope={scope} canIssue={active && !workspace.season.endedAt && !changesDisabled}

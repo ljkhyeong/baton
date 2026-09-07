@@ -258,7 +258,7 @@ export function ContentCreationCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '임시 기록 정리 중…' : '임시 기록 삭제 재시도'}
+          {pending ? '임시 기록 정리 중…' : '임시 기록 정리'}
         </button>
       </div>
     </section>

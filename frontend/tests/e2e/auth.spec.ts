@@ -475,7 +475,7 @@ test('인증 응답의 additive field를 무시한다', async ({ page }) => {
   })
   await page.goto('/register')
 
-  await page.getByLabel('표시 이름').fill('박민서')
+  await page.getByRole('textbox', { name: /^이름/ }).fill('박민서')
   await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByRole('button', { name: '인증 메일 받기' }).click()
   await expect(page.getByRole('heading', { name: '인증 메일을 확인해 주세요.' }))
@@ -495,7 +495,7 @@ test('@webkit CSRF 헤더 이름은 브라우저 Headers 규칙으로 검증한�
   await installAuthApi(page, { csrfHeaderName: 'X CSRF TOKEN' })
   await page.goto('/register')
 
-  await page.getByLabel('표시 이름').fill('박민서')
+  await page.getByRole('textbox', { name: /^이름/ }).fill('박민서')
   await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByRole('button', { name: '인증 메일 받기' }).click()
 
@@ -624,7 +624,7 @@ test('local 가입이 비활성화되면 CTA를 숨기고 직접 진입한 가�
   await expect(page.getByRole('heading', {
     name: '현재는 이메일로 가입할 수 없습니다.',
   })).toBeVisible()
-  await expect(page.getByLabel('표시 이름')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: /^이름/ })).toHaveCount(0)
   await expect(page.getByRole('link', { name: '로그인 화면으로' })).toBeVisible()
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/registrations')).toHaveLength(0)
 })
@@ -633,7 +633,7 @@ test('이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', 
   const api = await installAuthApi(page)
   await page.goto('/register')
 
-  await page.getByLabel('표시 이름').fill('박민서')
+  await page.getByRole('textbox', { name: /^이름/ }).fill('박민서')
   await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
   await page.getByRole('button', { name: '인증 메일 받기' }).click()
 
@@ -1078,7 +1078,7 @@ test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('로그인 후 특정 브리프 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke', async ({ page }) => {
+test('로그인 후 특정 주간 요약 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await installAuthApi(page)
   const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`
@@ -1091,7 +1091,7 @@ test('로그인 후 특정 브리프 선택을 유지하고 접근 거부 시 �
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('브리프와 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
+test('주간 요약과 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
   await installAuthApi(page)
   const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221&accessKey=${ACCESS_KEY}`
   await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)

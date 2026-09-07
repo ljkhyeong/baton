@@ -49,7 +49,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
         timeZone: workspace.season.timeZone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
       })
       content = <>
-        <p>{member.name}님의 남은 업무 {unfinished.length}건 · 넘겨받을 업무 {awaiting.length}건</p>
+        <p>{member.name}님의 남은 업무 {unfinished.length}건 · 수락할 인수인계 {awaiting.length}건</p>
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
         <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}`}
           scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
@@ -68,7 +68,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
             </ul>}
           </div>
           <div>
-            <h3>넘겨받을 업무</h3>
+            <h3>수락할 인수인계</h3>
             {awaiting.length === 0 ? <p>내가 수락할 인수인계가 없습니다.</p> : <ul>
               {awaiting.map((handoff) => <li key={handoff.id}>
                 <button type="button" onClick={() => onOpenHandoff(handoff.roleId)}>

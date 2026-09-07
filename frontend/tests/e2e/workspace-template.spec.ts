@@ -22,7 +22,7 @@ test('시작 템플릿 선택과 응답 유실 복구가 같은 생성 요청을
 
   await page.reload()
   await page.locator('.pending-workspaces summary').click()
-  const recovery = page.getByRole('region', { name: '완료 여부를 확인할 작업 공간' })
+  const recovery = page.getByRole('region', { name: '생성 확인이 필요한 작업 공간' })
   await expect(recovery).toContainText('스터디 기본 구성')
   await recovery.getByRole('button', { name: '템플릿 복구 스터디 2026 가을 저장된 입력 불러오기' }).click()
   await expect(page.getByRole('combobox', { name: '템플릿 선택', exact: true })).toHaveValue('STUDY_V1')

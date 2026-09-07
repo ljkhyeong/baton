@@ -50,7 +50,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
   return <div>
-    <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 취소'}`
+    <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 권한 해제'}`
       : '현재는 공유 링크로 이용합니다. 관리자를 지정하면 관리자와 초대받은 계정만 이용할 수 있습니다.'}</p>
     {!access.accountAccessEnabled && (access.memberId ? <form onSubmit={event => {
       event.preventDefault(); if (confirmed && recoveryKey && !mutation.isPending) mutation.mutate({ kind: 'activate' })
@@ -59,7 +59,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
       <label>운영자 복구 키<input type="password" autoComplete="off" value={recoveryKey} onChange={event => setRecoveryKey(event.target.value)} required /></label>
       <label className="team-access-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required />기존 공유 링크를 막고 내 계정을 관리자로 지정하는 데 동의합니다.</label>
       <button type="submit" disabled={mutation.isPending || !confirmed || !recoveryKey}>계정 로그인으로 전환</button>
-    </form> : <p>먼저 ‘내 계정 연결’에서 본인 이름을 선택하세요. 전환하려면 운영자 복구 키가 필요합니다.</p>)}
+    </form> : <p>먼저 ‘내 이름 선택’에서 본인 이름을 선택하세요. 전환하려면 운영자 복구 키가 필요합니다.</p>)}
     {access.permission === 'ADMIN' && <>
       <h4>구성원 권한</h4>
       <ul>{access.members.map(member => <li key={member.memberId}>
@@ -67,10 +67,11 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         {member.accountId ? <select aria-label={`${member.memberName} 접근 권한`} value={member.permission ?? ''}
           disabled={mutation.isPending || !member.active} onChange={event => {
             const next = event.target.value as Permission | ''
-            if (window.confirm(`${member.memberName}님의 접근 권한을 ${next ? permissionNames[next] : '접근 취소'}로 변경할까요?`))
+            if (window.confirm(next ? `${member.memberName}님의 접근 권한을 ${permissionNames[next]}로 변경할까요?`
+              : `${member.memberName}님의 접근 권한을 해제할까요?`))
               mutation.mutate({ kind: 'permission', id: member.memberId, permission: next || null })
           }}>
-          <option value="">접근 취소</option>{Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <option value="">접근 권한 해제</option>{Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select> : <span>연결된 계정 없음</span>}
       </li>)}</ul>
       <h4>구성원 초대</h4>

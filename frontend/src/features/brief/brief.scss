@@ -39,6 +39,8 @@
 .brief-source { align-items: center; }
 .brief-source button { flex-shrink: 0; }
 .brief-evidence { margin: .75rem 0; }
+.brief-evidence-list { display: grid; gap: 1rem; padding: 0; list-style: none; }
+.brief-evidence-list li { display: grid; gap: .4rem; font-size: .85rem; overflow-wrap: anywhere; }
 .brief-filters select { width: 100%; }
 @media (max-width: 600px) { .brief-change-columns { grid-template-columns: minmax(0, 1fr); } }
 

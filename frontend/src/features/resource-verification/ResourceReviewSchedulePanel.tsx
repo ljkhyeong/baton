@@ -25,7 +25,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
         : <p>{data!.nextReviewOn ? `${data!.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(data!.nextReviewOn)}${data!.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 확인이 꺼져 있습니다.'}</p>}
     {editable && data && <form onSubmit={event => { event.preventDefault(); if (!query.isError && !query.isFetching && !save.isPending) save.mutate() }}>
       <fieldset disabled={save.isPending || query.isError || query.isFetching}>
-        <label className="review-toggle"><input type="checkbox" checked={values.enabled} onChange={event => setDraft({ ...values, enabled: event.target.checked })} />정기 재확인 사용</label>
+        <label className="review-toggle"><input type="checkbox" checked={values.enabled} onChange={event => setDraft({ ...values, enabled: event.target.checked })} />정기 확인</label>
         {values.enabled && <>
           <label>확인 간격(일)<input type="number" min={1} max={365} required value={values.intervalDays} onChange={event => setDraft({ ...values, intervalDays: event.target.value })} /></label>
           <label>다음 확인일<input type="date" required value={values.nextReviewOn} onChange={event => setDraft({ ...values, nextReviewOn: event.target.value })} /></label>

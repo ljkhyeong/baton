@@ -86,7 +86,7 @@ export function RoutineModal({
     <ModalShell
       title={editing ? '반복 업무 수정' : '반복 업무 만들기'}
       description={editing
-        ? '업무 시점, 담당 역할, 마감 안내를 수정하세요.'
+        ? '업무 시점, 담당 역할, 기한 설명를 수정하세요.'
         : '반복할 업무와 담당 역할, 마감을 정합니다.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
@@ -127,7 +127,7 @@ export function RoutineModal({
           </label>
         </div>
         <label>
-          <span>마감 안내</span>
+          <span>기한 설명</span>
           <input
             required
             value={dueLabel}
@@ -166,7 +166,7 @@ export function RoutineModal({
           </label>
         </div>
         <p className="form-hint">
-          ‘마감 안내’는 설명용입니다. 지연 여부는 마감 기준일과 시각을 시즌 시간대로 계산합니다.
+          ‘기한 설명’는 설명용입니다. 지연 여부는 마감 기준일과 시각을 시즌 시간대로 계산합니다.
         </p>
         <label>
           <span>세부 설명</span>
@@ -244,7 +244,7 @@ export function RoundScheduleModal({
 
   return (
     <ModalShell
-      title="자동 회차 설정"
+      title="회차 자동 생성 설정"
       description="정한 주기에 맞춰 회차를 자동으로 만듭니다."
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
@@ -266,7 +266,7 @@ export function RoundScheduleModal({
         </label>
         <div className="form-grid">
           <label>
-            <span>첫 자동 회차</span>
+            <span>첫 회차 날짜</span>
             <input
               type="date"
               required
@@ -299,7 +299,7 @@ export function RoundScheduleModal({
             </select>
           </label>
           <label>
-            <span>미리 만들 기간</span>
+            <span>회차 생성 시점</span>
             <select
               value={generationLeadDays}
               onChange={(event) => setGenerationLeadDays(event.target.value)}
@@ -318,7 +318,7 @@ export function RoundScheduleModal({
             checked={enabled}
             onChange={(event) => setEnabled(event.target.checked)}
           />
-          <span>자동 회차 생성 사용</span>
+          <span>회차 자동 생성</span>
         </label>
         <p className="form-hint">
           일시 중지해도 기존 회차와 완료 기록은 남습니다. 자동 생성을 켜려면 사용 중인 모든 반복 업무에 마감을 설정하세요.
@@ -327,8 +327,8 @@ export function RoundScheduleModal({
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
-          submitLabel="자동 회차 저장"
-          pendingLabel="자동 회차 저장하는 중…"
+          submitLabel="설정 저장"
+          pendingLabel="설정 저장 중…"
           onClose={onClose}
         />
       </form>

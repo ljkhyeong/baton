@@ -123,10 +123,10 @@ export function useWorkspaceSeasonLifecycleFlow({
       onSuccess: () => {
         onCloseModal()
         notify(request.enabled
-          ? '자동 회차 일정을 저장했어요.'
-          : '자동 회차 생성을 일시중지했어요. 기존 회차는 그대로 남습니다.')
+          ? '회차 자동 생성 설정을 저장했습니다.'
+          : '회차 자동 생성을 중지했습니다. 기존 회차는 그대로 남습니다.')
       },
-    }), '자동 회차 설정', [
+    }), '회차 자동 생성 설정', [
       ['시간대', request.timeZone], ['첫 모임일', request.firstMeetingDate], ['모임 시각', request.meetingTime],
       ['반복 주기', request.recurrence === 'WEEKLY' ? '매주' : '격주'],
       ['미리 만들 일수', request.generationLeadDays], ['자동 생성', request.enabled ? '사용' : '중지'],

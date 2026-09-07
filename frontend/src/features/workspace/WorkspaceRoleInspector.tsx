@@ -140,8 +140,8 @@ export function RoleInspector({
           </details>
         )}
       </div>
-      {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">다음 반복 업무</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
-      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">연결된 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
+      {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">담당 반복 업무</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
+      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">관련 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
       {previousSeasonId && role.previousRoleId && (
         <PreviousRoleRecords
           key={`${roundRoomScope.teamId}:${roundRoomScope.seasonId}:${role.id}`}
@@ -152,7 +152,7 @@ export function RoleInspector({
           onCopyResource={onCopyPreviousResource}
         />
       )}
-      <div className="inspector-handoff"><div><span className="block-label">체크리스트 완료율</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 대기 중입니다. 수락 또는 취소 전까지 역할과 인수인계 문서를 수정할 수 없습니다.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '인수인계 수락 확인하기' : '인수인계 정리하기'} <Icon name="arrow" size={15} /></button></div>
+      <div className="inspector-handoff"><div><span className="block-label">체크리스트 완료율</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 대기 중입니다. 수락 또는 취소 전까지 역할과 인수인계 문서를 수정할 수 없습니다.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '인수인계 수락 확인하기' : '인수인계 보기'} <Icon name="arrow" size={15} /></button></div>
     </>
   )
 

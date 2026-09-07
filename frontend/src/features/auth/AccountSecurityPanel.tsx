@@ -96,7 +96,7 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
               <strong>{identityLabels[identity.provider]}</strong>
               <span>{identity.email ?? '이메일을 제공하지 않은 로그인 방법'}</span>
               {identity.email && (
-                <small>{identity.emailVerified ? '확인된 이메일' : '확인되지 않은 이메일'}</small>
+                <small>{identity.emailVerified ? '인증된 이메일' : '미인증 이메일'}</small>
               )}
             </li>
           ))}

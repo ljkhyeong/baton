@@ -182,7 +182,7 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
   await openSharedWorkspace(page)
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
-  await expect(panel).toContainText('남은 업무 1건 · 넘겨받을 업무 1건')
+  await expect(panel).toContainText('남은 업무 1건 · 수락할 인수인계 1건')
   await expect(panel.getByText('다른 사람의 업무')).toHaveCount(0)
   await expect(panel.getByText('문제 5개 선정')).toHaveCount(0)
   await panel.getByRole('button', { name: /풀이 노트 정리/ }).focus()
@@ -224,7 +224,7 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   await page.getByRole('button', { name: '구성원 관리' }).click()
 
   const dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await expect(dialog.getByText('내 계정 연결', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('내 이름 선택', { exact: true })).toBeVisible()
   await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => {
     expect(confirmation.message()).toContain('연결 후에는 다른 구성원으로 바꿀 수 없습니다.')

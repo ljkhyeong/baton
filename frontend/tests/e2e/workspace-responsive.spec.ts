@@ -276,7 +276,7 @@ test('@responsive 390x844에서 반복 업무 추가와 완료를 수행할 수 
   await dialog.getByLabel('반복 업무 이름').fill('다음 문제 예고')
   await dialog.getByLabel('업무 시점').selectOption('AFTER')
   await dialog.getByLabel('담당 역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('마감 안내').fill('금요일 20:00')
+  await dialog.getByLabel('기한 설명').fill('금요일 20:00')
   await dialog.getByLabel('세부 설명').fill('다음 주 주제를 한 줄로 공유합니다.')
   await dialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(page.locator('.routine-row').filter({ hasText: '다음 문제 예고' })).toContainText('다음 회차부터')
