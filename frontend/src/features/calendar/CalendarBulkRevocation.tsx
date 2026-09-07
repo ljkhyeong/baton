@@ -11,7 +11,7 @@ type Outcome = 'REVOKED' | 'PENDING' | 'CHECK_REQUIRED' | 'CHANGED' | 'ACCOUNT_R
 type Result = { subscription: CalendarSubscriptionSummary; outcome: Outcome }
 const outcomeLabels: Record<Outcome, string> = {
   REVOKED: '해제됨', PENDING: '해제 처리 중', CHECK_REQUIRED: '해제 여부 확인 필요', CHANGED: '구독 변경됨 · 다시 확인',
-  ACCOUNT_REQUIRED: '로그인 계정 확인 필요', NOT_ATTEMPTED: '요청하지 않음',
+  ACCOUNT_REQUIRED: '로그인 계정 확인 필요', NOT_ATTEMPTED: '요청 안 함',
 }
 const accountError = (error: unknown) => error instanceof ApiError && [401, 403].includes(error.status)
 function observedOutcome(status: CalendarSubscription, expectedId: string): Outcome {
@@ -29,6 +29,7 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
   const cache = useQueryClient()
   const [confirmation, setConfirmation] = useState<CalendarSubscriptionSummary[] | null>(null)
   const [results, setResults] = useState<Result[]>([])
+  const notAttemptedCount = results.filter(result => result.outcome === 'NOT_ATTEMPTED').length
   const [total, setTotal] = useState(0)
   const controller = useRef<AbortController | null>(null)
   const locked = useRef(false)
@@ -109,12 +110,16 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
       <button type="button" className="secondary-button" onClick={() => controller.current?.abort()}>남은 구독 해제 중단</button>
     </div>}
     {results.length > 0 && <section className="calendar-bulk-results" aria-label="구독 해제 결과">
-      <p role="status">해제됨 {results.filter(result => result.outcome === 'REVOKED').length}개 · 처리 중 {results.filter(result => result.outcome === 'PENDING').length}개 · 확인 필요 {results.filter(result => !['REVOKED', 'PENDING'].includes(result.outcome)).length}개</p>
+      <p role="status" className="calendar-bulk-summary">
+        <span>해제됨 {results.filter(result => result.outcome === 'REVOKED').length}개</span> · <span>처리 중 {results.filter(result => result.outcome === 'PENDING').length}개</span> · <span>확인 필요 {results.filter(result => !['REVOKED', 'PENDING', 'NOT_ATTEMPTED'].includes(result.outcome)).length}개</span>
+        {notAttemptedCount > 0 && <> · <span>요청 안 함 {notAttemptedCount}개</span></>}
+      </p>
       <ul>{results.map(result => <li key={result.subscription.subscriptionId}>
         <span>{result.subscription.teamName} · {result.subscription.seasonName}</span><strong>{outcomeLabels[result.outcome]}</strong>
       </li>)}</ul>
       {!operation.isPending && <>
-        {results.some(result => result.outcome !== 'REVOKED') && <p>‘선택 마치기’를 누른 뒤, 해제 여부가 확인되지 않은 구독을 열어 확인하세요. 중단 전에 보낸 해제 요청은 나중에 완료될 수 있습니다.</p>}
+        {results.some(result => !['REVOKED', 'NOT_ATTEMPTED'].includes(result.outcome)) && <p>‘선택 마치기’를 누른 뒤, 해제 여부가 확인되지 않은 구독을 열어 확인하세요. 이미 보낸 해제 요청은 나중에 완료될 수 있습니다.</p>}
+        {notAttemptedCount > 0 && <p>요청하지 않은 구독은 다시 선택해 해제하세요.</p>}
         <button type="button" className="secondary-button" onClick={() => setResults([])}>결과 닫기</button>
       </>}
     </section>}

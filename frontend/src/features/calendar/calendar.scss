@@ -51,6 +51,7 @@
 .calendar-bulk:empty { display: none; }
 .calendar-bulk .calendar-confirm { margin-top: 0; }
 .calendar-bulk-results { padding: 14px; border: 1px solid var(--rule); border-radius: 4px; }
+.calendar-bulk-summary span { white-space: nowrap; }
 .calendar-bulk-results ul { padding: 0; list-style: none; }
 .calendar-bulk-results li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 6px 0; }
 .calendar-bulk-results li span { flex: 1; min-width: 120px; }
