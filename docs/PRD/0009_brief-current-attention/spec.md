@@ -1,4 +1,4 @@
-# PRD-0009: BATON 경유 BRIEF 관심 항목 요약과 필터 조회
+# PRD-0009: BRIEF 주간 업무 점검 조회
 
 - 상태: 채택
 - 결정일: 2026-08-31
@@ -182,7 +182,7 @@ BRIEF 원문 오류나 자격 증명은 사용자에게 전달하지 않는다. 
 
 ## 관련 문서
 
-- [브리프 탐색·업무 연결·생성 준비](../0010_brief-navigation-and-readiness/spec.md)
+- [주간 요약 탐색·업무 연결·생성 준비](../0010_brief-navigation-and-readiness/spec.md)
 
 - [BATON API 계약](../0002_api-contract/spec.md)
 - [BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)

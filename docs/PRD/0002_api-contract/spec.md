@@ -201,7 +201,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | 필드 | 내용 |
 | --- | --- |
 | `type` | `ROLE_UNASSIGNED`, `ROLE_SUCCESSOR_MISSING`, `ROLE_PREPARATION_INCOMPLETE`, `ROUTINE_REPEATEDLY_OVERDUE`, `HANDOFF_INCOMPLETE` 중 하나 |
-| `severity` | 즉시 확인할 `CRITICAL` 또는 미리 준비할 `WARNING` |
+| `severity` | ‘긴급’으로 표시하는 `CRITICAL` 또는 ‘주의’로 표시하는 `WARNING` |
 | `roleId` | 신호가 가리키는 역할 UUID |
 | `routineId` | 반복 지연 신호가 가리키는 반복 업무 UUID. 다른 유형은 `null` |
 | `title` | 신호의 짧은 사용자용 제목 |
@@ -209,7 +209,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `recommendedAction` | 사용자가 바로 취할 수 있는 다음 행동 |
 | `relevantDate` | 담당 종료일 또는 새 담당 시작일. 날짜가 없는 유형은 `null` |
 
-레이더는 별도 저장 상태가 아니라 워크스페이스 조회 시점의 서버 `Clock`과 시즌 `timeZone`으로 계산한 프로젝션이다.
+업무 점검 신호는 별도로 저장하지 않는다. 작업 공간을 조회할 때 서버 `Clock`과 시즌 `timeZone`으로 계산해 응답에 포함한다.
 
 - 현재 담당자가 없거나 활동을 종료한 역할은 신호를 만든다. 시즌 시작 전이면 `WARNING`, 시작일 이후면 `CRITICAL`이다.
 - 현재 담당자가 활동 중이고 다음 담당자가 없거나 활동을 종료했거나 현재 담당자와 같으며 담당 종료일이 시즌 현지 오늘부터 14일 이내이거나 이미 지났으면 후임 공백 신호를 만든다. 종료일까지 시간이 남았으면 `WARNING`, 오늘이거나 지났으면 `CRITICAL`이다.
@@ -220,10 +220,10 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 - 현재 담당 종료일이 14일 이내이거나 이미 지났고 새 담당 시작일이 그 다음 날보다 늦으면, 열린 역할 인수인계의 시작일이 7일 밖에 있어도 실제 담당 공백을 `WARNING` 또는 `CRITICAL`로 알린다.
 - `PREPARING` 인수인계는 현재·다음 담당자가 모두 활동 중이어야 전달할 수 있다. `TRANSFERRED` 인수인계는 다음 담당자만 활동 중이면 수락할 수 있으므로 이전 담당자의 활동 종료를 참여자 오류로 오분류하지 않는다. 다만 수락 전 현재 역할의 담당 공백이므로 거리와 관계없이 `CRITICAL`로 즉시 수락 또는 취소를 안내한다. 현재 단계에 필요한 참여자가 활동을 종료했거나 기록을 찾을 수 없을 때도 `CRITICAL`로 알린다.
 - 구체적인 인수인계 신호가 있는 역할에서는 같은 담당자·후임·항목 공백을 일반 역할 신호로 다시 만들지 않는다.
-- 종료 시즌은 행동 가능한 신호를 반환하지 않는다. 보관 회차는 반복 지연에서, 보관 인수인계 항목은 준비도에서 제외한다.
+- 종료 시즌은 조치가 필요한 신호를 반환하지 않는다. 보관 회차는 반복 지연에서, 보관 인수인계 항목은 준비도에서 제외한다.
 - 응답 순서는 `CRITICAL`을 먼저 두고 관련 날짜가 이른 신호, 유형 우선순위와 제목 순으로 안정적으로 정렬한다.
 
-현재 자료에는 마지막 확인 시각이 없으므로 오래 확인되지 않은 역할 자료를 추측해 신호로 만들지 않는다.
+자료 확인 기록과 재확인 일정은 별도 API로 관리한다. 재확인 기한이 지난 자료는 [재확인할 자료 목록 API](#재확인할-자료-목록-api)로 조회하며 위 다섯 업무 점검 신호에는 포함하지 않는다.
 
 ### 시즌 생명주기
 
@@ -1131,7 +1131,7 @@ CSRF 없이 조회한다.
 | --- | --- | --- | --- |
 | `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
 | `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
-| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 브리프와 같은 시간대의 지난주 마지막 불변 본문·ETag |
+| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 주간 요약과 같은 시간대의 지난주 마지막 불변 본문·ETag |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
 | `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
 | `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
@@ -1243,7 +1243,7 @@ cd frontend && npm ci && cd ..
 - [서버 요청 시간 예산](../../ADR/0009_server-request-time-budget/adr.md)
 - [구성원 활동 종료와 참조 보존](../../ADR/0010_reversible-member-lifecycle/adr.md)
 - [시즌 종료와 다음 시즌 전환](../../ADR/0011_season_lifecycle/adr.md)
-- [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- [시즌 시간대와 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [반복 업무 정의의 보관·복원](../../ADR/0014_reversible-routine-archive/adr.md)
 - [역할 인수인계 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
 - [WATCH 트랜잭셔널 아웃박스와 현재 상태 재동기화](../../ADR/0015_watch-transactional-outbox/adr.md)

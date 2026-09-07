@@ -51,7 +51,7 @@ BATON Caddy ─────────────── BATON 정적 웹
 
 독립 실행 내부 경로, ROUND Actuator와 메트릭은 공개하지 않는다. 런타임이 비활성화되면 예약된
 ROUND UI·시그널·TURN 경로는 BATON SPA 대체 응답이나 존재하지 않는 업스트림의 502가 아니라
-`404`와 `Cache-Control: no-store`로 닫는다.
+`404`와 `Cache-Control: no-store`를 반환한다.
 
 ### 프록시 자격 증명을 허용 목록으로 제한한다
 

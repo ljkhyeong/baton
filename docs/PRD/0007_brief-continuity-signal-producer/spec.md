@@ -313,7 +313,7 @@ bash ops/tests/pilot-readiness-test.sh
 - [제품 명세](../0001_product-baseline/spec.md)
 - [제품 개발 우선순위](../0003_product-roadmap/spec.md)
 - [WATCH 트랜잭셔널 아웃박스](../../ADR/0015_watch-transactional-outbox/adr.md)
-- [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
+- [시즌 시간대와 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [고정한 BRIEF 이벤트 계약 팩](../../../contracts/brief/README.md)
 - [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
 - BRIEF `PRD-0018: BATON 생산자 호환성 선행조건`
