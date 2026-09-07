@@ -9,7 +9,7 @@ import './calendar.scss'
 
 const labels: Record<CalendarSubscriptionSummary['managementStatus'] | CalendarStatus, string> = {
   CHECK_REQUIRED: '상태 확인 필요', IN_PROGRESS: '처리 중', REVOKED: '해제됨', REVOCATION_PENDING: '해제 처리 중',
-  NOT_CREATED: '구독 없음', ACTIVE: '구독 중', REISSUE_REQUIRED: '새 주소 필요',
+  NOT_CREATED: '구독 없음', ACTIVE: '주소 사용 가능', REISSUE_REQUIRED: '새 주소 필요',
 }
 
 export default function CalendarSubscriptionList({ accountId }: { accountId: string }) {

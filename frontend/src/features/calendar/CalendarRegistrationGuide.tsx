@@ -40,7 +40,7 @@ export function CalendarRegistrationGuide({ feedUrl }: { feedUrl?: string }) {
 
   return <details className="calendar-guide" open={Boolean(feedUrl)}>
     <summary>캘린더 앱에 등록하는 방법</summary>
-    <label>사용할 캘린더
+    <label>캘린더 앱
       <select value={provider} onChange={event => setProvider(event.target.value as keyof typeof guides)}>
         {Object.entries(guides).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}
       </select>
@@ -49,8 +49,8 @@ export function CalendarRegistrationGuide({ feedUrl }: { feedUrl?: string }) {
       <label>내 구독 주소<input readOnly type="text" value={feedUrl} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
       <button type="button" className="primary-button" onClick={() => void copyAddress()}>구독 주소 복사</button>
       {copied && <p role="status">{copied}</p>}
-      <p>이 주소를 아는 사람은 일정을 볼 수 있습니다. 공유하지 마세요. 화면을 닫으면 주소가 사라지며, 다시 필요하면 새 주소를 발급해야 합니다.</p>
-    </div> : <p>새 구독 주소를 발급한 뒤 복사하세요. 기존 주소가 있다면 그대로 등록할 수 있습니다.</p>}
+      <p>이 주소를 아는 사람은 일정을 볼 수 있습니다. 공유하지 마세요. 주소는 다시 표시되지 않습니다. 분실하면 재발급하세요.</p>
+    </div> : <p>구독 주소가 있으면 그대로 등록하고, 없으면 발급하세요.</p>}
     <p>{guide.instruction}</p>
     <a href={guide.href} target="_blank" rel="noopener noreferrer">{guide.linkLabel} (새 탭)</a>
     <p>URL 구독으로 등록해야 이후 변경이 반영됩니다. 갱신 주기는 캘린더 앱마다 다르며 즉시 반영되지 않을 수 있습니다.</p>

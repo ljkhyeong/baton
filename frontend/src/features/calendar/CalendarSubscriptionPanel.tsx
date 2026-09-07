@@ -14,9 +14,9 @@ import './calendar.scss'
 
 type Props = { workspace: WorkspaceProjection; accessKey: string; changesDisabled: boolean; onManageMembership: () => void }
 const labels: Record<CalendarStatus, string> = {
-  NOT_CREATED: '아직 구독하지 않았습니다.', IN_PROGRESS: '구독 주소를 만드는 중입니다.',
-  ACTIVE: '구독 중입니다.', REISSUE_REQUIRED: '새 구독 주소가 필요합니다. 주소를 재발급하고 캘린더 앱에 다시 등록해 주세요.',
-  REVOKED: '구독을 해제했습니다.', REVOCATION_PENDING: '구독 해제를 처리 중입니다. 완료될 때까지 기존 주소가 작동할 수 있습니다.',
+  NOT_CREATED: '발급된 구독 주소가 없습니다.', IN_PROGRESS: '구독 주소를 만드는 중입니다.',
+  ACTIVE: '구독 주소를 사용할 수 있습니다.', REISSUE_REQUIRED: '새 구독 주소가 필요합니다. 주소를 재발급하고 캘린더 앱에 다시 등록해 주세요.',
+  REVOKED: '구독을 해제했습니다.', REVOCATION_PENDING: '구독 해제 중입니다. 완료 전까지 기존 주소를 사용할 수 있습니다.',
 }
 
 export function CalendarSubscriptionPanel(props: Props) {
@@ -47,7 +47,7 @@ function CalendarAccess({ workspace, accessKey, changesDisabled, onManageMembers
   if (session.isError) return <p>로그인 상태를 확인하지 못했습니다. <button type="button" className="secondary-button" onClick={() => void session.refetch()}>다시 확인</button></p>
   if (!accountId) return <p>로그인한 뒤 팀에 등록된 본인 이름을 선택하면 내 캘린더에 일정을 추가할 수 있습니다. <WorkspaceLoginLink {...scope}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
-  if (membership.isError) return <p>구성원 연결을 확인하지 못했습니다. <button type="button" className="secondary-button" onClick={() => void membership.refetch()}>다시 확인</button></p>
+  if (membership.isError) return <p>내 계정 연결 상태를 확인하지 못했습니다. <button type="button" className="secondary-button" onClick={() => void membership.refetch()}>다시 확인</button></p>
   const memberId = membership.data?.claimed ? membership.data.memberId : ''
   const active = workspace.members.some((member) => isSameUuid(member.id, memberId) && isActiveMember(member))
   return <>
