@@ -1078,7 +1078,7 @@ test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('로그인 후 특정 브리프 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke', async ({ page }) => {
+test('로그인 후 특정 주간 요약 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await installAuthApi(page)
   const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`
@@ -1091,7 +1091,7 @@ test('로그인 후 특정 브리프 선택을 유지하고 접근 거부 시 �
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('브리프와 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
+test('주간 요약과 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
   await installAuthApi(page)
   const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221&accessKey=${ACCESS_KEY}`
   await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)

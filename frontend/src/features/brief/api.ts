@@ -130,7 +130,7 @@ function decodeEditionItem(item: unknown): BriefEdition['items'][number] {
       || (item.section != null && item.section !== 'CURRENT_WEEK' && item.section !== 'CARRY_OVER')
       || !((item.aggregateRevision === null && item.revisionGap === null)
         || (isPositiveInteger(item.aggregateRevision) && typeof item.revisionGap === 'boolean'))) {
-      throw new Error('저장된 브리프 항목을 확인할 수 없습니다.')
+      throw new Error('저장된 주간 요약 항목을 확인할 수 없습니다.')
     }
     return { reasonCode: item.reasonCode, severity: item.severity, status: item.status, sourceReference: item.sourceReference,
       observedAt: item.observedAt, ruleVersion: item.ruleVersion, aggregateRevision: item.aggregateRevision,
@@ -144,7 +144,7 @@ function decodeEdition(value: unknown, scope: BriefScope): BriefEdition {
     || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
     || !isInstant(value.generatedAt) || !isInstant(value.windowStart) || !isInstant(value.windowEnd)
     || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !Array.isArray(value.items)) {
-    throw new Error('저장된 브리프 응답을 확인할 수 없습니다.')
+    throw new Error('저장된 주간 요약 응답을 확인할 수 없습니다.')
   }
   new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
   const items = value.items.map(decodeEditionItem)
@@ -167,7 +167,7 @@ export async function generateEdition(scope: BriefScope): Promise<BriefGeneratio
     decode: (value) => {
       if (!isJsonObject(value) || !isUuid(value.executionId) || !isUuid(value.editionId)
         || !isPositiveInteger(value.generation) || !isNonNegativeInteger(value.deliveryWatermark) || !isNonNegativeInteger(value.sourceCursor)
-        || typeof value.created !== 'boolean') throw new Error('브리프 생성 결과를 확인할 수 없습니다.')
+        || typeof value.created !== 'boolean') throw new Error('주간 요약 생성 결과를 확인할 수 없습니다.')
       return { executionId: value.executionId, editionId: value.editionId, generation: value.generation,
         deliveryWatermark: value.deliveryWatermark, sourceCursor: value.sourceCursor, created: value.created }
     },
@@ -179,7 +179,7 @@ function decodeEditionSummary(value: unknown): BriefEditionHistory['editions'][n
     || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
     || !isInstant(value.generatedAt) || !isNonNegativeInteger(value.sourceCursor)
     || !isPositiveInteger(value.ruleVersion) || !isNonNegativeInteger(value.itemCount)) {
-    throw new Error('브리프 이력의 저장 정보를 확인할 수 없습니다.')
+    throw new Error('주간 요약 이력의 저장 정보를 확인할 수 없습니다.')
   }
   new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
   return { editionId: value.editionId, generation: value.generation, weekStart: value.weekStart, zoneId: value.zoneId,
@@ -191,11 +191,11 @@ export function getEditionHistory(scope: BriefScope, before: number | null, sign
     method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, query: { beforeGeneration: before ?? undefined },
     decode: (value): BriefEditionHistory => {
       if (!isJsonObject(value) || !Array.isArray(value.editions)
-        || (value.nextBeforeGeneration !== null && !isPositiveInteger(value.nextBeforeGeneration))) throw new Error('브리프 이력을 확인할 수 없습니다.')
+        || (value.nextBeforeGeneration !== null && !isPositiveInteger(value.nextBeforeGeneration))) throw new Error('주간 요약 이력을 확인할 수 없습니다.')
       const editions = value.editions.map(decodeEditionSummary)
       if (editions.some((entry, index) => entry.generation >= (index === 0 ? before ?? Infinity : editions[index - 1]!.generation))
         || (value.nextBeforeGeneration !== null && value.nextBeforeGeneration !== editions.at(-1)?.generation)) {
-        throw new Error('브리프 이력의 조회 순서를 확인할 수 없습니다.')
+        throw new Error('주간 요약 이력의 조회 순서를 확인할 수 없습니다.')
       }
       return { editions, nextBeforeGeneration: value.nextBeforeGeneration }
     },
@@ -206,7 +206,7 @@ export function getEdition(scope: BriefScope, editionId: string, signal: AbortSi
   return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${editionId}`, {
     method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value) => {
       const edition = decodeEdition(value, scope)
-      if (!isSameUuid(edition.editionId, editionId)) throw new Error('선택한 브리프와 조회 결과가 다릅니다.')
+      if (!isSameUuid(edition.editionId, editionId)) throw new Error('선택한 주간 요약과 조회 결과가 다릅니다.')
       return edition
     },
   })
@@ -217,13 +217,13 @@ export function compareEditions(scope: BriefScope, fromId: string, toId: string,
     method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, query: { fromEditionId: fromId },
     decode: (value): BriefComparison => {
       if (!isJsonObject(value) || !Array.isArray(value.added) || !Array.isArray(value.removed) || !Array.isArray(value.changed)) {
-        throw new Error('브리프 비교 결과를 확인할 수 없습니다.')
+        throw new Error('주간 요약 비교 결과를 확인할 수 없습니다.')
       }
       const from = decodeEditionSummary(value.from); const to = decodeEditionSummary(value.to)
-      if (!isSameUuid(from.editionId, fromId) || !isSameUuid(to.editionId, toId)) throw new Error('선택한 브리프와 비교 대상이 다릅니다.')
+      if (!isSameUuid(from.editionId, fromId) || !isSameUuid(to.editionId, toId)) throw new Error('선택한 주간 요약과 비교 대상이 다릅니다.')
       return { from, to, added: value.added.map(decodeEditionItem), removed: value.removed.map(decodeEditionItem),
         changed: value.changed.map((change) => {
-          if (!isJsonObject(change)) throw new Error('브리프 변경 항목을 확인할 수 없습니다.')
+          if (!isJsonObject(change)) throw new Error('주간 요약 변경 항목을 확인할 수 없습니다.')
           const before = decodeEditionItem(change.before); const after = decodeEditionItem(change.after)
           if (before.reasonCode !== after.reasonCode || before.sourceReference !== after.sourceReference) throw new Error('변경 전후의 업무가 다릅니다.')
           return { before, after }
@@ -267,7 +267,7 @@ export function getGenerationReadiness(scope: BriefScope, signal: AbortSignal) {
       const statuses = ['READY', 'DELIVERY_PENDING', 'DELIVERY_FAILED', 'GENERATING', 'GENERATION_FAILED', 'SEASON_ENDED', 'DISABLED'] as const
       if (!isJsonObject(value) || !statuses.some((status) => status === value.status)
         || !isNonNegativeInteger(value.pendingCount) || !isNonNegativeInteger(value.failedCount)
-        || !isInstant(value.checkedAt) || (value.lastDeliveredAt !== null && !isInstant(value.lastDeliveredAt))) throw new Error('브리프 생성 준비 상태를 확인할 수 없습니다.')
+        || !isInstant(value.checkedAt) || (value.lastDeliveredAt !== null && !isInstant(value.lastDeliveredAt))) throw new Error('주간 요약 생성 가능 여부를 확인할 수 없습니다.')
       return { status: value.status as BriefReadiness['status'], pendingCount: value.pendingCount, failedCount: value.failedCount,
         lastDeliveredAt: value.lastDeliveredAt, checkedAt: value.checkedAt }
     },
@@ -279,7 +279,7 @@ export function getEditionDeliveryStatus(scope: BriefScope, editionId: string, s
     method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value): BriefDeliveryStatus => {
       if (!isJsonObject(value) || !isUuid(value.editionId) || !isSameUuid(value.editionId, editionId)
         || !['ADDITIONAL_DELIVERIES', 'NO_ADDITIONAL_DELIVERIES', 'UNKNOWN'].includes(value.status as string)
-        || !isInstant(value.checkedAt)) throw new Error('선택한 브리프의 추가 전달 기록을 확인할 수 없습니다.')
+        || !isInstant(value.checkedAt)) throw new Error('선택한 주간 요약의 추가 전달 기록을 확인할 수 없습니다.')
       return { editionId: value.editionId, status: value.status as BriefDeliveryStatus['status'], checkedAt: value.checkedAt }
     },
   })

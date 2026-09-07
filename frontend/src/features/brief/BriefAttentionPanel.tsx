@@ -111,7 +111,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
               <small>해결 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
               <details className="brief-evidence"><summary>해결 기록 보기</summary>
                 <small>원본 항목 ID <code>{item.sourceReference}</code></small>
-                <small>해결 시 변경 번호 {item.resolvedRevision}</small>
+                <small>해결 시 원본 버전 {item.resolvedRevision}</small>
               </details>
             </li>)}</ul>}
         </BriefSources>}
@@ -145,7 +145,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
           <small>상태 기록 {formatTime.format(new Date(item.observedAt))} ({timeZone})</small>
           <details className="brief-evidence"><summary>원본 기록 보기</summary>
             <small>원본 항목 ID <code>{item.sourceReference}</code></small>
-            <small>원본 변경 번호 {item.aggregateRevision}</small>
+            <small>원본 버전 {item.aggregateRevision}</small>
           </details>
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
@@ -165,7 +165,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
       <p className="brief-note">적용된 원본 변경을 최근 순서로 표시합니다. 상태가 같아도 근거가 바뀌면 기록이 남습니다.</p>
       <details className="brief-evidence"><summary>원본 기록과 확인 기준</summary>
         <code>{selected.sourceReference}</code>
-        <p className="brief-note">원본 변경 번호가 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 새로 발견한 결과이며, 항목 전체의 누락 이력과는 다릅니다.</p>
+        <p className="brief-note">원본 버전이 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 새로 발견한 결과이며, 항목 전체의 누락 이력과는 다릅니다.</p>
       </details>
       {history.isPending && <p role="status">변경 이력을 불러오고 있습니다.</p>}
       {history.isError && <p role="alert">변경 이력을 불러오지 못했습니다. {history.error.message}</p>}
@@ -174,9 +174,9 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
         : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
           <strong>{entry.state === 'ACTIVE' ? '미해결' : '해결'}</strong>
           <span>{formatTime.format(new Date(entry.observedAt))} ({timeZone})</span>
-          <span>원본 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
+          <span>BATON 판정 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
           <details className="brief-evidence"><summary>변경 근거 보기</summary>
-            <span>원본 변경 번호 {entry.aggregateRevision}</span>
+            <span>원본 버전 {entry.aggregateRevision}</span>
             <span>{entry.detectedRevisionGap ? '이 변경에서 기록 누락 발견' : '이 변경에서 추가 누락 발견 없음'}</span>
           </details>
         </li>)}</ol>)}
