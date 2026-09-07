@@ -61,7 +61,7 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
       </fieldset>
     </form>
     {query.isPending && <p role="status">구독 목록을 불러오고 있습니다.</p>}
-    {query.isError && <p role="alert">{query.error.message} {query.isFetchNextPageError ? '이전 목록은 유지됩니다. 더 보기를 다시 눌러 주세요.' : '목록 새로고침으로 다시 확인해 주세요.'}</p>}
+    {query.isError && <p role="alert">{query.error.message} {query.isFetchNextPageError ? '이전 목록은 유지됩니다. ‘구독 더 보기’를 눌러 주세요.' : '‘목록 새로고침’을 눌러 주세요.'}</p>}
     {query.isSuccess && rows.length === 0 && <p className="calendar-empty">{filters.query || !filters.includeRevoked
       ? '조건에 맞는 구독이 없습니다. 검색어나 필터를 바꿔 주세요.'
       : '아직 구독 기록이 없습니다. 팀의 오늘 화면에서 ‘내 캘린더에 추가’를 선택해 주세요.'}</p>}

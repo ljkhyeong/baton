@@ -115,7 +115,7 @@ test('앱별 등록 안내와 주소 복사는 재발급 없이 동작하고 외
 test('발급 응답을 놓치면 상태만 다시 조회하고 사용자 선택 전에는 재발급하지 않는다 @smoke', async ({ page }) => {
   const { panel, calls } = await setup(page, { lost: true })
   await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
-  await expect(panel.getByRole('alert')).toContainText('‘상태 다시 확인’을 눌러 주세요.')
+  await expect(panel.getByRole('alert')).toHaveText('구독 처리 결과를 확인하지 못했습니다. 상태를 다시 확인해 주세요.')
   await expect(panel.getByText('구독 주소를 사용할 수 있습니다.', { exact: true })).toBeVisible()
   await expect(panel.getByLabel('내 구독 주소')).toHaveCount(0)
   expect(calls.filter((call) => call.startsWith('POST'))).toEqual(['POST subscription'])

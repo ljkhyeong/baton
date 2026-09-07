@@ -141,7 +141,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
         : '처리가 끝났는지 확인하고 있습니다.'}
     </p>}
     {ended && <p>종료된 시즌은 새 주소를 발급할 수 없습니다. 기존 구독의 상태 확인과 해제는 가능합니다.</p>}
-    {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'}{!unavailable && <> ‘상태 다시 확인’을 눌러 주세요.</>}</p>}
+    {error && <p role="alert">{error instanceof Error ? error.message : '요청 결과를 확인하지 못했습니다.'}</p>}
     <div className="calendar-actions">
       {!managementOnly && status && ['NOT_CREATED', 'REVOKED'].includes(status) && <button type="button" className="primary-button" disabled={!ready || !canIssue} onClick={() => request('create')}>구독 주소 발급</button>}
       {!managementOnly && status && ['ACTIVE', 'REISSUE_REQUIRED'].includes(status) && <button type="button" className="secondary-button" disabled={!ready || !canIssue} onClick={() => setConfirmation('rotate')}>새 주소 발급</button>}
