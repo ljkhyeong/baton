@@ -6,12 +6,12 @@
   방법·IP와 공인 HTTPS 준비가 필요하다. 같은 호스트에서는 Caddy의 80·443 포트를 먼저 통합한다.
 - BRIEF 선정 규칙 v2와 주간 해결 상세 API를 먼저 배포한 뒤 BATON을 적용한다. 내부 조회·생성은
   `brief-service:8443`과 별도 서비스 인증을 사용하며 공개 Caddy에 조회 경로를 추가하지 않는다.
-- 실제 로그인 사용자로 해결 상세·비교·생성, 특정 브리프 링크의 로그인 복귀와 인쇄·PDF 저장을
+- 실제 로그인 사용자로 해결 상세·비교·생성, 특정 주간 요약 링크의 로그인 복귀와 인쇄·PDF 저장을
   확인해야 한다. 로컬 API 대역 검증을 공인 스테이징과 실기기 검증으로 확대하지 않는다.
 - 공인 HTTPS 검증 전 계약 핀 `2.0.0-rc.4`를 안정 버전으로 올리지 않는다. 전달 진단과 BRIEF
   지표를 실제 수집·경보 시스템에 연결하는 작업도 남아 있다.
 - 제품 동작은 [BRIEF 업무 점검](docs/PRD/0009_brief-current-attention/spec.md)과
-  [브리프 탐색·공유·출력](docs/PRD/0010_brief-navigation-and-readiness/spec.md)을 따른다.
+  [주간 요약 탐색·공유·출력](docs/PRD/0010_brief-navigation-and-readiness/spec.md)을 따른다.
 
 ## CAL 계약 채택의 남은 작업
 
