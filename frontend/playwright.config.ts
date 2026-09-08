@@ -12,8 +12,8 @@ export default defineConfig({
     timeout: 10_000,
   },
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? [['html', { open: 'never' }], ['github']] : [['list'], ['html', { open: 'never' }]],
+  workers: process.env.CI ? 2 : undefined,
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }], ['github']] : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: TEST_BASE_URL,
     screenshot: 'only-on-failure',

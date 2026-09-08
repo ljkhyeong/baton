@@ -646,11 +646,13 @@ test('@operations 이전 시즌에서 늦게 도착한 종료 오류는 현재 �
     .getByRole('button', { name: /2026 가을 시즌/ })
     .click()
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  await expect(seasonSwitcher(page)).toHaveAccessibleName(/2026 가을 시즌/)
   await seasonSwitcher(page).click()
   await page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
     .getByRole('button', { name: /2026 여름 시즌/ })
     .click()
   await expect(page).toHaveURL(WORKSPACE_URL)
+  await expect(seasonSwitcher(page)).toHaveAccessibleName(/2026 여름 시즌/)
 
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
   await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
