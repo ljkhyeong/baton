@@ -11,13 +11,17 @@ import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 final class HandoffContinuitySignalAnalyzer {
 
@@ -31,13 +35,14 @@ final class HandoffContinuitySignalAnalyzer {
             List<Member> members,
             LocalDate today
     ) {
-        Map<UUID, Role> rolesById = new HashMap<>();
-        for (Role role : roles) {
-            rolesById.put(role.getId(), role);
-        }
-        Map<UUID, List<HandoffItem>> activeItemsByRole = activeItemsByRole(handoffItems);
-        Map<UUID, Member> membersById = membersById(members);
-        Set<UUID> activeMemberIds = activeMemberIds(members);
+        Map<UUID, Role> rolesById = roles.stream()
+                .collect(toMap(Role::getId, identity(), (previous, current) -> current));
+        Map<UUID, List<HandoffItem>> activeItemsByRole = handoffItems.stream()
+                .filter(item -> item.getArchivedAt() == null).collect(groupingBy(HandoffItem::getRoleId));
+        Map<UUID, Member> membersById = members.stream()
+                .collect(toMap(Member::getId, identity(), (previous, current) -> current));
+        Set<UUID> activeMemberIds = members.stream()
+                .filter(Member::isActive).map(Member::getId).collect(toSet());
         Set<UUID> openHandoffRoleIds = new HashSet<>();
         Set<UUID> signaledRoleIds = new HashSet<>();
         List<ContinuitySignalResult> signals = new ArrayList<>();
@@ -323,36 +328,6 @@ final class HandoffContinuitySignalAnalyzer {
         return coverageGap
                 ? handoff.getOutgoingAssignmentEndDate()
                 : handoff.getIncomingAssignmentStartDate();
-    }
-
-    private Map<UUID, List<HandoffItem>> activeItemsByRole(List<HandoffItem> handoffItems) {
-        Map<UUID, List<HandoffItem>> activeItemsByRole = new HashMap<>();
-        for (HandoffItem item : handoffItems) {
-            if (item.getArchivedAt() == null) {
-                activeItemsByRole
-                        .computeIfAbsent(item.getRoleId(), ignored -> new ArrayList<>())
-                        .add(item);
-            }
-        }
-        return activeItemsByRole;
-    }
-
-    private Map<UUID, Member> membersById(List<Member> members) {
-        Map<UUID, Member> membersById = new HashMap<>();
-        for (Member member : members) {
-            membersById.put(member.getId(), member);
-        }
-        return membersById;
-    }
-
-    private Set<UUID> activeMemberIds(List<Member> members) {
-        Set<UUID> activeMemberIds = new HashSet<>();
-        for (Member member : members) {
-            if (member.isActive()) {
-                activeMemberIds.add(member.getId());
-            }
-        }
-        return activeMemberIds;
     }
 
     record Analysis(List<ContinuitySignalResult> signals, Set<UUID> signaledRoleIds) {

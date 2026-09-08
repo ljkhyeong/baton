@@ -10,12 +10,14 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.toSet;
 
 final class RoutineContinuitySignalAnalyzer {
 
@@ -28,22 +30,13 @@ final class RoutineContinuitySignalAnalyzer {
             Clock clock,
             ZoneId zoneId
     ) {
-        Set<UUID> activeRoundIds = new HashSet<>();
-        for (SeasonRound round : rounds) {
-            if (round.getArchivedAt() == null) {
-                activeRoundIds.add(round.getId());
-            }
-        }
-
-        Map<UUID, Set<UUID>> overdueRoundIdsByRoutine = new HashMap<>();
-        for (RoutineExecution execution : executions) {
-            if (activeRoundIds.contains(execution.getSeasonRoundId())
-                    && execution.timingStatus(clock, zoneId) == RoutineTimingStatus.OVERDUE) {
-                overdueRoundIdsByRoutine
-                        .computeIfAbsent(execution.getRoutineId(), ignored -> new HashSet<>())
-                        .add(execution.getSeasonRoundId());
-            }
-        }
+        Set<UUID> activeRoundIds = rounds.stream()
+                .filter(round -> round.getArchivedAt() == null).map(SeasonRound::getId).collect(toSet());
+        Map<UUID, Set<UUID>> overdueRoundIdsByRoutine = executions.stream()
+                .filter(execution -> activeRoundIds.contains(execution.getSeasonRoundId())
+                        && execution.timingStatus(clock, zoneId) == RoutineTimingStatus.OVERDUE)
+                .collect(groupingBy(RoutineExecution::getRoutineId,
+                        mapping(RoutineExecution::getSeasonRoundId, toSet())));
 
         List<ContinuitySignalResult> signals = new ArrayList<>();
         for (Routine routine : routines) {
