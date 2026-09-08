@@ -1,6 +1,6 @@
 import { ApiError } from '@/shared/api/ApiError'
 import { mutationError } from './workspacePresentation'
-import { isWorkspaceAccessDenied } from './useWorkspaceAccessKeyFlow'
+import { isWorkspaceAccessDenied } from './api'
 
 type WorkspaceAccessKeyRecoveryProps = {
   pendingIdempotencyKey: string | null

@@ -13,6 +13,7 @@ import {
   createRoutine,
   createSeasonRound,
   getWorkspace,
+  isWorkspaceAccessDenied,
   prepareRoleHandoff,
   rotateAccessKey,
   setDecisionArchived,
@@ -129,12 +130,8 @@ const WORKSPACE_SYNC_INTERVAL_MS = Number.isFinite(configuredWorkspaceSyncInterv
   ? configuredWorkspaceSyncInterval
   : 10_000
 
-function isWorkspaceAccessDeniedError(error: unknown) {
-  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
-}
-
 function canAutomaticallyRefetchWorkspace(query: { state: { error: unknown } }) {
-  return !isWorkspaceAccessDeniedError(query.state.error)
+  return !isWorkspaceAccessDenied(query.state.error)
 }
 
 export function useWorkspaceQuery(scope: WorkspaceScope) {
@@ -142,7 +139,7 @@ export function useWorkspaceQuery(scope: WorkspaceScope) {
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId),
     queryFn: ({ signal }) => getWorkspace(scope, signal),
     enabled: Boolean(scope.teamId && scope.seasonId),
-    retry: (failureCount, error) => !isWorkspaceAccessDeniedError(error)
+    retry: (failureCount, error) => !isWorkspaceAccessDenied(error)
       && failureCount < 1,
     refetchInterval: (query) => !canAutomaticallyRefetchWorkspace(query)
       ? false

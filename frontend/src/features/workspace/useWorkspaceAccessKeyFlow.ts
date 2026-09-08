@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react'
-import { ApiError } from '@/shared/api/ApiError'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
 import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { saveAccessKey } from './storage'
-import type { WorkspaceScope } from './api'
+import { isWorkspaceAccessDenied, type WorkspaceScope } from './api'
 import {
   clearPendingAccessKeyRotation,
   idempotencyKeyForAccessKeyRotation,
@@ -34,10 +33,6 @@ const rotationLockFailedMessage = '공유 링크를 재발급할 수 없습니�
 const accessKeyRotationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
-}
-
-export function isWorkspaceAccessDenied(error: unknown) {
-  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
 }
 
 function replaceAccessKeyFragment(accessKey?: string) {

@@ -5,7 +5,6 @@ import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
 
 export type NotificationInbox = operations['getWorkspaceNotifications']['responses'][200]['content']['application/json']
-export type Notification = NotificationInbox['notifications'][number]
 export type NotificationScope = WorkspaceScope & { accountId: string }
 function path(scope: NotificationScope) {
   return `/api/v1/teams/${encodeURIComponent(scope.teamId)}/seasons/${encodeURIComponent(scope.seasonId)}/notifications`

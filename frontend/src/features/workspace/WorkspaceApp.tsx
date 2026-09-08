@@ -64,10 +64,8 @@ import {
   useCreateSeasonRoundCommand,
   usePendingContentCreationCleanupCommand,
 } from './useContentCreationCommand'
-import {
-  isWorkspaceAccessDenied,
-  useWorkspaceAccessKeyFlow,
-} from './useWorkspaceAccessKeyFlow'
+import { isWorkspaceAccessDenied } from './api'
+import { useWorkspaceAccessKeyFlow } from './useWorkspaceAccessKeyFlow'
 import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
 import { useWorkspaceMutationRecovery } from './useWorkspaceMutationRecovery'
 import {

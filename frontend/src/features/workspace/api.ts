@@ -1,4 +1,5 @@
 import { apiRequest, type ContentRequestOptions } from '@/shared/api/client'
+import { ApiError } from '@/shared/api/ApiError'
 import { getCsrfToken } from '@/features/auth/api'
 import type { AuthSession } from '@/features/auth/types'
 import { queryClient, authSessionQueryKey } from '@/shared/api/queryClient'
@@ -123,6 +124,10 @@ import type {
   WorkspaceAccessHeaders,
   WorkspaceProjection,
 } from './types'
+
+export function isWorkspaceAccessDenied(error: unknown) {
+  return error instanceof ApiError && error.code === 'WORKSPACE_ACCESS_DENIED'
+}
 
 export type WorkspaceScope = {
   teamId: string
