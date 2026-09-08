@@ -13,7 +13,9 @@ const denied = (error: unknown) => error instanceof ApiError && [401, 403].inclu
 const queryOptions = (scope: WorkspaceScope) => ({
   queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId),
   queryFn: ({ signal }: { signal: AbortSignal }) => getWorkspace(scope, signal),
-  staleTime: 0, refetchOnWindowFocus: 'always' as const,
+  staleTime: 0,
+  refetchOnWindowFocus: (query: { state: { error: Error | null } }) => !denied(query.state.error) && 'always' as const,
+  refetchOnReconnect: (query: { state: { error: Error | null } }) => !denied(query.state.error) && 'always' as const,
   retry: (count: number, error: Error) => !denied(error) && count < 1,
   refetchInterval: (query: { state: { error: Error | null } }) => denied(query.state.error) ? false : 30_000,
   refetchIntervalInBackground: false,

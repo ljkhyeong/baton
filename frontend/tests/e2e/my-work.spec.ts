@@ -8,6 +8,7 @@ const ACTIVE_SEASON = '00000000-0000-4000-8000-000000000904'
 const ENDED_SEASON = '00000000-0000-4000-8000-000000000905'
 
 test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동하고 접근이 거부된 팀은 제외한다', async ({ page }, testInfo) => {
+  await page.clock.install()
   const current = makeProjection()
   current.team.accountAccessEnabled = true; current.team.permission = 'MEMBER'
   const other = structuredClone(current)
@@ -32,8 +33,12 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
       seasonName: workspace.season.name, seasonEnded: false })),
   } }))
   let allowed = true
-  await page.route(`**/teams/${OTHER_TEAM}/seasons/${OTHER_SEASON}/workspace`, route => route.fulfill(allowed
-    ? { json: other } : { status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '권한이 회수되었습니다.' } }))
+  let otherRequests = 0
+  await page.route(`**/teams/${OTHER_TEAM}/seasons/${OTHER_SEASON}/workspace`, route => {
+    otherRequests++
+    return route.fulfill(allowed ? { json: other }
+      : { status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '권한이 회수되었습니다.' } })
+  })
   await page.goto('/my-teams')
   const work = page.getByRole('region', { name: '모든 팀의 내 할 일' })
   const task = work.getByRole('link', { name: /두 번째 팀 회고 정리/ })
@@ -52,5 +57,16 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
   await expect(work.getByRole('alert')).toContainText('일부 팀이나 시즌의 업무가 빠져 있습니다')
   await expect(task).toHaveCount(0)
   await expect(work.getByRole('link', { name: /알고리즘 한 바퀴/ }).first()).toBeVisible()
+  const blockedRequests = otherRequests
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('online'))
+  })
+  await page.clock.runFor(61_000)
+  expect(otherRequests).toBe(blockedRequests)
+  allowed = true
+  await work.getByRole('button', { name: '업무 새로고침' }).click()
+  await expect(task).toBeVisible()
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))
 })

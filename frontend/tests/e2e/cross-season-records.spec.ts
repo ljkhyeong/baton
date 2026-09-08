@@ -47,7 +47,8 @@ test('@records @responsive 모든 시즌 검색은 요청 시 조회하고 각 �
   await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
 })
 
-test('@records 다른 시즌 응답의 소속 오류와 접근 거부는 검색 결과에서 제외하고 재시도한다', async ({ page }, testInfo) => {
+test('@records @smoke 다른 시즌 응답의 소속 오류와 접근 거부는 검색 결과에서 제외하고 재시도한다', async ({ page }, testInfo) => {
+  await page.clock.install()
   const { current, other } = sources()
   await installApi(page, current)
   let valid = false
@@ -61,10 +62,27 @@ test('@records 다른 시즌 응답의 소속 오류와 접근 거부는 검색 
   valid = true
   await page.getByRole('button', { name: '누락된 시즌 다시 불러오기' }).click()
   await expect(page.getByRole('heading', { name: '지난 시즌의 문제 선정 기준' })).toBeVisible()
-  await page.route(`**/api/v1/teams/${TEAM_ID}/seasons/${OTHER_SEASON_ID}/workspace`, route => route.fulfill({ status: 403,
-    json: { code: 'WORKSPACE_ACCESS_DENIED', message: '접근 권한이 없습니다.' } }))
+  let deniedRequests = 0
+  let denied = true
+  await page.route(`**/api/v1/teams/${TEAM_ID}/seasons/${OTHER_SEASON_ID}/workspace`, route => {
+    deniedRequests++
+    return route.fulfill(denied ? { status: 403,
+      json: { code: 'WORKSPACE_ACCESS_DENIED', message: '접근 권한이 없습니다.' } } : { json: other })
+  })
   await page.getByLabel('검색할 시즌').selectOption('current')
   await page.getByLabel('검색할 시즌').selectOption('all')
   await expect(page.getByRole('button', { name: '누락된 시즌 다시 불러오기' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '지난 시즌의 문제 선정 기준' })).toHaveCount(0)
+  expect(deniedRequests).toBe(1)
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('online'))
+  })
+  await page.clock.runFor(61_000)
+  expect(deniedRequests).toBe(1)
+  denied = false
+  await page.getByRole('button', { name: '누락된 시즌 다시 불러오기' }).click()
+  await expect(page.getByRole('heading', { name: '지난 시즌의 문제 선정 기준' })).toBeVisible()
+  expect(deniedRequests).toBe(2)
 })
