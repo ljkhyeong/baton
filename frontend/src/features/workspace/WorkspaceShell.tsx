@@ -74,7 +74,7 @@ export function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark" />BATON</div>
-      <div className="workspace-label">현재 팀 · <Link className="team-list-link" to="/my-teams">내 팀</Link></div>
+      <div className="workspace-label">현재 팀 <Link className="team-list-link" to="/my-teams">내 팀</Link></div>
       <button
         type="button"
         className="workspace-switcher"

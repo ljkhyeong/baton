@@ -21,7 +21,7 @@ type Props = { navigation: BriefNavigation; workspace: WorkspaceProjection; acce
 export function BriefAttentionPanel(props: Props) {
   const { selection, update } = props.navigation
   return <details className="brief-attention" open={selection.open} onToggle={(event) => update({ open: event.currentTarget.open })}>
-    <summary>BRIEF 업무 점검</summary>
+    <summary>주간 업무 점검</summary>
     {selection.open && <BriefAttentionAccess {...props} />}
   </details>
 }
@@ -32,14 +32,14 @@ function BriefAttentionAccess({ workspace, accessKey, changesDisabled, onManageM
   const membership = useCurrentAccountMembership({ accountId, teamId: workspace.team.id, accessKey })
   if (session.isPending) return <p role="status">로그인 상태를 확인하고 있습니다.</p>
   if (session.isError) return <p role="alert">로그인 상태를 확인하지 못했습니다. <button onClick={() => void session.refetch()}>다시 확인</button></p>
-  if (!accountId) return <p>로그인하고 팀 구성원과 계정을 연결하면 BRIEF 업무 점검을 볼 수 있습니다.{' '}
+  if (!accountId) return <p>로그인하고 팀 구성원과 계정을 연결하면 주간 업무 점검을 볼 수 있습니다.{' '}
     <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
   if (membership.isError) return <p role="alert">구성원 연결을 확인하지 못했습니다. <button onClick={() => void membership.refetch()}>다시 확인</button></p>
   if (!membership.data?.claimed) return <p>점검 항목을 보려면 계정을 팀 구성원과 연결해 주세요. <button onClick={onManageMembership}>구성원 연결하기</button></p>
   const memberId = membership.data.memberId
   const member = workspace.members.find((candidate) => isSameUuid(candidate.id, memberId))
-  if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 BRIEF 업무 점검을 볼 수 있습니다.</p>
+  if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 주간 업무 점검을 볼 수 있습니다.</p>
   return <BriefAttentionResults key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
     scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
     navigation={navigation} workspaceName={`${workspace.team.name} · ${workspace.season.name}`} onOpenSource={onOpenSource} timeZone={workspace.season.timeZone} readOnly={workspace.season.endedAt !== null} changesDisabled={changesDisabled} />
@@ -111,7 +111,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
               <small>해결 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
               <details className="brief-evidence"><summary>해결 기록 보기</summary>
                 <small>원본 항목 ID <code>{item.sourceReference}</code></small>
-                <small>해결 시 변경 번호 {item.resolvedRevision}</small>
+                <small>해결 시 원본 버전 {item.resolvedRevision}</small>
               </details>
             </li>)}</ul>}
         </BriefSources>}
@@ -145,7 +145,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
           <small>상태 기록 {formatTime.format(new Date(item.observedAt))} ({timeZone})</small>
           <details className="brief-evidence"><summary>원본 기록 보기</summary>
             <small>원본 항목 ID <code>{item.sourceReference}</code></small>
-            <small>원본 변경 번호 {item.aggregateRevision}</small>
+            <small>원본 버전 {item.aggregateRevision}</small>
           </details>
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
@@ -165,7 +165,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
       <p className="brief-note">적용된 원본 변경을 최근 순서로 표시합니다. 상태가 같아도 근거가 바뀌면 기록이 남습니다.</p>
       <details className="brief-evidence"><summary>원본 기록과 확인 기준</summary>
         <code>{selected.sourceReference}</code>
-        <p className="brief-note">원본 변경 번호가 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 새로 발견한 결과이며, 항목 전체의 누락 이력과는 다릅니다.</p>
+        <p className="brief-note">원본 버전이 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 새로 발견한 결과이며, 항목 전체의 누락 이력과는 다릅니다.</p>
       </details>
       {history.isPending && <p role="status">변경 이력을 불러오고 있습니다.</p>}
       {history.isError && <p role="alert">변경 이력을 불러오지 못했습니다. {history.error.message}</p>}
@@ -174,9 +174,9 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
         : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
           <strong>{entry.state === 'ACTIVE' ? '미해결' : '해결'}</strong>
           <span>{formatTime.format(new Date(entry.observedAt))} ({timeZone})</span>
-          <span>원본 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
+          <span>BATON 판정 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
           <details className="brief-evidence"><summary>변경 근거 보기</summary>
-            <span>원본 변경 번호 {entry.aggregateRevision}</span>
+            <span>원본 버전 {entry.aggregateRevision}</span>
             <span>{entry.detectedRevisionGap ? '이 변경에서 기록 누락 발견' : '이 변경에서 추가 누락 발견 없음'}</span>
           </details>
         </li>)}</ol>)}

@@ -4,17 +4,16 @@
 - 결정일: 2026-08-22
 - 수정일: 2026-08-27
 - 구현 상태: BRIEF 이벤트 v2·RC 계약 팩·직렬화, 신호 스트림·outbox, 설정형 시간 재조정·원본 변경 자동 연결, 커밋 뒤 HTTP 송신과 BATON 프로덕션 설정 주입 구현, 로컬 원본 API·초기 정합화→BRIEF 종단 간 검증 완료
-- 범위: BATON의 권위 있는 연속성 신호를 BRIEF에 내구성 있게 전달하기 위한 의미·정체성·리비전·재조정 경계
+- 범위: BATON의 업무·인수인계 점검 이벤트를 DB에 저장하고 BRIEF로 전달하기 위한 판정·식별·리비전·상태 갱신 기준
 
 ## 1. 목적
 
-BATON은 조직·시즌·역할·반복 업무·역할 인수인계 원본과 조직 연속성 신호의 권위 있는 판정을
-소유한다. BRIEF는 이 원본을 직접 읽거나 다시 판정하지 않고, BATON이 커밋 뒤 전달한
-상태 이벤트를 멱등하게 수신해 관심 항목과 불변 에디션을 만든다.
+BATON은 조직·시즌·역할·반복 업무·인수인계 원본을 관리하고, 이를 기준으로 업무·인수인계 문제를 판정한다. BRIEF는 이 원본을 직접 읽거나 다시 판정하지 않고, BATON이 커밋 뒤 전달한
+상태 이벤트를 멱등하게 수신해 점검 항목과 불변 생성본을 만든다.
 
 현재 워크스페이스 응답의 연속성 신호는 조회 시점의 `Clock`과 시즌 시간대로 계산한다.
 조회 결과를 곧바로 외부 이벤트로 보내면 안정적인 식별자·해소 전이·리비전과 날짜 경계의
-변화를 보존할 수 없다. 이 문서는 생산자 구현 전에 권위 있는 신호 의미와 내구성 경계를
+변화를 보존할 수 없다. 이 문서는 생산자 구현 전에 신호의 판정 기준과 DB 저장·전달 범위를
 채택한다.
 
 ## 2. 현재 호환성 판단
@@ -31,11 +30,11 @@ BATON의 현재 신호와 BRIEF 이벤트 v1은 다음과 같이 다르다.
 현재 `Decision`에는 후속 기한과 후속 완료 상태가 없다. 따라서
 `DECISION_FOLLOW_UP_OVERDUE`를 추측해 생산하지 않는다.
 
-## 3. 권위 있는 신호 계약
+## 3. 점검 이벤트 판정 기준
 
 BATON의 현재 다섯 `ContinuitySignalType`을 생산자 의미의 기준으로 채택한다.
 
-| 신호 | 권위 있는 정체성 | 발생·유지 근거 | 해소 근거 |
+| 신호 | 항목 식별 기준 | 발생·유지 근거 | 해소 근거 |
 |---|---|---|---|
 | `ROLE_UNASSIGNED` | 시즌·역할 | 활동 중 현재 담당자가 없고 역할 인수인계 신호가 이를 대신하지 않음 | 활동 중 담당자를 지정하거나 역할 인수인계 신호가 해당 공백을 대신하거나 시즌이 종료됨 |
 | `ROLE_SUCCESSOR_MISSING` | 시즌·역할 | 현재 담당자는 활동 중이고 담당 종료가 경고 구간 안이며 적격 후임과 역할 인수인계 신호가 없음 | 적격 후임 지정, 경고 구간 이탈, 역할 인수인계 신호로 전환 또는 시즌 종료 |
@@ -57,7 +56,7 @@ BRIEF origin을 명시한 환경에서만 켠다.
 - `eventType`은 이 문서의 다섯 `ContinuitySignalType` 중 하나다.
 - 심각도는 BATON이 판정한 `CRITICAL` 또는 `WARNING`이다.
 - `state`는 `ACTIVE` 또는 `RESOLVED`다.
-- `sourceReference`는 `baton-continuity:<signalId>` 형식의 안정적인 불투명 참조다.
+- `sourceReference`는 `baton-continuity:<signalId>` 형식의 내부 형식을 해석하지 않는 고정 참조다.
 - `eventId`는 한 리비전의 불변 이벤트 UUID이며 재시도 때 바꾸지 않는다.
 - `aggregateRevision`은 같은 `signalId` 안에서 `1`부터 연속 증가하는 양수다.
 - `occurredAt`은 해당 상태·심각도 변화를 확정한 주입 `Clock`의 UTC 시각이다.
@@ -124,7 +123,7 @@ BRIEF 기록까지 같은 원본 변경 트랜잭션으로 처리한다.
 
 같은 원본 변경 또는 재조정 트랜잭션에서 다음을 원자적으로 수행한다.
 
-1. 시즌 범위의 권위 있는 현재 신호를 계산한다.
+1. 시즌 범위의 현재 점검 결과를 BATON에서 계산한다.
 2. 영속 스트림의 마지막 스냅샷과 비교한다.
 3. 새 발생·해소·심각도 변경만 신호별 다음 리비전으로 기록한다.
 4. 같은 `eventId`와 이벤트 본문을 가진 전용 BRIEF outbox 행을 함께 기록한다.
@@ -315,5 +314,5 @@ bash ops/tests/pilot-readiness-test.sh
 - [WATCH 트랜잭셔널 아웃박스](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [시즌 시간대와 수렴형 회차·마감 자동화](../../ADR/0012_round_schedule_and_deadline_automation/adr.md)
 - [고정한 BRIEF 이벤트 계약 팩](../../../contracts/brief/README.md)
-- [BATON 경유 BRIEF 에디션 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
+- [BATON 경유 BRIEF 생성본 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
 - BRIEF `PRD-0018: BATON 생산자 호환성 선행조건`

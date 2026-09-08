@@ -324,6 +324,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/holidays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 대한민국 공휴일 조회
+         * @description 한국천문연구원 공휴일을 조회한다. 한국 시각 기준 작년부터 내년까지 지원한다.
+         */
+        get: operations["getPublicHolidays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/internal/resource-health-events": {
         parameters: {
             query?: never;
@@ -4335,6 +4355,27 @@ export interface components {
              */
             teamId: string;
         };
+        Schema_e1cc89d3e81f1381: {
+            /**
+             * Format: date-time
+             * @description 공급자 조회 성공 시각(UTC), 성공 자료가 없으면 null
+             */
+            checkedAt: string | null;
+            /** @description 공휴일 목록, READY가 아니면 빈 배열 */
+            holidays: {
+                /** @description 대한민국 공휴일 날짜(YYYY-MM-DD) */
+                date: string;
+                /** @description 공휴일 이름 */
+                name: string;
+            }[];
+            /**
+             * @description READY: 조회 성공, UNAVAILABLE: 공급자 장애·미발표, DISABLED: 연동 꺼짐, OUT_OF_RANGE: 지원 연도 밖
+             * @enum {string}
+             */
+            status: "READY" | "UNAVAILABLE" | "DISABLED" | "OUT_OF_RANGE";
+            /** @description 조회 연도 */
+            year: number;
+        };
         Schema_e2d0bb9a881c7ddd: {
             /** @description 검토한 대안 */
             alternative: string;
@@ -5607,6 +5648,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getPublicHolidays: {
+        parameters: {
+            query: {
+                /** @description 조회 연도 */
+                year: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 브라우저 응답 저장 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 요청 진단 식별자 */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_e1cc89d3e81f1381"];
+                };
             };
         };
     };

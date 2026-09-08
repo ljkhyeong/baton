@@ -996,6 +996,40 @@ paths:
       summary: 모든 계정 세션 종료
       tags:
         - api
+  /api/v1/calendar/holidays:
+    get:
+      description: 한국천문연구원 공휴일을 조회한다. 한국 시각 기준 작년부터 내년까지 지원한다.
+      operationId: getPublicHolidays
+      parameters:
+        - description: 조회 연도
+          in: query
+          name: year
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: '200'
+          content:
+            application/json:
+              examples:
+                getPublicHolidays:
+                  value: >-
+                    {"year":2026,"status":"READY","checkedAt":"2026-09-07T01:00:00Z","holidays":[{"date":"2026-10-09","name":"한글날"}]}
+              schema:
+                $ref: '#/components/schemas/Schema_e1cc89d3e81f1381'
+          headers:
+            Cache-Control:
+              description: 브라우저 응답 저장 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 요청 진단 식별자
+              schema:
+                type: string
+      summary: 대한민국 공휴일 조회
+      tags:
+        - api
   /api/v1/internal/resource-health-events:
     post:
       description: WATCH가 전달한 역할 자료 상태 변경 이벤트를 eventId 기준으로 멱등 수신하는 서비스 간 콜백이며 일반 프런트엔드에서 호출하지 않는다.
@@ -13783,6 +13817,45 @@ components:
         - from
         - removed
         - to
+      type: object
+    Schema_e1cc89d3e81f1381:
+      properties:
+        checkedAt:
+          description: 공급자 조회 성공 시각(UTC), 성공 자료가 없으면 null
+          format: date-time
+          nullable: true
+          type: string
+        holidays:
+          description: 공휴일 목록, READY가 아니면 빈 배열
+          items:
+            properties:
+              date:
+                description: 대한민국 공휴일 날짜(YYYY-MM-DD)
+                type: string
+              name:
+                description: 공휴일 이름
+                type: string
+            required:
+              - date
+              - name
+            type: object
+          type: array
+        status:
+          description: 'READY: 조회 성공, UNAVAILABLE: 공급자 장애·미발표, DISABLED: 연동 꺼짐, OUT_OF_RANGE: 지원 연도 밖'
+          enum:
+            - READY
+            - UNAVAILABLE
+            - DISABLED
+            - OUT_OF_RANGE
+          type: string
+        year:
+          description: 조회 연도
+          type: number
+      required:
+        - checkedAt
+        - holidays
+        - status
+        - year
       type: object
     Schema_e249d91938b2aea4:
       oneOf:

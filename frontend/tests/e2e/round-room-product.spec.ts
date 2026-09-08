@@ -278,7 +278,7 @@ test('@webkit 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 
   })
 
   await page.goto(WORKSPACE_PATH)
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   inspector = await openRoundResource(page, testInfo.project.name)
   await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
   page.once('dialog', async (dialog) => {
@@ -433,7 +433,7 @@ test('sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 �
   ), ROOM_ID)).toBeNull()
 
   await page.goto(WORKSPACE_PATH)
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   inspector = await openRoundResource(page, testInfo.project.name)
   await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
 
@@ -456,6 +456,13 @@ test('sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 �
 })
 
 test('여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목록을 한 번만 조회한다', async ({ page }, testInfo) => {
+  // StrictMode가 마운트 때 취소한 요청은 완료된 조회에 포함하지 않는다.
+  let completedMappingReads = 0
+  page.on('requestfinished', request => {
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/v1/round-room-mappings') {
+      completedMappingReads += 1
+    }
+  })
   await installApi(page, projectionWithMultipleRoundResources())
   const roundApi = await installRoundProductApi(page)
   await openSharedWorkspace(page)
@@ -468,10 +475,10 @@ test('여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목록을 �
   const mappingReads = () => roundApi.calls.filter((call) => (
     call.method === 'GET' && call.path === '/api/v1/round-room-mappings'
   ))
-  expect(mappingReads()).toHaveLength(1)
+  await expect.poll(() => completedMappingReads).toBe(1)
 
   await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
-  await expect.poll(() => mappingReads().length).toBe(2)
+  await expect.poll(() => completedMappingReads).toBe(2)
   expect(mappingReads().every((call) => (
     JSON.stringify(call.query) === JSON.stringify({
       seasonId: SEASON_ID,

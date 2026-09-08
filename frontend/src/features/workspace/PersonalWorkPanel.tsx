@@ -42,7 +42,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
     const memberId = membership.data.memberId
     const member = workspace.members.find((candidate) => candidate.id === memberId)
     if (!member || !isActiveMember(member)) {
-      content = <p>연결한 구성원의 활동이 종료되었거나 현재 목록에 없습니다. 팀 전체 기록은 아래에서 확인할 수 있습니다.</p>
+      content = <p>연결한 구성원의 활동이 종료되었거나 현재 목록에 없습니다. 팀 전체 기록은 이 화면에서 확인할 수 있습니다.</p>
     } else {
       const { unfinished, awaiting } = personalWork(workspace, member.id)
       const deadlineFormatter = new Intl.DateTimeFormat('ko-KR', {

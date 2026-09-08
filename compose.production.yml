@@ -50,6 +50,7 @@ services:
       DB_PASSWORD: ${BATON_DB_PASSWORD:?BATON_DB_PASSWORD is required}
       BATON_WORKSPACE_CREATION_KEY: ${BATON_WORKSPACE_CREATION_KEY:?BATON_WORKSPACE_CREATION_KEY is required}
       BATON_WORKSPACE_RECOVERY_KEY: ${BATON_WORKSPACE_RECOVERY_KEY:?BATON_WORKSPACE_RECOVERY_KEY is required}
+      BATON_HOLIDAYS_ENABLED: ${BATON_HOLIDAYS_ENABLED:-false}
       BATON_CAL_CAPTURE_ENABLED: ${BATON_CAL_CAPTURE_ENABLED:-false}
       BATON_CAL_BACKFILL_ENABLED: ${BATON_CAL_BACKFILL_ENABLED:-false}
       BATON_CAL_RECOVERY_PREPARATION_ENABLED: ${BATON_CAL_RECOVERY_PREPARATION_ENABLED:-false}
@@ -100,6 +101,11 @@ services:
       BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_PATH: ${BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH:-}
       TZ: UTC
     secrets:
+      - source: baton_holidays_service_key
+        target: /run/baton-config/baton.holidays.service-key
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
       - source: baton_google_oauth_client_secret
         target: /run/baton-config/baton.auth.oauth2.google.client-secret
         uid: "10001"
@@ -201,6 +207,8 @@ volumes:
   baton_caddy_config:
 
 secrets:
+  baton_holidays_service_key:
+    environment: BATON_SECRET_HOLIDAYS_SERVICE_KEY
   baton_google_oauth_client_secret:
     environment: BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET
   baton_naver_oauth_client_secret:

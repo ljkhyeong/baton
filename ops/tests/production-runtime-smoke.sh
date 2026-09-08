@@ -45,6 +45,8 @@ export BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=runtime-smoke-naver-client
 export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oauth
 export BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-naver-oauth
 export BATON_SECRET_CAL_BEARER_TOKEN=runtime-smoke-disabled-cal-bearer-token
+export BATON_HOLIDAYS_ENABLED=false
+export BATON_SECRET_HOLIDAYS_SERVICE_KEY=runtime-smoke-disabled-holidays-service-key
 export BATON_SECRET_SMTP_PASSWORD=runtime-smoke-disabled-smtp-password
 export BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
 export BATON_SECRET_BRIEF_BEARER_TOKEN=runtime-smoke-disabled-brief-bearer-token
@@ -1221,6 +1223,13 @@ assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/status.headers" \
   "API 응답의 no-store header가 없습니다."
 assert_matches '^cache-control:[[:space:]]*no-store' "$RUN_DIR/health.headers" \
   "health 응답의 no-store header가 없습니다."
+
+curl --insecure --fail --silent --show-error \
+  --resolve "localhost:$HTTPS_PORT:127.0.0.1" \
+  --output "$RUN_DIR/holidays.body" \
+  "$HTTPS_BASE_URL/api/v1/calendar/holidays?year=$(date -u +%Y)"
+assert_matches '"status"[[:space:]]*:[[:space:]]*"DISABLED"' "$RUN_DIR/holidays.body" \
+  "공휴일 API가 키 없는 기본 배포에서 비활성 상태를 반환하지 않습니다."
 
 log "Caddy가 정규화한 HTTPS host로 OAuth callback과 동일 출처 인증 경계를 검증합니다."
 curl --insecure --silent --show-error \

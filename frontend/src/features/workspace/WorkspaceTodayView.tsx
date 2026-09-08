@@ -6,17 +6,8 @@ import {
   PrimaryButton,
   RoundControl,
   RoutineRow,
-  formatInstant,
-  roundOriginLabel,
-  roundTimingStatusCopy,
   routineTimelineItems,
-  routineTimingStatusCopy,
 } from './WorkspaceViews'
-import {
-  getMember,
-  isActiveMember,
-  memberDisplayName,
-} from './workspacePresentation'
 import type {
   ContinuitySignal,
   Routine,
@@ -45,7 +36,6 @@ export function TodayView({
   onSelectRound,
   onAddRound,
   onSelectRole,
-  onOpenDecision,
   onToggleRoutine,
   onNavigate,
   onOpenContinuitySignal,
@@ -68,7 +58,6 @@ export function TodayView({
   onSelectRound: (roundId: string) => void
   onAddRound: () => void
   onSelectRole: (id: string) => void
-  onOpenDecision: () => void
   onToggleRoutine: (execution: RoutineExecution) => void
   onNavigate: (key: ViewKey) => void
   onOpenContinuitySignal: (signal: ContinuitySignal) => void
@@ -79,7 +68,7 @@ export function TodayView({
   selectedRoundOperationPending: boolean
   changesDisabled?: boolean
 }) {
-  const { roles, routines, decisions, members, season } = workspace
+  const { roles, routines, members, season } = workspace
   const timingPriority: Record<RoutineTimingStatus, number> = {
     OVERDUE: 0,
     IN_PROGRESS: 1,
@@ -95,13 +84,12 @@ export function TodayView({
     <>
       <PageHeader
         eyebrow={`${calendarLabel} · ${season.name}`}
-        title={`이번 회차 미완료 업무 ${pendingCount}개`}
-        description="남은 업무와 담당자를 확인하세요."
-        action={<PrimaryButton onClick={onOpenDecision} disabled={changesDisabled || !roles.length || !members.some(isActiveMember)}>결정 남기기</PrimaryButton>}
+        title={`남은 업무 ${pendingCount}개`}
+        description="끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요."
+        action={<PrimaryButton onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>{roles.length ? '업무 추가' : '역할 추가'}</PrimaryButton>}
       />
-      {personalWork}
-      {weeklyBrief}
       <RoundControl
+        compact
         rounds={rounds}
         selectedRound={selectedRound}
         archivedRoundCount={archivedRoundCount}
@@ -112,36 +100,43 @@ export function TodayView({
       />
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="section-heading">
-          <div><span className="section-kicker">진행할 회차</span><h2 id="relay-title">이번 회차 업무</h2></div>
+          <h2 id="relay-title">이번 회차 업무</h2>
           <div className="round-meta">
-            <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0}</strong>
-            <span>
-              {selectedRound
-                ? `${roundOriginLabel(selectedRound)} · ${roundTimingStatusCopy[selectedRound.timingStatus]} · ${selectedRound.name}`
-                : `회차 준비 · ${season.name}`}
-            </span>
+            <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0} 완료</strong>
           </div>
         </div>
         {!orderedRoutines.length ? (
           <ActionableEmpty title="아직 반복 업무가 없어요" description="담당 역할을 정하고 반복할 업무를 등록하세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
-          <div className="relay-line" role="list">
-            {orderedRoutines.map(({ id, routine, execution }, index) => {
-              const displayRoutine = execution ?? routine
-              if (!displayRoutine) return null
-              const role = roles.find((item) => item.id === displayRoutine.ownerRoleId)
-              const member = getMember(members, role?.currentMemberId)
-              return (
-                <div className="relay-step-item" role="listitem" key={id}>
-                  <button type="button" className={`relay-step ${execution?.timingStatus.toLowerCase() ?? 'future'}`} onClick={() => role && onSelectRole(role.id)}>
-                    <span className="relay-index">{String(index + 1).padStart(2, '0')}</span><span className="relay-node"><span /></span>
-                    <span className="relay-status">{execution ? routineTimingStatusCopy[execution.timingStatus] : '다음 회차부터'}</span><strong>{displayRoutine.title}</strong>
-                    <small>{member ? memberDisplayName(member) : '담당자 미정'} · {displayRoutine.dueLabel}</small>
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+          <section className="today-round-checklist" aria-label={`${selectedRound.name} 반복 업무 완료하기`}>
+            <progress
+              className="round-completion-track"
+              aria-label="이번 회차 업무 완료율"
+              value={completedCount}
+              max={Math.max(1, selectedRound.routineExecutions.length)}
+            />
+            <div className="today-task-list" role="list">
+              {orderedRoutines.map(({ id, routine, execution }) => {
+                const ownerRoleId = execution?.ownerRoleId ?? routine?.ownerRoleId
+                return (
+                  <div key={id} role="listitem">
+                    <RoutineRow
+                      routine={routine}
+                      execution={execution}
+                      role={roles.find((item) => item.id === ownerRoleId)}
+                      members={members}
+                      timeZone={season.timeZone}
+                      onToggle={onToggleRoutine}
+                      onSelectRole={onSelectRole}
+                      onEdit={onEditRoutine}
+                      pending={selectedRoundBusy}
+                      operationPending={selectedRoundOperationPending}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </section>
         ) : (
           <ActionableEmpty
             title={archivedRoundCount
@@ -156,49 +151,15 @@ export function TodayView({
           />
         )}
       </section>
-      {selectedRound && orderedRoutines.length > 0 && (
-        <section className="today-round-checklist plain-section" aria-labelledby="today-round-checklist-title">
-          <div className="section-heading compact">
-            <div>
-              <span className="section-kicker">이번 회차 체크리스트</span>
-              <h2 id="today-round-checklist-title">{selectedRound.name} 반복 업무 완료하기</h2>
-            </div>
-            <span className="today-round-progress">
-              {completedCount}/{selectedRound.routineExecutions.length} 완료
-            </span>
-          </div>
-          {orderedRoutines.map(({ id, routine, execution }) => {
-            const ownerRoleId = execution?.ownerRoleId ?? routine?.ownerRoleId
-            return (
-              <RoutineRow
-                key={id}
-                routine={routine}
-                execution={execution}
-                role={roles.find((item) => item.id === ownerRoleId)}
-                members={members}
-                timeZone={season.timeZone}
-                onToggle={onToggleRoutine}
-                onSelectRole={onSelectRole}
-                onEdit={onEditRoutine}
-                pending={selectedRoundBusy}
-                operationPending={selectedRoundOperationPending}
-              />
-            )
-          })}
-        </section>
-      )}
-      <div className="today-lower">
-        <section className="plain-section" aria-labelledby="continuity-radar-title">
-          <div className="section-heading compact">
-            <div>
-              <span className="section-kicker">담당자와 마감 확인</span>
+      {workspace.continuitySignals.length > 0 && (
+        <div className="today-lower">
+          <section className="plain-section" aria-labelledby="continuity-radar-title">
+            <div className="section-heading compact">
               <h2 id="continuity-radar-title">운영 점검</h2>
+              <span className="continuity-count">
+                {workspace.continuitySignals.length}개
+              </span>
             </div>
-            <span className="continuity-count">
-              {workspace.continuitySignals.length}개
-            </span>
-          </div>
-          {workspace.continuitySignals.length ? (
             <div className="signal-list" role="list">
               {workspace.continuitySignals.map((signal) => (
                 <div
@@ -228,21 +189,14 @@ export function TodayView({
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="quiet-state">
-              자동 점검에서 발견된 문제가 없습니다.
-            </p>
-          )}
-        </section>
-        <section className="plain-section decision-glimpse">
-          <div className="section-heading compact"><div><span className="section-kicker">최근 변경</span><h2>결정 기록</h2></div><button type="button" className="text-button" onClick={() => onNavigate('memory')}>전체 기록 <Icon name="arrow" size={14} /></button></div>
-          {decisions[0] ? (
-            <button type="button" className="decision-preview" onClick={() => onNavigate('memory')}>
-              <time>{formatInstant(decisions[0].createdAt)}</time><blockquote>“{decisions[0].title}”</blockquote><p>{decisions[0].reason}</p><span>{decisions[0].authorName} 기록</span>
-            </button>
-          ) : <p className="quiet-state">아직 남긴 결정이 없어요.</p>}
-        </section>
-      </div>
+          </section>
+        </div>
+      )}
+      <details className="today-secondary">
+        <summary>내 업무와 확인할 자료</summary>
+        <div className="today-support">{personalWork}</div>
+      </details>
+      {weeklyBrief}
     </>
   )
 }

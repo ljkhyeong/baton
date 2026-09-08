@@ -1,6 +1,6 @@
-.calendar-panel { scroll-margin-top: 90px; margin-bottom: 26px; padding-bottom: 16px; border-block: 1px solid var(--rule-strong); color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-panel { scroll-margin-top: 90px; margin-bottom: 26px; padding-bottom: 0; border-block: 1px solid var(--rule); color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .calendar-panel > summary { padding: 16px 0; cursor: pointer; }
-.calendar-panel h2 { display: inline; margin: 0 12px 0 4px; font-size: 17px; }
+.calendar-panel h2 { display: inline; margin: 0 12px 0 4px; font-size: 14px; }
 .calendar-panel > summary > span { color: var(--muted); font-size: 12px; }
 .calendar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .calendar-confirm, .calendar-address { margin-top: 18px; padding: 16px; background: var(--paper); border-left: 3px solid var(--baton-dark); }
@@ -56,3 +56,9 @@
 .calendar-bulk-results li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 6px 0; }
 .calendar-bulk-results li span { flex: 1; min-width: 120px; }
 .calendar-bulk-results li strong { font-size: 12px; }
+.holiday-month { display: grid; gap: 6px; max-width: 220px; }
+.holiday-month input { width: 100%; min-width: 0; }
+.holiday-list { list-style: none; padding: 0; margin: 0; }
+.holiday-list li { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.holiday-list time { color: var(--muted); }
+.holiday-notice { font-weight: 600; }

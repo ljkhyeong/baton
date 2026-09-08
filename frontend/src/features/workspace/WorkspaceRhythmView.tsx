@@ -1,4 +1,6 @@
 import { Icon } from '@/shared/ui/Icon'
+import { PublicHolidayPanel } from '@/features/calendar/PublicHolidayPanel'
+import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
 import {
   ActionableEmpty,
   formatInstant,
@@ -74,7 +76,7 @@ export function RhythmView({
     && routines.length === 0
   return (
     <>
-      <PageHeader eyebrow="회차별 진행 관리" title="반복 업무" description="반복 업무를 등록하고 회차별 완료 여부를 확인합니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
+      <PageHeader title="반복 업무" description="반복 업무를 등록하고 회차별 완료 여부를 확인합니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
       <section
         className={`round-schedule-card ${season.roundSchedule?.enabled ? 'active' : ''}`}
         aria-labelledby="round-schedule-title"
@@ -118,6 +120,12 @@ export function RhythmView({
         selectedRoundBusy={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
         changesDisabled={changesDisabled}
       />
+      {season.timeZone === 'Asia/Seoul' && <PublicHolidayPanel
+        key={selectedRound?.id ?? season.id}
+        meetingDate={selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate}
+        date={selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate
+          ?? clampToSeason(pilotCalendarDate(), season)}
+      />}
       {archivedRounds.length > 0 && (
         <details className="archive-shelf round-archive-shelf">
           <summary>보관한 회차 {archivedRounds.length}개</summary>

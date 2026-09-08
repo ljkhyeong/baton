@@ -145,7 +145,7 @@ for (const lock of ['handoff', 'conflict', 'ended-season'] as const) {
       api.makeWorkspaceGetsUnavailable()
       await dialog.getByRole('button', { name: '변경 저장' }).click()
       await expect(dialog).toBeHidden()
-      await expect(page.locator('.workspace-sync-status')).toContainText('다른 사람이 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 수정하세요.')
+      await expect(page.locator('.workspace-sync-status')).toContainText('최신 내용을 확인한 뒤 다시 수정하세요.')
     }
     await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
     await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()

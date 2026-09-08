@@ -2,12 +2,11 @@
   margin: 1rem 0;
   padding: 1rem;
   border: 1px solid var(--rule);
-  border-left: 4px solid var(--baton-dark);
   border-radius: 8px;
   background: var(--paper);
   min-width: 0;
 
-  summary { cursor: pointer; font-weight: 700; }
+  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
   p { line-height: 1.6; }
   button, select { padding: .55rem .7rem; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--paper); }
   button:not(:disabled) { cursor: pointer; }

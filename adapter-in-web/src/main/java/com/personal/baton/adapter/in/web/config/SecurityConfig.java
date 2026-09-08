@@ -15,6 +15,7 @@ import com.personal.baton.adapter.in.web.auth.LocalLoginRateLimitFilter;
 import com.personal.baton.adapter.in.web.auth.OAuthBrowserAuthenticationFailureHandler;
 import com.personal.baton.adapter.in.web.auth.SameOriginSessionMutationFilter;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
+import com.personal.baton.adapter.in.web.holiday.PublicHolidayController;
 import com.personal.baton.adapter.in.web.roundauth.RoundGrantAdmissionFilter;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
@@ -199,6 +200,7 @@ public class SecurityConfig {
                                     "/api/v1/system/status"
                             ).permitAll()
                             .requestMatchers(HttpMethod.GET,
+                                    PublicHolidayController.PATH,
                                     AuthController.CSRF_PATH,
                                     AuthController.SESSION_PATH,
                                     AuthController.PROVIDERS_PATH

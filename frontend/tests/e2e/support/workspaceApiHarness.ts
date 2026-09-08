@@ -1360,7 +1360,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
 export async function openSharedWorkspace(page: Page) {
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(page.getByRole('heading', { level: 1, name: /이번 회차 미완료 업무 \d+개/ })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
 }
 

@@ -51,6 +51,9 @@ management:
         enabled: true
 
 baton:
+  holidays:
+    enabled: ${BATON_HOLIDAYS_ENABLED:false}
+    service-key: ${BATON_HOLIDAYS_SERVICE_KEY:}
   calendar:
     capture-enabled: ${BATON_CAL_CAPTURE_ENABLED:false}
     backfill-enabled: ${BATON_CAL_BACKFILL_ENABLED:false}
