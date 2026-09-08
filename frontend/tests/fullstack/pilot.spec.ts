@@ -72,7 +72,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await resourceDialog.getByLabel('자료 이름').fill('질문 정리 가이드')
   await resourceDialog.getByLabel('링크').fill('https://docs.example.com/questions')
   await resourceDialog.getByLabel('자료 설명').fill('질문을 분류하고 다음 모임으로 넘기는 기준입니다.')
-  await resourceDialog.getByRole('button', { name: '자료 연결하기' }).click()
+  await resourceDialog.getByRole('button', { name: '자료 추가' }).click()
   await expect(inspector.getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))
     .toHaveAttribute('href', 'https://docs.example.com/questions')
 
@@ -82,7 +82,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await routineDialog.getByLabel('반복 업무 이름').fill('회고 질문 준비')
   await routineDialog.getByLabel('업무 시점').selectOption({ label: '모임 전' })
   await routineDialog.getByLabel('담당 역할').selectOption({ label: '질문 큐레이터' })
-  await routineDialog.getByLabel('마감 안내').fill('목요일 19:00')
+  await routineDialog.getByLabel('기한 설명').fill('목요일 19:00')
   await routineDialog.getByLabel('세부 설명').fill('지난 회차에서 이어갈 질문 두 개를 고릅니다.')
   await routineDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
 
@@ -167,7 +167,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
   await page.getByRole('button', { name: `${revisedHandoffLabel} 보관` }).click()
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toHaveCount(0)
-  const handoffArchiveSummary = page.getByText('보관한 인수인계 1개', { exact: true })
+  const handoffArchiveSummary = page.getByText('보관한 체크리스트 항목 1개', { exact: true })
   await handoffArchiveSummary.click()
   await page.getByRole('button', { name: `${revisedHandoffLabel} 복원` }).click()
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
