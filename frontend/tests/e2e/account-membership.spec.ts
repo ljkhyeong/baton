@@ -541,20 +541,27 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
   await openSharedWorkspace(page)
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const inbox = page.locator('.notification-inbox')
-  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
   await inbox.locator('summary').click()
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
+  await inbox.getByLabel('안 읽은 알림만', { exact: true }).check()
+  expect((await inbox.locator('.notification-source').boundingBox())!.width)
+    .toBeGreaterThan((await inbox.boundingBox())!.width / 2)
   await inbox.getByRole('button', { name: `${execution.title} 알림 읽음 처리` }).click()
   await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+  await expect(inbox.getByText('안 읽은 알림이 없습니다.', { exact: true })).toBeVisible()
+  await expect(inbox.locator('.notification-source')).toHaveCount(0)
+  await inbox.getByLabel('안 읽은 알림만', { exact: true }).uncheck()
+  await expect(inbox.locator('.notification-source')).toHaveCount(1)
   await page.reload()
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
-  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
   await inbox.locator('summary').click()
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
   await inbox.locator('.notification-source').click()
   await expect(page.locator(`[data-execution-id="${execution.id}"]`)).toBeVisible()
   await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '일정' })).toHaveAttribute('aria-current', 'page')
 })
 
- test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 다시 켜도 읽음 상태가 남는다', async ({ page }) => {
+test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 다시 켜도 읽음 상태가 남는다', async ({ page }) => {
   const projection = makeProjection()
   await installApi(page, projection)
   await installMembershipApi(page, { currentMembershipResponse: {
@@ -602,4 +609,76 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
   await inbox.getByRole('button', { name: '알림 설정 저장', exact: true }).click()
   await expect(inbox.locator('.notification-source')).toHaveCount(1)
   await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+})
+
+test('@smoke @responsive 접힌 알림과 권한 오류는 자동 조회를 멈추고 수동으로 복구한다', async ({ page }) => {
+  await page.clock.install()
+  const projection = makeProjection()
+  await installApi(page, projection)
+  await installMembershipApi(page, { currentMembershipResponse: {
+    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
+  } })
+  const round = projection.rounds[0]!
+  const execution = round.routineExecutions[0]!
+  let requests = 0
+  let allowed = true
+  await page.route('**/api/v1/teams/*/seasons/*/notifications', route => {
+    requests++
+    return route.fulfill(allowed ? { json: {
+      accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
+      notifications: [{ id: '00000000-0000-4000-8000-000000000205', kind: 'OVERDUE',
+        sourceId: execution.id, roleId: execution.ownerRoleId, roundId: round.id, title: execution.title,
+        occurredAt: '2026-09-05T03:00:00Z', read: false }],
+    } } : { status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '알림을 조회할 권한이 없습니다.' } })
+  })
+  await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
+  const inbox = page.locator('.notification-inbox')
+  await expect(inbox.locator('summary')).toHaveText('내 알림')
+  await page.clock.runFor(31_000)
+  expect(requests).toBe(0)
+  await inbox.locator('summary').click()
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
+  const loaded = requests
+  await inbox.locator('summary').click()
+  await expect(inbox).not.toHaveAttribute('open')
+  await page.clock.runFor(31_000)
+  expect(requests).toBe(loaded)
+  allowed = false
+  await inbox.locator('summary').click()
+  await expect(inbox.getByRole('alert')).toContainText('알림을 조회할 권한이 없습니다.')
+  await expect(inbox.locator('summary')).toHaveText('내 알림')
+  const denied = requests
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('offline'))
+    window.dispatchEvent(new Event('online'))
+  })
+  await page.clock.runFor(61_000)
+  expect(requests).toBe(denied)
+  allowed = true
+  await inbox.getByRole('button', { name: '다시 불러오기', exact: true }).click()
+  await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
+  expect(requests).toBe(denied + 1)
+  await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))
+})
+
+test('@smoke 알림 조회 중 패널을 닫으면 진행 중인 요청을 취소한다', async ({ page }) => {
+  await installApi(page)
+  await installMembershipApi(page, { currentMembershipResponse: {
+    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
+  } })
+  let pendingRoute: Route | undefined
+  await page.route('**/api/v1/teams/*/seasons/*/notifications', route => { pendingRoute = route })
+  await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
+  const inbox = page.locator('.notification-inbox')
+  await inbox.locator('summary').click()
+  await expect(inbox.getByRole('status')).toContainText('알림을 불러오고 있습니다.')
+  await expect.poll(() => Boolean(pendingRoute)).toBe(true)
+  const cancelled = page.waitForEvent('requestfailed', request => request.url().endsWith('/notifications'))
+  await inbox.locator('summary').click()
+  await cancelled
+  await pendingRoute!.fulfill({ json: { accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID, notifications: [] } })
+  await expect(inbox.locator('summary')).toHaveText('내 알림')
 })

@@ -21,8 +21,8 @@ function decode(value: unknown, scope: NotificationScope): NotificationInbox {
   }
   return value as NotificationInbox
 }
-export function getNotifications(scope: NotificationScope) {
-  return apiRequest(path(scope), { method: 'GET', headers: { 'X-Baton-Access-Key': scope.accessKey },
+export function getNotifications(scope: NotificationScope, signal?: AbortSignal) {
+  return apiRequest(path(scope), { method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey },
     decode: value => decode(value, scope) })
 }
 export async function readNotification(scope: NotificationScope, notificationId: string) {

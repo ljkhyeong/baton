@@ -51,7 +51,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
       content = <>
         <p>{member.name}님의 남은 업무 {unfinished.length}건 · 수락할 인수인계 {awaiting.length}건</p>
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
-        <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}`}
+        <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
           scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
           workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} />
         <div className="personal-work-columns">

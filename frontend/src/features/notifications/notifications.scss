@@ -6,8 +6,11 @@
   ul { list-style: none; padding: 0; }
   li { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--rule); padding: 10px 0; }
   li[data-read="true"] { color: var(--muted); }
-  button { min-height: 40px; }
-  .notification-source { display: grid; flex: 1; gap: 4px; min-width: 0; text-align: left; }
+  button { min-height: 44px; }
+  .notification-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .notification-controls label { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .notification-source { display: grid; flex: 1; gap: 4px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+  .notification-source span, .notification-source small { color: var(--muted); font-size: 12px; }
   strong { overflow-wrap: anywhere; }
 }
 
