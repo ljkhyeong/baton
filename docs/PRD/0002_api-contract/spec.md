@@ -26,6 +26,46 @@
 
 `X-Request-ID`는 서버가 요청마다 생성하는 UUID 형태의 진단 식별자다. 클라이언트는 값의 내부 구조를 해석하지 않고 운영 문의와 관련 로그를 찾는 데만 사용한다. 외부 요청의 같은 이름 헤더는 신뢰하거나 재사용하지 않고, 이 값으로 인증·권한·멱등성 판단 또는 메트릭 레이블을 만들지 않는다. Spring이 처리한 응답은 애플리케이션이 생성한 값을 유지하고, 요청 본문 제한이나 업스트림 장애처럼 Caddy가 직접 응답할 때만 Caddy가 누락된 헤더를 자체 UUID로 채운다.
 
+### 역할 자료 연결 상태와 재점검
+
+| 메서드와 경로 | 성공 | 동작 |
+| --- | --- | --- |
+| `GET /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/health` | 200 | 현재 자료 연결 상태의 별도 조회 |
+| `POST /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/check-requests` | 202 | 비동기 재점검 접수, 본문 없음 |
+
+두 요청은 `X-Baton-Access-Key`로 팀 접근과 자료 소유권을 확인한다. 성공 응답은
+`Cache-Control: no-store`와 `X-Request-ID`를 포함한다. 기존 공유 키·계정 세션의
+보안 경계를 유지하며 프런트 재점검은 CSRF 토큰도 전달한다. 새 Bearer나 계정 연결을 요구하지 않는다.
+
+조회 응답은 `resourceId`, `health`(`UNKNOWN/HEALTHY/DEGRADED/BROKEN`),
+`availability`(`AVAILABLE/PENDING/STALE/UNAVAILABLE/NOT_MONITORED`),
+nullable `lastCheckedAt`·`lastConclusiveAt`, boolean `checkRequestAllowed`, nullable `lastOutcome`와
+nullable `consecutiveFailures`, nullable `monitoringReason`이다. 모든 필드는 응답에 포함한다.
+`lastCheckedAt`은 최근 점검 시도의 완료 시각, `lastConclusiveAt`은 최근 연결 성공·실패 판정
+시각이며 UTC ISO 8601로 반환한다. 시도나 판정이 없으면 각각 `null`이다. 내부 오류는 판정
+시각을 갱신하지 않는다. 판정이 없으면 `PENDING`, 판정이 5분 이상 오래되면 `STALE`이며
+두 경우 모두 `UNKNOWN`이다. 현재 원본과 일치하는 응답의 시각은 오래됐어도 보존한다.
+프런트는 판정 시각 필드가 누락되거나 형식이 잘못되면 조회 불가로 처리하므로 API를 먼저 배포한다.
+`monitoringReason`은 `INTEGRATION_DISABLED/MONITORING_PAUSED/SEASON_ENDED/RESOURCE_ARCHIVED/URL_NOT_ELIGIBLE/MONITOR_INACTIVE/SYNC_PENDING` 중 하나다.
+`SYNC_PENDING`은 `PENDING`과 함께 반환하고 나머지 사유는 `NOT_MONITORED`와 함께 반환한다.
+점검 결과만 대기하거나 최근 결과·오래된 결과·통신 장애인 경우에는 사유가 `null`이다.
+`lastOutcome`의 열거형은
+[WATCH 연동 계약의 결과 코드](../0004_watch-integration-contract/spec.md#621-최근-점검-결과)에
+따른다. 실패 횟수는 0~2147483647의 정수이며 `AVAILABLE`일 때만 최근 결과 값을 반환한다.
+나머지 가용 상태에서는 원인과 횟수를 모두 `null`로 반환한다. 원격 장애는 HTTP 200의
+`UNKNOWN/UNAVAILABLE`로 반환하지만 BATON 공유 키 거부는 403, 자료 없음은 404를 유지한다.
+
+접수 응답은 `resourceId`와 `status`(`SCHEDULED/ALREADY_SCHEDULED/IN_PROGRESS`)다.
+자료 자체는 바꾸지 않으며 접수만으로 점검 완료를 뜻하지 않는다. 감시 중지·모니터 없음은
+409 `WATCH_CHECK_INACTIVE`, BATON 등록 정보가 아직 없거나 현재 주소와 일치하지 않으면
+503 `WATCH_CHECK_UNAVAILABLE`로 접수를 보류한다. WATCH의 간격 제한은 429 `WATCH_CHECK_RATE_LIMITED`와
+`Retry-After`, 통신·계약 오류 또는 동시성 한도는 503 `WATCH_CHECK_UNAVAILABLE`다.
+이 세 오류 응답에도 `Cache-Control: no-store`를 적용한다.
+프런트 공용 오류 모델은 `Retry-After`의 양의 정수 초를 보존하며 최대 3600초로 제한한다.
+WATCH 재점검 버튼은 이 대기 시간을 표시하고, 헤더가 잘못되거나 없으면 30초를 적용한다.
+[WATCH 연동 계약](../0004_watch-integration-contract/spec.md)과 `ResourceHealthRestDocsTest`가
+최신성·미점검·오류·재점검의 세부 계약을 유지한다.
+
 ## 3. 시스템 상태 API
 
 ### 시스템 상태 조회
