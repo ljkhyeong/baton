@@ -40,7 +40,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
             }}>
               <span>{item.kind === 'HANDOFF_REQUEST' ? '인수인계 수락 요청' : item.kind === 'OVERDUE' ? '기한 지남' : '마감 임박'} · {item.read ? '읽음' : '안 읽음'}</span>
               <strong>{item.title}</strong>
-              <small>{date.format(new Date(item.occurredAt))}{item.kind === 'HANDOFF_REQUEST' ? ' 전달' : ' 마감'} · 원본 보기</small>
+              <small>{date.format(new Date(item.occurredAt))}{item.kind === 'HANDOFF_REQUEST' ? ' 전달' : ' 마감'} · 관련 항목 보기</small>
             </button>
             {!item.read && <button type="button" disabled={read.isPending || inbox.isError}
               aria-label={`${item.title} 알림 읽음 처리`} onClick={() => read.mutate(item.id)}>읽음 처리</button>}

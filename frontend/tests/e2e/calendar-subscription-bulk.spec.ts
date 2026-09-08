@@ -124,7 +124,7 @@ test('응답 유실은 상태로 확인하고 일부 실패가 있어도 나머�
   expect(calls.filter(call => call.method === 'DELETE')).toHaveLength(3)
   await list.getByRole('button', { name: '선택 마치기' }).click()
   await list.locator('summary').filter({ hasText: '독서 모임 2' }).click()
-  await expect(list.getByText('구독 해제를 처리 중입니다.', { exact: false })).toBeVisible()
+  await expect(list.getByText('구독 해제 중입니다.', { exact: false })).toBeVisible()
 })
 
 test('계정 확인이 실패하면 남은 구독의 해제 요청을 보내지 않는다 @smoke', async ({ page }) => {
@@ -133,11 +133,12 @@ test('계정 확인이 실패하면 남은 구독의 해제 요청을 보내지 
   await list.getByRole('button', { name: /^\d+개 구독 해제$/, exact: true }).click()
   const result = list.getByRole('region', { name: '구독 해제 결과', exact: true })
   await expect(result).toContainText('로그인 계정 확인 필요')
-  await expect(result.getByText('요청하지 않음', { exact: true })).toHaveCount(2)
+  await expect(result.getByText('요청 안 함', { exact: true })).toHaveCount(2)
+  await expect(result.getByRole('status')).toHaveText('해제됨 0개 · 처리 중 0개 · 확인 필요 1개 · 요청 안 함 2개')
   expect(calls.filter(call => call.method === 'DELETE')).toHaveLength(1)
 })
 
-test('사용자가 중단하면 진행 중 요청은 확인 필요로 남기고 다음 구독을 해제하지 않는다 @smoke', async ({ page }) => {
+test('사용자가 중단하면 진행 중 요청은 확인 필요로 남기고 다음 구독을 해제하지 않는다 @smoke @responsive', async ({ page }, testInfo) => {
   const { list, calls } = await setup(page, { count: 3, pageSize: 20, revoked: [], failures: { 0: 'hold' } })
   await selectAll(list)
   await list.getByRole('button', { name: /^\d+개 구독 해제$/, exact: true }).click()
@@ -145,9 +146,12 @@ test('사용자가 중단하면 진행 중 요청은 확인 필요로 남기고 
   await list.getByRole('button', { name: '남은 구독 해제 중단' }).click()
   const result = list.getByRole('region', { name: '구독 해제 결과', exact: true })
   await expect(result.getByText('해제 여부 확인 필요', { exact: true })).toHaveCount(1)
-  await expect(result.getByText('요청하지 않음', { exact: true })).toHaveCount(2)
+  await expect(result.getByText('요청 안 함', { exact: true })).toHaveCount(2)
+  await expect(result.getByRole('status')).toHaveText('해제됨 0개 · 처리 중 0개 · 확인 필요 1개 · 요청 안 함 2개')
   await expect(list.getByRole('button', { name: '선택 마치기' })).toBeEnabled()
   expect(calls.filter(call => call.method === 'DELETE')).toHaveLength(1)
+  await list.screenshot({ path: testInfo.outputPath('bulk-calendar-stopped.png') })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
 test('계정이 바뀌면 이전 계정의 선택과 진행 중 조회를 버린다 @smoke', async ({ page }) => {

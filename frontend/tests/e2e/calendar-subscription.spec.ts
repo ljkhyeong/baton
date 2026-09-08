@@ -51,7 +51,7 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
   const { panel, calls } = await setup(page)
   await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
   await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ADDRESS)
-  await panel.getByText('캘린더 앱에 등록하는 방법', { exact: true }).click()
+  await expect(panel.getByRole('combobox', { name: '캘린더 앱' })).toBeVisible()
   await panel.evaluate((element) => element.scrollIntoView({ block: 'start' }))
   await panel.screenshot({ path: testInfo.outputPath('calendar-panel.png') })
   const stored = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))
@@ -62,7 +62,7 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
   await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ROTATED)
   await panel.locator(':scope > summary').click()
   await panel.locator(':scope > summary').click()
-  await expect(panel.getByText('구독 중입니다.', { exact: true })).toBeVisible()
+  await expect(panel.getByText('구독 주소를 사용할 수 있습니다.', { exact: true })).toBeVisible()
   await expect(panel.getByLabel('내 구독 주소')).toHaveCount(0)
   await panel.getByRole('button', { name: '구독 해제', exact: true }).click()
   await panel.getByRole('group', { name: '구독 해제 확인', exact: true }).getByRole('button', { name: '구독 해제', exact: true }).click()
@@ -71,11 +71,52 @@ test('구독 주소 발급·재발급·해제와 화면을 닫을 때 주소 제
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
+test('앱별 등록 안내와 주소 복사는 재발급 없이 동작하고 외부 링크에 비밀값을 넣지 않는다 @smoke @responsive', async ({ page }) => {
+  const { panel, calls } = await setup(page)
+  await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
+  const writes: string[] = []
+  await page.exposeFunction('captureCalendarAddress', (value: string) => { writes.push(value) })
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: (value: string) => (window as unknown as { captureCalendarAddress: (text: string) => Promise<void> }).captureCalendarAddress(value),
+    } })
+  })
+  await panel.getByRole('button', { name: '구독 주소 복사', exact: true }).click()
+  await expect(panel.getByText('구독 주소를 복사했습니다.', { exact: true })).toBeVisible()
+  expect(writes).toEqual([ADDRESS])
+  const destinations = [
+    ['google', 'https://calendar.google.com/calendar/u/0/r/settings/addbyurl'],
+    ['apple', 'https://support.apple.com/ko-kr/guide/iphone/iph3d1110d4/ios'],
+    ['outlook', 'https://outlook.live.com/calendar/'],
+    ['outlookWork', 'https://outlook.office.com/calendar/'],
+  ] as const
+  for (const [provider, href] of destinations) {
+    await panel.getByRole('combobox', { name: '캘린더 앱' }).selectOption(provider)
+    const link = panel.locator('.calendar-guide a')
+    await expect(link).toHaveAttribute('href', href)
+    await expect(link).toHaveAttribute('target', '_blank')
+    await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    await expect(panel.getByLabel('내 구독 주소')).toHaveValue(ADDRESS)
+  }
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async () => { throw new DOMException('Denied', 'NotAllowedError') },
+    } })
+  })
+  await panel.getByRole('button', { name: '구독 주소 복사', exact: true }).click()
+  await expect(panel.getByText('복사하지 못했습니다. 주소를 선택해 직접 복사해 주세요.', { exact: true })).toBeVisible()
+  const address = panel.getByLabel('내 구독 주소')
+  await address.focus()
+  expect(await address.evaluate((input: HTMLInputElement) => input.value.slice(input.selectionStart ?? 0, input.selectionEnd ?? 0))).toBe(ADDRESS)
+  expect(calls.filter(call => call.startsWith('POST'))).toEqual(['POST subscription'])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
 test('발급 응답을 놓치면 상태만 다시 조회하고 사용자 선택 전에는 재발급하지 않는다 @smoke', async ({ page }) => {
   const { panel, calls } = await setup(page, { lost: true })
   await panel.getByRole('button', { name: '구독 주소 발급', exact: true }).click()
-  await expect(panel.getByRole('alert')).toContainText('‘상태 다시 확인’을 눌러 주세요.')
-  await expect(panel.getByText('구독 중입니다.', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('alert')).toHaveText('구독 처리 결과를 확인하지 못했습니다. 상태를 다시 확인해 주세요.')
+  await expect(panel.getByText('구독 주소를 사용할 수 있습니다.', { exact: true })).toBeVisible()
   await expect(panel.getByLabel('내 구독 주소')).toHaveCount(0)
   expect(calls.filter((call) => call.startsWith('POST'))).toEqual(['POST subscription'])
   await panel.getByRole('button', { name: '새 주소 발급', exact: true }).click()

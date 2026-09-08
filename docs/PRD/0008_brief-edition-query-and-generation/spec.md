@@ -1,15 +1,17 @@
-# PRD-0008: BATON 경유 BRIEF 에디션 조회와 생성
+# PRD-0008: BATON 경유 주간 요약 조회와 생성
 
 - 상태: 채택
 - 결정일: 2026-08-29
 - 구현 상태: BATON API·서비스 client·V27 실행 기록·비공개 HTTPS 조립·주간 요약 화면 구현, 로컬 교차 서비스 검증 완료, 실제 원격 스테이징 검증 예정
-- 범위: 인증된 BATON 사용자가 BRIEF 최신 불변 에디션을 조회하고 현재 주차 에디션 생성을 지시하는 경계
+- 범위: 인증된 BATON 사용자의 최신 주간 요약 조회와 이번 주 요약 생성
 
 ## 1. 목적
 
+주간 요약은 생성 당시 내용을 보관하며 저장 후 수정하지 않는다. 각 생성 결과를 생성본으로 구분한다.
+
 BATON 사용자는 BATON UI와 백엔드만 사용한다. BATON은 사용자 세션, 팀 멤버십과 워크스페이스
 접근 권한을 판정하고 BRIEF는 사용자 계정·세션·멤버십을 복제하지 않는다. BATON 백엔드는
-권한 확인 뒤 BRIEF의 불변 에디션을 중계하고, 권위 있는 시즌 시간대와 전달 완료 경계를
+권한 확인 뒤 BRIEF의 불변 생성본을 중계하고, BATON에 저장된 시즌 시간대와 전달 완료 경계를
 고정한 생성 명령을 호출한다.
 
 ## 2. 사용자 API
@@ -20,8 +22,8 @@ BATON 사용자는 BATON UI와 백엔드만 사용한다. BATON은 사용자 세
 
 | 메서드 | 경로 | 성공 |
 | --- | --- | --- |
-| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | `200`과 BRIEF 불변 에디션 전체 표현 |
-| `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 새 에디션 `201`, 같은 불변 상태 재사용 `200` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | `200`과 BRIEF 불변 생성본 전체 표현 |
+| `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 새 생성본 `201`, 같은 불변 상태 재사용 `200` |
 
 최신 조회는 종료 시즌도 읽을 수 있지만 팀·시즌 범위와 활동 중인 현재 팀 멤버십을 확인한다.
 응답은 BRIEF가 저장한 에디션 식별자, 요약 버전, 주간 경계, 시간대, 원본 cursor, 규칙 버전과
@@ -47,7 +49,7 @@ V27의 `brief_edition_generation_execution`은 다음 경계를 고유하게 보
 
 실행 상태는 `PENDING`, `PROCESSING`, `SUCCEEDED`, `RETRYABLE_FAILURE`,
 `PERMANENT_FAILURE`다. claim은 1분 lease와 fencing token을 사용한다. 만료되지 않은 같은
-실행은 `409 BRIEF_GENERATION_IN_PROGRESS`, 성공한 실행은 저장한 에디션 요약과 `ETag`를
+실행은 `409 BRIEF_GENERATION_IN_PROGRESS`, 성공한 실행은 저장한 생성본 요약과 `ETag`를
 재사용한다. 만료 lease나 재시도 가능 실패는 같은 실행 ID에서 새 token과 증가한 시도
 횟수로 다시 claim한다. 외부 HTTP 호출 동안 MySQL 트랜잭션과 제품 행 잠금을 유지하지
 않으며 완료 갱신은 현재 lease token이 일치할 때만 허용한다.
@@ -89,8 +91,8 @@ JSON 형식 오류나 필수 응답 필드 누락은 기존처럼 영구 구성 
 이전 BRIEF 에디션에서 근거를 알 수 없으면 `null`일 수 있다.
 항목의 `section`은 생성 당시의 `CURRENT_WEEK`(이번 주 변경)·`CARRY_OVER`(이전 주부터 미해결)를
 그대로 중계한다. BRIEF V9 이전 항목은 `null`이며 서버·브라우저가 시각으로 재분류하지 않는다.
-에디션 선정 규칙 `2`와 항목 투영 규칙 `1`은 서로 다른 버전이다. 기존 BATON 생성 성공 실행의
-재사용 계약은 유지하며, 기존 결과를 분류하려고 과거 에디션을 덮어쓰지 않는다.
+생성본 선정 규칙 `2`와 항목 투영 규칙 `1`은 서로 다른 버전이다. 기존 BATON 생성 성공 실행의
+재사용 계약은 유지하며, 기존 결과를 분류하려고 과거 생성본을 덮어쓰지 않는다.
 
 생성 응답은 다음 필드만 반환한다.
 
@@ -101,9 +103,9 @@ JSON 형식 오류나 필수 응답 필드 누락은 기존처럼 영구 구성 
 | `editionId` | BRIEF 불변 에디션 UUID |
 | `generation` | 작업공간·시즌별 요약 버전 |
 | `sourceCursor` | BRIEF 로컬 수신 순서 cursor |
-| `created` | 새 에디션 생성이면 `true`, 직전 불변 상태 재사용이면 `false` |
+| `created` | 새 생성본 생성이면 `true`, 직전 불변 상태 재사용이면 `false` |
 
-새 에디션 `201`은 최신 조회 경로를 `Location`으로 반환한다. 두 성공 상태 모두 에디션
+새 생성본 `201`은 최신 조회 경로를 `Location`으로 반환한다. 두 성공 상태 모두 생성본
 `ETag`, `Cache-Control: no-store`와 `X-Request-ID`를 포함한다.
 
 ## 6. 화면과 비목표
@@ -122,12 +124,12 @@ React Query와 공용 HTTP 클라이언트를 사용한다. 생성 요청의 동
 ### 제외 범위
 
 - 브라우저의 BRIEF 직접 호출, BRIEF 사용자 계정·세션·CORS
-- BATON의 BRIEF 에디션 내용 재계산·수정·캐시 저장소
+- BATON의 BRIEF 생성본 내용 재계산·수정·캐시 저장소
 - BRIEF 생성 scheduler, 대상 registry나 별도 Idempotency-Key
 - 생성 실행 운영자 재처리 API
 - mTLS와 인증서 자동 발급·교체 체계
 
-에디션 이력·단건·비교와 생성 전 준비 상태 안내는
+생성본 이력·단건·비교와 생성 전 준비 상태 안내는
 [PRD-0010](../0010_brief-navigation-and-readiness/spec.md)에서 추가했다. 같은 사용자 권한과
 불변 본문·ETag를 유지하며 조회 뒤에도 실제 생성에서 전달 경계를 다시 확인한다.
 
@@ -153,7 +155,7 @@ PostgreSQL 18.6을 함께 기동해 다음을 확인했다.
 - 계정 로그인·활동 중인 팀 멤버십·워크스페이스 접근 키를 거친 HTTPS 생성과 최신 조회
 - BRIEF `ETag` 전달과 `If-None-Match` 조건부 `304`
 - BRIEF 저장 뒤 BATON 실행 성공 상태를 재시도 상태로 되돌린 응답 유실 재현, 같은
-  `executionId`·`editionId`와 에디션 한 건 수렴
+  `executionId`·`editionId`와 생성본 한 건 수렴
 - BRIEF의 새·직전 서비스 token 중첩 중 직전 token 성공, 직전 값 제거 뒤 기존 BATON의
   `503`, BATON을 새 token으로 전환한 뒤 조회와 새 범위 생성 성공
 - 서비스 Caddy의 비루트 UID `10001`, file capability 없음, 읽기 전용 rootfs,
@@ -192,5 +194,5 @@ PostgreSQL 18.6을 함께 기동해 다음을 확인했다.
 - [BRIEF 연속성 신호 생산 계약](../0007_brief-continuity-signal-producer/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
 - BRIEF `PRD-0023: BATON 백엔드 경유 조회`
-- BRIEF `PRD-0024: BATON 주도 에디션 생성`
+- BRIEF `PRD-0024: BATON 주도 생성본 생성`
 - BRIEF `PRD-0025: BATON 서비스 API 인증과 비공개 연결`
