@@ -129,6 +129,16 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
                 Duration connectTimeout,
                 Duration readTimeout
         ) {
+            return new RestClientWatchMonitorClient(buildRestClient(baseUri, bearerToken, connectTimeout, readTimeout));
+        }
+
+        public RestClientWatchInspectionClient createInspection(URI baseUri, String bearerToken) {
+            return new RestClientWatchInspectionClient(buildRestClient(baseUri, bearerToken,
+                    Duration.ofSeconds(1), Duration.ofSeconds(2)));
+        }
+
+        private RestClient buildRestClient(URI baseUri, String bearerToken,
+                                           Duration connectTimeout, Duration readTimeout) {
             HttpClientSettings settings = managedHttpClientSettings
                     .withTimeouts(
                             connectTimeout,
@@ -136,12 +146,11 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
                     )
                     .withRedirects(HttpRedirects.DONT_FOLLOW);
             ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-            RestClient restClient = restClientBuilder.clone()
+            return restClientBuilder.clone()
                     .baseUrl(baseUri)
                     .requestFactory(requestFactory)
                     .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
                     .build();
-            return new RestClientWatchMonitorClient(restClient);
         }
     }
 }

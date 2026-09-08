@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { ResourceHealthStatus } from '@/features/watch/ResourceHealthStatus'
 import { RoundRoomResourceActions } from '@/features/round/RoundRoomResourceActions'
 import { Icon } from '@/shared/ui/Icon'
 import { ContentChangePanel } from '@/features/content-history/ContentChangePanel'
@@ -97,6 +98,9 @@ export function RoleInspector({
                 <span>
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}
+                  <ResourceHealthStatus key={`${resource.id}:${resource.url}:${roundRoomScope.accessKey}`} {...roundRoomScope} resourceId={resource.id}
+                    title={resource.title} targetUrl={resource.url} enabled={open && !blocked}
+                    changesDisabled={changesDisabled} />
                 </span>
                 <div className="resource-row-actions">
                   <RoundRoomResourceActions

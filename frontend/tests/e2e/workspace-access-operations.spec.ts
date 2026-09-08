@@ -1224,6 +1224,7 @@ test('@operations 오늘 화면에서 선택한 회차의 반복 업무를 완�
   await expect(completeButton).toBeInViewport()
   await completeButton.click()
 
+  await expect(page.getByRole('status')).toContainText('이번 회차의 루틴을 완료했어요.')
   await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
   await expect(checklist.getByText('2/2 완료')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '이번 회차 미완료 업무 0개' })).toBeVisible()

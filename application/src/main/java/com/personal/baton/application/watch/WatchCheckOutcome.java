@@ -1,0 +1,17 @@
+package com.personal.baton.application.watch;
+
+public enum WatchCheckOutcome {
+    SUCCESS,
+    HTTP_CLIENT_ERROR,
+    HTTP_SERVER_ERROR,
+    DESTINATION_REJECTED,
+    DNS_FAILURE,
+    CONNECT_TIMEOUT,
+    READ_TIMEOUT,
+    TLS_FAILURE,
+    REDIRECT_REJECTED,
+    TOO_MANY_REDIRECTS,
+    RESPONSE_TOO_LARGE,
+    NETWORK_FAILURE,
+    INTERNAL_FAILURE
+}

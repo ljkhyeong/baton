@@ -1364,6 +1364,46 @@ export interface paths {
         patch: operations["updateRoleResourceArchive"];
         trace?: never;
     };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/check-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 자료 재점검 접수
+         * @description 공유 접근 키와 자료 소유권을 확인한 뒤 비동기 URL 재점검을 접수한다. 완료 결과가 아니다.
+         */
+        post: operations["requestResourceCheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 자료 연결 상태 조회
+         * @description 공유 접근 키와 자료 소유권을 확인한 뒤 자료 화면과 별도로 현재 연결 상태를 조회한다.
+         */
+        get: operations["inspectResourceHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/verifications": {
         parameters: {
             query?: never;
@@ -2429,6 +2469,50 @@ export interface components {
                 /** @description 빈 값이 아닌 원본 참조, 최대 512자 */
                 sourceReference: string;
             }[];
+        };
+        Schema_42cfc9da02e36f49: {
+            /**
+             * @description 조회 결과의 최신성 및 감시 여부
+             * @enum {string}
+             */
+            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
+            /** @description 현재 자료의 재점검 접수 가능 여부 */
+            checkRequestAllowed: boolean;
+            /**
+             * Format: int32
+             * @description 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
+             */
+            consecutiveFailures: number | null;
+            /**
+             * @description WATCH 도달 가능성 상태
+             * @enum {string}
+             */
+            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: date-time
+             * @description 최근 점검 시도 완료 UTC 시각. 시도가 없으면 null
+             */
+            lastCheckedAt: string | null;
+            /**
+             * Format: date-time
+             * @description 최근 연결 성공·실패 판정 UTC 시각. 내부 오류는 갱신하지 않으며 판정이 없으면 null
+             */
+            lastConclusiveAt: string | null;
+            /**
+             * @description 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
+             * @enum {string|null}
+             */
+            lastOutcome: "SUCCESS" | "HTTP_CLIENT_ERROR" | "HTTP_SERVER_ERROR" | "DESTINATION_REJECTED" | "DNS_FAILURE" | "CONNECT_TIMEOUT" | "READ_TIMEOUT" | "TLS_FAILURE" | "REDIRECT_REJECTED" | "TOO_MANY_REDIRECTS" | "RESPONSE_TOO_LARGE" | "NETWORK_FAILURE" | "INTERNAL_FAILURE" | null;
+            /**
+             * @description 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
+             * @enum {string|null}
+             */
+            monitoringReason: "INTEGRATION_DISABLED" | "MONITORING_PAUSED" | "SEASON_ENDED" | "RESOURCE_ARCHIVED" | "URL_NOT_ELIGIBLE" | "MONITOR_INACTIVE" | "SYNC_PENDING" | null;
+            /**
+             * Format: uuid
+             * @description 요청한 자료 UUID
+             */
+            resourceId: string;
         };
         Schema_056c9e55e5c84be6: {
             /**
@@ -4527,6 +4611,18 @@ export interface components {
                  */
                 zoneId: string;
             };
+        };
+        Schema_eb67d7974bb5c307: {
+            /**
+             * Format: uuid
+             * @description 요청한 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * @description 점검 접수 상태
+             * @enum {string}
+             */
+            status: "SCHEDULED" | "ALREADY_SCHEDULED" | "IN_PROGRESS";
         };
         Schema_edbd6b040919f594: {
             /**
@@ -8234,6 +8330,147 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_71d9598b6bc02fa6"];
+                };
+            };
+        };
+    };
+    requestResourceCheck: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 팀 공유 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 자료 UUID */
+                resourceId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 202 */
+            202: {
+                headers: {
+                    /** @description 응답 저장 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_eb67d7974bb5c307"];
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    /** @description 응답 저장 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 다음 요청까지 기다릴 초 */
+                    "Retry-After"?: string;
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 429 */
+            429: {
+                headers: {
+                    /** @description 응답 저장 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 다음 요청까지 기다릴 초 */
+                    "Retry-After"?: string;
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 응답 저장 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 다음 요청까지 기다릴 초 */
+                    "Retry-After"?: string;
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspectResourceHealth: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description 팀 공유 접근 키
+                 * @example workspace-access-key
+                 */
+                "X-Baton-Access-Key": string;
+            };
+            path: {
+                /** @description 자료 UUID */
+                resourceId: string;
+                /** @description 시즌 UUID */
+                seasonId: string;
+                /** @description 팀 UUID */
+                teamId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 200 */
+            200: {
+                headers: {
+                    /** @description 응답 저장 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schema_42cfc9da02e36f49"];
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    /** @description 서버 요청 진단 UUID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
