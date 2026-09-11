@@ -128,9 +128,13 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         : <ul>{access.invitations.map(invite => {
           const expired = Date.parse(invite.expiresAt) <= now
           const pending = !invite.acceptedAt && !invite.revokedAt && !expired
-          return <li key={invite.id}><span>{access.members.find(member => member.memberId === invite.memberId)?.memberName} · {permissionNames[invite.permission]}
+          const memberName = access.members.find(member => member.memberId === invite.memberId)?.memberName ?? '알 수 없는 구성원'
+          return <li key={invite.id}><span>{memberName} · {permissionNames[invite.permission]}
             <small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : expired ? '기간 만료' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
-            {pending && <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ kind: 'revoke', id: invite.id })}>초대 취소</button>}
+            {pending && <button type="button" disabled={mutation.isPending} onClick={() => {
+              if (window.confirm(`${memberName}님의 초대를 취소할까요? 이 초대 링크는 즉시 사용할 수 없게 됩니다.`))
+                mutation.mutate({ kind: 'revoke', id: invite.id })
+            }}>초대 취소</button>}
           </li>
         })}</ul>}
       <details><summary>최근 권한 변경 이력</summary><ul>{access.audit.map(item => <li key={item.id}><span>

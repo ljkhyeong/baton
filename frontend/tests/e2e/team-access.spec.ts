@@ -33,6 +33,7 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
       accountId: member.id === MEMBER_ONE_ID ? ACCOUNT : null, permission: null as 'ADMIN' | null })),
     invitations: [] as { id: string; memberId: string; permission: 'VIEWER'; createdAt: string; expiresAt: string; acceptedAt: null; revokedAt: string | null }[], audit: [],
   }
+  let revokeRequestCount = 0
   await page.route('**/api/v1/team-access/**', async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
@@ -54,7 +55,10 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
         createdAt: instant, expiresAt, acceptedAt: null, revokedAt: null }
       state.invitations.push(invitation)
       return route.fulfill({ json: { invitation, token: TOKEN } })
-    } else if (path.endsWith('/revoke')) state.invitations[0]!.revokedAt = instant
+    } else if (path.endsWith('/revoke')) {
+      revokeRequestCount += 1
+      state.invitations[0]!.revokedAt = instant
+    }
     return route.fulfill({ json: state })
   })
   await openSharedWorkspace(page)
@@ -78,9 +82,19 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   await dialog.getByRole('button', { name: '초대 링크 복사' }).click()
   await expect(dialog.getByRole('status')).toHaveText('초대 링크를 복사했습니다.')
   await expect(dialog.getByText('위 링크를 선택해 직접 복사해 주세요.', { exact: false })).toHaveCount(0)
+  page.once('dialog', async confirmation => {
+    expect(confirmation.message()).toBe('김준호님의 초대를 취소할까요? 이 초대 링크는 즉시 사용할 수 없게 됩니다.')
+    await confirmation.dismiss()
+  })
+  await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toBeVisible()
+  expect(revokeRequestCount).toBe(0)
+  page.once('dialog', confirmation => confirmation.accept())
   await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
   await expect(dialog.getByText('초대 취소', { exact: true })).toBeVisible()
+  expect(revokeRequestCount).toBe(1)
   await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toBeVisible()
   await page.clock.fastForward('02:00:00')
