@@ -7,7 +7,7 @@ const OTHER_SEASON = '00000000-0000-4000-8000-000000000903'
 const ACTIVE_SEASON = '00000000-0000-4000-8000-000000000904'
 const ENDED_SEASON = '00000000-0000-4000-8000-000000000905'
 
-test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본으로 이동하고 접근이 거부된 팀은 제외한다', async ({ page }, testInfo) => {
+test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본으로 이동하고 접근이 거부되거나 구성원 상태가 바뀐 팀은 제외한다', async ({ page }, testInfo) => {
   await page.clock.install({ time: new Date('2026-07-18T00:00:00Z') })
   const current = makeProjection()
   current.team.accountAccessEnabled = true; current.team.permission = 'MEMBER'
@@ -90,5 +90,11 @@ test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본�
   allowed = true
   await work.getByRole('button', { name: '업무 새로고침' }).click()
   await expect(task).toBeVisible()
+  await expect(work.getByRole('alert')).toHaveCount(0)
+  other.members.find(member => member.id === MEMBER_ONE_ID)!.deactivatedAt = '2026-07-18T01:00:00Z'
+  await work.getByRole('button', { name: '업무 새로고침' }).click()
+  await expect(work.getByRole('alert')).toContainText('일부 팀이나 시즌의 업무가 빠져 있습니다')
+  await expect(task).toHaveCount(0)
+  await expect(recent.getByRole('link', { name: /두 번째 팀 최근 결정/ })).toHaveCount(0)
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))
 })

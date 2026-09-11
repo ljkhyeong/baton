@@ -46,8 +46,10 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
     return team && workspace.members.some(member => member.id === team.memberId && isActiveMember(member))
       ? [{ workspace, memberId: team.memberId }] : []
   })
+  const membershipChanged = available.length !== workspaces.length
   const pending = all.filter(query => query.isPending).length
   const failed = all.filter(query => query.isError)
+  const partial = pending > 0 || failed.length > 0 || membershipChanged
   const now = Date.now()
   const dueSoonAt = preferences.data ? now + preferences.data.deadlineLeadHours * 60 * 60 * 1_000 : null
   const tasks = available.flatMap(({ workspace, memberId }) => {
@@ -86,15 +88,15 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
       <option value="all">전체</option><option value="overdue">기한 지난 업무</option><option value="soon">마감 임박 업무</option><option value="routine">그 밖의 남은 업무</option><option value="handoff">수락할 인수인계</option>
     </select></label>
     {pending > 0 && <p role="status">{pending}개 시즌의 업무를 불러오고 있습니다.</p>}
-    {failed.length > 0 && <p role="alert">일부 팀이나 시즌의 업무가 빠져 있습니다. ‘업무 새로고침’을 눌러 다시 불러오세요.</p>}
+    {(failed.length > 0 || membershipChanged) && <p role="alert">일부 팀이나 시즌의 업무가 빠져 있습니다. ‘업무 새로고침’을 눌러 다시 불러오세요.</p>}
     {preferences.isError && <p role="alert">마감 임박 기준을 불러오지 못했습니다. ‘업무 새로고침’을 눌러 다시 불러오세요.</p>}
-    {visible.length === 0 ? <p>{pending || failed.length ? '선택한 조건에서 확인된 업무가 없습니다.' : '선택한 조건의 남은 업무가 없습니다.'}</p>
+    {visible.length === 0 ? <p>{partial ? '선택한 조건에서 확인된 업무가 없습니다.' : '선택한 조건의 남은 업무가 없습니다.'}</p>
       : <ul>{visible.map(task => <li key={task.key}>
         <Link to={task.href}><strong>{task.title}</strong><span>{task.context}</span>
           <small>{task.label}{task.deadline && ` · ${new Intl.DateTimeFormat('ko-KR', { timeZone: task.timeZone, dateStyle: 'short', timeStyle: 'short' }).format(new Date(task.deadline))} (${task.timeZone}) 마감`}</small>
         </Link>
       </li>)}</ul>}
   </section>
-    <MyRecentRecordsAcrossTeams workspaces={available.map(item => item.workspace)} partial={pending > 0 || failed.length > 0} />
+    <MyRecentRecordsAcrossTeams workspaces={available.map(item => item.workspace)} partial={partial} />
   </>
 }
