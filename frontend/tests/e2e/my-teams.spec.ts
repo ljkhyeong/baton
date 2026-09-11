@@ -4,8 +4,10 @@ import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, WORKSPACE_PATH, SCOPE_PATH,
 
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const OTHER_ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22c'
+const INVITATION_TOKEN = 'a'.repeat(43)
 
 test('@smoke @responsive 내 팀에서 공유 키 없이 이동하고 계정을 바꾸면 이전 팀을 숨긴다', async ({ page }) => {
+  await page.addInitScript(token => window.sessionStorage.setItem('baton:team-invitation:v1', token), INVITATION_TOKEN)
   const projection = makeProjection()
   projection.team.accountAccessEnabled = true
   projection.team.permission = 'MEMBER'
@@ -20,6 +22,9 @@ test('@smoke @responsive 내 팀에서 공유 키 없이 이동하고 계정을 
   } }))
   await page.route(`**${SCOPE_PATH}/workspace`, route => route.fulfill({ json: projection }))
   await page.goto('/my-teams')
+  const pendingInvitation = page.getByRole('complementary', { name: '수락 대기 중인 팀 초대' })
+  await expect(pendingInvitation).toContainText('확인하지 않은 팀 초대가 있습니다.')
+  await expect(pendingInvitation.getByRole('link', { name: '초대 확인' })).toHaveAttribute('href', '/join')
   const link = page.getByRole('link', { name: `${projection.team.name} 열기` })
   await expect(link).toBeVisible()
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))

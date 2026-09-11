@@ -143,3 +143,17 @@ test('@operations @webkit 같은 탭에서 다른 초대를 열면 이전 초대
   await expect(page.getByRole('heading', { name: '두 번째 팀' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '첫 번째 팀' })).toHaveCount(0)
 })
+
+test('@operations @webkit 사용할 수 없는 저장 초대를 지우고 내 팀으로 돌아간다', async ({ page }) => {
+  await installApi(page)
+  await accountApi(page)
+  await page.addInitScript(token => window.sessionStorage.setItem('baton:team-invitation:v1', token), TOKEN)
+  await page.route('**/api/v1/team-invitations/preview', route => route.fulfill({ status: 404, json: {
+    code: 'TEAM_INVITATION_NOT_FOUND', message: '사용할 수 있는 초대가 없습니다.',
+  } }))
+  await page.goto('/join')
+  await expect(page.getByRole('alert')).toContainText('사용할 수 있는 초대가 없습니다.')
+  await page.getByRole('button', { name: '이 초대 지우기' }).click()
+  await expect(page).toHaveURL('/my-teams')
+  expect(await page.evaluate(() => sessionStorage.getItem('baton:team-invitation:v1'))).toBeNull()
+})
