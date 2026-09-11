@@ -827,7 +827,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
         <main className="main-surface" tabIndex={-1}>
           <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
-        <div className="page-stage" key={view}>
+        <div className="workspace-toolbar">
+          <div className="workspace-breadcrumb" aria-label="현재 작업 공간">
+            <span>{workspace.team.name}</span><span aria-hidden="true">/</span><span>{workspace.season.name}</span>
+          </div>
+          <button type="button" className="workspace-search-button" onClick={() => openView('records')}>
+            <Icon name="search" size={16} />기록 검색
+          </button>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
             syncing={workspaceQuery.isFetching}
@@ -841,6 +847,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               void workspaceQuery.refetch()
             }}
           />
+        </div>
+        <div className="page-stage" key={view}>
           {conflictDraftFlow.draft && (
             <WorkspaceConflictDraft
               key={conflictDraftFlow.draft.text}

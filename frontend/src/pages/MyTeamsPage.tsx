@@ -9,7 +9,7 @@ export default function MyTeamsPage() {
   return <main className="my-teams-page">
     <title>내 팀 — BATON</title>
     <div className="my-teams-content">
-      <header><Link className="brand" to="/">BATON</Link><h1>내 팀</h1>
+      <header><Link className="brand" to="/"><span className="brand-mark" aria-hidden="true" />BATON</Link><h1>내 팀</h1>
         <p>참여한 팀을 선택하고 이어서 작업하세요.</p>
         <nav aria-label="계정 메뉴"><Link to="/">시작 화면</Link><Link to="/account">계정 보안</Link></nav>
       </header>

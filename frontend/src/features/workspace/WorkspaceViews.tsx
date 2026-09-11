@@ -94,7 +94,7 @@ export function PrimaryButton({ children, onClick, icon = true, disabled = false
 export function ActionableEmpty({ title, description, actionLabel, onAction, disabled = false }: { title: string; description: string; actionLabel: string; onAction: () => void; disabled?: boolean }) {
   return (
     <div className="empty-state actionable-empty">
-      <Icon name="spark" size={28} /><strong>{title}</strong><p>{description}</p>
+      <Icon name="memory" size={24} /><strong>{title}</strong><p>{description}</p>
       <button type="button" className="secondary-button" disabled={disabled} onClick={onAction}>{actionLabel}</button>
     </div>
   )
@@ -205,7 +205,16 @@ export function RoutineRow({ routine, execution, role, members, timeZone, onTogg
           {execution.status === 'DONE' && <Icon name="check" size={14} />}
         </button>
       ) : <span className="check-button check-button-unavailable" aria-hidden="true" />}
-      <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}><span><strong>{displayRoutine.title}</strong><small>{displayRoutine.detail}</small>{execution ? <small className={`timing-label ${execution.timingStatus.toLowerCase()}`}>{routineTimingStatusCopy[execution.timingStatus]}{execution.deadlineAt ? ` · ${formatInstant(execution.deadlineAt, timeZone)}` : ''}</small> : <small className="routine-round-note">다음 회차부터</small>}</span><time>{displayRoutine.dueLabel}</time></button>
+      <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}>
+        <span className="routine-text"><strong>{displayRoutine.title}</strong><small>{displayRoutine.detail}</small></span>
+        <span className="routine-schedule">
+          {execution ? <>
+            <span className={`timing-label ${execution.timingStatus.toLowerCase()}`}>{routineTimingStatusCopy[execution.timingStatus]}</span>
+            {execution.deadlineAt && <time dateTime={execution.deadlineAt}>{formatInstant(execution.deadlineAt, timeZone)}</time>}
+          </> : <small className="routine-round-note">다음 회차부터</small>}
+          <small className="routine-due-label">{displayRoutine.dueLabel}</small>
+        </span>
+      </button>
       <button type="button" className="routine-owner" onClick={() => role && onSelectRole(role.id)}>{member && <span className="avatar" style={{ background: member.tone }}>{member.initials}</span>}<span><strong>{role?.name ?? '연결된 역할 없음'}</strong><small>{member ? memberDisplayName(member) : '담당자 미정'}</small></span></button>
       {routine ? (
         <span className="routine-actions">

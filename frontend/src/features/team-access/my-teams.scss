@@ -4,8 +4,8 @@
 .my-teams-content nav { display: flex; gap: 24px; }
 .my-teams-content a { color: var(--ink); }
 .my-teams-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.my-teams-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
-.my-teams-list li { background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.my-teams-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.my-teams-list li { background: var(--paper); border-bottom: 1px solid var(--rule); padding: 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .my-teams-list h3 { margin: 0; overflow-wrap: anywhere; }
 .my-teams-list p { color: var(--muted); overflow-wrap: anywhere; }
 .my-teams-list a { flex-shrink: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }

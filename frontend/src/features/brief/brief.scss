@@ -1,8 +1,9 @@
 .brief-attention {
   margin: 1rem 0;
-  padding: 1rem;
-  border: 1px solid var(--rule);
-  border-radius: 8px;
+  padding: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
   background: var(--paper);
   min-width: 0;
 
