@@ -35,6 +35,10 @@ final class WorkspaceTemplateInitializer {
                     new Starter("운영 담당", "팀의 운영 목표와 회의 안건을 관리합니다.", "회의 안건 정리", RoutinePhase.BEFORE, "회의 전", "결정이 필요한 안건과 참고 자료를 준비합니다."),
                     new Starter("일정 담당", "진행 상황과 일정의 변화를 확인합니다.", "진행 상태 확인", RoutinePhase.DURING, "회의 중", "지연된 일과 담당자 지원이 필요한 일을 확인합니다."),
                     new Starter("기록 담당", "결정과 후속 작업을 팀의 기록으로 남깁니다.", "결정과 후속 작업 정리", RoutinePhase.AFTER, "회의 후", "결정 이유와 다음 담당자의 행동을 기록합니다."));
+            case TASK_FORCE_V1 -> List.of(
+                    new Starter("TF 리드", "목표와 범위, 우선순위를 관리합니다.", "주간 우선순위 정리", RoutinePhase.BEFORE, "회의 전", "이번 주에 끝낼 일과 우선순위를 정리합니다."),
+                    new Starter("실행 담당", "진행 상황과 해결할 문제를 공유합니다.", "진행 상황과 장애물 확인", RoutinePhase.DURING, "회의 중", "진척과 막힌 일을 확인하고 필요한 지원을 정합니다."),
+                    new Starter("검토 담당", "결과와 결정, 후속 작업을 점검합니다.", "결과와 후속 작업 정리", RoutinePhase.AFTER, "회의 후", "완료 결과와 다음 행동, 담당자를 기록합니다."));
         };
         for (var starter : starters) {
             var role = Role.create(UUID.randomUUID(), teamId, seasonId, starter.roleName(), starter.purpose(),

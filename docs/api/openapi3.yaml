@@ -9504,7 +9504,7 @@ paths:
                     "memberNames" : [ "박민서", "  박민서  " ]
                   }
             schema:
-              $ref: '#/components/schemas/Schema_877191c8ad12d442'
+              $ref: '#/components/schemas/Schema_4638c5064b4052d0'
         required: true
       responses:
         '201':
@@ -12021,6 +12021,50 @@ components:
         - monitoringReason
         - resourceId
       type: object
+    Schema_4638c5064b4052d0:
+      properties:
+        endDate:
+          description: 시즌 종료일(ISO-8601 날짜)
+          format: date
+          type: string
+        memberNames:
+          description: 한 명 이상의 구성원 이름
+          items:
+            maxLength: 100
+            minLength: 1
+            type: string
+          maxItems: 100
+          minItems: 1
+          type: array
+        seasonName:
+          description: 첫 시즌 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        startDate:
+          description: 시즌 시작일(ISO-8601 날짜)
+          format: date
+          type: string
+        teamName:
+          description: 팀 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        template:
+          description: 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
+          enum:
+            - STUDY_V1
+            - TEAM_V1
+            - TASK_FORCE_V1
+          nullable: true
+          type: string
+      required:
+        - endDate
+        - memberNames
+        - seasonName
+        - startDate
+        - teamName
+      type: object
     Schema_491e14a825d07254:
       properties:
         title:
@@ -12976,49 +13020,6 @@ components:
       required:
         - password
         - token
-      type: object
-    Schema_877191c8ad12d442:
-      properties:
-        endDate:
-          description: 시즌 종료일(ISO-8601 날짜)
-          format: date
-          type: string
-        memberNames:
-          description: 한 명 이상의 구성원 이름
-          items:
-            maxLength: 100
-            minLength: 1
-            type: string
-          maxItems: 100
-          minItems: 1
-          type: array
-        seasonName:
-          description: 첫 시즌 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        startDate:
-          description: 시즌 시작일(ISO-8601 날짜)
-          format: date
-          type: string
-        teamName:
-          description: 팀 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        template:
-          description: 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
-          enum:
-            - STUDY_V1
-            - TEAM_V1
-          nullable: true
-          type: string
-      required:
-        - endDate
-        - memberNames
-        - seasonName
-        - startDate
-        - teamName
       type: object
     Schema_883049cd69ea4cd6:
       properties:

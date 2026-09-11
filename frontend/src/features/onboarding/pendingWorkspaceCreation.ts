@@ -91,7 +91,8 @@ function isNormalizedPayload(value: unknown): value is string {
       || !isCalendarDate(parsed.startDate)
       || !isCalendarDate(parsed.endDate)
       || parsed.startDate > parsed.endDate
-      || !(parsed.template === undefined || parsed.template === 'STUDY_V1' || parsed.template === 'TEAM_V1')
+      || !(parsed.template === undefined || parsed.template === 'STUDY_V1' || parsed.template === 'TEAM_V1'
+        || parsed.template === 'TASK_FORCE_V1')
       || !Array.isArray(parsed.memberNames)
       || !parsed.memberNames.length
       || parsed.memberNames.length > MAX_INITIAL_MEMBER_COUNT
