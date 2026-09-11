@@ -558,6 +558,26 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const openResourceReview = (roleId: string, resourceId: string) => {
+    const resource = resources.find((entry) => entry.id === resourceId
+      && entry.roleId === roleId && !entry.archivedAt)
+    if (!resource) {
+      showToast('자료 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error')
+      return
+    }
+    setView('roles')
+    selectRole(roleId)
+    window.requestAnimationFrame(() => {
+      const row = [...document.querySelectorAll<HTMLElement>('[data-resource-id]')]
+        .find((element) => element.dataset.resourceId === resourceId)
+      const details = row?.querySelector<HTMLDetailsElement>('.resource-verification')
+      if (details) details.open = true
+      const target = details?.querySelector<HTMLElement>('summary') ?? null
+      target?.scrollIntoView({ block: 'center' })
+      focusWorkspaceElement(target)
+    })
+  }
+
   const openRecordSearchResult = (result: RecordSearchResult) => {
     if (result.kind === 'decision') {
       openView('memory')
@@ -879,7 +899,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             <TodayView
               workspace={activeWorkspace}
               personalWork={<><DueResourceReviewsPanel scope={scope} timeZone={workspace.season.timeZone} ended={Boolean(workspace.season.endedAt)}
-                onOpenRole={roleId => { setView('roles'); selectRole(roleId) }} /><PersonalWorkPanel
+                onOpenResource={openResourceReview} /><PersonalWorkPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
