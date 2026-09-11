@@ -49,6 +49,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   if (query.isError) return <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
+  const now = Date.now()
   return <div>
     <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 권한 해제'}`
       : '현재는 공유 링크로 이용합니다. 관리자를 지정하면 관리자와 초대받은 계정만 이용할 수 있습니다.'}</p>
@@ -90,9 +91,15 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         <p>초대한 구성원에게 전달하세요. 7일 동안 사용할 수 있습니다. 새 링크를 만들면 같은 구성원의 미수락 초대는 취소됩니다.</p>
       </div>}
       <h4>초대 목록</h4>
-      <ul>{access.invitations.map(invite => <li key={invite.id}><span>{access.members.find(member => member.memberId === invite.memberId)?.memberName} · {permissionNames[invite.permission]}<small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
-        {!invite.acceptedAt && !invite.revokedAt && <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ kind: 'revoke', id: invite.id })}>초대 취소</button>}
-      </li>)}</ul>
+      {access.invitations.length === 0 ? <p>아직 만든 초대가 없습니다.</p>
+        : <ul>{access.invitations.map(invite => {
+          const expired = Date.parse(invite.expiresAt) <= now
+          const pending = !invite.acceptedAt && !invite.revokedAt && !expired
+          return <li key={invite.id}><span>{access.members.find(member => member.memberId === invite.memberId)?.memberName} · {permissionNames[invite.permission]}
+            <small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : expired ? '기간 만료' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
+            {pending && <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ kind: 'revoke', id: invite.id })}>초대 취소</button>}
+          </li>
+        })}</ul>}
       <details><summary>최근 권한 변경 이력</summary><ul>{access.audit.map(item => <li key={item.id}><span>
         {access.members.find(member => member.memberId === item.memberId)?.memberName} · {({ ADMIN_RECOVERY: '관리자 지정·복구', INVITED: '초대 생성', INVITATION_REVOKED: '초대 취소', INVITATION_ACCEPTED: '초대 수락', PERMISSION_CHANGED: '권한 변경', ACCOUNT_DEACTIVATED: '계정 비활성화' } as Record<string, string>)[item.action] ?? '접근 설정 변경'}
         <small>변경한 사람: {access.members.find(member => member.accountId === item.actorAccountId)?.memberName ?? '연결된 구성원 없음'}</small>

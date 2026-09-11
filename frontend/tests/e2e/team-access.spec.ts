@@ -5,6 +5,7 @@ import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, MEMBER_TWO_ID, WORKSPACE_PATH, SCOPE
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const TOKEN = 'a'.repeat(43)
 const INVITATION = '00000000-0000-4000-8000-000000000099'
+const SECOND_INVITATION = '00000000-0000-4000-8000-000000000100'
 const instant = '2026-09-05T03:00:00Z'
 const expiresAt = '2026-09-12T03:00:00Z'
 async function accountApi(page: Page) {
@@ -19,7 +20,8 @@ async function accountApi(page: Page) {
   } }))
 }
 
-test('@operations @webkit 관리자가 계정 권한 전환 후 초대를 만들고 취소한다', async ({ page }, testInfo) => {
+test('@operations @webkit 관리자가 초대를 만들고 취소하며 만료된 초대는 상태만 확인한다', async ({ page }, testInfo) => {
+  await page.clock.install({ time: new Date('2026-09-12T02:00:00Z') })
   const projection = makeProjection()
   await installApi(page, projection)
   await page.route(`**${SCOPE_PATH}/workspace`, route => route.fulfill({ json: projection }))
@@ -47,7 +49,8 @@ test('@operations @webkit 관리자가 계정 권한 전환 후 초대를 만들
       projection.team.permission = 'ADMIN'
     } else if (request.method() === 'POST' && path.endsWith('/invitations')) {
       expect(request.postDataJSON()).toMatchObject({ memberId: MEMBER_TWO_ID, permission: 'VIEWER' })
-      const invitation = { id: INVITATION, memberId: MEMBER_TWO_ID, permission: 'VIEWER' as const,
+      const invitation = { id: state.invitations.length === 0 ? INVITATION : SECOND_INVITATION,
+        memberId: MEMBER_TWO_ID, permission: 'VIEWER' as const,
         createdAt: instant, expiresAt, acceptedAt: null, revokedAt: null }
       state.invitations.push(invitation)
       return route.fulfill({ json: { invitation, token: TOKEN } })
@@ -69,6 +72,16 @@ test('@operations @webkit 관리자가 계정 권한 전환 후 초대를 만들
   await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
   await expect(dialog.getByText('초대 취소', { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
+  await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toBeVisible()
+  await page.clock.fastForward('02:00:00')
+  const accessPanel = dialog.locator('.team-access-panel')
+  const accessSummary = accessPanel.locator(':scope > summary')
+  await accessSummary.click()
+  await expect(accessPanel).not.toHaveAttribute('open', '')
+  await accessSummary.click()
+  await expect(dialog.getByText('기간 만료', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
 })
 
 test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람자는 기록을 읽고 변경할 수 없다', async ({ page }, testInfo) => {
