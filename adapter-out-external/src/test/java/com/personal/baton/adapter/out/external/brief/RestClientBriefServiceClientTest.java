@@ -139,7 +139,7 @@ class RestClientBriefServiceClientTest {
                         : BriefIntegrationUnavailableException.class);
     }
 
-    @DisplayName("별도 Bearer로 최신 에디션을 조회하고 ETag를 보존한다")
+    @DisplayName("전용 Bearer 토큰으로 최신 주간 요약을 조회하고 ETag를 보존한다")
     @Test
     void readsLatestEditionWithServiceBearer() {
         server.expect(requestTo(BASE_URL + latestPath()))

@@ -356,7 +356,7 @@ class WatchHealthEventInboxPersistenceTest {
         )).isEqualTo(LocalDateTime.of(2026, 8, 2, 4, 5, 6, 654_321_000));
     }
 
-    @DisplayName("동일 event의 동시 재수신은 한 행과 하나의 최초 접수 시각으로 수렴한다")
+    @DisplayName("같은 이벤트를 동시에 다시 받아도 한 행과 최초 접수 시각 하나만 저장한다")
     @Test
     void concurrentlyAcceptsExactReplayOnce() throws Exception {
         WatchHealthChangedEvent event = baseEvent();

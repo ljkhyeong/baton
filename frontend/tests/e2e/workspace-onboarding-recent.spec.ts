@@ -174,7 +174,7 @@ test("@smoke 작업 공간 생성 화면을 떠난 뒤 늦은 성공 응답이 �
   await expect(page).toHaveURL(/\/login/)
 })
 
-test('온보딩 자격 증명 응답이 손상되면 생성 journal과 현재 위치를 보존한다', async ({ page }) => {
+test('온보딩 자격 증명 응답이 손상되면 생성 임시 기록과 현재 위치를 보존한다', async ({ page }) => {
   const api = await installApi(page)
   api.returnMalformedNextWorkspaceCreationResponse()
   await page.goto('/')
@@ -259,7 +259,7 @@ test('온보딩 입력 한도를 서버 호출 전에 안내한다', async ({ pa
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
-test('생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
+test('생성 임시 기록을 안전하게 저장할 수 없으면 새로고침 후에도 API를 호출하지 않는다', async ({ page }) => {
   await blockBrowserStorage(page)
   const api = await installApi(page)
 
@@ -270,7 +270,7 @@ test('생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 �
     await page.getByLabel('종료일').fill('2027-08-31')
     await page.getByLabel('구성원 이름').fill('박민서\n김준호')
     await page.getByRole('button', { name: '작업 공간 만들기' }).click()
-    await expect(page.getByRole('alert')).toContainText('일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.')
+    await expect(page.getByRole('alert')).toContainText('일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')
   }
 
   await page.goto('/')
@@ -281,7 +281,7 @@ test('생성 pending을 내구 저장할 수 없으면 reload 후에도 API를 �
   expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
 })
 
-test('구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 같은 멱등 키를 사용한다', async ({ page }) => {
+test('구성원 순서가 바뀐 온보딩 재시도는 새로고침 후에도 같은 멱등 키를 사용한다', async ({ page }) => {
   const api = await installApi(page)
   api.failNextWorkspaceCreation()
   await page.goto('/')
@@ -312,7 +312,7 @@ test('구성원 순서가 바뀐 온보딩 재시도는 reload 후에도 같은 
   expect(attempts[1]?.headers['x-baton-creation-key']).toBeUndefined()
 })
 
-test('서버 입력 오류 뒤 온보딩 pending을 지우고 다음 시도에 새 멱등 키를 사용한다', async ({ page }) => {
+test('서버 입력 오류 뒤 온보딩 임시 기록을 지우고 다음 시도에 새 멱등 키를 사용한다', async ({ page }) => {
   const api = await installApi(page)
   api.rejectNextWorkspaceCreationAsInvalidInput()
   await page.goto('/')
@@ -357,13 +357,13 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 결과 확인 필요 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
-  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
+  await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
 
   await expect(page.getByRole('alert')).toContainText('입력한 작업 공간 정보를 확인해 주세요.')
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
@@ -381,7 +381,7 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(pendingEntry.idempotencyKey)
 })
 
-test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리를 요구한다', async ({ page }) => {
+test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전송 전에 정리를 요구한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
@@ -401,16 +401,16 @@ test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리�
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByText(
-    '작업 공간을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '생성 확인에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
-  await expect(page.getByRole('button', { name: '임시 요청 기록 삭제 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '임시 기록 삭제 필요' })).toBeDisabled()
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(await pendingCreationEntries(page)).toHaveLength(1)
 
   await page.getByRole('button', { name: '임시 기록 정리' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('브라우저의 임시 요청 기록을 삭제했습니다.')
+  await expect(page.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
@@ -425,7 +425,7 @@ test('온보딩 terminal 기록 cleanup이 실패하면 재전송 전에 정리�
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 한 번만 이동한다', async ({ page }) => {
+test('온보딩 성공 기록을 삭제하지 못하면 정리 후 한 번만 이동한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
@@ -445,10 +445,10 @@ test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 �
 
   await expect(page).toHaveURL(/\/$/)
   await expect(page.getByText(
-    '작업 공간을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '생성 확인에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
-  await expect(page.getByRole('button', { name: '임시 요청 기록 삭제 필요' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '임시 기록 삭제 필요' })).toBeDisabled()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
@@ -463,7 +463,7 @@ test('온보딩 성공 기록 cleanup이 실패하면 정리를 확인한 뒤 �
   )).toHaveLength(1)
 })
 
-test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재시도를 막는다', async ({ page, context }) => {
+test('다른 탭이 생성 결과를 확인하는 동안 임시 기록 삭제 재시도를 막는다', async ({ page, context }) => {
   const request: CreateWorkspaceRequest = {
     teamName: '정리 잠금 스터디',
     seasonName: '2029 겨울 시즌',
@@ -489,15 +489,15 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 cleanup 재�
   await api.attachPage(peerPage)
   await peerPage.goto('/')
   const peerRegion = peerPage.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await peerRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await peerRegion.getByText('생성 결과 확인 필요 1개').click()
   await peerRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
 
   api.holdNextWorkspaceCreation()
-  await peerPage.getByRole('button', { name: '작업 공간 다시 확인' }).click()
+  await peerPage.getByRole('button', { name: '생성 결과 다시 확인' }).click()
   await expect.poll(() => api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces').length).toBe(2)
 
@@ -557,7 +557,7 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
   )).toHaveLength(1)
 
   await page.getByRole('button', {
-    name: '기존 작업 공간 확인 완료',
+    name: '확인 후 새로 만들기',
   }).click()
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 
@@ -569,7 +569,7 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와도 유지된다', async ({ page }) => {
+test('만료된 온보딩 결과 확인은 다른 항목의 저장된 입력을 불러와도 유지된다', async ({ page }) => {
   const expiredRequest: CreateWorkspaceRequest = {
     teamName: '만료 확인 유지 스터디',
     seasonName: '2029 여름 시즌',
@@ -601,9 +601,9 @@ test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와�
 
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   const pendingRegion = page.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 결과 확인 필요 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${otherRequest.teamName} ${otherRequest.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -618,7 +618,7 @@ test('만료된 온보딩 결과 확인은 다른 복구 snapshot을 불러와�
   )).toHaveLength(1)
 })
 
-test('서로 다른 탭의 생성 pending을 순서대로 보존하고 응답 유실 뒤 같은 키로 복구한다', async ({ page, context }) => {
+test('서로 다른 탭의 생성 임시 기록을 순서대로 보존하고 응답 유실 뒤 같은 키로 복구한다', async ({ page, context }) => {
   const apiA = await installApi(page)
   apiA.failNextWorkspaceCreation()
   await page.goto('/')
@@ -676,7 +676,7 @@ test('서로 다른 탭의 생성 pending을 순서대로 보존하고 응답 �
   await expect.poll(async () => (await pendingCreationEntries(pageB)).length).toBe(0)
 })
 
-test('손상된 온보딩 pending 저장소를 무시하고 정상 멱등 키로 재시도한다', async ({ page }) => {
+test('손상된 온보딩 임시 기록 저장소를 무시하고 정상 멱등 키로 재시도한다', async ({ page }) => {
   const malformedIdempotencyKey = 'invalid key'
   await page.addInitScript(({ storageKey, invalidKey }) => {
     localStorage.setItem(storageKey, JSON.stringify({ normalizedPayload: '{}', idempotencyKey: invalidKey }))
@@ -703,7 +703,7 @@ test('손상된 온보딩 pending 저장소를 무시하고 정상 멱등 키로
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
-test('생성 계약을 벗어난 v3 온보딩 pending을 정리하고 정상 생성한다', async ({ page }) => {
+test('생성 계약을 벗어난 v3 온보딩 임시 기록을 정리하고 정상 생성한다', async ({ page }) => {
   const baseRequest: CreateWorkspaceRequest = {
     teamName: '오래된 스터디',
     seasonName: '2028 과거 시즌',
@@ -799,9 +799,9 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 결과 확인 필요 1개').click()
   await expect(pendingRegion.getByText(pendingRequest.teamName)).toBeVisible()
   await pendingRegion.getByRole('button', {
     name: `${pendingRequest.teamName} ${pendingRequest.seasonName} 저장된 입력 불러오기`,
@@ -814,7 +814,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect(page.getByLabel('구성원 이름')).toHaveValue(
     [...pendingRequest.memberNames].sort().join('\n'),
   )
-  const loadedNotice = page.getByText('입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘작업 공간 다시 확인’을 누르세요.')
+  const loadedNotice = page.getByText('저장된 입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘생성 결과 다시 확인’을 누르세요.')
   await expect(loadedNotice).toBeVisible()
   expect(api.calls.filter((call) => call.path === '/api/v1/workspaces')).toHaveLength(0)
 
@@ -823,7 +823,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect(loadedNotice).toBeHidden()
   await page.getByLabel('팀 이름').fill(pendingRequest.teamName)
 
-  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
+  await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
@@ -833,7 +833,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
 })
 
-test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청으로 전환하지 않는다', async ({ page }) => {
+test('불러온 온보딩 입력이 바뀌면 명시적 확인 전 새 요청으로 전환하지 않는다', async ({ page }) => {
   const request: CreateWorkspaceRequest = {
     teamName: 'snapshot 확인 스터디',
     seasonName: '2029 봄 시즌',
@@ -851,9 +851,9 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await pendingRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await pendingRegion.getByText('생성 결과 확인 필요 1개').click()
   await pendingRegion.getByRole('button', {
     name: `${request.teamName} ${request.seasonName} 저장된 입력 불러오기`,
   }).click()
@@ -867,7 +867,7 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
       }),
     }))
   }, { prefix: PENDING_CREATION_STORAGE_PREFIX, entry: pendingEntry })
-  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
+  await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
 
   await expect(page.getByRole('alert')).toContainText('다른 탭에서 임시 기록이 변경됐습니다.')
   await expect(page.getByText('다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다.')).toBeVisible()
@@ -877,12 +877,12 @@ test('불러온 온보딩 snapshot이 바뀌면 명시적 확인 전 새 요청�
   )).toHaveLength(0)
 
   await page.getByRole('button', {
-    name: '기존 작업 공간 확인 완료',
+    name: '확인 후 새로 만들기',
   }).click()
   await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
 })
 
-test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐기를 막는다', async ({ page, context }) => {
+test('다른 탭이 생성 결과를 확인하는 동안 온보딩 임시 기록 폐기를 막는다', async ({ page, context }) => {
   const pendingRequest: CreateWorkspaceRequest = {
     teamName: '다중 탭 복구 스터디',
     seasonName: '2028 겨울 시즌',
@@ -911,25 +911,25 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
 
   const pendingLabel = `${pendingRequest.teamName} ${pendingRequest.seasonName}`
   const pageRegion = page.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await pageRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await pageRegion.getByText('생성 결과 확인 필요 1개').click()
   await pageRegion.getByRole('button', {
     name: `${pendingLabel} 저장된 입력 불러오기`,
   }).click()
-  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
+  await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
   await expect.poll(() =>
     api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces').length,
   ).toBe(1)
 
   const peerRegion = peerPage.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
-  await peerRegion.getByText('생성 확인이 필요한 작업 공간 1개').click()
+  await peerRegion.getByText('생성 결과 확인 필요 1개').click()
   await peerRegion.getByRole('button', {
     name: `${pendingLabel} 저장된 입력 불러오기`,
   }).click()
-  await expect(peerPage.getByRole('button', { name: '작업 공간 다시 확인' })).toBeVisible()
+  await expect(peerPage.getByRole('button', { name: '생성 결과 다시 확인' })).toBeVisible()
   await peerRegion.getByRole('button', {
     name: `${pendingLabel} 목록에서 지우기`,
   }).click()
@@ -950,7 +950,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 pending 폐�
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
-    name: '기존 작업 공간 확인 완료',
+    name: '확인 후 새로 만들기',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
   expect(api.calls.filter((call) =>
@@ -991,14 +991,14 @@ test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제�
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
-    name: '기존 작업 공간 확인 완료',
+    name: '확인 후 새로 만들기',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
   expect(api.calls.filter((call) =>
     call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
 })
 
-test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 만든다', async ({ page }) => {
+test('온보딩 임시 기록 한 건을 확인 후 폐기하고 새 작업 공간을 만든다', async ({ page }) => {
   const pendingRequests = Array.from({ length: 5 }, (_, index): CreateWorkspaceRequest => ({
     teamName: `작업 공간이 만들어졌는지 확인해 주세요 스터디 ${index + 1}`,
     seasonName: `2028 봄 시즌 ${index + 1}`,
@@ -1019,7 +1019,7 @@ test('온보딩 pending 한 건을 확인 후 폐기하고 새 작업 공간을 
   await page.goto('/')
 
   const pendingRegion = page.getByRole('region', {
-    name: '생성 확인이 필요한 작업 공간',
+    name: '생성 결과 확인 필요',
   })
   await expect(pendingRegion.getByRole('listitem')).toHaveCount(5)
 
@@ -1110,7 +1110,7 @@ test('@webkit 브라우저 저장소가 막혀도 일회성 접근 키를 잃지
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 })
 
-test('@smoke 잘못된 fragment 키가 저장된 정상 키를 덮지 않고 복구할 수 있다', async ({ page }) => {
+test('@smoke 잘못된 URL 접근 키가 저장된 정상 키를 덮지 않고 복구할 수 있다', async ({ page }) => {
   const api = await installApi(page)
   await page.addInitScript(({ storageKey, accessKey }) => {
     localStorage.setItem(storageKey, accessKey)

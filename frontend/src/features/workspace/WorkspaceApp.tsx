@@ -265,7 +265,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const retry = contentCreationCleanupCommand.retryCleanup()
     if (!retry) return
     void retry.then((completed) => {
-      if (completed) showToast('브라우저의 임시 요청 기록을 삭제했습니다.')
+      if (completed) showToast('임시 기록을 삭제했습니다.')
     })
   }
   const roleHandoffFlow = useWorkspaceRoleHandoffFlow({
@@ -769,7 +769,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     closeModal,
     onRecordSaved: (kind, id) => {
       if (!sessionQuery.isSuccess) return
-      void clearRecordDraft(scope, kind, id).catch(() => showToast('기록은 저장했지만 탭의 초안을 지우지 못했습니다. 다시 작성할 때 이전 초안을 삭제해 주세요.', 'error'))
+      void clearRecordDraft(scope, kind, id).catch(() => showToast('기록은 저장했지만 작성 중인 초안은 삭제하지 못했습니다. 다음 작성 전에 이전 초안을 삭제해 주세요.', 'error'))
     },
     openMemberManagement: () => openModal('members'),
     selectRound,

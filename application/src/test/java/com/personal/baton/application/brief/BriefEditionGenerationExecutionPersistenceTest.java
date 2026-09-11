@@ -207,7 +207,7 @@ class BriefEditionGenerationExecutionPersistenceTest {
     }
 
     @Test
-    @DisplayName("추가 전달은 성공한 생성 경계 이후 완료 기록만 보며 같은 에디션 재사용으로 기준을 갱신한다")
+    @DisplayName("추가 전달은 성공한 생성 경계 이후 완료 기록만 보며 같은 주간 요약을 재사용하면 기준을 갱신한다")
     void comparesDeliveredRecordsWithLatestSuccessfulConfirmation() {
         assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).isEmpty();
         var target = new GenerationTarget(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), ZoneId.of("Asia/Seoul"), 0);

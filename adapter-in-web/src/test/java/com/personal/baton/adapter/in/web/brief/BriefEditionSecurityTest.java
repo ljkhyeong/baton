@@ -96,7 +96,7 @@ class BriefEditionSecurityTest {
     @MockitoBean
     private BriefAttentionUseCase attentionUseCase;
 
-    @DisplayName("BRIEF 관심 항목 요약과 목록도 접근 키 외에 계정 세션을 요구한다")
+    @DisplayName("BRIEF 점검 항목 요약과 목록도 접근 키 외에 계정 세션을 요구한다")
     @Test
     void requiresSessionForAttentionReads() throws Exception {
         for (String path : List.of(BriefAttentionController.LIST_PATH, BriefAttentionController.SUMMARY_PATH,

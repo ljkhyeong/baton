@@ -81,7 +81,7 @@ export default function OnboardingForm() {
                     className="text-button"
                     onClick={creation.startNewRequest}
                   >
-                    기존 작업 공간 확인 완료
+                    확인 후 새로 만들기
                   </button>
                 )}
           </div>
@@ -187,7 +187,7 @@ export default function OnboardingForm() {
             </small>
           </label>
           <label>
-            <span>작업 공간 생성 코드 <small>(선택)</small></span>
+            <span>운영자 생성 코드 <small>(선택)</small></span>
             <input
               type="password"
               autoComplete="off"
@@ -195,7 +195,7 @@ export default function OnboardingForm() {
               onChange={(event) => form.setCreationKey(event.target.value)}
               placeholder="운영자에게 받은 코드"
             />
-            <small>작업 공간을 만들 때만 사용하며 브라우저에 저장하지 않습니다.</small>
+            <small>작업 공간을 만들 때만 사용하며 저장하지 않습니다.</small>
           </label>
 
           {creation.feedbackMessage && (

@@ -38,7 +38,7 @@ public class AccountAuthenticationService implements
             return externalLoginTransaction.resolve(command);
         } catch (IdentityConflictException | IdentityConcurrentModificationException ignored) {
             // 실패한 REQUIRES_NEW 트랜잭션은 이 재시도 전에 끝난다.
-            // 수렴 트랜잭션은 커밋된 공급자 주체의 승자 행을 잠가 여러 중복 콜백을
+            // 중복 콜백 처리 트랜잭션은 먼저 커밋된 공급자 계정 행을 잠가 여러 중복 콜백을
             // @Version 경쟁 대신 순서대로 처리한다.
             return externalLoginTransaction.resolveAfterContention(command);
         }

@@ -199,7 +199,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     @Test
-    @DisplayName("같은 resource를 동시에 생성한 두 요청은 DB unique 경쟁 뒤 하나의 매핑으로 수렴한다")
+    @DisplayName("같은 역할 자료의 방 매핑을 동시에 생성해도 하나만 저장한다")
     void convergesConcurrentResourceCreationOnOneMapping() throws Exception {
         RoundFixture fixture = createFixture();
         roomIdGenerator.synchronizeNextPair(
@@ -277,7 +277,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     @Test
-    @DisplayName("같은 계정과 구성원의 동시 membership claim은 DB unique 경쟁 뒤 한 결과로 수렴한다")
+    @DisplayName("같은 계정과 구성원을 동시에 연결해도 구성원 연결 하나만 저장한다")
     void convergesConcurrentMembershipClaim() throws Exception {
         RoundFixture fixture = createUnclaimedFixture();
         AccountTeamMembership firstCandidate = AccountTeamMembership.create(
@@ -329,7 +329,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     @Test
-    @DisplayName("다른 계정이 점유한 구성원 연결은 DB unique 판정 뒤 구성원 충돌로 수렴한다")
+    @DisplayName("다른 계정에 연결된 구성원을 요청하면 구성원 충돌을 반환한다")
     void rejectsMembershipClaimOwnedByAnotherAccount() {
         RoundFixture fixture = createUnclaimedFixture();
         UUID otherAccountId = UUID.randomUUID();

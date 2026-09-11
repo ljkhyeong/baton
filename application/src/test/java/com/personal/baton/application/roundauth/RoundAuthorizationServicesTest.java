@@ -252,7 +252,7 @@ class RoundAuthorizationServicesTest {
     }
 
     @Test
-    @DisplayName("같은 계정과 구성원의 동시 claim 패자는 승자의 멤버십 결과로 수렴한다")
+    @DisplayName("같은 계정과 구성원을 동시에 연결하면 먼저 완료된 구성원 연결을 반환한다")
     void convergesOnSameMembershipAfterClaimRace() {
         Member member = Member.create(MEMBER_ID, TEAM_ID, "스터디원");
         AccountTeamMembership winner = AccountTeamMembership.create(

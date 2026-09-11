@@ -37,7 +37,7 @@ import {
   expectScopedCall,
 } from './support/workspaceApiHarness'
 
-test('공유 링크 fragment를 지울 때 React Router history 상태를 보존한다', async ({ page }) => {
+test('공유 링크의 URL 접근 키를 지울 때 React Router 이력을 보존한다', async ({ page }) => {
   const api = await installApi(page)
   api.holdWorkspaceGets()
   let workspaceGetsReleased = false
@@ -150,7 +150,7 @@ test('@smoke 키 변경 중 화면을 떠나면 임시 기록을 유지하고 �
   }
 })
 
-test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 journal을 보존한다', async ({ page }, testInfo) => {
+test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 임시 기록을 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await page.evaluate((accessKey) => {
@@ -185,7 +185,7 @@ test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 journal을 
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
 })
 
-test('접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막는다', async ({ page }, testInfo) => {
+test('접근 키 회전은 서버 응답 전 대화 상자 종료와 재진입을 막는다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -278,7 +278,7 @@ test('접근 키 회전은 서버 응답 전 dialog 종료와 재진입을 막�
   )).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('접근 키 회전 journal은 탭 간 요청 완료까지 같은 임계 구역에서 보호한다', async ({ page, context }, testInfo) => {
+test('접근 키 회전 임시 기록은 탭 간 요청 완료까지 같은 임계 구역에서 보호한다', async ({ page, context }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   const peerPage = await context.newPage()
@@ -480,7 +480,7 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
     localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragment에 보존한다', async ({ page }, testInfo) => {
+test('접근 키 변경 후 사이트 데이터 저장이 실패하면 새 키를 URL에 유지한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     const originalSetItem = Storage.prototype.setItem
     Storage.prototype.setItem = function setItem(key, value) {
@@ -512,7 +512,7 @@ test('접근 키 회전 후 브라우저 저장이 실패하면 새 키를 fragm
   expect(reloadedGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 호출하지 않는다', async ({ page }) => {
+test('공유 링크 변경 기록을 안전하게 저장할 수 없으면 새로고침 후에도 API를 호출하지 않는다', async ({ page }) => {
   await blockBrowserStorage(page)
   const api = await installApi(page)
 
@@ -523,7 +523,7 @@ test('회전 pending을 내구 저장할 수 없으면 reload 후에도 API를 �
     await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
-    await expect(page.getByRole('alert')).toContainText('일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.')
+    await expect(page.getByRole('alert')).toContainText('일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')
   }
 
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
@@ -611,7 +611,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   expect(recoveredGet?.headers['x-baton-access-key']).toBe(ROTATED_ACCESS_KEY)
 })
 
-test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
+test('충돌 임시 기록 복구가 403이면 반복을 멈추고 최신 공유 링크 확인을 안내한다', async ({ page }) => {
   await failNextAccessKeyRotationCleanup(page)
   const api = await installApi(page)
   api.conflictNextAccessKeyRotation()
@@ -635,7 +635,7 @@ test('충돌 pending 복구가 403이면 반복을 멈추고 최신 공유 링�
   await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
 
   await expect(page.getByText('다른 기기에서 공유 링크를 변경한 것으로 보입니다.')).toBeVisible()
-  await expect(page.getByText('이전 공유 링크의 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')).toBeVisible()
+  await expect(page.getByText('이전 공유 링크의 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')).toBeVisible()
   await expect(page.getByText('작업 공간 운영자에게 새 공유 링크를 요청하거나, 이미 전달받은 최신 링크가 있는지 확인해 주세요.')).toBeVisible()
   await expect(page.getByRole('button', { name: '변경된 공유 링크 확인' })).toHaveCount(0)
   expect(JSON.parse(await page.evaluate(
@@ -681,7 +681,7 @@ test('만료된 접근 키 임시 기록을 지우고 최신 공유 링크 확�
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
-test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 replay한다', async ({ page }) => {
+test('손상된 회전 임시 기록 저장소를 무시하고 정상 멱등 키로 재요청한다', async ({ page }) => {
   const pendingStorageKey = `baton-pending-access-key-change:v1:${TEAM_ID}`
   const malformedIdempotencyKey = 'invalid key'
   await page.addInitScript(({ storageKey, invalidKey }) => {
@@ -725,7 +725,7 @@ test('손상된 회전 pending 저장소를 무시하고 정상 멱등 키로 re
   )).toBeTruthy()
 })
 
-test('@smoke @responsive @continuity 확인할 항목은 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
+test('@smoke @responsive @continuity 조치할 항목은 이유와 다음 행동을 보여 주고 관련 역할을 연다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.roles.push({
     previousRoleId: null,
@@ -756,7 +756,7 @@ test('@smoke @responsive @continuity 확인할 항목은 이유와 다음 행동
       roleId: ROLE_ID,
       routineId: null,
       title: '문제 큐레이터 준비 부족',
-      reason: '위험 신호가 있지만 역할 자료와 미완료 인수인계 항목을 먼저 정리해야 합니다.',
+      reason: '주의사항이 있지만 역할 자료와 미완료 인수인계 항목을 먼저 정리해야 합니다.',
       recommendedAction: '역할 화면과 인수인계 문서에서 빠진 책임, 항목과 자료를 보완하세요.',
       relevantDate: null,
     },
@@ -765,7 +765,7 @@ test('@smoke @responsive @continuity 확인할 항목은 이유와 다음 행동
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  const radar = page.getByRole('region', { name: '확인할 항목' })
+  const radar = page.getByRole('region', { name: '조치할 항목' })
   await expect(radar).toBeVisible()
   await expect(radar.locator('.continuity-count')).toHaveText('2개')
   const signals = radar.getByRole('listitem')
@@ -799,7 +799,7 @@ test('@smoke @responsive @continuity 확인할 항목은 이유와 다음 행동
   }
 })
 
-test('@continuity 반복 지연 신호는 해당 반복 업무가 있는 일정 화면으로 초점을 옮긴다', async ({ page }) => {
+test('@continuity 반복 업무 지연 항목은 해당 업무가 있는 일정 화면으로 초점을 옮긴다', async ({ page }) => {
   const projection = makeProjection()
   projection.continuitySignals = [{
     type: 'ROUTINE_REPEATEDLY_OVERDUE',
@@ -814,7 +814,7 @@ test('@continuity 반복 지연 신호는 해당 반복 업무가 있는 일정 
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '확인할 항목' })
+  await page.getByRole('region', { name: '조치할 항목' })
     .getByRole('button')
     .click()
 
@@ -824,7 +824,7 @@ test('@continuity 반복 지연 신호는 해당 반복 업무가 있는 일정 
     .toBeFocused()
 })
 
-test('@continuity 미완료 인수인계 신호는 해당 역할의 인수인계 탭으로 초점을 옮긴다', async ({ page }) => {
+test('@continuity 미완료 인수인계 항목은 해당 역할의 인수인계 탭으로 초점을 옮긴다', async ({ page }) => {
   const projection = makeProjection()
   projection.continuitySignals = [{
     type: 'HANDOFF_INCOMPLETE',
@@ -839,7 +839,7 @@ test('@continuity 미완료 인수인계 신호는 해당 역할의 인수인계
 
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await page.getByRole('region', { name: '확인할 항목' })
+  await page.getByRole('region', { name: '조치할 항목' })
     .getByRole('button')
     .click()
 
@@ -971,7 +971,7 @@ test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 �
   })
 })
 
-test('@operations 반복 업무와 회차를 내구 생성하고 선택한 회차의 완료 상태를 독립적으로 저장한다', async ({ page }, testInfo) => {
+test('@operations 반복 업무와 회차를 안전하게 생성하고 선택한 회차의 완료 상태를 따로 저장한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
@@ -1389,7 +1389,7 @@ test('동기화 실패에도 기존 내용을 유지하고 수동으로 다시 �
   await expect(syncStatus).toContainText('화면 갱신')
 })
 
-test('창 포커스와 네트워크 복구 때 즉시 최신 내용을 확인한다', async ({ page }) => {
+test('창 활성화와 네트워크 복구 때 즉시 최신 내용을 확인한다', async ({ page }) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
   const workspaceGetCount = () => api.calls.filter((call) =>
@@ -1408,7 +1408,7 @@ test('창 포커스와 네트워크 복구 때 즉시 최신 내용을 확인한
   await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(getsAfterFocus)
 })
 
-test('접근 거부 뒤에는 retry와 focus 및 reconnect 동기화를 멈춘다', async ({ page }) => {
+test('접근 거부 뒤에는 재시도와 창 활성화 및 네트워크 복구 동기화를 멈춘다', async ({ page }) => {
   const api = await installApi(page)
   const workspaceGetCount = () => api.calls.filter((call) =>
     call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,

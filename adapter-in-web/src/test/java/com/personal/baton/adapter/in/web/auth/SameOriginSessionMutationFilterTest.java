@@ -19,7 +19,7 @@ class SameOriginSessionMutationFilterTest {
                     new SecurityErrorResponseWriter(new ObjectMapper())
             );
 
-    @DisplayName("ROUND membership claim은 exact same-origin이 없으면 controller 전에 거부한다")
+    @DisplayName("ROUND 구성원 연결은 동일 출처 요청이 아니면 컨트롤러 호출 전에 거부한다")
     @Test
     void rejectsRoundMembershipClaimWithoutOriginEvidence() throws Exception {
         MockHttpServletRequest request = request(

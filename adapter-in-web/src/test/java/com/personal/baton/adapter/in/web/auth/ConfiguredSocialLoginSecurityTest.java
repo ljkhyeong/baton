@@ -160,7 +160,7 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(header().doesNotExist("Location"));
     }
 
-    @DisplayName("OAuth callback 실패는 provider 설명 없이 고정 login_failed로 이동한다")
+    @DisplayName("OAuth 콜백 실패는 공급자 정보 없이 고정 login_failed 경로로 이동한다")
     @Test
     void redirectsCallbackFailureToFixedBrowserError() throws Exception {
         MockHttpSession session = new MockHttpSession();

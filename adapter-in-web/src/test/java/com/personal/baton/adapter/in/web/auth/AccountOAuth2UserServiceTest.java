@@ -100,7 +100,7 @@ class AccountOAuth2UserServiceTest {
         );
     }
 
-    @DisplayName("Naver OAuth2 profile의 중첩 response.id를 provider subject로 사용한다")
+    @DisplayName("Naver OAuth2 프로필의 중첩 response.id를 공급자 사용자 식별자로 사용한다")
     @Test
     void resolvesNaverByNestedResponseId() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);

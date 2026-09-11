@@ -242,12 +242,12 @@ export function ContentCreationCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="새 항목 추가를 위한 임시 기록 삭제"
+      aria-label="임시 기록 삭제 필요"
     >
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>새 항목을 추가하려면 브라우저의 임시 기록을 지워야 합니다.</strong>
+          <strong>새 항목을 추가하려면 남아 있는 임시 기록을 먼저 삭제하세요.</strong>
           <small>{message}</small>
         </span>
       </div>
@@ -258,7 +258,7 @@ export function ContentCreationCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '임시 기록 정리 중…' : '임시 기록 정리'}
+          {pending ? '임시 기록 삭제 중…' : '임시 기록 삭제'}
         </button>
       </div>
     </section>

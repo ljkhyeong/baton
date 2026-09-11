@@ -381,7 +381,7 @@ function seasonSwitcher(page: Page) {
   return page.getByRole('button', { name: /현재 시즌 .*시즌 전환|알고리즘 한 바퀴 .*시즌 전환/ }).first()
 }
 
-test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 최신 projection을 불러온다', async ({ page }, testInfo) => {
+test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 최신 데이터를 불러온다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '중앙 충돌 복구는 데스크톱에서 한 번 검증합니다.')
   const api = await attachSeasonApi(page)
   await openWorkspace(page)
@@ -402,7 +402,7 @@ test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 �
     .toContainText('다른 구성원이 고친 시즌')
 })
 
-test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 포커스를 복원한다', async ({ page }) => {
+test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 초점을 복원한다', async ({ page }) => {
   await attachSeasonApi(page)
   await openWorkspace(page)
 
@@ -537,7 +537,7 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
     .resolves.toBeNull()
 })
 
-test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload 뒤 정리할 수 있다', async ({ page }, testInfo) => {
+test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 새로고침 뒤 정리할 수 있다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '시즌 journal 복구는 데스크톱 Chromium에서 한 번 검증합니다.')
   await failSeasonSuccessorCleanup(
     page,
@@ -561,7 +561,7 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
 
   await page.reload()
   await expect(page.getByRole('heading', { name: '남은 업무 0개' })).toBeVisible()
-  const cleanupBanner = page.getByRole('alert', { name: '시즌 시작 임시 요청 기록 삭제' })
+  const cleanupBanner = page.getByRole('alert', { name: '시즌 생성 임시 기록 삭제 필요' })
   await expect(cleanupBanner).toBeVisible()
   await cleanupBanner.getByRole('button', { name: '임시 기록 정리' }).click()
 
@@ -575,7 +575,7 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
 
   await expect(cleanupBanner).toBeHidden()
   await expect(page.locator('.toast[role="status"]')).toContainText(
-    '브라우저의 임시 요청 기록을 삭제했습니다.',
+    '임시 기록을 삭제했습니다.',
   )
   await expect(page.evaluate((storageKey) =>
     window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
@@ -583,7 +583,7 @@ test('@handoff 다음 시즌 성공 기록 cleanup 실패는 새 시즌 reload �
   expect(api.successorAttempts).toHaveLength(1)
 })
 
-test('@handoff 다음 시즌 terminal 기록 cleanup 실패는 새 POST 전에 정리를 요구한다', async ({ page }, testInfo) => {
+test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못하면 새 POST 전에 정리를 요구한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '시즌 journal 복구는 데스크톱 Chromium에서 한 번 검증합니다.')
   await failSeasonSuccessorCleanup(
     page,
@@ -600,7 +600,7 @@ test('@handoff 다음 시즌 terminal 기록 cleanup 실패는 새 POST 전에 �
   await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
 
   await expect(dialog.getByText(
-    '다음 시즌을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.',
+    '다음 시즌 생성에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
   await expect(dialog.getByRole('button', { name: '임시 기록 정리' }))

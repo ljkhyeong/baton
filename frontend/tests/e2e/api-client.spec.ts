@@ -399,7 +399,7 @@ test('@webkit 외부 취소 신호를 timeout으로 오인하지 않는다', asy
   expect(result.ok ? undefined : result.kind).toBeUndefined()
 })
 
-test('성공 응답이 JSON이 아니거나 손상되면 invalid-response로 분류한다', async ({ page }) => {
+test('성공 응답이 JSON이 아니거나 손상되면 응답 오류로 분류한다', async ({ page }) => {
   await page.route('**/api-client-test/plain-text', (route) => route.fulfill({
     status: 200,
     contentType: 'text/plain',
@@ -444,7 +444,7 @@ test('204는 명시한 no-content 계약에서만 성공한다', async ({ page }
     .resolves.toEqual(expectedError)
 })
 
-test('역할 인수인계 전이 응답이 nextMemberId를 누락하면 invalid-response로 분류한다', async ({ page }) => {
+test('역할 인수인계 응답에 nextMemberId가 없으면 응답 오류로 분류한다', async ({ page }) => {
   const response = acceptedRoleHandoffTransitionResponse()
   const scope = {
     teamId: '77777777-7777-4777-8777-777777777777',
@@ -709,7 +709,7 @@ test('다음 시즌 응답은 요청한 원본 시즌과 직접 계보를 유지
   }
 })
 
-test('워크스페이스 생성의 자격 증명 응답이 비거나 필수 값을 잃으면 invalid-response로 분류한다', async ({ page }) => {
+test('워크스페이스 생성 응답에 자격 증명 필수 값이 없으면 응답 오류로 분류한다', async ({ page }) => {
   const responses = [
     { status: 201, body: '{}' },
     { status: 201, body: 'null' },
@@ -755,7 +755,7 @@ test('워크스페이스 생성의 자격 증명 응답이 비거나 필수 값�
   expect(responseIndex).toBe(responses.length)
 })
 
-test('접근 키 회전의 one-time credential 응답이 비면 invalid-response로 분류한다', async ({ page }) => {
+test('접근 키 변경 응답에 일회성 자격 증명이 없으면 응답 오류로 분류한다', async ({ page }) => {
   const scope = {
     teamId: '33333333-3333-4333-8333-333333333333',
     seasonId: '44444444-4444-4444-8444-444444444444',
@@ -796,7 +796,7 @@ test('접근 키 회전의 one-time credential 응답이 비면 invalid-response
   expect(responseIndex).toBe(responses.length)
 })
 
-test('워크스페이스 성공 응답의 필수 shape가 없으면 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
+test('워크스페이스 성공 응답에 필수 필드가 없으면 복구 가능한 응답 오류를 표시한다', async ({ page }) => {
   const scope = {
     teamId: '11111111-1111-4111-8111-111111111111',
     seasonId: '22222222-2222-4222-8222-222222222222',
@@ -827,7 +827,7 @@ test('워크스페이스 성공 응답의 필수 shape가 없으면 복구 가�
   await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
 })
 
-test('워크스페이스 배열의 손상된 원소도 복구 가능한 invalid-response로 수렴한다', async ({ page }) => {
+test('워크스페이스 배열에 잘못된 항목이 있으면 복구 가능한 응답 오류를 표시한다', async ({ page }) => {
   const scope = {
     teamId: '33333333-3333-4333-8333-333333333333',
     seasonId: '44444444-4444-4444-8444-444444444444',

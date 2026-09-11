@@ -37,7 +37,7 @@ class IdentityPolicyTest {
         assertThat(identity.isEmailVerified()).isFalse();
     }
 
-    @DisplayName("외부 provider subject는 대소문자를 보존하고 앞뒤 공백을 별도 신원으로 정규화하지 않는다")
+    @DisplayName("외부 공급자 사용자 식별자는 대소문자와 앞뒤 공백을 그대로 보존한다")
     @Test
     void preservesExternalSubjectAndRejectsWhitespaceAliasing() {
         AccountIdentity identity = AccountIdentity.createExternal(

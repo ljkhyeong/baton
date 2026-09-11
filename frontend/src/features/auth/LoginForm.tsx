@@ -44,8 +44,8 @@ const accountSecurityNotices = {
   sessions_revoked: '모든 기기에서 로그아웃했습니다. 계속하려면 다시 로그인해 주세요.',
 } as const
 
-const deviceStateCleanupFailureMessage = '로그아웃했지만 이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const deviceStateCleanupRetryFailureMessage = '이 기기의 작업 공간 접근 정보를 다시 지우지 못했습니다. 브라우저 저장을 허용했는지 확인한 뒤 다시 시도해 주세요.'
+const deviceStateCleanupFailureMessage = '로그아웃했지만 이 기기의 팀 접속 정보를 모두 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const deviceStateCleanupRetryFailureMessage = '이 기기의 팀 접속 정보를 삭제하지 못했습니다. 사이트 데이터 저장을 허용했는지 확인해 주세요.'
 
 function oauthCallbackErrorMessage(search: string) {
   const errorCode = new URLSearchParams(search).get('oauthError')

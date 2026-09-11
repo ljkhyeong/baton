@@ -372,7 +372,7 @@ async function installSharedEdition(page: Page, options: { printItems?: boolean 
   })
 }
 
-test('복사한 링크는 비밀 없이 특정 생성본을 열고 로그인 경로에도 남는다 @smoke', async ({ page }) => {
+test('복사한 링크는 비밀값 없이 특정 주간 요약을 열고 로그인 경로에도 남는다 @smoke', async ({ page }) => {
   await installSharedEdition(page)
   await openSharedWorkspace(page)
   const target = `${WORKSPACE_PATH}?brief=${OLD}`
@@ -399,7 +399,7 @@ test('복사한 링크는 비밀 없이 특정 생성본을 열고 로그인 경
   await expect(page.locator('.brief-print-sheet')).toHaveCount(0)
 })
 
-test('잘못된 주간 요약 링크와 조회 거부는 최신 생성본으로 바꾸지 않는다 @smoke', async ({ page }) => {
+test('잘못된 주간 요약 링크와 조회 거부 시 최신 주간 요약으로 바꾸지 않는다 @smoke', async ({ page }) => {
   await installSharedEdition(page)
   await openSharedWorkspace(page)
   const panel = page.locator('.brief-attention')

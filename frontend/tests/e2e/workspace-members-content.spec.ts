@@ -202,7 +202,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
     .getByRole('option', { name: '박민서(리드)' })).toBeEnabled()
 })
 
-test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유지한다', async ({ page }, testInfo) => {
+test('@smoke 서버 작업 공간에서 역할을 만들고 새로고침 후에도 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -274,7 +274,7 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 reload 후에도 유
   expect(await page.evaluate(() => ['baton-roles', 'baton-routines', 'baton-decisions', 'baton-handoff'].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
 })
 
-test('@webkit dialog는 Escape로 닫히고 진입 버튼으로 focus를 돌려보낸다', async ({ page }, testInfo) => {
+test('@webkit 대화 상자는 Escape로 닫히고 진입 버튼으로 초점을 되돌린다', async ({ page }, testInfo) => {
   await installApi(page)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
@@ -292,7 +292,7 @@ test('@webkit dialog는 Escape로 닫히고 진입 버튼으로 focus를 돌려�
   await expect(opener).toBeFocused()
 })
 
-test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차의 실행 스냅샷은 유지한다', async ({ page }, testInfo) => {
+test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차의 실행 당시 정보는 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -592,7 +592,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await expect.poll(rolePutCount).toBe(1)
 })
 
-test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog를 닫지 않는다', async ({ page }, testInfo) => {
+test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 대화 상자를 닫지 않는다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -630,7 +630,7 @@ test('@operations 수정 저장 중에는 닫기와 배경 클릭으로 dialog�
   await expect(routineDialog).toHaveCount(0)
 })
 
-test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을 막는다', async ({ page }, testInfo) => {
+test('모든 콘텐츠 생성은 서버 응답 전 대화 상자 종료와 재진입을 막는다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
@@ -746,14 +746,14 @@ test('모든 콘텐츠 생성은 서버 응답 전 dialog 종료와 재진입을
   expect(api.projection().roles.filter((role) => role.name === '생성 잠금 역할')).toHaveLength(1)
 })
 
-test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {
+test('생성 재시도 정보를 안전하게 저장할 수 없으면 콘텐츠 POST를 보내지 않는다', async ({ page }, testInfo) => {
   await blockContentCreationStorage(page)
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
   const expectStorageBlock = async (dialog: Locator, submitLabel: string) => {
     await dialog.getByRole('button', { name: submitLabel }).click()
-    await expect(dialog.getByRole('alert')).toContainText('일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.')
+    await expect(dialog.getByRole('alert')).toContainText('일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')
     await dialog.getByRole('button', { name: '닫기' }).click()
   }
 
@@ -809,7 +809,7 @@ test('생성 재시도 정보를 내구 저장할 수 없으면 콘텐츠 POST�
   expect(api.calls.filter((call) => call.method === 'POST' && contentPaths.has(call.path))).toHaveLength(0)
 })
 
-test('legacy 콘텐츠 pending의 request guard를 저장하지 못하면 replay POST를 보내지 않는다', async ({ page }, testInfo) => {
+test('기존 형식의 콘텐츠 임시 기록에서 요청 잠금을 저장하지 못하면 재요청을 보내지 않는다', async ({ page }, testInfo) => {
   const legacyKey = 'legacy-content-guard-key-000000000001'
   await page.addInitScript(({ prefix, idempotencyKey, teamId, seasonId, roleId }) => {
     const storageKey = `${prefix}${idempotencyKey}`
@@ -852,7 +852,7 @@ test('legacy 콘텐츠 pending의 request guard를 저장하지 못하면 replay
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(dialog.getByRole('alert')).toContainText(
-    '일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.',
+    '일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
   )
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
@@ -862,7 +862,7 @@ test('legacy 콘텐츠 pending의 request guard를 저장하지 못하면 replay
   expect(pending[0]?.requestGuard).toBeUndefined()
 })
 
-test('콘텐츠 생성 성공 뒤 cleanup이 실패하면 다음 POST 전에 기록부터 정리한다', async ({ page }, testInfo) => {
+test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음 요청 전에 기록부터 정리한다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
@@ -913,7 +913,7 @@ test('콘텐츠 생성 성공 뒤 cleanup이 실패하면 다음 POST 전에 기
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 키 발급을 막고 명시적으로 복구한다', async ({ page, context }, testInfo) => {
+test('콘텐츠 임시 기록 삭제 실패는 새로고침과 다른 작업 전환 뒤에도 새 키 발급을 막고 직접 복구한다', async ({ page, context }, testInfo) => {
   await blockContentCreationCleanupUntilReleased(page)
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -988,7 +988,7 @@ test('콘텐츠 cleanup 실패는 reload와 다른 작업 전환 뒤에도 새 �
     .not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에도 같은 키 재확인만 허용한다', async ({ page }, testInfo) => {
+test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패해도 새로고침 후 같은 키로 결과 확인만 허용한다', async ({ page }, testInfo) => {
   await failContentCreationMarkerAndCleanupUntilReleased(page)
   const api = await installApi(page)
   await openSharedWorkspace(page)
@@ -1061,7 +1061,7 @@ test('콘텐츠 request guard는 marker와 cleanup 전체 실패 뒤 reload에�
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('콘텐츠 생성 성공 응답이 손상되면 journal을 유지하고 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
+test('콘텐츠 생성 성공 응답이 손상되면 임시 기록을 유지하고 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'mutation 응답 검증과 journal 복구는 데스크톱 Chromium에서 한 번만 검증합니다.')
   const api = await installApi(page)
   api.returnMalformedNextContentCreationResponse('role')

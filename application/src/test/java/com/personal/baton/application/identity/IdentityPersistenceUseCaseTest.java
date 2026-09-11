@@ -502,7 +502,7 @@ class IdentityPersistenceUseCaseTest {
         )).isEqualTo(2);
     }
 
-    @DisplayName("같은 provider subject의 동시 최초 OAuth callback은 한 Account로 수렴한다")
+    @DisplayName("같은 공급자 사용자의 첫 OAuth 콜백이 겹쳐도 계정 하나만 생성한다")
     @Test
     void convergesConcurrentFirstExternalLogin() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);

@@ -32,7 +32,7 @@ export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
     || !Array.isArray(value.providers)
     || typeof value.localRegistrationEnabled !== 'boolean'
     || typeof value.passwordResetEnabled !== 'boolean') {
-    throw new Error('인증 capability 응답 형식이 올바르지 않습니다.')
+    throw new Error('로그인 기능 응답 형식이 올바르지 않습니다.')
   }
 
   const providers: AuthProvider[] = []

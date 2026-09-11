@@ -22,11 +22,11 @@ test('시작 템플릿 선택과 응답 유실 복구가 같은 생성 요청을
 
   await page.reload()
   await page.locator('.pending-workspaces summary').click()
-  const recovery = page.getByRole('region', { name: '생성 확인이 필요한 작업 공간' })
+  const recovery = page.getByRole('region', { name: '생성 결과 확인 필요' })
   await expect(recovery).toContainText('스터디 기본 구성')
   await recovery.getByRole('button', { name: '템플릿 복구 스터디 2026 가을 저장된 입력 불러오기' }).click()
   await expect(page.getByRole('combobox', { name: '템플릿 선택', exact: true })).toHaveValue('STUDY_V1')
-  await page.getByRole('button', { name: '작업 공간 다시 확인' }).click()
+  await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
   await expect(page).toHaveURL(/\/teams\/[^/]+\/seasons\/[^/]+$/)
 
   const attempts = api.calls.filter(call => call.method === 'POST' && call.path === '/api/v1/workspaces')

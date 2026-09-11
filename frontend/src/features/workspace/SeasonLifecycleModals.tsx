@@ -448,7 +448,7 @@ export function SeasonSuccessorCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="시즌 시작 임시 요청 기록 삭제"
+      aria-label="시즌 생성 임시 기록 삭제 필요"
     >
       <div>
         <Icon name="alert" size={18} />

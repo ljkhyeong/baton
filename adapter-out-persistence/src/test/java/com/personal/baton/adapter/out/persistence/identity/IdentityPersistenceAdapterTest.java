@@ -51,7 +51,7 @@ class IdentityPersistenceAdapterTest {
         );
     }
 
-    @DisplayName("이메일 provider subject unique 경쟁은 열거 방지 가능한 신원 충돌로 변환한다")
+    @DisplayName("이메일 공급자 사용자 식별자의 유일 제약 충돌은 계정 노출 없는 신원 충돌로 변환한다")
     @Test
     void translatesProviderSubjectUniqueRaceToIdentityConflict() {
         AccountIdentity identity = mock(AccountIdentity.class);

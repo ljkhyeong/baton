@@ -24,7 +24,7 @@ class WatchMonitorOutboxDispatchServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-01T04:00:00Z");
 
-    @DisplayName("WATCH 성공과 stale revision은 같은 outbox 전달 완료로 수렴한다")
+    @DisplayName("WATCH 성공과 오래된 리비전 응답은 아웃박스 전달 완료로 기록한다")
     @Test
     void completesDeliveredAndStaleMessages() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);
