@@ -537,7 +537,7 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
     .resolves.toBeNull()
 })
 
-test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 새로고침 뒤 정리할 수 있다', async ({ page }, testInfo) => {
+test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 새로고침 뒤 삭제할 수 있다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '시즌 journal 복구는 데스크톱 Chromium에서 한 번 검증합니다.')
   await failSeasonSuccessorCleanup(
     page,
@@ -563,7 +563,7 @@ test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 
   await expect(page.getByRole('heading', { name: '남은 업무 0개' })).toBeVisible()
   const cleanupBanner = page.getByRole('alert', { name: '시즌 생성 임시 기록 삭제 필요' })
   await expect(cleanupBanner).toBeVisible()
-  await cleanupBanner.getByRole('button', { name: '임시 기록 정리' }).click()
+  await cleanupBanner.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
 
   await expect(cleanupBanner).toBeVisible()
   await expect(page.evaluate((storageKey) =>
@@ -571,7 +571,7 @@ test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 
     .resolves.not.toBeNull()
   expect(api.successorAttempts).toHaveLength(1)
 
-  await cleanupBanner.getByRole('button', { name: '임시 기록 정리' }).click()
+  await cleanupBanner.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
 
   await expect(cleanupBanner).toBeHidden()
   await expect(page.locator('.toast[role="status"]')).toContainText(
@@ -583,7 +583,7 @@ test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 
   expect(api.successorAttempts).toHaveLength(1)
 })
 
-test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못하면 새 POST 전에 정리를 요구한다', async ({ page }, testInfo) => {
+test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못하면 새 POST 전에 삭제를 요구한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '시즌 journal 복구는 데스크톱 Chromium에서 한 번 검증합니다.')
   await failSeasonSuccessorCleanup(
     page,
@@ -603,7 +603,7 @@ test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못�
     '다음 시즌 생성에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
     { exact: true },
   )).toBeVisible()
-  await expect(dialog.getByRole('button', { name: '임시 기록 정리' }))
+  await expect(dialog.getByRole('button', { name: '임시 기록 삭제', exact: true }))
     .toBeVisible()
   expect(api.successorAttempts).toHaveLength(1)
   const firstIdempotencyKey = api.successorAttempts[0]!.idempotencyKey
@@ -611,10 +611,10 @@ test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못�
   await dialog.getByLabel('다음 시즌 이름').fill('')
   await dialog.getByLabel('시작일').fill('2026-12-31')
   await dialog.getByLabel('종료일').fill('2026-10-01')
-  await dialog.getByRole('button', { name: '임시 기록 정리' }).click()
+  await dialog.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
 
   await expect(dialog.getByText(
-    '브라우저의 임시 기록을 정리했습니다. 입력을 확인한 뒤 다시 제출해 주세요.',
+    '임시 기록을 삭제했습니다. 입력을 확인한 뒤 다시 제출해 주세요.',
     { exact: true },
   )).toBeVisible()
   await expect(dialog.getByText('다음 시즌 이름을 입력해 주세요.')).toHaveCount(0)

@@ -862,7 +862,7 @@ test('기존 형식의 콘텐츠 임시 기록에서 요청 잠금을 저장하�
   expect(pending[0]?.requestGuard).toBeUndefined()
 })
 
-test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음 요청 전에 기록부터 정리한다', async ({ page }, testInfo) => {
+test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음 요청 전에 기록부터 삭제한다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
@@ -894,7 +894,7 @@ test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음
 
   const secondDialog = await openRoleCreation('cleanup 성공 둘째 역할')
   await expect(secondDialog.getByRole('alert')).toContainText(
-    '임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.',
+    '임시 기록을 삭제하지 못해 요청을 보내지 않았습니다.',
   )
   await secondDialog.getByRole('button', { name: '역할 만들기' }).click()
 
@@ -927,8 +927,8 @@ test('콘텐츠 임시 기록 삭제 실패는 새로고침과 다른 작업 전
   await expect(roleDialog).toHaveCount(0)
 
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
-  const cleanupBanner = page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' })
-  await expect(cleanupBanner).toContainText('새 항목을 추가하려면 브라우저의 임시 기록을 지워야 합니다.')
+  const cleanupBanner = page.getByRole('alert', { name: '임시 기록 삭제 필요' })
+  await expect(cleanupBanner).toContainText('새 항목을 추가하려면 남아 있는 임시 기록을 먼저 삭제하세요.')
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
       operation: 'role',
@@ -948,7 +948,7 @@ test('콘텐츠 임시 기록 삭제 실패는 새로고침과 다른 작업 전
   await handoffDialog.getByRole('button', { name: '항목 추가하기' }).click()
 
   await expect(handoffDialog.getByRole('alert')).toContainText(
-    '임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.',
+    '임시 기록을 삭제하지 못해 요청을 보내지 않았습니다.',
   )
   expect(api.calls.filter((call) =>
     call.method === 'POST' && Object.values(CONTENT_CREATION_PATHS).includes(call.path),
@@ -962,9 +962,9 @@ test('콘텐츠 임시 기록 삭제 실패는 새로고침과 다른 작업 전
   await api.attachPage(peerPage)
   await openSharedWorkspace(peerPage)
   const peerCleanupBanner = peerPage.getByRole('alert', {
-    name: '새 항목 추가를 위한 임시 기록 삭제',
+    name: '임시 기록 삭제 필요',
   })
-  await peerCleanupBanner.getByRole('button', { name: '임시 기록 정리' }).click()
+  await peerCleanupBanner.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
   await expect(peerCleanupBanner).toHaveCount(0)
   await expect(cleanupBanner).toHaveCount(0)
   await peerPage.close()
@@ -1015,7 +1015,7 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
     }),
   ])
   expect(pendingAfterFailure[0]?.cleanupRequired).toBeUndefined()
-  await expect(page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' }))
+  await expect(page.getByRole('alert', { name: '임시 기록 삭제 필요' }))
     .toBeVisible()
 
   await page.evaluate((releaseKey) => {
@@ -1023,7 +1023,7 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
   }, CONTENT_CREATION_GUARD_FAILURE_RELEASE_KEY)
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
-  await expect(page.getByRole('alert', { name: '새 항목 추가를 위한 임시 기록 삭제' }))
+  await expect(page.getByRole('alert', { name: '임시 기록 삭제 필요' }))
     .toHaveCount(0)
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()

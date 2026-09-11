@@ -89,7 +89,7 @@ test('@smoke @responsive 오늘은 업무에 집중하고 필요한 역할과 �
     .toHaveAttribute('aria-current', 'page')
 })
 
-test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유지한다', async ({ page }, testInfo) => {
+test('@responsive 390x844에서 구성원 관리 동작과 초점 복귀를 유지한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
   await installApi(page)
   await openSharedWorkspace(page)
@@ -169,7 +169,7 @@ test('@responsive 모바일 역할 상세는 닫힌 대화상자 접근을 차�
   await expect(opener).toBeFocused()
 })
 
-test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지한다', async ({ page }, testInfo) => {
+test('@responsive 보조 문구와 경고 및 키보드 초점 대비를 유지한다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
   initialProjection.rounds.find((round) => round.id === ROUND_ONE_ID)!.archivedAt = '2026-07-21T12:00:00Z'
   await installApi(page, initialProjection)

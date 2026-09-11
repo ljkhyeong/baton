@@ -88,7 +88,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
     {summaryData && <div className="brief-summary" aria-label="미해결 항목 요약">
       <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', severity: 'HIGH' })}>높은 심각도 <strong>{summaryData.highCount}건</strong></button>
       <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', severity: 'MEDIUM' })}>보통 심각도 <strong>{summaryData.mediumCount}건</strong></button>
-      <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', revisionGap: true })}>기록 누락 이력 <strong>{summaryData.revisionGapCount}건</strong></button>
+      <button type="button" onClick={() => changeFilter({ status: 'ACTIVE', revisionGap: true })}>변경 기록 누락 <strong>{summaryData.revisionGapCount}건</strong></button>
     </div>}
     <section className="brief-readiness" aria-label="이번 주 해결 요약">
       <button type="button" aria-expanded={resolutionsOpen} aria-controls={resolutionsId}
@@ -127,23 +127,23 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
       </div>}
     </section>
     <details className="brief-evidence"><summary>요약과 전달 기록 안내</summary>
-      <p className="brief-note">요약은 미해결 항목만 집계합니다. 기록 누락 이력은 변경 기록이 빠진 적이 있는 항목 수이며, 누락 건수가 아닙니다.
-        심각도별 개수와 중복되며, 조회 시점에 따라 목록과 개수가 다를 수 있습니다. 누락 이력이 없어도 모든 변경이 전송됐다는 뜻은 아닙니다.</p>
+      <p className="brief-note">요약은 미해결 항목만 집계합니다. 변경 기록 누락은 변경 기록이 빠진 적이 있는 항목 수이며, 누락 건수가 아닙니다.
+        심각도별 개수와 중복되며, 조회 시점에 따라 목록과 개수가 다를 수 있습니다. 누락이 없어도 모든 변경이 전송됐다는 뜻은 아닙니다.</p>
     </details>
     <div className="brief-filters">
       <label>상태<select value={filter.status} onChange={(event) => changeFilter({ ...filter, status: event.target.value as AttentionFilter['status'] })}>
         <option value="ACTIVE">미해결</option><option value="RESOLVED">해결</option></select></label>
       <label>심각도<select value={filter.severity ?? ''} onChange={(event) => changeFilter({ ...filter, severity: event.target.value as AttentionFilter['severity'] || undefined })}>
         <option value="">전체 심각도</option><option value="HIGH">높음</option><option value="MEDIUM">보통</option></select></label>
-      <label>기록 누락 이력<select value={filter.revisionGap === undefined ? '' : String(filter.revisionGap)} onChange={(event) => changeFilter({ ...filter, revisionGap: event.target.value === '' ? undefined : event.target.value === 'true' })}>
-        <option value="">전체</option><option value="true">누락 이력 있음</option><option value="false">누락 이력 없음</option></select></label>
+      <label>변경 기록 누락<select value={filter.revisionGap === undefined ? '' : String(filter.revisionGap)} onChange={(event) => changeFilter({ ...filter, revisionGap: event.target.value === '' ? undefined : event.target.value === 'true' })}>
+        <option value="">전체</option><option value="true">누락 있음</option><option value="false">누락 없음</option></select></label>
     </div>
     {page.isPending && <p role="status">점검 항목 목록을 불러오고 있습니다.</p>}
     {page.isError && <p role="alert">목록을 불러오지 못했습니다. {page.error.message}</p>}
     {pageData && <BriefSources scope={scope} items={pageData.items} onOpen={onOpenSource}>
       {pageData.items.length === 0 ? <p role="status">선택한 조건에 해당하는 점검 항목이 없습니다.</p> : <ul className="brief-items">
         {pageData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
-          <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}{item.revisionGap && ' · 누락 이력 있음'}</span></div>
+          <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}{item.revisionGap && ' · 누락 있음'}</span></div>
           <BriefSourceLink item={item} readOnly={readOnly} />
           <small>상태 기록 {formatTime.format(new Date(item.observedAt))} ({timeZone})</small>
           <button type="button" aria-controls={historyId}
@@ -171,7 +171,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
       <p className="brief-note">적용된 원본 변경을 최근 순서로 표시합니다. 상태가 같아도 근거가 바뀌면 기록이 남습니다.</p>
       <details className="brief-evidence"><summary>원본 기록과 확인 기준</summary>
         <code>{selected.sourceReference}</code>
-        <p className="brief-note">원본 변경 번호가 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 새로 발견한 결과이며, 항목 전체의 누락 이력과는 다릅니다.</p>
+        <p className="brief-note">원본 변경 번호가 큰 순서로 표시합니다. 각 기록의 누락 여부는 해당 변경에서 확인한 값이며, 항목 전체 이력과는 다릅니다.</p>
       </details>
       {history.isPending && <p role="status">변경 이력을 불러오고 있습니다.</p>}
       {history.isError && <p role="alert">변경 이력을 불러오지 못했습니다. {history.error.message}</p>}

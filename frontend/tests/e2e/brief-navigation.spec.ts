@@ -447,7 +447,7 @@ test('인쇄에는 선택한 불변 주간 요약과 현재 업무명 구분만 
   await expect(printSheet).toContainText('이번 주 변경 · 8건')
   await expect(printSheet).toContainText('이전 주부터 미해결 · 8건')
   await expect(printSheet).toContainText('이전 주간 요약 · 분류 미기록 · 8건')
-  await expect(printSheet).toContainText('이전 주간 요약: 변경 번호·누락 이력 미기록')
+  await expect(printSheet).toContainText('이전 주간 요약: 변경 번호·누락 여부 미기록')
   await expect(printSheet).toContainText(OLD)
   await expect(printSheet).not.toContainText(LATEST)
   await expect(printSheet).not.toContainText(ACCESS_KEY)

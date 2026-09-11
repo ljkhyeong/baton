@@ -105,7 +105,7 @@ export function useWorkspaceAccessKeyFlow({
         return
       }
       if (!lockResult.value) return
-      setRotationStorageError('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')
+      setRotationStorageError('임시 기록을 삭제했습니다. 최신 공유 링크로 다시 열어 주세요.')
     } finally {
       rotationRequestInFlightRef.current = false
       setRotationLockPending(false)
@@ -137,8 +137,8 @@ export function useWorkspaceAccessKeyFlow({
     } else {
       onOpenShareLink()
       const message = pendingCleared
-        ? '새 공유 링크를 브라우저에 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요.'
-        : '새 공유 링크가 브라우저에 저장됐는지 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요. 임시 기록도 지우지 못했습니다.'
+        ? '새 공유 링크를 이 기기에 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요.'
+        : '새 공유 링크가 이 기기에 저장됐는지 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요. 임시 기록도 지우지 못했습니다.'
       notify(message, 'error')
     }
   }

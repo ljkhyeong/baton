@@ -381,7 +381,7 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(pendingEntry.idempotencyKey)
 })
 
-test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전송 전에 정리를 요구한다', async ({ page }) => {
+test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전송 전에 삭제를 요구한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
@@ -408,7 +408,7 @@ test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전�
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(await pendingCreationEntries(page)).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 정리' }).click()
+  await page.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
 
   await expect(page.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -425,7 +425,7 @@ test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전�
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
-test('온보딩 성공 기록을 삭제하지 못하면 정리 후 한 번만 이동한다', async ({ page }) => {
+test('온보딩 성공 기록을 삭제하지 못하면 삭제 재시도 후 한 번만 이동한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
@@ -454,7 +454,7 @@ test('온보딩 성공 기록을 삭제하지 못하면 정리 후 한 번만 �
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
   )).toHaveLength(1)
 
-  await page.getByRole('button', { name: '임시 기록 정리' }).click()
+  await page.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -481,7 +481,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 임시 기록 삭제 �
   await fillOnboardingForm(page, request)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
-  const cleanupButton = page.getByRole('button', { name: '임시 기록 정리' })
+  const cleanupButton = page.getByRole('button', { name: '임시 기록 삭제', exact: true })
   await expect(cleanupButton).toBeVisible()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
 
@@ -703,7 +703,7 @@ test('손상된 온보딩 임시 기록 저장소를 무시하고 정상 멱등 
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
 })
 
-test('생성 계약을 벗어난 v3 온보딩 임시 기록을 정리하고 정상 생성한다', async ({ page }) => {
+test('생성 계약을 벗어난 v3 온보딩 임시 기록을 삭제하고 정상 생성한다', async ({ page }) => {
   const baseRequest: CreateWorkspaceRequest = {
     teamName: '오래된 스터디',
     seasonName: '2028 과거 시즌',
@@ -1277,7 +1277,7 @@ test('접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다
   await forgetButton.click()
 
   await expect(forgetButton).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('이 기기에 저장된 작업 공간 접근 권한을 제거하지 못했습니다.')
+  await expect(page.getByRole('alert')).toContainText('이 기기의 공유 링크를 삭제하지 못했습니다.')
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
     .toBe(ACCESS_KEY)
   expect(await page.evaluate(() =>

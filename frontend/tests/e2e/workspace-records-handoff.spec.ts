@@ -123,7 +123,7 @@ test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 �
     archivedAt: null,
   })
 })
-test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
+test('@memory 결정 저장 응답이 유실된 뒤 새로고침해도 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('decision')
   await openSharedWorkspace(page)
@@ -782,7 +782,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await expect(reopenedDialog.getByLabel('자료 설명')).toHaveValue('서버의 최신 기준입니다.')
 })
 
-test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다음 제출에 새 키를 쓴다', async ({ page }, testInfo) => {
+test('@handoff 재사용할 수 없는 생성 요청은 임시 기록을 지우고 다음 제출에 새 키를 쓴다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.rejectNextContentCreationAsReused('handoffItem')
   await openSharedWorkspace(page)
@@ -804,7 +804,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재전송을 막는다', async ({ page }, testInfo) => {
+test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전송을 막는다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
@@ -820,7 +820,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
   await dialog.getByLabel('남길 내용').fill('terminal cleanup 재전송 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 삭제하지 못해 요청을 보내지 않았습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
@@ -946,7 +946,7 @@ test('@handoff Web Locks 요청이 실패하면 인수인계 생성 요청을 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pending을 지우지 않는다', async ({ page }, testInfo) => {
+test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임시 기록을 지우지 않는다', async ({ page }, testInfo) => {
   const firstKey = 'content-race-key-00000000000000000001'
   const secondKey = 'content-race-key-00000000000000000002'
   await page.addInitScript(({ prefix, teamId, seasonId, roleId, first, second }) => {

@@ -72,7 +72,7 @@ export default function OnboardingForm() {
                     disabled={creation.busy}
                     onClick={() => void creation.retryJournalCleanup()}
                   >
-                    임시 기록 정리
+                    임시 기록 삭제
                   </button>
                 )
               : (

@@ -201,7 +201,7 @@ function EditionEvidence({ items }: { items: BriefEdition['items'] }) {
   return items.length === 0 ? <p>항목 없음</p> : <ul className="brief-evidence-list">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
     <span>원본 항목 ID <code>{item.sourceReference}</code></span>
-    <span>{item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 이력 미기록'
-      : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '누락 이력 있음' : '누락 이력 없음'}`}</span>
+    <span>{item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
+      : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`}</span>
   </li>)}</ul>
 }

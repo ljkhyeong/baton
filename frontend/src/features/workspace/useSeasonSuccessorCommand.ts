@@ -34,7 +34,7 @@ const busyMessage = '다른 탭에서 다음 시즌을 시작하고 있습니다
 const lockUnsupportedMessage = '이 브라우저에서는 다음 시즌을 시작할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const lockFailedMessage = '다음 시즌을 시작할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
 const cleanupRequiredMessage = '다음 시즌 생성에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
-const cleanupCompletedMessage = '브라우저의 임시 기록을 정리했습니다. 입력을 확인한 뒤 다시 제출해 주세요.'
+const cleanupCompletedMessage = '임시 기록을 삭제했습니다. 입력을 확인한 뒤 다시 제출해 주세요.'
 
 export function useSeasonSuccessorCommand(
   scope: WorkspaceScope,

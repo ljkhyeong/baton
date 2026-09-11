@@ -643,9 +643,9 @@ test('충돌 임시 기록 복구가 403이면 반복을 멈추고 최신 공유
     PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   ))?.idempotencyKey).toBe(firstAttempt.headers['idempotency-key'])
 
-  await page.getByRole('button', { name: '임시 기록 정리' }).click()
-  await expect(page.getByRole('button', { name: '임시 기록 정리' })).toHaveCount(0)
-  await expect(page.getByText('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
+  await page.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
+  await expect(page.getByRole('button', { name: '임시 기록 삭제', exact: true })).toHaveCount(0)
+  await expect(page.getByText('임시 기록을 삭제했습니다. 최신 공유 링크로 다시 열어 주세요.')).toBeVisible()
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()

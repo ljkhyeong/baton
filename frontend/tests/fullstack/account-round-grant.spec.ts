@@ -166,7 +166,7 @@ function requireHttpsOrigin(value: string | undefined, variableName: string): st
   try {
     url = new URL(candidate)
   } catch {
-    throw new Error(`${variableName}는 HTTPS origin이어야 합니다.`)
+    throw new Error(`${variableName}는 HTTPS 출처여야 합니다.`)
   }
   if (
     url.protocol !== 'https:'
@@ -176,7 +176,7 @@ function requireHttpsOrigin(value: string | undefined, variableName: string): st
     || url.search
     || url.hash
   ) {
-    throw new Error(`${variableName}는 HTTPS origin이어야 합니다.`)
+    throw new Error(`${variableName}는 HTTPS 출처여야 합니다.`)
   }
   return url.origin
 }

@@ -467,7 +467,7 @@ test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 �
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
 })
 
-test('인증 응답의 additive field를 무시한다', async ({ page }) => {
+test('인증 응답의 추가 필드를 무시한다', async ({ page }) => {
   const api = await installAuthApi(page, {
     additiveResponseFields: true,
     providers: ['google', 'google'],
@@ -652,7 +652,7 @@ test('이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', 
   expect(body).not.toHaveProperty('password')
 })
 
-test('이메일 fragment를 먼저 제거하고 token과 새 비밀번호를 한 번만 검증한다', async ({ page }) => {
+test('이메일 주소 조각을 먼저 제거하고 토큰과 새 비밀번호를 한 번만 검증한다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
 
@@ -676,7 +676,7 @@ test('이메일 fragment를 먼저 제거하고 token과 새 비밀번호를 한
   })
 })
 
-test('일시적 이메일 검증 실패는 제거한 token과 비밀번호로 재시도한다', async ({ page }) => {
+test('일시적인 이메일 검증 실패는 제거한 토큰과 비밀번호로 재시도한다', async ({ page }) => {
   const api = await installAuthApi(page, { verificationFailure: 'transientOnce' })
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
   await fillVerificationPassword(page)
@@ -702,7 +702,7 @@ test('일시적 이메일 검증 실패는 제거한 token과 비밀번호로 �
   ])
 })
 
-test('유효하지 않은 이메일 token은 비밀번호 form을 닫고 새 메일을 안내한다', async ({ page }) => {
+test('유효하지 않은 이메일 토큰은 비밀번호 입력 화면을 닫고 새 메일을 안내한다', async ({ page }) => {
   const api = await installAuthApi(page, { verificationFailure: 'invalid' })
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
   await fillVerificationPassword(page)
@@ -1065,7 +1065,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
 })
 
-test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
+test('로그인은 검증된 내부 작업 공간 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
@@ -1138,7 +1138,7 @@ test('외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로를 이어 간다', async ({ page }) => {
+test('소셜 로그인 콜백 세션은 같은 탭의 검증된 작업 공간 복귀 경로를 이어 간다', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await page.addInitScript(({ key, returnTo }) => {
     window.sessionStorage.setItem(key, returnTo)
@@ -1154,7 +1154,7 @@ test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
+test('소셜 로그인 콜백 세션도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await page.addInitScript(({ key, returnTo }) => {
     if (window.name === 'baton-round-return-seeded') return
@@ -1173,7 +1173,7 @@ test('소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다'
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@responsive 모바일 로그인은 가로 넘침 없이 키보드 focus와 터치 크기를 유지한다', async ({ page }, testInfo) => {
+test('@responsive 모바일 로그인은 가로 넘침 없이 키보드 초점과 터치 영역 크기를 유지한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 viewport 전용 접근성 경계입니다.')
   await installAuthApi(page, { providers: ['google', 'naver'] })
   await page.goto('/login')

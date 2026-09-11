@@ -128,9 +128,9 @@ for (const access of ['ended', 'viewer'] as const) {
     await panel.getByText('저장된 주간 요약', { exact: true }).click()
     await expect(panel.getByRole('region', { name: '이전 주간 요약 · 분류 미기록' })).toContainText('반복 업무 누락')
     await expect(panel.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('legacy:+& 한글')
-    await expect(panel.getByText('이전 주간 요약: 변경 번호·누락 이력 미기록')).not.toBeVisible()
+    await expect(panel.getByText('이전 주간 요약: 변경 번호·누락 여부 미기록')).not.toBeVisible()
     await panel.getByText('연동 상세', { exact: true }).click()
-    await expect(panel.getByText('이전 주간 요약: 변경 번호·누락 이력 미기록')).toBeVisible()
+    await expect(panel.getByText('이전 주간 요약: 변경 번호·누락 여부 미기록')).toBeVisible()
     if (access === 'ended') {
       await expect(panel.getByText('종료된 시즌은 저장된 주간 요약만 조회할 수 있습니다.')).toBeVisible()
     } else {

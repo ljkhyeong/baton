@@ -334,7 +334,7 @@ test('@smoke ROUND 시작 중 화면을 떠나면 자동 입장하지 않고 돌
   }
 })
 
-test('ROUND 응답은 additive field를 무시한다', async ({ page }, testInfo) => {
+test('ROUND 응답의 추가 필드를 무시한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
   await installRoundProductApi(page, {
     additiveResponseFields: true,
@@ -455,7 +455,7 @@ test('sessionStorage가 막혀도 서버 매핑을 다시 조회해 돌아온 �
   ))).toBe(true)
 })
 
-test('여러 자료 행은 최초 진입과 focus마다 ROUND 매핑 목록을 한 번만 조회한다', async ({ page }, testInfo) => {
+test('여러 자료 행은 최초 진입과 초점 복귀 때 ROUND 연결 목록을 한 번만 조회한다', async ({ page }, testInfo) => {
   // StrictMode가 마운트 때 취소한 요청은 완료된 조회에 포함하지 않는다.
   let completedMappingReads = 0
   page.on('requestfinished', request => {
