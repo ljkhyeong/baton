@@ -90,7 +90,7 @@ class BriefEditionGenerationExecutionPersistenceTest {
         );
     }
 
-    @DisplayName("같은 전달 경계 실행을 재사용하고 만료 lease만 회수한다")
+    @DisplayName("같은 전달 작업을 재사용하고 만료된 처리 임대만 회수한다")
     @Test
     void reusesExecutionAndReclaimsOnlyExpiredLease() {
         var boundary = executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID);
@@ -161,7 +161,7 @@ class BriefEditionGenerationExecutionPersistenceTest {
         assertThat(completed.sourceCursor()).isEqualTo(17);
     }
 
-    @DisplayName("전달 대기 outbox가 있으면 watermark 실행을 PENDING으로 기록한다")
+    @DisplayName("전달 대기 아웃박스가 있으면 워터마크 실행을 PENDING으로 기록한다")
     @Test
     void recordsPendingExecutionForIncompleteDelivery() {
         insertPendingOutbox();

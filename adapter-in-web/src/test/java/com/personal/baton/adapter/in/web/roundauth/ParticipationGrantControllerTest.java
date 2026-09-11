@@ -74,7 +74,7 @@ class ParticipationGrantControllerTest {
     }
 
     @Test
-    @DisplayName("참여권 cookie는 JWT보다 오래 남지 않도록 부분 초를 버린다")
+    @DisplayName("참여권 쿠키는 JWT보다 오래 남지 않도록 부분 초를 버린다")
     void roundsDownCookieLifetimeBelowGrantExpiry() {
         var cookie = RoundGrantCookie.issue(
                 ROOM_ID,
@@ -87,7 +87,7 @@ class ParticipationGrantControllerTest {
     }
 
     @Test
-    @DisplayName("hint가 없으면 Content-Type과 body를 모두 생략해야 한다")
+    @DisplayName("힌트가 없으면 Content-Type과 본문을 모두 생략해야 한다")
     void acceptsMissingHintWithoutContentType() throws Exception {
         when(roundParticipationUseCase.issueParticipationGrant(any()))
                 .thenReturn(new ParticipationGrantResult(
@@ -156,7 +156,7 @@ class ParticipationGrantControllerTest {
     }
 
     @Test
-    @DisplayName("추가 hint 필드는 INVALID_INPUT이며 기존 참여권 cookie를 유지한다")
+    @DisplayName("추가 힌트 필드는 INVALID_INPUT이며 기존 참여권 쿠키를 유지한다")
     void rejectsUnknownHintFieldWithoutClearingCookie() throws Exception {
         mockMvc.perform(post(PATH)
                         .with(authentication(accountAuthentication()))
@@ -177,7 +177,7 @@ class ParticipationGrantControllerTest {
     }
 
     @Test
-    @DisplayName("멤버십이 없으면 403과 같은 room path의 만료 cookie를 반환한다")
+    @DisplayName("멤버십이 없으면 403과 같은 방 경로의 만료 쿠키를 반환한다")
     void clearsCookieWhenParticipationIsDenied() throws Exception {
         when(roundParticipationUseCase.issueParticipationGrant(any()))
                 .thenThrow(new RoundParticipationDeniedException());

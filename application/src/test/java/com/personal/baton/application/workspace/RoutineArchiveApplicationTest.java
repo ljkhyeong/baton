@@ -95,7 +95,7 @@ class RoutineArchiveApplicationTest {
         assertThat(routine.getDeadlineTime()).isEqualTo(LocalTime.NOON);
     }
 
-    @DisplayName("반복 업무 보관은 시즌 배타 잠금을 사용하고 서버 Clock 시각을 결과에 반영한다")
+    @DisplayName("반복 업무 보관은 시즌 배타 잠금을 사용하고 서버 시각을 결과에 반영한다")
     @Test
     void archivesRoutineWithExclusiveSeasonLockAndServerClock() {
         UUID teamId = UUID.randomUUID();

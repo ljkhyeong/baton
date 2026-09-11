@@ -137,7 +137,7 @@ class BriefEditionSecurityTest {
                 .andExpect(status().isOk());
     }
 
-    @DisplayName("BRIEF 최신 조회는 실제 filter chain에서 계정 세션을 요구한다")
+    @DisplayName("BRIEF 최신 조회는 실제 필터 체인에서 계정 세션을 요구한다")
     @Test
     void requiresAccountSessionForLatestEdition() throws Exception {
         mockMvc.perform(get(BriefEditionController.LATEST_PATH, TEAM_ID, SEASON_ID)

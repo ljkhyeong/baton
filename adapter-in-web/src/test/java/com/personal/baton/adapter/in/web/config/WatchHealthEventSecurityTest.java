@@ -58,7 +58,7 @@ class WatchHealthEventSecurityTest {
     @MockitoBean
     private PasswordEncoder passwordEncoder;
 
-    @DisplayName("올바른 WATCH bearer token은 CSRF token 없이 이벤트 수신 controller에 진입한다")
+    @DisplayName("올바른 WATCH Bearer 토큰은 CSRF 토큰 없이 이벤트 수신 컨트롤러에 진입한다")
     @Test
     void acceptAuthenticatedRequestWithoutCsrf() throws Exception {
         when(useCase.accept(eq(EVENT_ID), any(AcceptWatchHealthEventCommand.class)))
@@ -94,7 +94,7 @@ class WatchHealthEventSecurityTest {
         verifyNoInteractions(useCase);
     }
 
-    @DisplayName("틀린 WATCH bearer token은 누락된 token과 같은 401 계약으로 거부한다")
+    @DisplayName("틀린 WATCH Bearer 토큰은 누락된 토큰과 같은 401 계약으로 거부한다")
     @Test
     void rejectInvalidTokenGenerically() throws Exception {
         mockMvc.perform(post(WatchHealthEventController.PATH)
@@ -108,7 +108,7 @@ class WatchHealthEventSecurityTest {
         verifyNoInteractions(useCase);
     }
 
-    @DisplayName("Authorization header가 중복되면 올바른 token을 포함해도 거부한다")
+    @DisplayName("Authorization 헤더가 중복되면 올바른 토큰을 포함해도 거부한다")
     @Test
     void rejectDuplicateAuthorizationHeaders() throws Exception {
         mockMvc.perform(post(WatchHealthEventController.PATH)

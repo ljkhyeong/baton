@@ -20,7 +20,7 @@ class EmailVerificationOutboxSchedulerTest {
             .withBean(DispatchEmailVerificationOutboxUseCase.class, () -> dispatch)
             .withUserConfiguration(EmailVerificationOutboxScheduler.class);
 
-    @DisplayName("이메일 인증 scheduler는 commit 이후 outbox dispatcher만 호출한다")
+    @DisplayName("이메일 인증 스케줄러는 커밋 뒤 아웃박스 디스패처만 호출한다")
     @Test
     void delegatesToOutboxDispatcher() {
         when(dispatch.dispatchPending()).thenReturn(new DispatchResult(1, 1, 0, 0));
@@ -31,7 +31,7 @@ class EmailVerificationOutboxSchedulerTest {
         verify(dispatch).dispatchPending();
     }
 
-    @DisplayName("SMTP 발송 모드에서는 이메일 인증 outbox scheduler를 등록한다")
+    @DisplayName("SMTP 발송 모드에서는 이메일 인증 아웃박스 스케줄러를 등록한다")
     @Test
     void registersSchedulerForSmtpDelivery() {
         contextRunner
@@ -41,7 +41,7 @@ class EmailVerificationOutboxSchedulerTest {
                         .hasSingleBean(EmailVerificationOutboxScheduler.class));
     }
 
-    @DisplayName("메일 발송을 비활성화하면 backlog를 claim할 scheduler를 등록하지 않는다")
+    @DisplayName("메일 발송을 비활성화하면 대기 작업의 처리 권한을 확보할 스케줄러를 등록하지 않는다")
     @Test
     void pausesSchedulerForDisabledDelivery() {
         contextRunner

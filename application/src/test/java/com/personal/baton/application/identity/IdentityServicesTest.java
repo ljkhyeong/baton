@@ -56,7 +56,7 @@ class IdentityServicesTest {
             "nonceValue000000"
     );
 
-    @DisplayName("자체 이메일 가입은 비밀번호 자격을 만들지 않고 outbox에만 원문 인증 토큰을 건넨다")
+    @DisplayName("자체 이메일 가입은 비밀번호 자격을 만들지 않고 아웃박스에만 원문 인증 토큰을 건넨다")
     @Test
     void registersLocalAccountWithoutPersistingRawSecrets() {
         IdentityRepository repository = mock(IdentityRepository.class);
@@ -256,7 +256,7 @@ class IdentityServicesTest {
         verify(repository, never()).saveLocalCredential(any());
     }
 
-    @DisplayName("외부 신원 unique 또는 낙관적 lock 경쟁은 실패한 transaction 밖에서 한 번 재시도한다")
+    @DisplayName("외부 신원 유일 제약 또는 낙관적 잠금 충돌은 실패한 트랜잭션 밖에서 한 번 재시도한다")
     @Test
     void retriesConcurrentExternalLoginInFreshTransaction() {
         IdentityRepository repository = mock(IdentityRepository.class);
@@ -501,7 +501,7 @@ class IdentityServicesTest {
         assertThat(service.loadLocalCredential("LOCAL@EXAMPLE.COM")).isEmpty();
     }
 
-    @DisplayName("로컬 로그인 자격 조회는 이메일을 정규화하고 opaque hash와 검증 상태만 반환한다")
+    @DisplayName("로컬 로그인 자격 조회는 이메일을 정규화하고 불투명 해시와 검증 상태만 반환한다")
     @Test
     void loadsLocalCredentialByNormalizedEmail() {
         IdentityRepository repository = mock(IdentityRepository.class);
@@ -519,7 +519,7 @@ class IdentityServicesTest {
         assertThat(result.toString()).doesNotContain(PASSWORD_HASH);
     }
 
-    @DisplayName("로그인 후 encoder upgrade는 로컬 자격 증명을 잠그고 새 opaque hash로 교체한다")
+    @DisplayName("로그인 후 인코더 업그레이드는 로컬 자격 증명을 잠그고 새 불투명 해시로 교체한다")
     @Test
     void upgradesLocalCredentialPasswordHash() {
         IdentityRepository repository = mock(IdentityRepository.class);

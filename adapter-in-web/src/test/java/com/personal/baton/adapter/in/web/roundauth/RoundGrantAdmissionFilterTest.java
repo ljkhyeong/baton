@@ -41,7 +41,7 @@ class RoundGrantAdmissionFilterTest {
     }
 
     @Test
-    @DisplayName("cross-origin refresh는 인증 여부를 노출하지 않고 cookie를 유지한 채 거절한다")
+    @DisplayName("교차 출처 갱신은 인증 여부를 노출하지 않고 쿠키를 유지한 채 거절한다")
     void rejectsCrossOriginBeforeAuthentication() throws Exception {
         MockHttpServletRequest request = request();
         request.addHeader(HttpHeaders.ORIGIN, "https://attacker.example");
@@ -61,7 +61,7 @@ class RoundGrantAdmissionFilterTest {
     }
 
     @Test
-    @DisplayName("동일 출처지만 session이 없으면 401과 room-scoped 만료 cookie를 반환한다")
+    @DisplayName("동일 출처지만 세션이 없으면 401과 해당 방 범위의 만료 쿠키를 반환한다")
     void clearsGrantCookieWithoutAccountSession() throws Exception {
         MockHttpServletRequest request = sameOriginRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -97,7 +97,7 @@ class RoundGrantAdmissionFilterTest {
     }
 
     @Test
-    @DisplayName("같은 Account와 room의 refresh burst는 429와 재시도 시간을 반환한다")
+    @DisplayName("같은 Account와 방의 연속 갱신 요청은 429와 재시도 시간을 반환한다")
     void rateLimitsAuthenticatedAccountRoomBurst() throws Exception {
         AuthenticatedAccountPrincipal principal = new AccountSessionPrincipal(ACCOUNT_ID, 0);
         SecurityContextHolder.getContext().setAuthentication(

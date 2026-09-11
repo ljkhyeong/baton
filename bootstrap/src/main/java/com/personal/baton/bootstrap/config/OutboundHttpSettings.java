@@ -16,7 +16,7 @@ final class OutboundHttpSettings {
     static String requireBearerToken(String service, String value) {
         if (!BEARER_TOKEN_PATTERN.matcher(value).matches()) {
             throw new IllegalStateException(
-                    service + " bearer token은 32~200자의 URL-safe ASCII여야 합니다"
+                    service + " Bearer 토큰은 32~200자의 URL 안전 ASCII여야 합니다"
             );
         }
         return value;
@@ -41,7 +41,7 @@ final class OutboundHttpSettings {
         if (connect.compareTo(MAX_REQUEST_TIMEOUT_BUDGET) >= 0
                 || read.compareTo(MAX_REQUEST_TIMEOUT_BUDGET.minus(connect)) > 0) {
             throw new IllegalStateException(
-                    service + " connect timeout과 read timeout의 합은 45초 이하여야 합니다"
+                    service + " 연결 시간 제한과 읽기 시간 제한의 합은 45초 이하여야 합니다"
             );
         }
     }

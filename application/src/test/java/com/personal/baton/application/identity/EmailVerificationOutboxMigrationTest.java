@@ -32,7 +32,7 @@ class EmailVerificationOutboxMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V21은 identity에 귀속된 lease 기반 이메일 인증 전달 outbox를 추가한다")
+    @DisplayName("V21은 신원 DB에 임대 기반 이메일 인증 전달 아웃박스를 추가한다")
     @Test
     void addsDurableEmailVerificationDeliveryOutbox() {
         migrateTo("20");

@@ -55,7 +55,7 @@ class WatchHealthEventIngestionServiceTest {
                 .isEqualTo(Instant.parse("2026-08-02T03:04:05.123456789Z"));
     }
 
-    @DisplayName("Idempotency-Key와 eventId가 다르면 inbox를 호출하지 않고 거절한다")
+    @DisplayName("Idempotency-Key와 eventId가 다르면 인박스를 호출하지 않고 거절한다")
     @Test
     void rejectsMismatchedIdempotencyKeyBeforePersistence() {
         WatchHealthEventInboxPort inboxPort = mock(WatchHealthEventInboxPort.class);
@@ -80,7 +80,7 @@ class WatchHealthEventIngestionServiceTest {
                 .isInstanceOf(WatchHealthEventConflictException.class);
     }
 
-    @DisplayName("다른 환경 namespace의 resourceReference는 inbox에 섞지 않는다")
+    @DisplayName("다른 환경의 resourceReference는 인박스에 저장하지 않는다")
     @Test
     void rejectsForeignResourceReferenceNamespace() {
         WatchHealthEventInboxPort inboxPort = mock(WatchHealthEventInboxPort.class);
@@ -123,7 +123,7 @@ class WatchHealthEventIngestionServiceTest {
         verify(inboxPort, never()).accept(any(), any());
     }
 
-    @DisplayName("MySQL DATETIME 범위를 벗어난 changedAt은 inbox 호출 전에 거절한다")
+    @DisplayName("MySQL DATETIME 범위를 벗어난 changedAt은 인박스 호출 전에 거절한다")
     @Test
     void rejectsChangedAtOutsidePersistenceRange() {
         WatchHealthEventInboxPort inboxPort = mock(WatchHealthEventInboxPort.class);

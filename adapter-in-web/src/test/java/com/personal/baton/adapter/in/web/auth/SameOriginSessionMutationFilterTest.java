@@ -39,7 +39,7 @@ class SameOriginSessionMutationFilterTest {
         assertThat(chain.getRequest()).isNull();
     }
 
-    @DisplayName("ROUND room mapping 종료도 exact same-origin에서만 통과한다")
+    @DisplayName("ROUND 방 연결 종료도 정확히 같은 출처에서만 허용한다")
     @Test
     void admitsSameOriginRoundMappingDeletion() throws Exception {
         MockHttpServletRequest request = request(
@@ -60,7 +60,7 @@ class SameOriginSessionMutationFilterTest {
         assertThat(response.getStatus()).isEqualTo(200);
     }
 
-    @DisplayName("공유 access-key 전용 workspace mutation은 기존 정책을 바꾸지 않는다")
+    @DisplayName("공유 접근 키 전용 작업 공간 변경 요청은 기존 정책을 바꾸지 않는다")
     @Test
     void leavesNonSessionWorkspaceMutationUntouched() throws Exception {
         MockHttpServletRequest request = request(

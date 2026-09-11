@@ -75,7 +75,7 @@ class AuthExceptionObservationTest {
                 .build();
     }
 
-    @DisplayName("인증 transaction 시작 실패는 일반화된 503과 원래 HTTP 관측 오류로 남긴다")
+    @DisplayName("인증 트랜잭션 시작 실패는 공통 503으로 응답하고 HTTP 관측 정보에는 원래 오류를 기록한다")
     @Test
     void recordsTransactionStartFailureAsObservationError() throws Exception {
         CannotCreateTransactionException failure = new CannotCreateTransactionException(
@@ -102,7 +102,7 @@ class AuthExceptionObservationTest {
         assertThat(stoppedObservation.get().getError()).isSameAs(failure);
     }
 
-    @DisplayName("인증 commit 연결 장애는 일반화된 503과 원래 HTTP 관측 오류로 남긴다")
+    @DisplayName("인증 커밋 연결 장애는 공통 503으로 응답하고 HTTP 관측 정보에는 원래 오류를 기록한다")
     @Test
     void recordsCommitResourceFailureAsObservationError() throws Exception {
         DataAccessResourceFailureException failure = new DataAccessResourceFailureException(

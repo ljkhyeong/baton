@@ -188,7 +188,7 @@ class WatchHealthEventInboxPersistenceTest {
         )).isOne();
     }
 
-    @DisplayName("높은 source revision 뒤에 도착한 낮은 revision의 다른 event도 버리지 않는다")
+    @DisplayName("높은 원본 리비전 뒤에 도착한 낮은 리비전의 다른 이벤트도 버리지 않는다")
     @Test
     void preservesReorderedEventsAcrossSourceRevisions() {
         WatchHealthChangedEvent newerRevision = event(
@@ -219,7 +219,7 @@ class WatchHealthEventInboxPersistenceTest {
         )).containsExactly(17L, 18L);
     }
 
-    @DisplayName("같은 source revision의 서로 다른 health event를 모두 보존한다")
+    @DisplayName("원본 리비전이 같은 서로 다른 상태 이벤트를 모두 보존한다")
     @Test
     void preservesDistinctEventsAtSameSourceRevision() {
         WatchHealthChangedEvent becameHealthy = event(

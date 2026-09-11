@@ -3290,7 +3290,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleResourceResponseFields())));
     }
 
-    @DisplayName("허용하지 않는 역할 자료 URL은 안정적인 400 오류 계약을 반환한다")
+    @DisplayName("허용하지 않는 역할 자료 URL은 일관된 400 오류 계약을 반환한다")
     @Test
     void documentsCreateRoleResourceInvalidInput() throws Exception {
         when(recordsUseCase.createRoleResource(
@@ -4073,7 +4073,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("UUID 경로 변수 형식이 잘못되면 안정적인 400 오류 계약을 반환한다")
+    @DisplayName("UUID 경로 변수 형식이 잘못되면 일관된 400 오류 계약을 반환한다")
     @Test
     void handlesInvalidPathVariableFormat() throws Exception {
         mockMvc.perform(get("/api/v1/teams/not-a-uuid/seasons/{seasonId}/workspace", SEASON_ID)

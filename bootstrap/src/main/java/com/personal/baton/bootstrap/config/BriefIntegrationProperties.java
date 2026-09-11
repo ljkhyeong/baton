@@ -16,11 +16,11 @@ public record BriefIntegrationProperties(
 ) {
 
     URI requiredBaseUri() {
-        return ExternalHttpOrigin.requireHttpsOrLoopbackHttp("BRIEF base URL", baseUrl);
+        return ExternalHttpOrigin.requireHttpsOrLoopbackHttp("BRIEF 기본 URL", baseUrl);
     }
 
     Duration requiredConnectTimeout() {
-        return requiredPositiveTimeout(connectTimeout, "connect timeout");
+        return requiredPositiveTimeout(connectTimeout, "연결 시간 제한");
     }
 
     String configuredBearerToken() {
@@ -31,7 +31,7 @@ public record BriefIntegrationProperties(
     }
 
     Duration requiredReadTimeout() {
-        return requiredPositiveTimeout(readTimeout, "read timeout");
+        return requiredPositiveTimeout(readTimeout, "읽기 시간 제한");
     }
 
     void validateRequestTimeoutBudget(Duration connect, Duration read) {

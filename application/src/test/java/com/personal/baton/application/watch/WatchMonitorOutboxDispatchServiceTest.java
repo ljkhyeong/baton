@@ -76,7 +76,7 @@ class WatchMonitorOutboxDispatchServiceTest {
         );
     }
 
-    @DisplayName("WATCH가 ACTIVE URL을 거절하면 실패 기록과 INACTIVE 보상 snapshot을 원자적으로 남긴다")
+    @DisplayName("WATCH가 ACTIVE URL을 거절하면 실패 기록과 INACTIVE 보상 스냅샷을 원자적으로 남긴다")
     @Test
     void compensatesInvalidTargetWithInactiveSnapshot() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);

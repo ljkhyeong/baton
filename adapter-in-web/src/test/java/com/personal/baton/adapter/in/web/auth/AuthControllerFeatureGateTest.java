@@ -34,7 +34,7 @@ class AuthControllerFeatureGateTest {
             new AuthFeatureProperties(false, false)
     );
 
-    @DisplayName("자체 이메일 가입 gate가 닫히면 계정 존재 조회 전에 fail-closed 한다")
+    @DisplayName("자체 이메일 가입이 비활성화되면 계정 조회 전에 차단한다")
     @Test
     void rejectsRegistrationBeforeCallingTheApplicationPort() {
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
@@ -47,7 +47,7 @@ class AuthControllerFeatureGateTest {
         verifyNoInteractions(registerUseCase);
     }
 
-    @DisplayName("가입 gate가 닫혀도 이미 발급한 이메일 검증 링크는 완료할 수 있다")
+    @DisplayName("가입을 비활성화해도 이미 발급한 이메일 검증 링크는 완료할 수 있다")
     @Test
     void keepsVerificationAvailableWhileRegistrationIsClosed() {
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();

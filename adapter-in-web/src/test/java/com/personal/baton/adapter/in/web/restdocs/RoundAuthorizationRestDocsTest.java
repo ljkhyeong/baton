@@ -393,7 +393,7 @@ class RoundAuthorizationRestDocsTest {
                 ));
     }
 
-    @DisplayName("ROUND room mapping 생성 API는 resource와 새 canonical room을 연결한다")
+    @DisplayName("ROUND 방 연결 생성 API는 자료와 새 표준 방을 연결한다")
     @Test
     void documentsRoundRoomMappingCreation() throws Exception {
         when(roundAdministrationUseCase.createRoomMapping(new CreateRoomMappingCommand(
@@ -455,7 +455,7 @@ class RoundAuthorizationRestDocsTest {
                         responseFields(roomMappingResponseFields(true))));
     }
 
-    @DisplayName("ROUND room mapping 종료 API는 room tombstone을 남기고 재사용을 막는다")
+    @DisplayName("ROUND 방 연결 종료 API는 방 삭제 표식을 남겨 재사용을 막는다")
     @Test
     void documentsRoundRoomMappingEnd() throws Exception {
         Instant endedAt = NOW.plusSeconds(30);
@@ -495,7 +495,7 @@ class RoundAuthorizationRestDocsTest {
                         responseFields(roomMappingResponseFields(false))));
     }
 
-    @DisplayName("ROUND 참여권 갱신 API는 JWT를 body에 노출하지 않고 room cookie만 회전한다")
+    @DisplayName("ROUND 참여권 갱신 API는 JWT를 본문에 노출하지 않고 방 쿠키만 교체한다")
     @Test
     void documentsRoundParticipationGrantRefresh() throws Exception {
         long expiresAt = NOW.plusSeconds(300).getEpochSecond();

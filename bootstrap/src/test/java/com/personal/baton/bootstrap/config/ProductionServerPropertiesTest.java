@@ -16,7 +16,7 @@ import org.springframework.core.io.ClassPathResource;
 
 class ProductionServerPropertiesTest {
 
-    @DisplayName("production 세션 보안은 Boot 표준 server properties에 바인딩된다")
+    @DisplayName("운영 환경의 세션 보안은 Spring Boot 표준 서버 설정에 연결된다")
     @Test
     void bindsProductionSessionSecurityProperties() throws Exception {
         var environment = new StandardEnvironment();

@@ -36,7 +36,7 @@ public final class ExternalHttpOrigin {
                 || uri.getQuery() != null
                 || uri.getFragment() != null) {
             throw new IllegalStateException(
-                    subject + "은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
+                    subject + "은 경로, 사용자 정보, 쿼리, 조각이 없는 절대 HTTPS 출처여야 합니다"
             );
         }
         String rawAuthority = uri.getRawAuthority();

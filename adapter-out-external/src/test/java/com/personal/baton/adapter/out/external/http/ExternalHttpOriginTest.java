@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class ExternalHttpOriginTest {
 
     @Test
-    @DisplayName("HTTPS origin에 빈 명시 포트가 있으면 설정을 거부한다")
+    @DisplayName("HTTPS 출처에 빈 명시 포트가 있으면 설정을 거부한다")
     void rejectEmptyExplicitPort() {
         assertThatThrownBy(() -> ExternalHttpOrigin.requireHttps(
                 "외부 서비스 주소",

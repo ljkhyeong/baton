@@ -55,7 +55,7 @@ class LocalRegistrationInfrastructureValidatorTest {
         assertThatCode(validator::afterSingletonsInstantiated).doesNotThrowAnyException();
     }
 
-    @DisplayName("production은 공개 가입 gate와 무관하게 기존 outbox 복호화 키를 요구한다")
+    @DisplayName("운영 환경은 공개 가입 제한과 관계없이 기존 아웃박스 복호화 키를 요구한다")
     @Test
     void productionAlwaysRequiresOutboxKey() {
         MockEnvironment environment = new MockEnvironment();
@@ -71,7 +71,7 @@ class LocalRegistrationInfrastructureValidatorTest {
                 .hasMessageContaining("AES-256 key");
     }
 
-    @DisplayName("개발 환경도 공개 자체 이메일 가입을 켜면 outbox 복호화 키를 요구한다")
+    @DisplayName("개발 환경도 자체 이메일 공개 가입을 켜면 아웃박스 복호화 키를 요구한다")
     @Test
     void enabledRegistrationRequiresOutboxKeyOutsideProduction() {
         assertThatThrownBy(() -> validator(

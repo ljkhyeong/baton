@@ -136,7 +136,7 @@ class ConfiguredSocialLoginSecurityTest {
                 ));
     }
 
-    @DisplayName("provider 목록에는 repository에 구성된 Google만 고정 allowlist로 노출한다")
+    @DisplayName("공급자 목록에는 저장소에 설정된 Google만 고정 허용 목록으로 노출한다")
     @Test
     void exposesOnlyConfiguredProvider() throws Exception {
         mockMvc.perform(get(AuthController.PROVIDERS_PATH))
@@ -187,7 +187,7 @@ class ConfiguredSocialLoginSecurityTest {
         assertThat(session.getAttribute("preserved")).isEqualTo("session value");
     }
 
-    @DisplayName("실제 OIDC callback filter는 provider token을 저장하지 않고 canonical account session만 남긴다")
+    @DisplayName("실제 OIDC 콜백 필터는 공급자 토큰을 저장하지 않고 표준 계정 세션만 남긴다")
     @Test
     void persistsOnlyCanonicalAccountAuthenticationAfterOidcCallback() throws Exception {
         RecordingMockHttpSession session = new RecordingMockHttpSession();

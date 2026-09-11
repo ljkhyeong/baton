@@ -63,7 +63,7 @@ class IdentityPolicyTest {
         )).isInstanceOf(IdentityValidationException.class);
     }
 
-    @DisplayName("외부 로그인 갱신은 이메일 snapshot이 없을 때 기존 검증 정보를 지우지 않는다")
+    @DisplayName("외부 로그인 갱신은 이메일 스냅샷이 없을 때 기존 검증 정보를 지우지 않는다")
     @Test
     void keepsExistingEmailSnapshotWhenProviderOmitsEmail() {
         AccountIdentity identity = AccountIdentity.createExternal(

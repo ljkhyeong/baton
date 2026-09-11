@@ -194,7 +194,7 @@ class WatchHealthEventRestDocsTest {
         assertThat(command.getValue().attemptId()).isNull();
     }
 
-    @DisplayName("Idempotency-Key와 eventId가 다르면 안정적인 400 오류를 반환한다")
+    @DisplayName("Idempotency-Key와 eventId가 다르면 일관된 400 오류를 반환한다")
     @Test
     void documentsIdempotencyKeyMismatch() throws Exception {
         when(useCase.accept(eq(EVENT_ID), any(AcceptWatchHealthEventCommand.class)))
@@ -206,7 +206,7 @@ class WatchHealthEventRestDocsTest {
                 .andDo(documentError("acceptWatchHealthEventIdempotencyKeyMismatch"));
     }
 
-    @DisplayName("현재 BATON namespace가 아닌 resourceReference는 안정적인 400 오류를 반환한다")
+    @DisplayName("현재 BATON 네임스페이스가 아닌 resourceReference는 일관된 400 오류를 반환한다")
     @Test
     void documentsInvalidResourceReference() throws Exception {
         when(useCase.accept(eq(EVENT_ID), any(AcceptWatchHealthEventCommand.class)))
@@ -218,7 +218,7 @@ class WatchHealthEventRestDocsTest {
                 .andDo(documentError("acceptWatchHealthEventInvalidResourceReference"));
     }
 
-    @DisplayName("같은 eventId에 다른 payload가 저장돼 있으면 안정적인 409 오류를 반환한다")
+    @DisplayName("같은 eventId에 다른 페이로드가 저장돼 있으면 일관된 409 오류를 반환한다")
     @Test
     void documentsEventIdConflict() throws Exception {
         when(useCase.accept(eq(EVENT_ID), any(AcceptWatchHealthEventCommand.class)))

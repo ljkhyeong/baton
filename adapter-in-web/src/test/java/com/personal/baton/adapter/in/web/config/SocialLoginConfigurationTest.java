@@ -20,7 +20,7 @@ class SocialLoginConfigurationTest {
             ))
             .withUserConfiguration(SocialLoginConfiguration.class);
 
-    @DisplayName("지원하지 않는 표준 registration은 allowlist 검증에서 시작을 중단한다")
+    @DisplayName("지원하지 않는 표준 등록 설정은 허용 목록 검증에서 시작을 중단한다")
     @Test
     void rejectsUnsupportedRegistration() {
         contextRunner

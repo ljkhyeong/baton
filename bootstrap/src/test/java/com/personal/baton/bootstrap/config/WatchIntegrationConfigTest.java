@@ -41,7 +41,7 @@ class WatchIntegrationConfigTest {
     }
 
     @Test
-    @DisplayName("WATCH 연동은 기본 비활성 상태에서 외부 설정 없이 context를 시작한다")
+    @DisplayName("WATCH 연동은 기본 비활성 상태이며 외부 설정 없이 애플리케이션을 시작한다")
     void startWithDisabledClientByDefault() {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
@@ -59,7 +59,7 @@ class WatchIntegrationConfigTest {
     }
 
     @Test
-    @DisplayName("WATCH 연동을 켜면 유효한 URL과 충분히 긴 token으로 HTTP client를 조립한다")
+    @DisplayName("WATCH 연동을 켜면 유효한 URL과 충분히 긴 토큰으로 HTTP 클라이언트를 구성한다")
     void createEnabledClientWithValidConfiguration() {
         contextRunner
                 .withPropertyValues(
@@ -84,7 +84,7 @@ class WatchIntegrationConfigTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 65_535})
-    @DisplayName("WATCH base URL의 명시 포트는 유효 범위 경곗값을 허용한다")
+    @DisplayName("WATCH 기본 URL의 명시 포트는 유효 범위 경곗값을 허용한다")
     void acceptValidExplicitPortBoundaries(int port) {
         contextRunner
                 .withPropertyValues(
@@ -102,7 +102,7 @@ class WatchIntegrationConfigTest {
             "https://watch.internal:65536",
             "https://watch.internal:"
     })
-    @DisplayName("WATCH base URL의 명시 포트가 유효 범위 밖이면 시작을 거부한다")
+    @DisplayName("WATCH 기본 URL의 명시 포트가 유효 범위 밖이면 시작을 거부한다")
     void rejectInvalidExplicitPortBoundaries(String baseUrl) {
         contextRunner
                 .withPropertyValues(
@@ -114,7 +114,7 @@ class WatchIntegrationConfigTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).hasRootCauseMessage(
-                            "WATCH base URL의 명시 포트는 1~65535 범위여야 합니다"
+                            "WATCH 기본 URL의 명시 포트는 1~65535 범위여야 합니다"
                     );
                 });
     }
@@ -139,7 +139,7 @@ class WatchIntegrationConfigTest {
     }
 
     @Test
-    @DisplayName("WATCH 연동을 켤 때 source namespace를 명시하지 않으면 시작을 거부한다")
+    @DisplayName("WATCH 연동을 켤 때 원본 네임스페이스를 명시하지 않으면 시작을 거부한다")
     void rejectMissingSourceNamespaceWhenEnabled() {
         contextRunner
                 .withPropertyValues(
@@ -150,12 +150,12 @@ class WatchIntegrationConfigTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
-                            .hasRootCauseMessage("WATCH 연동을 켤 때 source namespace는 필수입니다");
+                            .hasRootCauseMessage("WATCH 연동을 켤 때 원본 네임스페이스는 필수입니다");
                 });
     }
 
     @Test
-    @DisplayName("WATCH 연동을 켠 상태에서 base URL이 비어 있으면 시작을 거부한다")
+    @DisplayName("WATCH 연동을 켠 상태에서 기본 URL이 비어 있으면 시작을 거부한다")
     void rejectMissingBaseUrlWhenEnabled() {
         contextRunner
                 .withPropertyValues(
@@ -167,13 +167,13 @@ class WatchIntegrationConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage(
-                                    "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
+                                    "WATCH 기본 URL은 경로, 사용자 정보, 쿼리, 조각이 없는 절대 HTTPS 출처여야 합니다"
                             );
                 });
     }
 
     @Test
-    @DisplayName("WATCH 연동을 켠 상태에서 HTTP base URL이면 bearer token 보호를 위해 시작을 거부한다")
+    @DisplayName("WATCH 연동을 켠 상태에서 HTTP 기본 URL이면 Bearer 토큰 보호를 위해 시작을 거부한다")
     void rejectHttpBaseUrlWhenEnabled() {
         contextRunner
                 .withPropertyValues(
@@ -185,13 +185,13 @@ class WatchIntegrationConfigTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).hasRootCauseMessage(
-                            "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
+                            "WATCH 기본 URL은 경로, 사용자 정보, 쿼리, 조각이 없는 절대 HTTPS 출처여야 합니다"
                     );
                 });
     }
 
     @Test
-    @DisplayName("WATCH base URL에 서비스 path가 포함되면 origin 혼동을 막기 위해 거부한다")
+    @DisplayName("WATCH 기본 URL에 서비스 경로가 포함되면 출처 혼동을 막기 위해 거부한다")
     void rejectBaseUrlWithPath() {
         contextRunner
                 .withPropertyValues(
@@ -203,13 +203,13 @@ class WatchIntegrationConfigTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).hasRootCauseMessage(
-                            "WATCH base URL은 path, user info, query, fragment가 없는 절대 HTTPS origin이어야 합니다"
+                            "WATCH 기본 URL은 경로, 사용자 정보, 쿼리, 조각이 없는 절대 HTTPS 출처여야 합니다"
                     );
                 });
     }
 
     @Test
-    @DisplayName("WATCH 연동을 켠 상태에서 token이 짧으면 시작을 거부한다")
+    @DisplayName("WATCH 연동을 켠 상태에서 토큰이 짧으면 시작을 거부한다")
     void rejectShortBearerTokenWhenEnabled() {
         contextRunner
                 .withPropertyValues(
@@ -222,13 +222,13 @@ class WatchIntegrationConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage(
-                                    "WATCH bearer token은 32~200자의 URL-safe ASCII여야 합니다"
+                                    "WATCH Bearer 토큰은 32~200자의 URL 안전 ASCII여야 합니다"
                             );
                 });
     }
 
     @Test
-    @DisplayName("WATCH HTTP 시간 예산이 lease 안전 여유를 침범하면 시작을 거부한다")
+    @DisplayName("WATCH HTTP 최대 처리 시간이 임대 안전 범위를 넘으면 시작을 거부한다")
     void rejectRequestTimeoutBeyondLeaseBudget() {
         contextRunner
                 .withPropertyValues(
@@ -242,13 +242,13 @@ class WatchIntegrationConfigTest {
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure()).hasRootCauseMessage(
-                            "WATCH connect timeout과 read timeout의 합은 45초 이하여야 합니다"
+                            "WATCH 연결 시간 제한과 읽기 시간 제한의 합은 45초 이하여야 합니다"
                     );
                 });
     }
 
     @Test
-    @DisplayName("WATCH 설정 문자열은 URL과 bearer token을 노출하지 않는다")
+    @DisplayName("WATCH 설정 문자열은 URL과 Bearer 토큰을 노출하지 않는다")
     void redactSensitiveConfigurationFromToString() {
         WatchIntegrationProperties properties = new WatchIntegrationProperties(
                 true,

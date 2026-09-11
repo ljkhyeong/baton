@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Tag("policy")
 class WatchMonitorSourceTest {
 
-    @DisplayName("최대 길이 namespace도 WATCH의 128자 resource reference 제한을 지킨다")
+    @DisplayName("최대 길이 네임스페이스도 WATCH의 128자 자료 참조 제한을 지킨다")
     @Test
     void keepsResourceReferenceWithinWatchLimit() {
         WatchMonitorSource source = new WatchMonitorSource("a".repeat(63));
@@ -25,7 +25,7 @@ class WatchMonitorSourceTest {
         assertThat(reference).matches("[A-Za-z0-9._:-]+");
     }
 
-    @DisplayName("WATCH 제한을 넘는 namespace는 시작 전에 거절한다")
+    @DisplayName("WATCH 제한을 넘는 네임스페이스는 시작 전에 거부한다")
     @Test
     void rejectsOversizedNamespace() {
         assertThatThrownBy(() -> new WatchMonitorSource("a".repeat(64)))
@@ -33,7 +33,7 @@ class WatchMonitorSourceTest {
                 .hasMessageContaining("1~63자");
     }
 
-    @DisplayName("현재 namespace의 canonical 역할 자료 reference에서 UUID를 복원한다")
+    @DisplayName("현재 네임스페이스의 표준 역할 자료 참조에서 UUID를 복원한다")
     @Test
     void parsesCanonicalRoleResourceReference() {
         WatchMonitorSource source = new WatchMonitorSource("study-pilot");
@@ -43,7 +43,7 @@ class WatchMonitorSourceTest {
                 .contains(resourceId);
     }
 
-    @DisplayName("다른 namespace와 non-canonical UUID reference는 소유하지 않는다")
+    @DisplayName("다른 네임스페이스나 비표준 UUID 자료 참조는 소유하지 않는다")
     @Test
     void rejectsForeignOrNonCanonicalResourceReference() {
         WatchMonitorSource source = new WatchMonitorSource("study-pilot");

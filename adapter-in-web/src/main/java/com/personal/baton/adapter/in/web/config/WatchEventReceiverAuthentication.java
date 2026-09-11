@@ -19,7 +19,7 @@ public final class WatchEventReceiverAuthentication {
     }
 
     public static WatchEventReceiverAuthentication enabled(String bearerToken) {
-        Objects.requireNonNull(bearerToken, "WATCH 이벤트 수신 bearer token은 필수입니다");
+        Objects.requireNonNull(bearerToken, "WATCH 이벤트 수신 Bearer 토큰은 필수입니다");
         return new WatchEventReceiverAuthentication(
                 true,
                 bearerToken.getBytes(StandardCharsets.UTF_8)

@@ -87,7 +87,7 @@ class WatchMonitorOutboxPersistenceTest {
         seedActiveWorkspace();
     }
 
-    @DisplayName("같은 WATCH snapshot은 다시 쌓지 않고 변경된 payload만 불변 행으로 추가한다")
+    @DisplayName("같은 WATCH 스냅샷은 다시 저장하지 않고 변경된 페이로드만 새 행으로 추가한다")
     @Test
     void appendsOnlyChangedImmutableSnapshots() {
         WatchMonitorChange initial = activeChange(
@@ -146,7 +146,7 @@ class WatchMonitorOutboxPersistenceTest {
         )).isTrue();
     }
 
-    @DisplayName("source namespace 검사는 대소문자만 달라도 서로 다른 환경으로 판정한다")
+    @DisplayName("원본 네임스페이스는 대소문자만 달라도 다른 환경으로 판정한다")
     @Test
     void comparesSourceNamespaceCaseSensitively() {
         outboxPort.appendIfChanged(activeChange(
@@ -163,7 +163,7 @@ class WatchMonitorOutboxPersistenceTest {
         )).isTrue();
     }
 
-    @DisplayName("reconciliation은 후보 조회 뒤 바뀐 자료를 오래된 snapshot으로 되돌리지 않는다")
+    @DisplayName("상태 조정 중 자료가 바뀌면 오래된 스냅샷으로 되돌리지 않는다")
     @Test
     void rejectsStaleReconciliationCandidate() {
         String initialUrl = "https://example.com/first";
@@ -195,7 +195,7 @@ class WatchMonitorOutboxPersistenceTest {
         )).containsExactly(initialUrl, changedUrl);
     }
 
-    @DisplayName("reconciliation은 겹친 자료 수정 commit을 기다린 뒤 오래된 후보를 폐기한다")
+    @DisplayName("상태 조정은 동시에 진행된 자료 수정이 끝날 때까지 기다린 뒤 오래된 후보를 폐기한다")
     @Test
     void waitsForConcurrentResourceChangeBeforeRejectingStaleCandidate() throws Exception {
         String initialUrl = "https://example.com/first";
@@ -251,7 +251,7 @@ class WatchMonitorOutboxPersistenceTest {
         }
     }
 
-    @DisplayName("claim은 만료된 lease를 회수하고 같은 자료의 후속 snapshot을 앞선 종료 뒤에만 연다")
+    @DisplayName("처리를 시작할 때 만료된 임대를 회수하고, 같은 자료의 다음 스냅샷은 앞선 처리가 끝난 뒤 연다")
     @Test
     void reclaimsExpiredLeaseAndPreservesPerResourceOrder() {
         outboxPort.appendIfChanged(activeChange(UUID.randomUUID(), FIRST_RESOURCE_ID, "https://example.com/v1"));
@@ -327,7 +327,7 @@ class WatchMonitorOutboxPersistenceTest {
         });
     }
 
-    @DisplayName("유효하지 않은 대상 처리는 실패 표시와 INACTIVE 보상 snapshot을 한 트랜잭션으로 묶는다")
+    @DisplayName("유효하지 않은 대상 처리는 실패 표시와 INACTIVE 보상 스냅샷을 한 트랜잭션으로 묶는다")
     @Test
     void atomicallyMarksInvalidTargetAndAppendsInactiveCompensation() {
         UUID sourceEventId = UUID.fromString("00000000-0000-0000-0000-000000001641");
@@ -439,7 +439,7 @@ class WatchMonitorOutboxPersistenceTest {
         )).containsExactly(rejectedUrl, null, changedUrl);
     }
 
-    @DisplayName("시작 복구는 설정성 HTTP 실패만 재처리하고 revision 충돌은 영구 실패로 남긴다")
+    @DisplayName("시작 복구는 설정성 HTTP 실패만 재처리하고 리비전 충돌은 영구 실패로 남긴다")
     @Test
     void requeuesOnlyOperationalHttpFailuresOnStartup() {
         outboxPort.appendIfChanged(activeChange(
@@ -483,7 +483,7 @@ class WatchMonitorOutboxPersistenceTest {
         assertThat(storedStatus(revisionConflict.sourceRevision())).isEqualTo("FAILED");
     }
 
-    @DisplayName("reconciliation 후보는 UUID keyset page와 시즌 종료 상태를 함께 반환한다")
+    @DisplayName("상태 조정 후보는 UUID 키셋 페이지와 시즌 종료 상태를 함께 반환한다")
     @Test
     void findsReconciliationCandidatesThroughRoleAndSeason() {
         seedEndedWorkspace();
@@ -511,7 +511,7 @@ class WatchMonitorOutboxPersistenceTest {
                 );
     }
 
-    @DisplayName("page cursor보다 앞에 추가된 자료는 다음 reconciliation에서 처음부터 다시 찾는다")
+    @DisplayName("페이지 커서보다 앞에 추가된 자료는 다음 상태 조정 때 처음부터 다시 찾는다")
     @Test
     void findsEarlierResourceOnNextReconciliationRun() {
         assertThat(outboxPort.findReconciliationCandidates(null, 1))
@@ -533,7 +533,7 @@ class WatchMonitorOutboxPersistenceTest {
                 .containsExactly(EARLIER_RESOURCE_ID, FIRST_RESOURCE_ID, SECOND_RESOURCE_ID);
     }
 
-    @DisplayName("reconciliation page 크기는 양수여야 한다")
+    @DisplayName("상태 조정 페이지 크기는 양수여야 한다")
     @Test
     void rejectsNonPositiveReconciliationPageLimit() {
         assertThatThrownBy(() -> outboxPort.findReconciliationCandidates(null, 0))

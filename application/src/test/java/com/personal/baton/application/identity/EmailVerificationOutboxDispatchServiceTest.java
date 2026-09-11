@@ -37,7 +37,7 @@ class EmailVerificationOutboxDispatchServiceTest {
             "secure-email-verification-token-000000000001"
     );
 
-    @DisplayName("현재 challenge와 lease가 유효한 이메일 인증 메시지만 전달 완료한다")
+    @DisplayName("현재 인증 요청과 처리 임대가 유효한 이메일 인증 메시지만 전달 완료한다")
     @Test
     void deliversCurrentClaimAfterClaimTransaction() {
         EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
@@ -60,7 +60,7 @@ class EmailVerificationOutboxDispatchServiceTest {
         verify(outboxPort).markDelivered(1, delivery.leaseToken(), NOW);
     }
 
-    @DisplayName("재발급으로 supersede된 claim은 SMTP 호출 직전에 걸러낸다")
+    @DisplayName("재발급으로 대체된 처리 권한은 SMTP 호출 직전에 걸러낸다")
     @Test
     void skipsSupersededClaimBeforeDelivery() {
         EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);

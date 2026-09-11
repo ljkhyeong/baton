@@ -261,7 +261,7 @@ class AuthRestDocsTest {
                         )));
     }
 
-    @DisplayName("인증 provider 목록 API는 완전히 구성된 allowlist만 고정 순서로 반환한다")
+    @DisplayName("인증 공급자 목록 API는 설정이 끝난 허용 목록만 고정 순서로 반환한다")
     @Test
     void documentsAuthProviders() throws Exception {
         mockMvc.perform(get(AuthController.PROVIDERS_PATH))
@@ -338,7 +338,7 @@ class AuthRestDocsTest {
                         )));
     }
 
-    @DisplayName("자체 이메일 등록 API는 일시적 identity 저장 실패를 재시도 가능한 503으로 반환한다")
+    @DisplayName("자체 이메일 등록 API는 일시적인 신원 저장 실패를 재시도 가능한 503으로 반환한다")
     @Test
     void documentsLocalRegistrationTemporarilyUnavailable() throws Exception {
         when(registerUseCase.registerLocalAccount(any()))
@@ -418,7 +418,7 @@ class AuthRestDocsTest {
                         )));
     }
 
-    @DisplayName("자체 이메일 검증 API는 일시적 identity 저장 실패를 재시도 가능한 503으로 반환한다")
+    @DisplayName("자체 이메일 검증 API는 일시적인 신원 저장 실패를 재시도 가능한 503으로 반환한다")
     @Test
     void documentsLocalEmailVerificationTemporarilyUnavailable() throws Exception {
         when(verifyUseCase.verifyLocalEmail(any()))
@@ -674,7 +674,7 @@ class AuthSessionRestDocsTest {
                 ));
     }
 
-    @DisplayName("자체 이메일 로그인 API는 일시적 identity 인프라 장애를 503으로 반환한다")
+    @DisplayName("자체 이메일 로그인 API는 일시적인 신원 인프라 장애를 503으로 반환한다")
     @Test
     void documentsLocalSessionTemporarilyUnavailable() throws Exception {
         when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))

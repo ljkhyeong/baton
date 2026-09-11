@@ -231,7 +231,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     }
 
     @Test
-    @DisplayName("실제 MySQL batch 조회는 team과 season의 active 매핑만 resource UUID 순서로 반환한다")
+    @DisplayName("실제 MySQL 일괄 조회는 팀과 시즌의 활성 연결만 자료 UUID 순서로 반환한다")
     void queriesActiveMappingsByTeamAndSeasonInResourceOrder() {
         RoundFixture fixture = createFixture();
         UUID secondResourceId = createAdditionalResource(fixture);

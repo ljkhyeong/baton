@@ -65,7 +65,7 @@ class RoundAuthorizationPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("구성원 멤버십 unique 경쟁은 실패 transaction 밖에서 구성원 충돌로 변환한다")
+    @DisplayName("구성원 멤버십 유일 제약 충돌은 실패한 트랜잭션 밖에서 구성원 충돌로 변환한다")
     void classifyMemberMembershipUniqueConflict() {
         AccountTeamMembership membership = membership();
         AccountTeamMembership winner = membership();
@@ -82,7 +82,7 @@ class RoundAuthorizationPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("계정·팀 멤버십 unique 경쟁은 실패 transaction 밖에서 계정·팀 충돌로 변환한다")
+    @DisplayName("계정·팀 멤버십 유일 제약 충돌은 실패한 트랜잭션 밖에서 계정·팀 충돌로 변환한다")
     void classifyAccountTeamMembershipUniqueConflict() {
         AccountTeamMembership membership = membership();
         AccountTeamMembership winner = membership();
@@ -99,7 +99,7 @@ class RoundAuthorizationPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("resource 경쟁 직후 방이 종료되면 새 식별자로 다시 시도할 수 있다")
+    @DisplayName("자료 식별자 충돌 직후 방이 종료되면 새 식별자로 다시 시도할 수 있다")
     void retryWhenConflictingResourceMappingWasAlreadyEnded() {
         RoundRoomMapping mapping = mapping();
         RoundRoomTombstone tombstone = tombstone();

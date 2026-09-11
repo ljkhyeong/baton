@@ -36,7 +36,7 @@ class AccountAuthenticationFailureHandlerTest {
                     rateLimiter
             );
 
-    @DisplayName("Spring Security가 감싼 identity 인프라 장애는 모두 503으로 분류한다")
+    @DisplayName("Spring Security가 감싼 신원 인프라 장애는 모두 503으로 분류한다")
     @ParameterizedTest(name = "{0}")
     @MethodSource("identityInfrastructureFailures")
     void exposesWrappedIdentityInfrastructureFailure(
@@ -57,7 +57,7 @@ class AccountAuthenticationFailureHandlerTest {
                 .contains("IDENTITY_TEMPORARILY_UNAVAILABLE");
     }
 
-    @DisplayName("identity 인프라 장애는 계정 실패 예산을 소비하지 않는다")
+    @DisplayName("신원 인프라 장애는 계정 실패 예산을 소비하지 않는다")
     @Test
     void refundsAccountFailureBudgetForInfrastructureFailure() throws Exception {
         String email = "member@example.com";

@@ -17,7 +17,7 @@ class RoundAuthorizationExceptionHandlerTest {
     private final RoundAuthorizationExceptionHandler handler =
             new RoundAuthorizationExceptionHandler();
 
-    @DisplayName("roomId가 있는 mapping 종료 요청이어도 참여권 cookie를 만료하지 않는다")
+    @DisplayName("roomId가 있는 연결 종료 요청이어도 참여권 쿠키를 만료하지 않는다")
     @Test
     void keepsCookieForRoomMappingDeletion() {
         MockHttpServletRequest request = mappedRequest(
@@ -33,7 +33,7 @@ class RoundAuthorizationExceptionHandlerTest {
         assertThat(response.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).isNull();
     }
 
-    @DisplayName("참여권 갱신 mapping의 roomId가 canonical 형식이 아니면 cookie를 만들지 않는다")
+    @DisplayName("참여권 갱신 연결의 roomId가 표준 형식이 아니면 쿠키를 만들지 않는다")
     @Test
     void rejectsNonCanonicalRefreshRoomIdForCookie() {
         MockHttpServletRequest request = mappedRequest(

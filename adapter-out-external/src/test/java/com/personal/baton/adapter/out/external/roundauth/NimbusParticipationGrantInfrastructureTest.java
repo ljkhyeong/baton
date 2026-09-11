@@ -80,7 +80,7 @@ class NimbusParticipationGrantInfrastructureTest {
     }
 
     @Test
-    @DisplayName("현재 RSA key와 kid로 RS256 참여권의 고정 claim을 서명한다")
+    @DisplayName("현재 RSA 키와 kid로 RS256 참여권의 고정 클레임을 서명한다")
     void signRs256ParticipationGrant() throws Exception {
         NimbusParticipationGrantInfrastructure infrastructure = infrastructure();
 
@@ -211,7 +211,7 @@ class NimbusParticipationGrantInfrastructureTest {
     }
 
     @Test
-    @DisplayName("roomId claim이 canonical 4-4-4 형식이 아니면 서명하지 않는다")
+    @DisplayName("roomId 클레임이 표준 4-4-4 형식이 아니면 서명하지 않는다")
     void rejectNonCanonicalRoomId() {
         ParticipationGrantClaims malformedClaims = new ParticipationGrantClaims(
                 ACCOUNT_ID,
@@ -247,7 +247,7 @@ class NimbusParticipationGrantInfrastructureTest {
     }
 
     @Test
-    @DisplayName("PEM marker가 없는 raw base64 key 파일은 거부한다")
+    @DisplayName("PEM 표식이 없는 Base64 원문 키 파일은 거부한다")
     void rejectRawBase64KeyFile() throws IOException {
         Path rawPublicKey = tempDirectory.resolve("raw-public.key");
         Files.writeString(

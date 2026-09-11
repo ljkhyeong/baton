@@ -43,7 +43,7 @@ class AccountOAuth2UserServiceTest {
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
 
-    @DisplayName("Google OIDC sub로 계정을 resolve하고 callback 동안 provider OIDC 계약을 보존한다")
+    @DisplayName("Google OIDC sub로 계정을 찾고 콜백 처리 중 공급자의 OIDC 계약을 유지한다")
     @Test
     void resolvesGoogleByOidcSubject() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
@@ -150,7 +150,7 @@ class AccountOAuth2UserServiceTest {
         );
     }
 
-    @DisplayName("Google 표시 이름은 domain 길이 계약에 맞추되 surrogate pair를 자르지 않는다")
+    @DisplayName("Google 표시 이름은 도메인 길이 제한에 맞추되 서로게이트 쌍을 자르지 않는다")
     @Test
     void safelyLimitsUnicodeDisplayName() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
@@ -187,7 +187,7 @@ class AccountOAuth2UserServiceTest {
         assertThat(Character.isLowSurrogate(displayName.charAt(99))).isTrue();
     }
 
-    @DisplayName("Naver response.id가 없으면 일반화된 OAuth profile 오류로 fail-closed 한다")
+    @DisplayName("Naver response.id가 없으면 공통 OAuth 프로필 오류로 차단한다")
     @Test
     void rejectsNaverProfileWithoutSubject() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
@@ -216,7 +216,7 @@ class AccountOAuth2UserServiceTest {
         verify(resolveUseCase, never()).resolveExternalLogin(any());
     }
 
-    @DisplayName("Google identity 인프라 장애는 원인을 보존한 OAuth 인증 실패로 변환한다")
+    @DisplayName("Google 신원 인프라 장애는 원인을 보존한 OAuth 인증 실패로 변환한다")
     @Test
     void wrapsGoogleIdentityInfrastructureFailureForSecurityFailureHandler() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
@@ -249,7 +249,7 @@ class AccountOAuth2UserServiceTest {
                 .hasCause(failure);
     }
 
-    @DisplayName("identity와 무관한 외부 로그인 결함은 OAuth 실패로 오분류하지 않는다")
+    @DisplayName("신원 처리와 무관한 외부 로그인 결함은 OAuth 실패로 오분류하지 않는다")
     @Test
     void preservesUnrelatedExternalLoginFailure() {
         ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);

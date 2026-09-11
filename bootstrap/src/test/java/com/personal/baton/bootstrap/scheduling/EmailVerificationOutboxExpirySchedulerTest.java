@@ -19,7 +19,7 @@ class EmailVerificationOutboxExpirySchedulerTest {
             .withBean(ExpireEmailVerificationOutboxUseCase.class, () -> expiry)
             .withUserConfiguration(EmailVerificationOutboxExpiryScheduler.class);
 
-    @DisplayName("이메일 발송을 비활성화해도 만료 payload 정리 scheduler는 등록한다")
+    @DisplayName("이메일 발송을 비활성화해도 만료 페이로드 정리 스케줄러는 등록한다")
     @Test
     void registersExpirySchedulerForDisabledDelivery() {
         contextRunner
@@ -29,7 +29,7 @@ class EmailVerificationOutboxExpirySchedulerTest {
                         .hasSingleBean(EmailVerificationOutboxExpiryScheduler.class));
     }
 
-    @DisplayName("이메일 인증 만료 scheduler는 독립된 expiry 유스케이스를 호출한다")
+    @DisplayName("이메일 인증 만료 스케줄러는 별도의 만료 유스케이스를 호출한다")
     @Test
     void delegatesToExpiryUseCase() {
         when(expiry.expireUndeliverable()).thenReturn(1);

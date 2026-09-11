@@ -84,7 +84,7 @@ class IdentityPersistenceAdapterTest {
                 );
     }
 
-    @DisplayName("낙관적 lock 경쟁은 중립 accepted 응답으로 숨길 수 없는 일시적 처리 불가다")
+    @DisplayName("낙관적 잠금 충돌은 성공 응답으로 숨기지 않고 일시적인 처리 실패로 반환한다")
     @Test
     void translatesOptimisticContentionToTemporaryUnavailability() {
         Account account = mock(Account.class);
@@ -100,7 +100,7 @@ class IdentityPersistenceAdapterTest {
                 );
     }
 
-    @DisplayName("외부 신원 낙관적 lock 경쟁은 fresh transaction 재시도용 예외로 구분한다")
+    @DisplayName("외부 신원 낙관적 잠금 충돌은 새 트랜잭션 재시도용 예외로 구분한다")
     @Test
     void translatesIdentityOptimisticContentionToConcurrentModification() {
         AccountIdentity identity = mock(AccountIdentity.class);
@@ -116,7 +116,7 @@ class IdentityPersistenceAdapterTest {
                 );
     }
 
-    @DisplayName("인증 token unique 경쟁은 이메일 존재 충돌로 위장하지 않는다")
+    @DisplayName("인증 토큰 유일 제약 충돌은 이메일 존재 충돌로 위장하지 않는다")
     @Test
     void keepsChallengeTokenRaceOutOfIdentityConflict() {
         EmailVerificationChallenge challenge = mock(EmailVerificationChallenge.class);

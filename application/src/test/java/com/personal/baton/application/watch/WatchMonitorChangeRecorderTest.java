@@ -32,7 +32,7 @@ class WatchMonitorChangeRecorderTest {
             Clock.fixed(NOW, ZoneOffset.UTC)
     );
 
-    @DisplayName("감시 적격 자료 생성은 안정적인 reference와 ACTIVE snapshot을 기록한다")
+    @DisplayName("감시 적격 자료 생성은 고정된 자료 참조와 ACTIVE 스냅샷을 기록한다")
     @Test
     void recordsEligibleCreation() {
         when(outboxPort.appendIfChanged(any())).thenReturn(true);
@@ -52,7 +52,7 @@ class WatchMonitorChangeRecorderTest {
         assertThat(change.occurredAt()).isEqualTo(NOW);
     }
 
-    @DisplayName("처음부터 감시 비적격인 자료는 WATCH outbox를 만들지 않는다")
+    @DisplayName("처음부터 감시 비적격인 자료는 WATCH 아웃박스를 만들지 않는다")
     @Test
     void skipsIneligibleCreation() {
         recorder.recordCreated(resource("https://docs.example.com/study?token=secret"));
@@ -60,7 +60,7 @@ class WatchMonitorChangeRecorderTest {
         verify(outboxPort, never()).appendIfChanged(any());
     }
 
-    @DisplayName("WATCH 연동이 꺼져 있으면 기본 namespace로 미래 전달 snapshot을 쌓지 않는다")
+    @DisplayName("WATCH 연동이 꺼져 있으면 기본 네임스페이스로 다음 전달 스냅샷을 쌓지 않는다")
     @Test
     void skipsChangesWhileIntegrationIsDisabled() {
         WatchMonitorOutboxPort disabledOutbox = mock(WatchMonitorOutboxPort.class);
@@ -142,7 +142,7 @@ class WatchMonitorChangeRecorderTest {
                 .allMatch(change -> change.monitoringState() == WatchMonitoringState.INACTIVE);
     }
 
-    @DisplayName("reconciliation은 현재 후보 확인과 snapshot 저장을 같은 출력 port 경계에 맡긴다")
+    @DisplayName("상태 조정은 현재 후보 확인과 스냅샷 저장을 같은 출력 포트에 맡긴다")
     @Test
     void delegatesReconciliationWithExpectedCandidate() {
         WatchMonitorCandidate candidate = new WatchMonitorCandidate(
@@ -162,7 +162,7 @@ class WatchMonitorChangeRecorderTest {
         assertThat(captor.getValue().targetUrl()).isEqualTo(candidate.targetUrl());
     }
 
-    @DisplayName("점검 중단 모드의 reconciliation은 연결을 끊지 않고 INACTIVE를 기록한다")
+    @DisplayName("점검 중단 모드의 상태 조정은 연결을 끊지 않고 INACTIVE를 기록한다")
     @Test
     void reconcilesInactiveWhileMonitoringIsDisabled() {
         WatchMonitorOutboxPort decommissioningOutbox = mock(WatchMonitorOutboxPort.class);

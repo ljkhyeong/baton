@@ -227,7 +227,7 @@ class RoundAuthorizationServicesTest {
     }
 
     @Test
-    @DisplayName("인증 계정은 접근 키로 확인한 활성 구성원을 팀 멤버십으로 명시적으로 claim한다")
+    @DisplayName("인증 계정은 접근 키로 확인한 활성 구성원을 팀 멤버십으로 명시적으로 연결한다")
     void claimsActiveMemberForAuthenticatedAccount() {
         Member member = Member.create(MEMBER_ID, TEAM_ID, "스터디원");
         when(peopleRepository.findMemberById(MEMBER_ID)).thenReturn(Optional.of(member));
@@ -350,7 +350,7 @@ class RoundAuthorizationServicesTest {
     }
 
     @Test
-    @DisplayName("참여권은 공급자 ID가 아닌 Account UUID를 sub claim으로 300초 동안 발급한다")
+    @DisplayName("참여권은 공급자 ID가 아닌 Account UUID를 subject 클레임으로 300초 동안 발급한다")
     void issuesShortLivedGrantForCanonicalAccount() {
         RoundRoomMapping mapping = mapping();
         when(roundRepository.findTombstoneForShare(ROOM_ID))
@@ -421,7 +421,7 @@ class RoundAuthorizationServicesTest {
     }
 
     @Test
-    @DisplayName("클라이언트가 보낸 team/season/resource hint가 authoritative mapping과 다르면 방 존재를 숨긴다")
+    @DisplayName("클라이언트가 보낸 팀·시즌·자료 힌트가 서버 연결 정보와 다르면 방 존재를 숨긴다")
     void rejectsMismatchedRoomHint() {
         when(roundRepository.findTombstoneForShare(ROOM_ID))
                 .thenReturn(Optional.of(tombstone()));

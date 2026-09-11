@@ -100,7 +100,7 @@ class AuthRateLimiterTest {
         );
     }
 
-    @DisplayName("인증 token은 다섯 번 뒤 제한한다")
+    @DisplayName("인증 토큰은 다섯 번 뒤 제한한다")
     @Test
     void limitsVerificationByToken() {
         AuthRateLimiter limiter = new AuthRateLimiter();
@@ -114,7 +114,7 @@ class AuthRateLimiterTest {
                 .isInstanceOf(AuthRateLimitExceededException.class);
     }
 
-    @DisplayName("ROUND refresh는 같은 Account와 room에서 분당 열두 번까지만 허용한다")
+    @DisplayName("ROUND 갱신은 같은 Account와 방에서 분당 열두 번까지만 허용한다")
     @Test
     void limitsRoundGrantByAccountAndRoom() {
         AuthRateLimiter limiter = new AuthRateLimiter();
@@ -136,7 +136,7 @@ class AuthRateLimiterTest {
         limiter.checkRoundGrant("198.51.100.200", accountId, "cdef-hjkm-npqr");
     }
 
-    @DisplayName("ROUND refresh의 IPv6 client 제한은 주소 회전을 막도록 /64로 묶는다")
+    @DisplayName("ROUND 갱신의 IPv6 클라이언트 제한은 주소 회전을 막도록 /64로 묶는다")
     @Test
     void limitsRoundGrantByIpv6NetworkPrefix() {
         AuthRateLimiter limiter = new AuthRateLimiter();
