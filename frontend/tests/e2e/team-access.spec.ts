@@ -69,6 +69,15 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 만료�
   await dialog.getByLabel('초대 권한').selectOption('VIEWER')
   await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveValue(new RegExp(`/join#invite=${TOKEN}$`))
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true,
+    value: { writeText: async () => { throw new DOMException('복사 권한 없음', 'NotAllowedError') } } }))
+  await dialog.getByRole('button', { name: '초대 링크 복사' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('위 링크를 선택해 직접 복사해 주세요.')
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true,
+    value: { writeText: async () => undefined } }))
+  await dialog.getByRole('button', { name: '초대 링크 복사' }).click()
+  await expect(dialog.getByRole('status')).toHaveText('초대 링크를 복사했습니다.')
+  await expect(dialog.getByText('위 링크를 선택해 직접 복사해 주세요.', { exact: false })).toHaveCount(0)
   await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
   await expect(dialog.getByText('초대 취소', { exact: true })).toBeVisible()

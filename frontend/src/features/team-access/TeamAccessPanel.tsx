@@ -26,7 +26,21 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const [memberId, setMemberId] = useState('')
   const [permission, setPermission] = useState<Permission>('MEMBER')
   const [invitationUrl, setInvitationUrl] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const copyInvitationUrl = async () => {
+    if (!invitationUrl) return
+    setCopyStatus('idle')
+    if (!navigator.clipboard?.writeText) {
+      setCopyStatus('failed')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(invitationUrl)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
+    }
+  }
   const mutation = useMutation({ mutationFn: async (action: { kind: 'activate' | 'invite' | 'revoke' | 'permission'; id?: string; permission?: Permission | null }) => {
     if (action.kind === 'activate') {
       const key = recoveryKey
@@ -36,10 +50,10 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     if (action.kind === 'invite') {
       const created = await createTeamInvitation(scope, memberId, permission)
       setInvitationUrl(`${window.location.origin}/join#invite=${created.token}`)
-      setCopied(false)
+      setCopyStatus('idle')
       return getTeamAccess(scope)
     }
-    if (action.kind === 'revoke') { setInvitationUrl(''); return revokeTeamInvitation(scope, action.id!) }
+    if (action.kind === 'revoke') { setInvitationUrl(''); setCopyStatus('idle'); return revokeTeamInvitation(scope, action.id!) }
     return changeTeamPermission(scope, action.id!, action.permission ?? null)
   }, onSuccess: data => {
     client.setQueryData(queryKey, data)
@@ -86,8 +100,10 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         <p>열람자는 조회, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리를 할 수 있습니다.</p>
         <button type="submit" disabled={!memberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
-      {invitationUrl && <div><label>생성한 초대 링크<input readOnly value={invitationUrl} /></label>
-        <button type="button" onClick={() => void navigator.clipboard.writeText(invitationUrl).then(() => setCopied(true)).catch(() => setCopied(false))}>{copied ? '복사했습니다' : '초대 링크 복사'}</button>
+      {invitationUrl && <div><label>생성한 초대 링크<input readOnly value={invitationUrl} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
+        <button type="button" onClick={() => void copyInvitationUrl()}>초대 링크 복사</button>
+        {copyStatus === 'copied' && <p role="status">초대 링크를 복사했습니다.</p>}
+        {copyStatus === 'failed' && <p role="alert">자동으로 복사하지 못했습니다. 위 링크를 선택해 직접 복사해 주세요.</p>}
         <p>초대한 구성원에게 전달하세요. 7일 동안 사용할 수 있습니다. 새 링크를 만들면 같은 구성원의 미수락 초대는 취소됩니다.</p>
       </div>}
       <h4>초대 목록</h4>
