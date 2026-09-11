@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
 import type {
   Decision,
@@ -102,12 +102,14 @@ export function RecordSearchView({
     ).filter(result => !result.createdAt).length, 0)
   }, [filters, sources])
   const validDateRange = isRecordSearchDateRangeValid(filters)
-  const hasFilters = filters.query !== ''
-    || filters.type !== 'all'
-    || filters.roleId !== ''
-    || filters.state !== 'all'
-    || filters.fromDate !== ''
-    || filters.toDate !== ''
+  const activeFilterCount = [
+    filters.type !== 'all',
+    filters.roleId !== '',
+    filters.state !== 'all',
+    filters.fromDate !== '' || filters.toDate !== '',
+  ].filter(Boolean).length
+  const hasFilters = filters.query !== '' || activeFilterCount > 0
+  const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0)
   const updateFilter = <Key extends keyof RecordSearchFilters>(
     key: Key,
     value: RecordSearchFilters[Key],
@@ -143,68 +145,72 @@ export function RecordSearchView({
             />
           </span>
         </label>
-        <div className="record-search-filters">
-          <label>
-            <span>기록 종류</span>
-            <select
-              value={filters.type}
-              onChange={(event) =>
-                updateFilter('type', event.target.value as RecordSearchFilters['type'])}
-            >
-              <option value="all">결정 · 인수인계 · 자료</option>
-              <option value="decision">결정만</option>
-              <option value="handoff">인수인계만</option>
-              <option value="resource">자료만</option>
-            </select>
-          </label>
-          <label>
-            <span>관련 역할</span>
-            <select
-              aria-label="관련 역할"
-              value={filters.roleId}
-              onChange={(event) => updateFilter('roleId', event.target.value)}
-            >
-              <option value="">모든 역할</option>
-              {sources.map(source => <optgroup key={source.season.id} label={source.season.name}>
-                {source.roles.map(role => <option key={role.id} value={role.id}>{source.season.id === season.id && sources.length === 1 ? role.name : `${source.season.name} · ${role.name}`}</option>)}
-              </optgroup>)}
-            </select>
-          </label>
-          <label>
-            <span>상태</span>
-            <select
-              value={filters.state}
-              onChange={(event) =>
-                updateFilter('state', event.target.value as RecordSearchFilters['state'])}
-            >
-              <option value="all">전체 기록</option>
-              <option value="active">보관하지 않은 기록</option>
-              <option value="archived">보관 기록</option>
-            </select>
-          </label>
-          <label>
-            <span>작성일(시작)</span>
-            <input
-              type="date"
-              value={filters.fromDate}
-              max={filters.toDate || undefined}
-              onChange={(event) => updateFilter('fromDate', event.target.value)}
-            />
-          </label>
-          <label>
-            <span>작성일(종료)</span>
-            <input
-              type="date"
-              value={filters.toDate}
-              min={filters.fromDate || undefined}
-              onChange={(event) => updateFilter('toDate', event.target.value)}
-            />
-          </label>
-        </div>
-        <div className="record-search-footer">
-          <span>
+        <details className="record-search-advanced" open={filtersOpen}
+          onToggle={event => setFiltersOpen(event.currentTarget.open)}>
+          <summary>상세 필터{activeFilterCount > 0 && <span>{activeFilterCount}개 적용</span>}</summary>
+          <div className="record-search-filters">
+            <label>
+              <span>기록 종류</span>
+              <select
+                value={filters.type}
+                onChange={(event) =>
+                  updateFilter('type', event.target.value as RecordSearchFilters['type'])}
+              >
+                <option value="all">결정 · 인수인계 · 자료</option>
+                <option value="decision">결정만</option>
+                <option value="handoff">인수인계만</option>
+                <option value="resource">자료만</option>
+              </select>
+            </label>
+            <label>
+              <span>관련 역할</span>
+              <select
+                aria-label="관련 역할"
+                value={filters.roleId}
+                onChange={(event) => updateFilter('roleId', event.target.value)}
+              >
+                <option value="">모든 역할</option>
+                {sources.map(source => <optgroup key={source.season.id} label={source.season.name}>
+                  {source.roles.map(role => <option key={role.id} value={role.id}>{source.season.id === season.id && sources.length === 1 ? role.name : `${source.season.name} · ${role.name}`}</option>)}
+                </optgroup>)}
+              </select>
+            </label>
+            <label>
+              <span>상태</span>
+              <select
+                value={filters.state}
+                onChange={(event) =>
+                  updateFilter('state', event.target.value as RecordSearchFilters['state'])}
+              >
+                <option value="all">전체 기록</option>
+                <option value="active">보관하지 않은 기록</option>
+                <option value="archived">보관 기록</option>
+              </select>
+            </label>
+            <label>
+              <span>작성일(시작)</span>
+              <input
+                type="date"
+                value={filters.fromDate}
+                max={filters.toDate || undefined}
+                onChange={(event) => updateFilter('fromDate', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>작성일(종료)</span>
+              <input
+                type="date"
+                value={filters.toDate}
+                min={filters.fromDate || undefined}
+                onChange={(event) => updateFilter('toDate', event.target.value)}
+              />
+            </label>
+          </div>
+          <p className="record-search-date-note">
             날짜는 각 시즌의 시간대를 기준으로 검색합니다. 현재 시즌의 시간대는 <strong>{season.timeZone}</strong>입니다.
-          </span>
+          </p>
+        </details>
+        <div className="record-search-footer">
           <button
             type="button"
             className="secondary-button"

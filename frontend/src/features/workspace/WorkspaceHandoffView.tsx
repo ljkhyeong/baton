@@ -165,7 +165,17 @@ export function HandoffView({
         aria-labelledby={selectedTabId}
         tabIndex={0}
       >
-        <div className="handoff-summary"><span className="section-kicker">{selected.name}</span><h2>{handoffSummaryTitle}</h2><p>{next && !isActiveMember(next) ? '활동 중인 다음 담당자를 정한 뒤 인수인계를 이어 주세요.' : selected.purpose}</p><div className="handoff-score"><strong>{selectedProgress}%</strong><span><i style={{ width: `${selectedProgress}%` }} /></span><small>{items.filter((item) => item.completed).length}/{items.length} 항목 완료</small></div></div>
+        <div className="handoff-summary">
+          <div className="handoff-summary-copy">
+            <h2>{handoffSummaryTitle}</h2>
+            <p>{next && !isActiveMember(next) ? '활동 중인 다음 담당자를 정한 뒤 인수인계를 이어 주세요.' : selected.purpose}</p>
+          </div>
+          <div className="handoff-score">
+            <strong>{selectedProgress}%</strong>
+            <span><i style={{ width: `${selectedProgress}%` }} /></span>
+            <small>{items.filter((item) => item.completed).length}/{items.length} 항목 완료</small>
+          </div>
+        </div>
         <div className="handoff-checklist">
           <div
             className={`handoff-lifecycle-card ${selectedHandoff?.status.toLowerCase() ?? 'ready'}`}

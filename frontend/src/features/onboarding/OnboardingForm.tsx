@@ -32,22 +32,20 @@ export default function OnboardingForm() {
     <main className="onboarding-page">
       <section className="onboarding-story" aria-labelledby="onboarding-title">
         <div className="brand onboarding-brand"><span className="brand-mark" />BATON</div>
-        <div>
-          <span className="section-kicker">시작하기</span>
-          <h1 id="onboarding-title">담당 업무부터<br />인수인계까지.</h1>
+        <div className="onboarding-story-copy">
+          <h1 id="onboarding-title">담당 업무부터 <br />인수인계까지.</h1>
           <p>담당 업무, 결정 이유, 인수인계 자료를 한곳에서 관리하세요.</p>
         </div>
         <ol className="onboarding-points">
-          <li><span>01</span><strong>활동 기간 정하기</strong><small>팀이 함께 활동할 기간을 ‘시즌’으로 관리합니다.</small></li>
-          <li><span>02</span><strong>담당자 정하기</strong><small>누가 어떤 업무를 맡을지 정합니다.</small></li>
-          <li><span>03</span><strong>인수인계 준비하기</strong><small>담당 업무와 참고 자료를 남깁니다.</small></li>
+          <li><strong>활동 기간</strong><small>함께 활동할 기간을 ‘시즌’으로 관리합니다.</small></li>
+          <li><strong>업무와 담당자</strong><small>누가 무엇을 맡는지 정합니다.</small></li>
+          <li><strong>인수인계</strong><small>다음 담당자에게 업무와 자료를 전달합니다.</small></li>
         </ol>
       </section>
 
       <section className="onboarding-form-panel" aria-labelledby="workspace-form-title">
         <div className="onboarding-form-topline">
           <div className="onboarding-form-heading">
-            <span className="section-kicker">새 작업 공간</span>
             <h2 id="workspace-form-title">팀 작업 공간 만들기</h2>
             <p>팀 이름, 활동 기간, 구성원을 입력하세요.</p>
           </div>
@@ -136,7 +134,6 @@ export default function OnboardingForm() {
             <span>팀 이름</span>
             <input
               required
-              autoFocus
               ref={teamNameInputRef}
               maxLength={MAX_WORKSPACE_NAME_LENGTH}
               value={form.teamName}

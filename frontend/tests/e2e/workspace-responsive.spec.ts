@@ -32,6 +32,11 @@ test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역�
     await page.setViewportSize({ width, height: 844 })
 
     const topbar = page.locator('.mobile-topbar')
+    await expect(topbar.locator('.mobile-team strong')).toBeInViewport()
+    expect(await topbar.locator('.mobile-team strong').evaluate(element =>
+      element.scrollWidth <= element.clientWidth,
+    )).toBe(true)
+    await expect(page.locator('.role-row .next-cell')).toBeVisible()
     const workspaceActions = [
       topbar.getByRole('button', { name: '공유' }),
       topbar.getByRole('button', { name: '링크 관리' }),
@@ -201,6 +206,12 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   const selectedRoleTab = page.getByRole('tab', { selected: true })
+  if (testInfo.project.name === 'mobile') {
+    const prepareButton = page.getByRole('button', { name: '인수인계 준비 시작' })
+    const prepareBounds = await prepareButton.boundingBox()
+    const navBounds = await navigation(page, testInfo.project.name).boundingBox()
+    expect(prepareBounds!.y + prepareBounds!.height).toBeLessThanOrEqual(navBounds!.y)
+  }
   await selectedRoleTab.focus()
   await page.keyboard.press('Tab')
 

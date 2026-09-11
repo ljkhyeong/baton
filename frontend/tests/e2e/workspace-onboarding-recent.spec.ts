@@ -112,6 +112,8 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
   const api = await installApi(page)
   await page.goto('/')
 
+  await expect(page.getByRole('heading', { level: 1 })).toBeInViewport()
+  await expect(page.getByLabel('팀 이름')).toBeInViewport()
   await page.getByLabel('팀 이름').fill('함께 푸는 알고리즘')
   await page.getByLabel('시즌 이름').fill('2026 가을 시즌')
   await page.getByLabel('시작일').fill('2026-09-01')

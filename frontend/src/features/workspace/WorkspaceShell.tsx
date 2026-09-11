@@ -145,8 +145,8 @@ export function MobileTopbar({
         aria-label={`${teamName} ${seasonName}. 시즌 전환`}
         onClick={onSwitchSeason}
       >
-        <span>{teamName}</span>
-        <small>{seasonName}</small>
+        <span className="mobile-team-copy"><strong>{teamName}</strong><small>{seasonName}</small></span>
+        <Icon name="chevron" size={15} />
       </button>
       <span className="mobile-workspace-actions">
         <Link className="team-list-link" to="/my-teams">내 팀</Link>
