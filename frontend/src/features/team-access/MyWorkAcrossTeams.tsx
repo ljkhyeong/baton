@@ -83,7 +83,7 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
         onClick={() => { void preferences.refetch(); all.forEach(query => { void query.refetch() }) }}>업무 새로고침</button></div>
     <p>내가 맡은 업무와 수락할 인수인계를 확인하세요. 마감 임박 기준은 개인 알림 설정을 따르며 종료된 시즌은 제외합니다.</p>
     <label>업무 구분<select value={filter} onChange={event => setFilter(event.target.value)}>
-      <option value="all">전체</option><option value="overdue">기한 지난 업무</option><option value="soon">마감 임박 업무</option><option value="handoff">수락할 인수인계</option>
+      <option value="all">전체</option><option value="overdue">기한 지난 업무</option><option value="soon">마감 임박 업무</option><option value="routine">그 밖의 남은 업무</option><option value="handoff">수락할 인수인계</option>
     </select></label>
     {pending > 0 && <p role="status">{pending}개 시즌의 업무를 불러오고 있습니다.</p>}
     {failed.length > 0 && <p role="alert">일부 팀이나 시즌의 업무가 빠져 있습니다. ‘업무 새로고침’을 눌러 다시 불러오세요.</p>}
