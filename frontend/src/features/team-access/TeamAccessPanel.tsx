@@ -7,6 +7,8 @@ import { activateTeamAccess, changeTeamPermission, createTeamInvitation, getTeam
   permissionNames, revokeTeamInvitation, type AccessScope, type Permission } from './api'
 import './team-access.scss'
 
+type InvitationLink = { invitationId: string; url: string }
+
 export function TeamAccessPanel({ scope }: { scope: WorkspaceScope }) {
   const session = useAuthSession()
   const [open, setOpen] = useState(false)
@@ -25,7 +27,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const [confirmed, setConfirmed] = useState(false)
   const [memberId, setMemberId] = useState('')
   const [permission, setPermission] = useState<Permission>('MEMBER')
-  const [invitationUrl, setInvitationUrl] = useState('')
+  const [invitationLink, setInvitationLink] = useState<InvitationLink | null>(null)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
@@ -46,14 +48,14 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     return () => { if (timeoutId !== undefined) window.clearTimeout(timeoutId) }
   }, [query.data?.invitations])
   const copyInvitationUrl = async () => {
-    if (!invitationUrl) return
+    if (!invitationLink) return
     setCopyStatus('idle')
     if (!navigator.clipboard?.writeText) {
       setCopyStatus('failed')
       return
     }
     try {
-      await navigator.clipboard.writeText(invitationUrl)
+      await navigator.clipboard.writeText(invitationLink.url)
       setCopyStatus('copied')
     } catch {
       setCopyStatus('failed')
@@ -67,11 +69,11 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     }
     if (action.kind === 'invite') {
       const created = await createTeamInvitation(scope, memberId, permission)
-      setInvitationUrl(`${window.location.origin}/join#invite=${created.token}`)
+      setInvitationLink({ invitationId: created.invitation.id, url: `${window.location.origin}/join#invite=${created.token}` })
       setCopyStatus('idle')
       return getTeamAccess(scope)
     }
-    if (action.kind === 'revoke') { setInvitationUrl(''); setCopyStatus('idle'); return revokeTeamInvitation(scope, action.id!) }
+    if (action.kind === 'revoke') { setCopyStatus('idle'); return revokeTeamInvitation(scope, action.id!) }
     return changeTeamPermission(scope, action.id!, action.permission ?? null)
   }, onSuccess: data => {
     client.setQueryData(queryKey, data)
@@ -81,6 +83,10 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   if (query.isError) return <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
+  const visibleInvitationLink = invitationLink && access.invitations.some(invitation =>
+    invitation.id.toLowerCase() === invitationLink.invitationId.toLowerCase()
+    && !invitation.acceptedAt && !invitation.revokedAt && Date.parse(invitation.expiresAt) > now)
+    ? invitationLink : null
   return <div>
     <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 권한 해제'}`
       : '현재는 공유 링크로 이용합니다. 관리자를 지정하면 관리자와 초대받은 계정만 이용할 수 있습니다.'}</p>
@@ -117,7 +123,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         <p>열람자는 조회, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리를 할 수 있습니다.</p>
         <button type="submit" disabled={!memberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
-      {invitationUrl && <div><label>생성한 초대 링크<input readOnly value={invitationUrl} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
+      {visibleInvitationLink && <div><label>생성한 초대 링크<input readOnly value={visibleInvitationLink.url} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
         <button type="button" onClick={() => void copyInvitationUrl()}>초대 링크 복사</button>
         {copyStatus === 'copied' && <p role="status">초대 링크를 복사했습니다.</p>}
         {copyStatus === 'failed' && <p role="alert">자동으로 복사하지 못했습니다. 위 링크를 선택해 직접 복사해 주세요.</p>}

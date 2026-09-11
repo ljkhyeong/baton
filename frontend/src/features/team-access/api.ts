@@ -8,7 +8,11 @@ export type TeamAccess = operations['getTeamAccess']['responses'][200]['content'
 export type Permission = NonNullable<TeamAccess['permission']>
 export type InvitationPreview = operations['previewTeamInvitation']['responses'][200]['content']['application/json']
 type Accepted = operations['acceptTeamInvitation']['responses'][200]['content']['application/json']
-type Created = operations['createTeamInvitation']['responses'][200]['content']['application/json']
+type CreatedResponse = operations['createTeamInvitation']['responses'][200]['content']['application/json']
+type Created = Omit<CreatedResponse, 'invitation' | 'token'> & {
+  invitation: NonNullable<CreatedResponse['invitation']>
+  token: string
+}
 export type AccessScope = { teamId: string; accountId: string; accessKey: string }
 export const permissionNames = { ADMIN: '관리자', MEMBER: '구성원', VIEWER: '열람자' } as const
 const permission = (value: unknown): value is Permission => value === 'ADMIN' || value === 'MEMBER' || value === 'VIEWER'

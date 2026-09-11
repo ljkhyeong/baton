@@ -57,6 +57,9 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
       return route.fulfill({ json: { invitation, token: TOKEN } })
     } else if (path.endsWith('/revoke')) {
       revokeRequestCount += 1
+      if (revokeRequestCount === 1) return route.fulfill({ status: 503, json: {
+        code: 'TEAM_INVITATION_REVOKE_FAILED', message: '초대 취소에 실패했습니다.',
+      } })
       state.invitations[0]!.revokedAt = instant
     }
     return route.fulfill({ json: state })
@@ -91,15 +94,21 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   expect(revokeRequestCount).toBe(0)
   page.once('dialog', confirmation => confirmation.accept())
   await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('초대 취소에 실패했습니다.')
+  await expect(dialog.getByLabel('생성한 초대 링크')).toHaveValue(new RegExp(`/join#invite=${TOKEN}$`))
+  expect(revokeRequestCount).toBe(1)
+  page.once('dialog', confirmation => confirmation.accept())
+  await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
   await expect(dialog.getByText('초대 취소', { exact: true })).toBeVisible()
-  expect(revokeRequestCount).toBe(1)
+  expect(revokeRequestCount).toBe(2)
   await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toBeVisible()
   await page.clock.fastForward('02:00:00')
   await expect(dialog.getByText('기간 만료', { exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
+  await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
 })
 
 test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람자는 기록을 읽고 변경할 수 없다', async ({ page }, testInfo) => {
