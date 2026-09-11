@@ -64,7 +64,7 @@ BRIEF 응답의 `workspaceId`와 `seasonId`가 요청 범위와 다르면 노출
 
 - 이벤트 송신 토큰과 다른 서비스 전용 Bearer를 사용한다.
 - `baton.brief.service-api.enabled`는 기본 `false`다.
-- 활성화할 때 base URL은 경로 없는 HTTPS origin만 허용하며 redirect를 따르지 않는다.
+- 활성화할 때 기본 URL은 경로 없는 HTTPS 출처만 허용하며 리디렉션을 따르지 않는다.
 - BATON 프로덕션 override는 Bearer를 Spring config tree로, 인증서 truststore를 고정 경로의
   PKCS12 파일로 마운트한다.
 - BATON `app`과 BRIEF 서비스 전용 Caddy만 운영자가 만든 `Internal=true` Docker 네트워크를

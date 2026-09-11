@@ -262,7 +262,7 @@ openssl rand -hex 32
 
 ### 외부 연동 비밀과 ROUND 운영 설정
 
-`.env.production`에는 공개 설정과 비밀 파일 경로를 둔다. 공개 설정은 Google·Naver 클라이언트 ID, SMTP 호스트·사용자 이름, BRIEF HTTPS origin, JWK `kid` 등이다. 비밀 원문을 이 파일에 복사하거나 래퍼 없이 `docker compose`를 직접 실행하지 않는다.
+`.env.production`에는 공개 설정과 비밀 파일 경로를 둔다. 공개 설정은 Google·Naver 클라이언트 ID, SMTP 호스트·사용자 이름, BRIEF HTTPS 출처, JWK `kid` 등이다. 비밀 원문을 이 파일에 복사하거나 래퍼 없이 `docker compose`를 직접 실행하지 않는다.
 
 `ops/validate-production-auth-secrets.sh`는 다음을 검사한다.
 
@@ -377,7 +377,12 @@ systemctl --user start baton-backup.timer
 
 백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 보조 파일로 생성된다. `backup.sh`는 gzip과 BATON 핵심 스키마 표식을 확인하고 보조 파일을 먼저 원자적으로 게시한 뒤 덤프 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. `restore.sh`는 보조 파일 검증을 자체적으로 강제하고 예약 백업 잠금과 프로덕션 Compose 생명주기 잠금을 모두 잡는다. 또한 애플리케이션·웹과 잔존 ROUND 웹·시그널링 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다.
 
-계정 권한 팀이 없는 백업에 대해 다음 자동 복구를 적용한다. 복원한 스냅샷의 접근 키 상태는 현재 시점의 폐기 이력을 증명할 수 없으므로 `restore.sh`는 공개 전에 모든 팀의 접근 키 해시를 발급한 적 없는 무작위 값으로 교체한다. 현재 스키마에서는 마지막 키 변경 멱등 표식을 비우고 팀 버전도 함께 올리되, 이미 사용한 키 변경·워크스페이스 생성·콘텐츠 생성 멱등 이력은 과거 요청을 새 요청으로 되살리지 않도록 보존한다. 모든 팀이 무효화됐고 팀마다 복구에 사용할 최신 대표 시즌이 하나씩 있는지 확인한 뒤에만 성공하며, 대상은 권한이 제한된 `last-restore-recovery-targets.tsv`에 기록한다. 따라서 복원 뒤에는 기존 공유 링크가 전부 `403`이 되고, 운영자가 각 팀을 서로 다른 새 멱등 키로 복구해 받은 접근 키로 새 링크를 다시 배포해야 한다. 응답이 유실되면 해당 팀에는 같은 멱등 키로 재시도한다. 스냅샷의 출처나 운영 비밀 노출 여부가 의심되면 `.env.production`의 생성 키와 복구 키도 새 값으로 교체한다.
+계정 권한 모델 도입 전 백업은 현재 접근 키 폐기 상태를 증명할 수 없다. 따라서 기존 공유 링크를 모두 무효화하고 다음 순서로 복구한다.
+
+1. 모든 팀의 접근 키 해시를 발급 이력이 없는 무작위 값으로 바꾸고 팀 버전을 올린다. 마지막 키 변경 표식은 지우되, 과거 멱등 이력은 보존한다.
+2. 모든 팀의 키가 무효화됐고 팀마다 복구할 최신 시즌이 있는지 확인한다. 대상은 권한을 제한한 `last-restore-recovery-targets.tsv`에 기록한다.
+3. 운영자가 팀마다 다른 멱등 키로 새 접근 키를 발급하고 공유 링크를 다시 배포한다. 응답이 유실되면 같은 팀과 멱등 키로 다시 요청한다.
+4. 백업 출처나 비밀값 노출이 의심되면 생성 키와 복구 키도 교체한다.
 
 기존 DB를 교체하고 모든 공유 링크를 폐기하는 작업이므로 복구 직전에도 백업하고, 실제 데이터를 넣기 전 별도 환경에서 복구·팀별 키 재발급·옛 링크 거부까지 리허설한다.
 
@@ -543,7 +548,7 @@ BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 \
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 - `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 두 DB를 연결해 이벤트 전달·재시도·해소 반영과 사용자 세션 기반 주간 요약 생성·조회·응답 유실 복구·서비스 토큰 교체를 확인하는 선택 실행 테스트
 - `round-consumer-contract.sh`: BATON의 실제 RS256 서명자·JWK를 현재 ROUND 시그널링 `bootJar`에 연결해 올바른 방의 TURN·WebSocket 수락, 다른 방·발급자·수신자·`kid`·만료 참여권 거부, 키 선게시·새 `kid` 즉시 재조회·이전 키 중첩과 반복되는 알 수 없는 `kid`의 JWK 갱신 제한을 검증하는 선택 실행 교차 서비스 테스트
-- `calendar-consumer-contract.sh`: CAL 불변 사전 릴리스 `1.1.0-rc.1`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
+- `calendar-consumer-contract.sh`: CAL 고정 사전 릴리스 `1.1.0-rc.1`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
 
 교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다.
 
@@ -555,7 +560,7 @@ ROUND 교차 서비스 경계는 실제 BATON 서명자와 ROUND의 Nimbus JWK �
 
 CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.1`인 `contracts-v1.1.0-rc.1` 태그 checkout을
 사용한다. `BATON_CAL_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `baton-cal`을
-시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 불변 태그의 별도 절대 경로를
+시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 고정 태그의 별도 절대 경로를
 지정한다. 버전 확인 뒤 실제 CAL 컨테이너를 띄워 일정과 시즌 이름 생산자 계약을 함께 검증한다.
 요청 스키마는 게시된 계약 자산에서 `contracts/baton-cal`로 고정하며 런타임 검증에는 사용하지 않는다.
 `calendarMetadataOutboxContractTest`는 실제 시즌 생성·이름 수정 → MySQL 아웃박스 → 운영 전달
@@ -564,7 +569,7 @@ CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.1`인 `contracts-v1.1.0-rc
 재전달도 확인한다. 이어 새 복구 모드에서 BATON이 계산한 시즌별·전체 다이제스트와 완료 요청
 재시도를 실제 CAL 저장 상태에 대조한다. 실제 캘린더 앱 검증은 포함하지 않는다.
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·반복 업무·회차·결정·인수인계 항목·역할 인수인계 생성, 구성원 이름·활동 상태와 시즌·반복 업무 정의·회차·결정·인수인계 정정·보관·복원, 역할 인수인계 전달·수락·취소, 다음 시즌 역할·활성 반복 업무 복사, 활성 정의만 사용하는 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 활성 정의가 없는 자동 발생의 커서 전진과 빈 회차 미생성, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 애그리거트별 충돌로 실패하고 트랜잭션이 롤백되어 나중에 변경이 반영되지 않는지도 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 워크스페이스 생성, 콘텐츠 변경·보관·복원, 역할 인수인계, 다음 시즌 전환, 수동·자동 회차, 접근 키 변경·복구와 동시 수정 충돌을 검증한다. 행 잠금 시간 초과가 대상별 충돌로 처리되고 트랜잭션 전체가 롤백되는지도 확인한다.
 
 Flyway 변경은 대상 이전 버전의 대표 데이터를 최신 스키마로 올린 뒤 기존 데이터·참조 보존과 새 제약·인덱스 같은 실제 사후조건을 전용 마이그레이션 테스트가 검증한다. 개별 버전별 기대값은 [제품 명세](docs/PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](docs/PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](docs/PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에서 관리하며 이 명령 색인에는 반복해 열거하지 않는다.
 
@@ -615,7 +620,7 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 - `e2e:focus`: Chromium·워커 2개로 실행하고 첫 실패에서 중단한다. 확인할 파일이나 `--grep`을 함께 지정한다.
 - `e2e:failed`: 직전 Playwright 실행에서 실패한 테스트만 다시 실행한다. 중간에 다른 실행을 하면 실패 목록이 바뀌므로 그때는 파일·제목을 직접 지정한다.
 - `e2e`: 독립 API 픽스처를 사용하는 전체 Playwright 회귀 테스트. 전체 흐름은 Chromium, 모바일 흐름은 390px Chromium, 핵심 스모크·반응형 흐름과 `@webkit`으로 고른 브라우저 API 대표 사례는 Safari 호환 WebKit에서도 실행한다.
-- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 반복 업무·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인한다. 테스트 전용 로컬 계정과 폐기 가능한 RSA 키로 실제 로그인 세션, AccountMembership 연결, 서버에서 관리하는 방 매핑, 참여권 쿠키의 속성·RS256 서명·클레임·300초 수명과 공개 JWK를 함께 검증한다. 세션 ID 회전은 실제 Spring Security 필터 체인을 사용하는 `AuthSecurityTest`가 검증한다.
+- `e2e:fullstack`: 임시 MySQL과 실제 Spring Boot·Vite를 실행해 온보딩, 핵심 콘텐츠, 두 브라우저 동기화와 새로고침 뒤 저장 상태를 확인한다. 테스트 계정과 임시 RSA 키로 로그인 세션, 구성원 연결, 방 매핑, 참여권 쿠키와 공개 JWK도 검증한다. 세션 ID 회전은 `AuthSecurityTest`가 담당한다.
 - `e2e:round-edge`: 명시한 ROUND 저장소의 기존 `baton-web-runtime`·`signaling-runtime` 이미지를 테스트 전용 Caddy, 로컬 사설 CA와 임시 MySQL에 연결한다. 실제 HTTPS 브라우저 세션에서 구성원 연결·방 매핑·참여권 재발급을 거쳐 공개 TURN 자격 증명 엔드포인트와 WSS 방 입장, 내부 TURN 경로 비노출을 확인한다. 프록시는 ROUND 업스트림에 참여 쿠키만 전달하고 BATON 세션·`Authorization`·워크스페이스 자격 증명은 제거하도록 구성한다.
 
 Chromium과 WebKit이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `@webkit`은 `Headers`, 요청 취소, Web Storage와 네이티브 dialog처럼 엔진 차이를 직접 확인할 대표 사례에만 사용한다. WebKit 검증은 최신 Safari 엔진과의 핵심 호환성을 확인하지만 실제 macOS·iOS 기기, Safari 확장 기능과 운영 네트워크를 대신하지 않는다. `e2e:fullstack`은 Docker, Java 21과 OpenSSL도 필요하며, 고유 Compose 프로젝트와 임시 MySQL 볼륨·RSA 키를 만들었다가 종료 시 함께 제거한다. 합성 로컬 자격 증명은 실행기가 추가한 테스트 전용 Flyway 위치에만 있고 운영 마이그레이션과 기존 로컬·프로덕션 DB에는 들어가지 않는다. 이 명령은 실제 브라우저와 Vite 개발 프록시까지 검증하지만 Caddy, TLS, 프로덕션 이미지와 ROUND TURN·WebSocket 런타임을 대신하지 않는다. 프런트엔드 단위 테스트와 린트 명령은 아직 구성하지 않았다.
@@ -718,7 +723,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   기본 연결 시간 제한은 `PT2S`, 읽기 시간 제한은 `PT5S`, 전달 간격은 `PT10S`이며 두 시간 제한의
   합은 45초를 넘을 수 없다. `401`·`403`은 아웃박스를 실패로 확정하지 않고 자격 증명 교체 뒤 같은
   행을 재시도한다. 로컬 교차 서비스 검증은 `./ops/tests/calendar-consumer-contract.sh`로
-  CAL 불변 사전 릴리스 `1.1.0-rc.1` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
+  CAL 고정 사전 릴리스 `1.1.0-rc.1` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
   `baton_integration_delivery_items{integration="calendar",status="..."}`는 `pending`,
   `processing`, `failed` 상태별 현재 행 수를 MySQL에서 읽고,
   `baton_integration_delivery_actionable_failed_items{integration="calendar"}`는 조치 대상 영구

@@ -14,7 +14,7 @@ BATON의 회차와 반복 업무 마감은 MySQL 트랜잭션에서 확정되고
 
 ### 계약 고정과 계층
 
-BATON은 불변 사전 릴리스 `contracts-v1.1.0-rc.1` 자산과 SHA-256을 생산자 검증 기준으로 고정한다.
+BATON은 고정 사전 릴리스 `contracts-v1.1.0-rc.1` 자산과 SHA-256을 생산자 검증 기준으로 고정한다.
 운영 안정 기준은 정식 버전 승격 전까지 `1.0.0`을 유지한다. 애플리케이션 계층은 외부
 라이브러리를 모르는 `CalendarSnapshot` 합 타입과 `CalendarSnapshotFactory`를 소유하고, 외부
 어댑터가 이를 CAL JSON 요청으로 바꾼다. 생산자 테스트는 고정한 실제 JSON Schema로 결과를

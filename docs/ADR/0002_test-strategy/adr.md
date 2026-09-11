@@ -22,7 +22,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | CAL 소비자 계약 | `calendar-crossservice` | BATON 일정·시즌 이름·복구 완료 직렬화와 외부 CAL 사전 릴리스 호환성 | `BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 bash ops/tests/calendar-consumer-contract.sh` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·반복 업무 정의·회차·실행·결정·인수인계 항목·역할 인수인계 저장과 조회 프로젝션을 검증한다. Flyway 변경은 대상 이전 버전까지 적용한 대표 데이터를 최신 마이그레이션으로 올린 뒤 데이터·참조·제약·인덱스 같은 실제 이관 사후조건을 확인하는 전용 테스트가 소유한다. 개별 버전의 제품·연동 기대값은 [제품 명세](../../PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](../../PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](../../PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에 두며 이 문서에는 반복해 열거하지 않는다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 워크스페이스 생성, 콘텐츠 저장·조회, 접근 키 변경, 멱등 재시도와 동시 수정 충돌을 검증한다. Flyway 테스트는 이전 버전의 대표 데이터를 최신 스키마로 올려 데이터·참조·제약·인덱스를 확인한다. 세부 제품·연동 규칙은 PRD와 관련 ADR에서 관리하며 여기서 반복하지 않는다. 실행한 태스크가 대상 테스트와 실제로 일치하는지도 확인한다.
 
 `policyTest`는 의존 방향뿐 아니라 DevTools 분리 클래스 로더에서 Spring Data 프록시 생성에 필요한 저장소 공개 가시성도 고정한다.
 
@@ -87,7 +87,10 @@ npm run e2e:fullstack
 - 백엔드와 API 계약은 Docker가 실제로 사용 가능한지 먼저 확인한 뒤 `build checkApiContract`를 한 Gradle 호출로 실행한다. 이 조합은 Testcontainers·Flyway 통합 테스트와 REST Docs를 포함하고 같은 태스크 그래프 안에서 REST Docs 중복 실행을 피한다.
 - 프런트엔드는 `npm run typecheck`로 프로덕션 소스와 Playwright 코드를 엄격하게 검사하고 `npm run build`로 프로덕션 번들을 확인한 뒤 Chromium·WebKit에서 Playwright E2E를 실행한다. Chromium은 전체 흐름과 390px 모바일 흐름, WebKit은 핵심 스모크·반응형 흐름과 브라우저 API 대표 사례를 소유한다. CI에서는 `test.only`를 거부하고 재시도에서만 성공한 불안정 테스트도 실패로 판정한다. 같은 실행기에서 워커 2개를 사용하고, 테스트별 진행 결과를 로그에 남긴다. 전체 작업 제한은 브라우저 설치와 전체 E2E 실행 시간을 포함해 40분이며, 개별 테스트 제한은 30초를 유지한다. 실패한 실행의 보고서·추적·화면 캡처는 7일 동안 산출물로 남긴다.
 - 전 구간 파일럿 스모크는 Java 21, Node, Docker와 Chromium을 준비한 독립 작업에서 `npm run e2e:fullstack`으로 실행한다. 픽스처 기반 UI 회귀와 분리해 Vite 프록시, Spring 보안·HTTP·애플리케이션 경계, Flyway와 MySQL 사이의 조립 실패를 명확히 드러내고 실패 보고서와 각 런타임 로그를 7일 동안 보존한다.
-- 운영 패키지는 단일 `ops/check-shell-scripts.sh`가 Git 인덱스의 추적 파일과 작업 트리의 무시되지 않은 신규 파일에서 모든 `ops/**/*.sh`를 모아 각각 `bash -n`으로 해석하고 같은 집합에 ShellCheck를 적용한 뒤, 실제 비밀이 아닌 CI 전용 값으로 백업·복구와 프로덕션 Compose를 확인한다. 결정론적 셸 픽스처로 배포 환경 파일 권한·리터럴 문법·비밀 분리·호스트 환경 우선순위 제거, 공개 HTTPS 서비스 상태의 성공·실패 종료와 백업 상태의 UTC 교차검증을 고정하고 백업·모니터 systemd 유닛을 정적으로 검증한다. 이어서 고유 프로젝트에서 `app`·`web` 이미지를 한 번 빌드하고 같은 이미지를 `--no-build`로 실행해 Caddy 로컬 CA HTTPS, 정적·SPA 경로, 역방향 프록시와 보안 헤더, 프로덕션 프로필, Flyway와 MySQL TLS 세션을 검증한다. 이 런타임 스모크는 정상 제품 API의 Spring 요청 ID 보존과 Caddy가 직접 만드는 413·502/503의 엣지 요청 ID·접근 로그 상관관계, 운영 키·멱등 키 로그 제거를 고정한다. 같은 폐기 가능 DB에서 원본 `backup.sh`·`restore.sh`로 실제 덤프·체크섬·삭제/가져오기를 수행하고, 스냅샷 롤백, 팀별 최신 복구 대상, 모든 과거 키의 `403`, 생성·키 변경 동일 재처리 만료, 운영자 복구와 팀별 새 키의 조회·변경·재백업까지 확인한다. 파괴 경계는 원본 운영 래퍼를 변경하지 않고 실행 토큰·데몬/컨텍스트·사용자 정의 레이블·전용 볼륨과 DB 이름·중지된 `app`/`web`을 다시 확인하는 테스트 전용 심이 소유한다. 실패 산출물은 컨테이너 환경 변수를 제외하며 보호 값이 발견된 런타임 로그도 보존하지 않는다.
+- 운영 패키지는 `ops/check-shell-scripts.sh`로 모든 `ops/**/*.sh`에 `bash -n`과 ShellCheck를 실행한다.
+- CI 전용 값으로 프로덕션 환경 검증, Compose, 백업·복구와 systemd 유닛을 확인한다.
+- `app`·`web` 이미지는 한 번만 빌드해 재사용한다. 로컬 CA HTTPS, 역방향 프록시, 보안 헤더, 프로덕션 프로필, Flyway·MySQL TLS와 요청 ID·비밀 로그 처리를 검증한다.
+- 폐기 가능한 DB에서 실제 백업·복구, 접근 키 무효화, 운영자 복구와 재백업을 확인한다. 테스트 전용 보호 장치는 운영 프로젝트·볼륨·DB를 다시 확인하고, 비밀값이 포함된 로그는 보존하지 않는다.
 - 네 병렬 작업의 결과는 기존 계약 워크플로의 작업 식별자를 유지한 최종 `contract` 작업으로 집계한다. 원격 규칙 집합 또는 브랜치 보호는 이 최종 검사를 필수로 지정해야 병합을 강제 차단한다.
 
 워크플로는 `contents: read` 외 권한과 운영 비밀을 사용하지 않는다. 이미지를 레지스트리에 게시하거나 호스트에 배포하는 단계는 공급자와 배포 승인 경계를 결정할 때 별도로 채택한다.

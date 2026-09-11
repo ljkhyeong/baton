@@ -53,8 +53,13 @@ MySQL
 
 - 도메인, DB 자격 증명, `BATON_WORKSPACE_CREATION_KEY`와 `BATON_WORKSPACE_RECOVERY_KEY`는 추적하지 않는 `.env.production`에서 주입한다. OAuth 클라이언트 비밀, SMTP 비밀번호, 안정적인 이메일 아웃박스 AES-256-GCM 키, BRIEF 이벤트 수신 Bearer와 ROUND PEM은 환경에 원문을 넣지 않고 저장소 밖 소유자 전용 파일의 절대 경로만 기록한다.
 - 예시 환경 파일은 실제 비밀값을 제공하지 않는다. `ops/validate-production-env.sh`는 소유자 전용 일반 파일과 Git 비추적, 리터럴 허용 목록, 공개 DNS 형식, DB 식별자와 독립 생성한 32~200자 URL 안전 비밀 정책을 소유한다. 전용 인증 검증기는 Google·Naver 동시 완성, 로컬 등록과 SMTP의 폐쇄형 실패 관계, 단일 값 비밀 파일 경계, RSA 크기·쌍·`kid`를 검증한다. 배포 사전점검은 이 검증에 Linux 로컬 Docker 소켓·Compose v2와 최종 조립 확인을 더한다. DNS 전파, 외부 포트 접근, 공인 인증서 발급과 호스트 용량은 이 정적 점검의 보장 범위가 아니다.
-- `ops/production-compose.sh`는 모든 명령 직전에 공통 환경 검증기를 다시 실행하고, 현재 셸의 충돌 가능한 배포·Compose·Docker·BuildKit 경계 변수를 명시적으로 제거하며, `unix:///var/run/docker.sock`, `baton-production` 프로젝트와 프로덕션 Compose를 고정한다. 생명주기 변경은 환경·체크아웃·호출 UID와 무관하게 미리 마련한 소유자 전용 `/srv/baton/state/production-lifecycle.lock` 아이노드의 `flock`으로 복구와 직렬화한다. 운영 명령을 명시적 허용 목록으로 제한해 일회성 `run`, 신호 프록시 `attach`, 모델 변환, 이미지 게시, 확장, 데이터 볼륨 삭제와 토폴로지 재정의를 거부하고 `config`는 정확한 `--quiet`만 허용한다. BATON `app`의 OAuth·SMTP·아웃박스·BRIEF 단일 값 비밀은 환경 기반 Compose 비밀에서 컨테이너의 Spring 설정 트리 파일로 재구성하고, ROUND TURN 자격 증명은 원문을 환경에 넣지 않는 파일 기반 비밀과 호스트 소유자 UID/GID로 전달한다. 사전점검 이후 잘못 변경된 환경이나 비밀 파일은 다음 Compose 호출에서 거부한다. 수동 기동뿐 아니라 백업과 복구도 이 경계를 공유한다.
-- 개발용 DB 주소와 계정 기본값은 `local` Spring 프로필에만 둔다. 프로덕션 Compose는 필수 값이 비어 있으면 설정 단계에서 실패하고, `production` Spring 프로필도 설정 데이터를 읽은 직후 애플리케이션 컨텍스트와 Flyway를 구성하기 전에 명시적인 MySQL JDBC 주소·비루트 사용자·32~200자 URL 안전 비밀번호를 검증한다. JDBC 주소는 속성 없는 단일 `host[:port]/database`만 허용하고 쿼리에는 `sslMode=REQUIRED`, `VERIFY_CA` 또는 `VERIFY_IDENTITY` 중 하나를 정확히 한 번 지정해야 한다. 프래그먼트·중복·호스트별 속성이나 Hikari/JNDI·Flyway 대체 연결 속성으로 실제 TLS 설정과 검증 결과가 달라지는 구성을 거절하고, Flyway도 검증된 주 DataSource만 사용하게 한다. 이 조건이 없으면 진입 경로와 무관하게 DB에 접속하기 전에 시작을 거절한다. 설정한 두 운영 비밀은 모든 프로필에서 32~200자의 URL 안전 ASCII여야 하며, `production`에서는 두 값이 모두 있고 서로 달라야 시작한다.
+- `ops/production-compose.sh`는 명령마다 공통 환경 검증을 다시 실행한다. 충돌할 수 있는 Compose·Docker·BuildKit 변수를 제거하고 `unix:///var/run/docker.sock`, `baton-production` 프로젝트와 Compose 파일을 고정한다.
+- 기동·중지·백업·복구는 소유자 전용 미리 만든 `/srv/baton/state/production-lifecycle.lock`의 `flock`으로 직렬화한다.
+- 운영 명령은 허용 목록만 실행한다. 일회성 `run`, `attach`, 모델 변환, 이미지 게시, 확장, 볼륨 삭제와 토폴로지 재정의는 거부한다. `config`는 `--quiet`만 허용한다.
+- BATON 비밀값은 Spring 구성 트리 파일로, ROUND TURN 비밀값은 소유자 전용 파일로 전달한다. 다음 Compose 호출에서도 환경과 비밀 파일을 다시 검증한다.
+- 개발용 DB 기본값은 `local` 프로필에만 둔다. `production`은 MySQL JDBC 주소, 비루트 사용자와 32~200자 비밀번호를 애플리케이션 기동 전에 검증한다.
+- JDBC URL은 단일 `host[:port]/database` 형식이어야 하며 `sslMode=REQUIRED`, `VERIFY_CA`, `VERIFY_IDENTITY` 중 하나만 허용한다. 프래그먼트·중복·호스트별 속성을 거부하고, Hikari·JNDI·Flyway 별도 연결로 검증을 우회할 수 없다.
+- 생성 키와 복구 키는 모든 프로필에서 URL 안전 ASCII 형식이어야 한다. `production`에서는 두 값을 모두 설정하고 서로 다르게 사용한다.
 - 생성 키는 공개된 생성 API를 파일럿 운영자에게 제한한다. 별도의 복구 키는 모든 구성원이 워크스페이스 접근 키를 잃었을 때만 사용하며 두 값을 서로 다르게 생성한다.
 - 최종 계정·초대·권한 모델은 이 결정에 포함하지 않는다.
 
