@@ -65,7 +65,7 @@ PREPARING ──전달──> TRANSFERRED ──수락──> ACCEPTED
 - 역할 인수인계 준비·전달·수락·취소는 대상 `Role`의 배타적 쓰기 잠금을 먼저 얻는다. 기존 이력 전환은 이어서 대상 `RoleHandoff`를 배타적으로 잠근다.
 - 새 참여자의 활동 상태는 UUID 순서의 `Member` 공유 잠금으로 확인한다.
 - 인수인계 항목·자료 변경은 대상 역할을 공유 잠금한 뒤 열린 `RoleHandoff`도 공유 잠금의 최신 읽기로 조회해 `TRANSFERRED` 상태가 아닌지 확인한다. 자식 엔티티를 먼저 읽어 MySQL `REPEATABLE READ` 스냅샷이 생겼더라도 오래된 `PREPARING` 상태를 재사용하지 않으며, 역할 인수인계 전환의 배타 잠금과 직렬화되어 전달 뒤 자식 변경이 끼어들지 않는다.
-- `RoleHandoff`와 다른 공유 애그리거트에는 낙관적 잠금 `version`을 유지하고, 잠금·저장 충돌은 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
+- `RoleHandoff`와 다른 공유 애그리거트에는 낙관적 잠금 `version`을 유지하고, 잠금·저장 충돌은 `409 WORKSPACE_CONTENT_CONFLICT`로 처리한다.
 - 서비스 검증과 별도로 MySQL의 생성 열 `active_role_id`와 고유 제약으로 역할당 열린 인수인계 하나를 보장한다.
 
 ### 멱등성과 HTTP 계약

@@ -285,7 +285,7 @@ PRD-0009의 계정 전환 팀은 공유 키 연결 진입점을 닫고 기존 �
 - 시작: `/oauth2/authorization/google`, `/oauth2/authorization/naver`
 - 콜백: `/login/oauth2/code/google`, `/login/oauth2/code/naver`
 
-콜백 실패는 JSON 오류 응답 대신 다음 고정 브라우저 리디렉션으로 수렴한다.
+콜백에 실패하면 JSON 오류 대신 다음 고정 브라우저 리디렉션을 반환한다.
 
 | 실패 분류 | 응답 |
 | --- | --- |
@@ -337,7 +337,7 @@ BATON은 각 정규 ROUND `roomId`를 정확히 하나의 활성
 반환한다. 구성원 활동이 종료되어도 영속적인 연결 사실은 유지하며 종료 시즌에서도 조회할 수
 있다. 신규 연결은 활동 중인 같은 팀 `Member`만 허용하고 종료 시즌의 읽기 전용 경계에서는 거부한다.
 현재 방 매핑 목록 조회는 팀 접근 키와 활동 중인 멤버십을 한 번 확인한 뒤 팀·시즌의
-서버 영속 매핑을 한 번에 조회해 권위로 반환한다. 브라우저 `sessionStorage`는 ROUND 입장과 복귀를
+서버에 저장된 매핑을 한 번에 조회해 기준 정보로 반환한다. 브라우저 `sessionStorage`는 ROUND 입장과 복귀를
 돕는 힌트이며 매핑의
 존재·종료 여부를 결정하지 않는다.
 
@@ -357,7 +357,7 @@ ROUND 시작 요청 뒤 해당 화면을 떠나면 늦은 응답으로 입장 �
 성공 응답은 `200 {expiresAt,refreshAfterSeconds}`다. 힌트를 보내지 않으면 본문과 `Content-Type`을
 모두 생략하고, 보낼 때는 `{teamId,seasonId,resourceId}` 세 필드만 허용한다. 미인증은
 `401 AUTHENTICATION_REQUIRED`, 멤버십·시즌 조건 거부는 `403 ROUND_PARTICIPATION_DENIED`,
-매핑 부재나 힌트 불일치는 `404 ROUND_ROOM_NOT_FOUND`로 수렴한다.
+매핑이 없거나 힌트가 다르면 `404 ROUND_ROOM_NOT_FOUND`를 반환한다.
 
 ## 10. JWK와 키 회전
 

@@ -368,7 +368,7 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
    DB 상태에서 `baton_integration_delivery_actionable_failed_items{integration="calendar"}`가
    `0`인지 확인한 뒤
    `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
-5. 두 점검 명령을 다시 실행해 `pending`, `processing`, `failed`가 모두 `0`으로 수렴했는지 확인하고
+5. 두 점검 명령을 다시 실행해 `pending`, `processing`, `failed`가 모두 `0`인지 확인하고
    CAL 시즌 피드의 대표 회차·마감을 확인한다.
 
 ### 시즌 이름 최초 보정·캡처 재개

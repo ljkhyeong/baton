@@ -31,9 +31,9 @@ Spring의 기본 트랜잭션 시간 초과는 워크스페이스 생명주기·
 ### 오류 분류
 
 - 명시적 비관적 잠금 획득이나 버전이 있는 애그리게이트의 `saveAndFlush`에서 MySQL 잠금 시간이 초과되면 Spring의 `PessimisticLockingFailureException` 계열로 변환한다.
-- 새 워크스페이스 저장이나 콘텐츠 생성 멱등 예약이 같은 키의 미완료 트랜잭션을 기다리다 시간 초과되면 기존 `409 IDEMPOTENCY_KEY_CONFLICT`로 수렴해 같은 요청 재확인을 안내한다.
-- 팀 접근 키 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_ACCESS_KEY_CONFLICT`로 수렴한다.
-- 구성원·역할·역할 자료·반복 업무·회차·실행·결정·인수인계 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다.
+- 새 워크스페이스 저장이나 콘텐츠 생성 멱등 예약이 같은 키의 미완료 트랜잭션을 기다리다 시간 초과되면 기존 `409 IDEMPOTENCY_KEY_CONFLICT`로 처리해 같은 요청 재확인을 안내한다.
+- 팀 접근 키 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_ACCESS_KEY_CONFLICT`로 처리한다.
+- 구성원·역할·역할 자료·반복 업무·회차·실행·결정·인수인계 애그리게이트의 잠금 충돌은 기존 `409 WORKSPACE_CONTENT_CONFLICT`로 처리한다.
 - 일반 쿼리 시간 초과, 트랜잭션 시간 초과와 커넥션 획득 실패는 도메인 충돌로 추측하지 않는다. 기존 `500 INTERNAL_ERROR`와 요청 ID 경계를 유지한다.
 
 새 HTTP 상태나 오류 코드는 추가하지 않는다. 실제 행 잠금 충돌의 기존 의미를 저장 시점까지 일관되게 적용하는 변경이므로 REST Docs와 생성 OpenAPI 구조도 바뀌지 않는다.
