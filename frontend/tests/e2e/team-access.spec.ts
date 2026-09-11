@@ -20,7 +20,7 @@ async function accountApi(page: Page) {
   } }))
 }
 
-test('@operations @webkit 관리자가 초대를 만들고 취소하며 만료된 초대는 상태만 확인한다', async ({ page }, testInfo) => {
+test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 둔 목록에서 만료 상태를 확인한다', async ({ page }, testInfo) => {
   await page.clock.install({ time: new Date('2026-09-12T02:00:00Z') })
   const projection = makeProjection()
   await installApi(page, projection)
@@ -84,11 +84,6 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 만료�
   await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toBeVisible()
   await page.clock.fastForward('02:00:00')
-  const accessPanel = dialog.locator('.team-access-panel')
-  const accessSummary = accessPanel.locator(':scope > summary')
-  await accessSummary.click()
-  await expect(accessPanel).not.toHaveAttribute('open', '')
-  await accessSummary.click()
   await expect(dialog.getByText('기간 만료', { exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
 })

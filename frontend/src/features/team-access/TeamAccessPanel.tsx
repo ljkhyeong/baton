@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { formatInstant } from '@/features/workspace/WorkspaceViews'
@@ -27,6 +27,24 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const [permission, setPermission] = useState<Permission>('MEMBER')
   const [invitationUrl, setInvitationUrl] = useState('')
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const invitations = query.data?.invitations
+    if (!invitations) return
+    const expirations = invitations
+      .filter(invitation => !invitation.acceptedAt && !invitation.revokedAt)
+      .map(invitation => Date.parse(invitation.expiresAt))
+      .sort((left, right) => left - right)
+    let timeoutId: number | undefined
+    const updateExpiration = () => {
+      const current = Date.now()
+      setNow(current)
+      const next = expirations.find(expiration => expiration > current)
+      if (next !== undefined) timeoutId = window.setTimeout(updateExpiration, next - current)
+    }
+    updateExpiration()
+    return () => { if (timeoutId !== undefined) window.clearTimeout(timeoutId) }
+  }, [query.data?.invitations])
   const copyInvitationUrl = async () => {
     if (!invitationUrl) return
     setCopyStatus('idle')
@@ -63,7 +81,6 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   if (query.isError) return <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
-  const now = Date.now()
   return <div>
     <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 권한 해제'}`
       : '현재는 공유 링크로 이용합니다. 관리자를 지정하면 관리자와 초대받은 계정만 이용할 수 있습니다.'}</p>
