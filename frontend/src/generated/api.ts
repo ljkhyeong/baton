@@ -700,8 +700,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * BRIEF 관심 항목 목록
-         * @description 상태·심각도·공백 조건의 현재 관심 항목을 키셋으로 중계한다. 조건 변경 시 커서를 초기화한다.
+         * BRIEF 점검 항목 목록
+         * @description 상태·심각도·담당 공백 조건으로 현재 점검 항목을 페이지 단위 조회한다. 조건을 바꾸면 첫 페이지부터 조회한다.
          */
         get: operations["getBriefAttentionItems"];
         put?: never;
@@ -740,8 +740,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * BRIEF 관심 항목 요약
-         * @description 권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.
+         * BRIEF 점검 항목 요약
+         * @description 권한을 확인한 팀·시즌의 미해결 항목을 심각도별로 집계하고 담당 공백 항목 수를 반환한다.
          */
         get: operations["getBriefAttentionSummary"];
         put?: never;
@@ -760,8 +760,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * BRIEF 관심 항목 상태 전이
-         * @description 같은 관심 항목에 적용된 상태 전이를 원본 리비전 역순으로 중계한다.
+         * BRIEF 점검 항목 상태 변경 이력
+         * @description 같은 점검 항목의 상태 변경 이력을 원본 변경 번호 역순으로 조회한다.
          */
         get: operations["getBriefAttentionTransitions"];
         put?: never;
@@ -781,13 +781,13 @@ export interface paths {
         };
         /**
          * BRIEF 이력 조회
-         * @description 권한 범위의 저장된 브리프를 과거 방향으로 조회한다.
+         * @description 권한 범위의 저장된 주간 요약을 최신순으로 조회한다.
          */
         get: operations["getBriefEditionHistory"];
         put?: never;
         /**
-         * BRIEF 에디션 생성
-         * @description BATON이 시즌 시간대의 현재 주차와 완료된 BRIEF 이벤트 전달 watermark를 실행 기록에 고정하고 BRIEF 에디션 생성을 호출한다.
+         * BRIEF 주간 요약 생성
+         * @description BATON이 현재 주차와 전달 완료 범위를 요청 기록에 저장한 뒤 BRIEF 주간 요약 생성을 호출한다.
          */
         post: operations["generateBriefEdition"];
         delete?: never;
@@ -805,7 +805,7 @@ export interface paths {
         };
         /**
          * BRIEF 단건 조회
-         * @description 선택한 브리프의 팀·시즌 권한을 확인하고 고정된 내용을 반환한다.
+         * @description 선택한 주간 요약의 팀·시즌 권한을 확인하고 저장된 내용을 반환한다.
          */
         get: operations["getBriefEdition"];
         put?: never;
@@ -825,7 +825,7 @@ export interface paths {
         };
         /**
          * BRIEF 비교
-         * @description 양쪽 브리프의 팀·시즌 권한을 확인하고 저장된 차이만 중계한다.
+         * @description 두 주간 요약의 팀·시즌 권한을 확인하고 저장된 차이만 반환한다.
          */
         get: operations["compareBriefEditions"];
         put?: never;
@@ -845,7 +845,7 @@ export interface paths {
         };
         /**
          * BRIEF 추가 전달 확인
-         * @description 선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
+         * @description 선택한 주간 요약의 권한을 확인하고 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
          */
         get: operations["getBriefEditionDeliveryStatus"];
         put?: never;
@@ -864,8 +864,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * BRIEF 지난주 에디션 조회
-         * @description 선택한 브리프와 같은 시간대의 정확한 지난주 마지막 에디션을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.
+         * BRIEF 지난주 요약 조회
+         * @description 선택한 주간 요약과 같은 시간대의 지난주 마지막 요약을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.
          */
         get: operations["getPreviousWeekBriefEdition"];
         put?: never;
@@ -884,8 +884,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * BRIEF 최신 에디션 조회
-         * @description 인증된 BATON 계정의 활성 팀 멤버십과 워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계한다.
+         * BRIEF 최신 주간 요약 조회
+         * @description 인증된 BATON 계정의 활성 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF의 최신 주간 요약을 전달한다.
          */
         get: operations["getLatestBriefEdition"];
         put?: never;
@@ -1483,7 +1483,7 @@ export interface paths {
         put?: never;
         /**
          * 역할 생성
-         * @description 현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다.
+         * @description 현재 시즌에 역할, 담당자, 담당 업무와 주의사항을 등록한다.
          */
         post: operations["createRole"];
         delete?: never;
@@ -1502,7 +1502,7 @@ export interface paths {
         get?: never;
         /**
          * 역할 수정
-         * @description 현재 시즌의 역할 이름, 담당자, 책임과 위험 신호를 수정한다.
+         * @description 현재 시즌의 역할 이름, 담당자, 담당 업무와 주의사항을 수정한다.
          */
         put: operations["updateRole"];
         post?: never;
@@ -1763,7 +1763,7 @@ export interface paths {
         put?: never;
         /**
          * 다음 시즌 시작
-         * @description 현재 시즌을 종료하고 선택한 역할과 반복 업무 정의만 새 시즌 snapshot으로 이어 간다.
+         * @description 현재 시즌을 종료하고 선택한 역할과 반복 업무 정의만 새 시즌으로 이어 간다.
          */
         post: operations["createNextSeason"];
         delete?: never;
@@ -2034,6 +2034,72 @@ export interface components {
             /** @description 서비스 식별자 */
             service: string;
         };
+        Schema_1cc1e45b99fe0049: {
+            /**
+             * Format: uuid
+             * @description 서버 저장 매핑과 대조할 역할 자료 UUID
+             */
+            resourceId: string;
+            /**
+             * Format: uuid
+             * @description 서버 저장 매핑과 대조할 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 서버 저장 매핑과 대조할 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_1d3be7104c4d77c4: {
+            /** @description 현재 점검 항목 */
+            items: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 원본 신호 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 누적 리비전 공백 기록 여부 */
+                revisionGap: boolean;
+                /**
+                 * Format: int32
+                 * @description 투영 규칙 버전
+                 */
+                ruleVersion: number;
+                /**
+                 * @description 표시 심각도
+                 * @enum {string}
+                 */
+                severity: "HIGH" | "MEDIUM";
+                /** @description 원본 참조 문자열 */
+                sourceReference: string;
+                /**
+                 * @description 현재 상태
+                 * @enum {string}
+                 */
+                status: "ACTIVE" | "RESOLVED";
+            }[];
+            /** @description 다음 커서, 마지막 페이지는 null */
+            nextCursor: {
+                /**
+                 * @description 커서 신호 종류
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
+        };
         Schema_1ffbbe40834589a9: {
             /** @description 회전 시 한 번만 제공하는 새 워크스페이스 접근 키 */
             accessKey: string;
@@ -2069,806 +2135,10 @@ export interface components {
             /** @description 일정 버전. 미설정은 -1 */
             version: number;
         };
-        Schema_3a4a0e7a2f90e51f: {
-            /** @description 가입한 이메일 */
-            email: string;
-        };
-        Schema_3a58b37054fe25db: {
-            /**
-             * Format: uuid
-             * @description 서버 권위 매핑과 대조할 역할 자료 UUID
-             */
-            resourceId: string;
-            /**
-             * Format: uuid
-             * @description 서버 권위 매핑과 대조할 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 서버 권위 매핑과 대조할 팀 UUID
-             */
-            teamId: string;
-        };
-        Schema_3b8b9e297849dc60: {
-            /**
-             * Format: uuid
-             * @description 자료 식별자
-             */
-            resourceId: string;
-            /** @description 현재 자료 버전 */
-            resourceVersion: number;
-            /**
-             * Format: uuid
-             * @description 시즌 식별자
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
-            /** @description 최근 확인 20건 */
-            verifications: {
-                /** @description 현재 자료 버전에 대한 확인 여부 */
-                current: boolean;
-                /**
-                 * Format: uuid
-                 * @description 확인 기록 식별자
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 확인한 구성원 식별자
-                 */
-                memberId: string;
-                /** @description 확인 당시 구성원 이름 */
-                memberName: string;
-                /** @description 확인 메모 */
-                note: string | null;
-                /** @description 확인 당시 자료 버전 */
-                resourceVersion: number;
-                /**
-                 * @description 확인 결과
-                 * @enum {string}
-                 */
-                status: "CONFIRMED" | "NEEDS_UPDATE";
-                /** @description 확인 당시 주소 */
-                url: string;
-                /**
-                 * Format: date-time
-                 * @description 서버 확인 시각
-                 */
-                verifiedAt: string;
-            }[];
-        };
-        Schema_3e546778723d69d3: {
-            /** @description 생성 순번 내림차순의 저장된 브리프 */
-            editions: {
-                /**
-                 * Format: uuid
-                 * @description 불변 에디션 UUID
-                 */
-                editionId: string;
-                /**
-                 * Format: date-time
-                 * @description 생성 UTC 시각
-                 */
-                generatedAt: string;
-                /** @description 시즌 안에서 증가하는 생성 순번 */
-                generation: number;
-                /** @description 고정된 항목 수 */
-                itemCount: number;
-                /** @description 선정 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 로컬 수신 경계 */
-                sourceCursor: number;
-                /** @description 주간 시작 월요일 */
-                weekStart: string;
-                /**
-                 * Format: uuid
-                 * @description 저장된 IANA 시간대
-                 */
-                zoneId: string;
-            }[];
-            /** @description 다음 과거 페이지의 배타 커서. 마지막은 null */
-            nextBeforeGeneration: number | null;
-        };
-        Schema_4abb9640ae4170a2: {
-            /**
-             * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
-             * @enum {string}
-             */
-            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
-            /** @description 인수인계할 내용 */
-            label: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-        };
-        Schema_4bec2c49abd86a09: {
-            /** @description 자동 회차 생성 활성 여부 */
-            enabled: boolean;
-            /**
-             * Format: date
-             * @description 첫 자동 회차 모임 날짜
-             */
-            firstMeetingDate: string;
-            /** @description 회차를 미리 만들 기간(0~30일) */
-            generationLeadDays: number;
-            /** @description 시즌 시간대 기준 모임 시각 */
-            meetingTime: string;
-            /**
-             * @description 반복 주기: WEEKLY 또는 BIWEEKLY
-             * @enum {string}
-             */
-            recurrence: "WEEKLY" | "BIWEEKLY";
-            /** @description IANA 시간대 식별자 */
-            timeZone: string;
-        };
-        Schema_4ecb1080a3aa9816: {
-            /**
-             * Format: uuid
-             * @description 전달을 확인했다고 선언한 이전 담당자 UUID
-             */
-            confirmedByMemberId: string;
-            /** @description 미완료 항목 또는 자료 없음 경고 확인 여부 */
-            warningAcknowledged: boolean;
-        };
-        Schema_5baa3f1a60a86ba9: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 팀 안에서 유일한 시즌 이름 */
-            name: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-        };
-        Schema_5f8da2d691004162: {
-            /** @enum {boolean} */
-            authenticated: false;
-        } | {
-            /** Format: uuid */
-            accountId: string;
-            /** @enum {boolean} */
-            authenticated: true;
-            csrfHeaderName: string;
-            csrfToken: string;
-        };
-        Schema_6a0ae0ae4f3b3839: {
-            /** @description BATON에 표시할 계정 이름 */
-            displayName: string;
-            /**
-             * Format: email
-             * @description 등록할 이메일 주소
-             */
-            email: string;
-        };
-        Schema_6c100ce885441212: {
-            /** @description true면 활동 종료, false면 다시 활성화 */
-            deactivated: boolean;
-        };
-        Schema_7a4c4a67e8a20167: {
-            /**
-             * Format: uuid
-             * @description 취소를 확인했다고 선언한 이전 담당자 UUID
-             */
-            confirmedByMemberId: string;
-        };
-        Schema_7aa2fa2c6585a4d7: {
-            /**
-             * Format: date-time
-             * @description BATON 확인 UTC 시각
-             */
-            checkedAt: string;
-            /** @description 전달 영구 실패 이벤트 수 */
-            failedCount: number;
-            /**
-             * Format: date-time
-             * @description 마지막 전달 성공 시각. 성공 기록이 없으면 null
-             */
-            lastDeliveredAt: string | null;
-            /** @description 전달 대기·진행 중인 이벤트 수 */
-            pendingCount: number;
-            /**
-             * @description 전달·생성 요청 준비 상태
-             * @enum {string}
-             */
-            status: "READY" | "DELIVERY_PENDING" | "DELIVERY_FAILED" | "GENERATING" | "GENERATION_FAILED" | "SEASON_ENDED" | "DISABLED";
-        };
-        Schema_8ff7ee21dc10031e: {
-            /**
-             * Format: uuid
-             * @description 현재 로그인 계정
-             */
-            expectedAccountId: string;
-            /**
-             * @description 새 권한, null은 접근 취소
-             * @enum {string|null}
-             */
-            permission?: "ADMIN" | "MEMBER" | "VIEWER" | null;
-        };
-        Schema_9d7a993539b49e9e: {
-            /**
-             * Format: uuid
-             * @description 현재 로그인 계정
-             */
-            expectedAccountId: string;
-            /**
-             * Format: uuid
-             * @description 현재 계정과 연결된 구성원
-             */
-            memberId: string;
-        };
-        Schema_9d26cd80bf5240ea: {
-            /**
-             * Format: date
-             * @description 배정 종료일
-             */
-            assignmentEndDate?: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate?: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당 구성원 UUID
-             */
-            currentMemberId?: string | null;
-            /** @description 팀에서 유일한 역할 이름 */
-            name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당 구성원 UUID
-             */
-            nextMemberId?: string | null;
-            /** @description 역할의 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 인수인계 위험 신호 */
-            risk?: string | null;
-        };
-        Schema_19f6740e091bbe3d: {
-            /** @description 현재 관심 항목 */
-            items: {
-                /**
-                 * Format: int64
-                 * @description 적용한 원본 리비전
-                 */
-                aggregateRevision: number;
-                /**
-                 * Format: date-time
-                 * @description 원본 관측 UTC 시각
-                 */
-                observedAt: string;
-                /**
-                 * @description 원본 신호 종류
-                 * @enum {string}
-                 */
-                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 누적 리비전 공백 기록 여부 */
-                revisionGap: boolean;
-                /**
-                 * Format: int32
-                 * @description 투영 규칙 버전
-                 */
-                ruleVersion: number;
-                /**
-                 * @description 표시 심각도
-                 * @enum {string}
-                 */
-                severity: "HIGH" | "MEDIUM";
-                /** @description 불투명 원본 참조 */
-                sourceReference: string;
-                /**
-                 * @description 현재 상태
-                 * @enum {string}
-                 */
-                status: "ACTIVE" | "RESOLVED";
-            }[];
-            /** @description 다음 커서, 마지막 페이지는 null */
-            nextCursor: {
-                /**
-                 * @description 커서 신호 종류
-                 * @enum {string}
-                 */
-                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 커서 원본 참조 */
-                sourceReference: string;
-            } | null;
-        };
-        Schema_022e517c9925a05a: {
-            /** @description 최신순 이력 */
-            changes: {
-                /**
-                 * Format: uuid
-                 * @description 변경 계정. 비로그인 공유 키 사용은 null
-                 */
-                actorAccountId: string | null;
-                /** @description 변경 당시 계정 이름 또는 공유 키 사용자 */
-                actorName: string;
-                /**
-                 * Format: date-time
-                 * @description 변경 시각
-                 */
-                changedAt: string;
-                /** @description 값이 바뀐 항목 */
-                fields: {
-                    /** @description 변경 후 값. 값이 없으면 null */
-                    afterValue: string | null;
-                    /** @description 변경 전 값. 값이 없으면 null */
-                    beforeValue: string | null;
-                    /** @description 항목 이름 */
-                    fieldName: string;
-                }[];
-                /**
-                 * Format: uuid
-                 * @description 변경 식별자
-                 */
-                id: string;
-            }[];
-            /**
-             * Format: uuid
-             * @description 원본 기록 식별자
-             */
-            recordId: string;
-            /**
-             * @description 기록 종류
-             * @enum {string}
-             */
-            recordKind: "DECISION" | "ROLE_RESOURCE";
-            /**
-             * Format: uuid
-             * @description 시즌 식별자
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
-        };
-        Schema_27a7f932602250ee: {
-            invitation?: {
-                /**
-                 * Format: date-time
-                 * @description 수락 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: date-time
-                 * @description 생성 시각
-                 */
-                createdAt: string;
-                /**
-                 * Format: date-time
-                 * @description 만료 시각
-                 */
-                expiresAt: string;
-                /**
-                 * Format: uuid
-                 * @description 초대 식별자
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 초대할 구성원
-                 */
-                memberId: string;
-                /**
-                 * @description 초대 권한
-                 * @enum {string}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER";
-                /**
-                 * Format: date-time
-                 * @description 취소 시각
-                 */
-                revokedAt: string | null;
-            };
-            /** @description 43자 일회용 초대 토큰 */
-            token: string;
-        };
-        Schema_42b1cc7be118ed2a: {
-            /** @description 현재 표시할 원본 참조 1~100건 */
-            sources: {
-                /**
-                 * @description 신호 유형
-                 * @enum {string}
-                 */
-                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 빈 값이 아닌 원본 참조, 최대 512자 */
-                sourceReference: string;
-            }[];
-        };
-        Schema_42cfc9da02e36f49: {
-            /**
-             * @description 조회 결과의 최신성 및 감시 여부
-             * @enum {string}
-             */
-            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
-            /** @description 현재 자료의 재점검 접수 가능 여부 */
-            checkRequestAllowed: boolean;
-            /**
-             * Format: int32
-             * @description 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
-             */
-            consecutiveFailures: number | null;
-            /**
-             * @description WATCH 도달 가능성 상태
-             * @enum {string}
-             */
-            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
-            /**
-             * Format: date-time
-             * @description 최근 점검 시도 완료 UTC 시각. 시도가 없으면 null
-             */
-            lastCheckedAt: string | null;
-            /**
-             * Format: date-time
-             * @description 최근 연결 성공·실패 판정 UTC 시각. 내부 오류는 갱신하지 않으며 판정이 없으면 null
-             */
-            lastConclusiveAt: string | null;
-            /**
-             * @description 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
-             * @enum {string|null}
-             */
-            lastOutcome: "SUCCESS" | "HTTP_CLIENT_ERROR" | "HTTP_SERVER_ERROR" | "DESTINATION_REJECTED" | "DNS_FAILURE" | "CONNECT_TIMEOUT" | "READ_TIMEOUT" | "TLS_FAILURE" | "REDIRECT_REJECTED" | "TOO_MANY_REDIRECTS" | "RESPONSE_TOO_LARGE" | "NETWORK_FAILURE" | "INTERNAL_FAILURE" | null;
-            /**
-             * @description 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
-             * @enum {string|null}
-             */
-            monitoringReason: "INTEGRATION_DISABLED" | "MONITORING_PAUSED" | "SEASON_ENDED" | "RESOURCE_ARCHIVED" | "URL_NOT_ELIGIBLE" | "MONITOR_INACTIVE" | "SYNC_PENDING" | null;
-            /**
-             * Format: uuid
-             * @description 요청한 자료 UUID
-             */
-            resourceId: string;
-        };
-        Schema_056c9e55e5c84be6: {
-            /**
-             * Format: date
-             * @description 모임 날짜(ISO-8601 날짜)
-             */
-            meetingDate: string;
-            /** @description 시즌 안에서 유일한 회차 이름 */
-            name: string;
-        };
-        Schema_71d9598b6bc02fa6: {
-            /**
-             * Format: date-time
-             * @description 보관한 UTC 시각
-             */
-            archivedAt: string | null;
-            /**
-             * Format: date-time
-             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
-             */
-            createdAt: string | null;
-            /** @description 자료 자료 설명 */
-            description: string | null;
-            /**
-             * Format: uuid
-             * @description 자료 UUID
-             */
-            id: string;
-            /**
-             * Format: uuid
-             * @description 소유 역할 UUID
-             */
-            roleId: string;
-            /** @description 자료 제목 */
-            title: string;
-            /** @description http 또는 https 외부 링크 */
-            url: string;
-        };
-        Schema_78f1554c32b35a98: {
-            /**
-             * Format: date
-             * @description 배정 종료일
-             */
-            assignmentEndDate: string | null;
-            /**
-             * Format: date
-             * @description 배정 시작일
-             */
-            assignmentStartDate: string | null;
-            /**
-             * Format: uuid
-             * @description 현재 담당자 UUID
-             */
-            currentMemberId: string | null;
-            /**
-             * Format: uuid
-             * @description 역할 UUID
-             */
-            id: string;
-            /** @description 역할 이름 */
-            name: string;
-            /**
-             * Format: uuid
-             * @description 다음 담당자 UUID
-             */
-            nextMemberId: string | null;
-            /**
-             * Format: uuid
-             * @description 복사·이관 원본 역할 UUID. 원본 연결이 없으면 null
-             */
-            previousRoleId: string | null;
-            /** @description 역할 목적 */
-            purpose: string;
-            /** @description 역할 책임 목록 */
-            responsibilities: string[];
-            /** @description 위험 신호 */
-            risk: string | null;
-        };
-        Schema_89a67e6a4a2dd84e: {
-            /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
-            csrfHeaderName: string;
-            /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
-            csrfToken: string;
-        };
-        Schema_94be7d47165b11ba: {
-            /**
-             * Format: uuid
-             * @description 현재 로그인 계정
-             */
-            expectedAccountId: string;
-            /** @description 43자 초대 토큰 */
-            token: string;
-        };
-        Schema_129aea6c22399f87: {
-            /** @description 요청 순서의 현재 업무 정보 */
-            sources: {
-                /**
-                 * @description 요청한 신호 유형
-                 * @enum {string}
-                 */
-                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 요청한 원본 참조 */
-                sourceReference: string;
-                /** @description 현재 업무. 이전 참조·삭제·범위 불일치는 null */
-                target: {
-                    /** @description 현재 루틴 보관 여부 */
-                    archived: boolean;
-                    /**
-                     * Format: uuid
-                     * @description 같은 팀·시즌 역할 UUID
-                     */
-                    roleId: string;
-                    /**
-                     * Format: uuid
-                     * @description 루틴이면 UUID, 역할이면 null
-                     */
-                    routineId: string | null;
-                    /** @description 현재 업무 이름. 브리프 생성 당시 이름이 아님 */
-                    title: string;
-                } | null;
-            }[];
-        };
-        Schema_164d049e7f0ca10c: {
-            /** @description 재확인할 활성 자료 */
-            resources: {
-                /**
-                 * Format: uuid
-                 * @description 현재 활성 담당자 식별자. 없으면 null
-                 */
-                memberId: string | null;
-                /** @description 현재 활성 담당자 이름. 없으면 null */
-                memberName: string | null;
-                /** @description 다음 확인일 */
-                nextReviewOn: string;
-                /**
-                 * Format: uuid
-                 * @description 자료 식별자
-                 */
-                resourceId: string;
-                /**
-                 * Format: uuid
-                 * @description 소속 역할 식별자
-                 */
-                roleId: string;
-                /** @description 역할 이름 */
-                roleName: string;
-                /** @description 자료 이름 */
-                title: string;
-            }[];
-            /**
-             * Format: uuid
-             * @description 시즌 식별자
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
-            /** @description 시즌 IANA 시간대 */
-            timeZone: string;
-            /** @description 시즌 현지 오늘 날짜 */
-            today: string;
-        };
-        Schema_190aeb236e459d98: {
-            /**
-             * Format: int64
-             * @description 다음 과거 페이지 커서, 마지막은 null
-             */
-            nextBeforeAggregateRevision: number | null;
-            /** @description 실제 적용 전이 목록 */
-            transitions: {
-                /**
-                 * Format: int64
-                 * @description 적용한 원본 리비전
-                 */
-                aggregateRevision: number;
-                /** @description 이 전이에서 새로 공백을 발견했는지 여부 */
-                detectedRevisionGap: boolean;
-                /**
-                 * Format: uuid
-                 * @description 전이를 만든 원본 이벤트 UUID
-                 */
-                eventId: string;
-                /**
-                 * Format: date-time
-                 * @description 원본 관측 UTC 시각
-                 */
-                observedAt: string;
-                /**
-                 * @description 전이에 저장된 원본 심각도. v1은 null
-                 * @enum {string|null}
-                 */
-                sourceSeverity: "CRITICAL" | "WARNING" | null;
-                /**
-                 * @description 전이의 원본 상태
-                 * @enum {string}
-                 */
-                state: "ACTIVE" | "RESOLVED";
-            }[];
-        };
-        Schema_316d1fabcd9119c2: {
-            /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
-            ended: boolean;
-        };
-        Schema_491e14a825d07254: {
-            /** @description 자료 자료 설명 */
-            description?: string | null;
-            /**
-             * Format: uuid
-             * @description 자료를 소유하는 역할 UUID
-             */
-            roleId: string;
-            /** @description 자료 제목 */
-            title: string;
-            /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
-            url: string;
-        };
-        Schema_570a39d889e9996f: {
-            /**
-             * Format: date-time
-             * @description 최초로 영속 수신한 UTC 시각
-             */
-            acceptedAt: string;
-            /**
-             * Format: uuid
-             * @description 수신한 이벤트 UUID
-             */
-            eventId: string;
-        };
-        Schema_647b579478fb2e28: {
-            /** @description true면 보관, false면 복원 */
-            archived: boolean;
-        };
-        Schema_671b40434414e7d8: {
-            /** @description 팀 안에서 유일한 구성원 이름 */
-            name: string;
-        };
-        Schema_721ee5b24f3a4ef0: {
-            /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
-            accessKey: string;
-        };
-        Schema_809bfac6c8a82eaa: {
-            /**
-             * Format: date-time
-             * @description 만료 시각
-             */
-            expiresAt: string;
-            /**
-             * Format: uuid
-             * @description 구성원 식별자
-             */
-            memberId: string;
-            /** @description 구성원 이름 */
-            memberName: string;
-            /**
-             * @description 초대 권한
-             * @enum {string}
-             */
-            permission: "ADMIN" | "MEMBER" | "VIEWER";
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
-            /** @description 팀 이름 */
-            teamName: string;
-        };
-        Schema_892abbd42867bf81: {
-            /**
-             * Format: uuid
-             * @description 구성원 연결을 확인한 화면의 계정 UUID. 실제 로그인 계정과 같아야 함
-             */
-            expectedAccountId: string;
-            /**
-             * Format: uuid
-             * @description 계정에 연결할 기존 구성원 UUID
-             */
-            memberId: string;
-            /**
-             * Format: uuid
-             * @description 연결할 구성원의 시즌 UUID
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 연결할 구성원의 팀 UUID
-             */
-            teamId: string;
-        };
-        Schema_910a28d176d2ff82: {
-            /**
-             * Format: uuid
-             * @description 수락을 확인했다고 선언한 다음 담당자 UUID
-             */
-            confirmedByMemberId: string;
-        };
-        Schema_970b7022a56df951: {
-            /**
-             * Format: uuid
-             * @description 현재 로그인 계정
-             */
-            expectedAccountId: string;
-            /** @description 조회한 일정 버전. 미설정은 -1 */
-            expectedVersion: number;
-            /** @description 확인 간격 1~365일. 해제는 null */
-            intervalDays?: number | null;
-            /** @description 시즌 달력 기준 다음 확인일. 해제는 null */
-            nextReviewOn?: string | null;
-        };
-        Schema_2749ed0aebe2038f: {
-            /** @description 모임 날짜 기준 마감일 오프셋 */
-            deadlineDayOffset?: number | null;
-            /** @description 시즌 시간대 기준 마감 시각 */
-            deadlineTime?: string | null;
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 사용자에게 보일 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계: BEFORE, DURING, AFTER
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 반복 업무 제목 */
-            title: string;
-        };
-        Schema_4907c7cda751d086: {
-            /** @description 설명 가능한 규칙으로 계산한 조직 연속성 위험 신호 */
+        Schema_2fe02c76e0fc59e0: {
+            /** @description 담당자 공백과 업무 지연 등 조치가 필요한 항목 */
             continuitySignals: {
-                /** @description 현재 기록에서 이 신호가 발생한 이유 */
+                /** @description 현재 기록을 기준으로 항목을 표시한 이유 */
                 reason: string;
                 /** @description 사용자가 바로 취할 수 있는 다음 행동 */
                 recommendedAction: string;
@@ -2879,12 +2149,12 @@ export interface components {
                 relevantDate: string | null;
                 /**
                  * Format: uuid
-                 * @description 신호가 가리키는 역할 UUID
+                 * @description 항목이 가리키는 역할 UUID
                  */
                 roleId: string;
                 /**
                  * Format: uuid
-                 * @description 반복 지연 신호가 가리키는 반복 업무 UUID
+                 * @description 반복 업무 지연 항목이 가리키는 반복 업무 UUID
                  */
                 routineId: string | null;
                 /**
@@ -2892,7 +2162,7 @@ export interface components {
                  * @enum {string}
                  */
                 severity: "CRITICAL" | "WARNING";
-                /** @description 신호의 짧은 제목 */
+                /** @description 항목 제목 */
                 title: string;
                 /**
                  * @description 역할 공백, 후임 공백, 준비 부족, 반복 지연 또는 미완료 인수인계 유형
@@ -3145,9 +2415,9 @@ export interface components {
                 previousRoleId: string | null;
                 /** @description 역할 목적 */
                 purpose: string;
-                /** @description 역할 책임 목록 */
+                /** @description 담당 업무 목록 */
                 responsibilities: string[];
-                /** @description 위험 신호 */
+                /** @description 주의사항 */
                 risk: string | null;
             }[];
             /** @description 시즌 회차 목록 */
@@ -3402,6 +2672,961 @@ export interface components {
                 permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
             };
         };
+        Schema_3a4a0e7a2f90e51f: {
+            /** @description 가입한 이메일 */
+            email: string;
+        };
+        Schema_3b8b9e297849dc60: {
+            /**
+             * Format: uuid
+             * @description 자료 식별자
+             */
+            resourceId: string;
+            /** @description 현재 자료 버전 */
+            resourceVersion: number;
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 최근 확인 20건 */
+            verifications: {
+                /** @description 현재 자료 버전에 대한 확인 여부 */
+                current: boolean;
+                /**
+                 * Format: uuid
+                 * @description 확인 기록 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 확인한 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 확인 당시 구성원 이름 */
+                memberName: string;
+                /** @description 확인 메모 */
+                note: string | null;
+                /** @description 확인 당시 자료 버전 */
+                resourceVersion: number;
+                /**
+                 * @description 확인 결과
+                 * @enum {string}
+                 */
+                status: "CONFIRMED" | "NEEDS_UPDATE";
+                /** @description 확인 당시 주소 */
+                url: string;
+                /**
+                 * Format: date-time
+                 * @description 서버 확인 시각
+                 */
+                verifiedAt: string;
+            }[];
+        };
+        Schema_4abb9640ae4170a2: {
+            /**
+             * @description 분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE
+             * @enum {string}
+             */
+            category: "RESPONSIBILITY" | "ROUTINE" | "RESOURCE" | "ADVICE";
+            /** @description 인수인계할 내용 */
+            label: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+        };
+        Schema_4bec2c49abd86a09: {
+            /** @description 자동 회차 생성 활성 여부 */
+            enabled: boolean;
+            /**
+             * Format: date
+             * @description 첫 자동 회차 모임 날짜
+             */
+            firstMeetingDate: string;
+            /** @description 회차를 미리 만들 기간(0~30일) */
+            generationLeadDays: number;
+            /** @description 시즌 시간대 기준 모임 시각 */
+            meetingTime: string;
+            /**
+             * @description 반복 주기: WEEKLY 또는 BIWEEKLY
+             * @enum {string}
+             */
+            recurrence: "WEEKLY" | "BIWEEKLY";
+            /** @description IANA 시간대 식별자 */
+            timeZone: string;
+        };
+        Schema_4ecb1080a3aa9816: {
+            /**
+             * Format: uuid
+             * @description 전달을 확인했다고 선언한 이전 담당자 UUID
+             */
+            confirmedByMemberId: string;
+            /** @description 미완료 항목 또는 자료 없음 경고 확인 여부 */
+            warningAcknowledged: boolean;
+        };
+        Schema_5baa3f1a60a86ba9: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 팀 안에서 유일한 시즌 이름 */
+            name: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+        };
+        Schema_5f8da2d691004162: {
+            /** @enum {boolean} */
+            authenticated: false;
+        } | {
+            /** Format: uuid */
+            accountId: string;
+            /** @enum {boolean} */
+            authenticated: true;
+            csrfHeaderName: string;
+            csrfToken: string;
+        };
+        Schema_6a0ae0ae4f3b3839: {
+            /** @description BATON에 표시할 계정 이름 */
+            displayName: string;
+            /**
+             * Format: email
+             * @description 등록할 이메일 주소
+             */
+            email: string;
+        };
+        Schema_6c100ce885441212: {
+            /** @description true면 활동 종료, false면 다시 활성화 */
+            deactivated: boolean;
+        };
+        Schema_7a4c4a67e8a20167: {
+            /**
+             * Format: uuid
+             * @description 취소를 확인했다고 선언한 이전 담당자 UUID
+             */
+            confirmedByMemberId: string;
+        };
+        Schema_7f96165b3d93f31b: {
+            /** @description 요약 버전 내림차순의 저장된 주간 요약 */
+            editions: {
+                /**
+                 * Format: uuid
+                 * @description 주간 요약 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            }[];
+            /** @description 다음 과거 페이지의 배타 커서. 마지막은 null */
+            nextBeforeGeneration: number | null;
+        };
+        Schema_8ff7ee21dc10031e: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /**
+             * @description 새 권한, null은 접근 취소
+             * @enum {string|null}
+             */
+            permission?: "ADMIN" | "MEMBER" | "VIEWER" | null;
+        };
+        Schema_9d7a993539b49e9e: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /**
+             * Format: uuid
+             * @description 현재 계정과 연결된 구성원
+             */
+            memberId: string;
+        };
+        Schema_19b8ad8665adeba8: {
+            /** @description 새 요약을 만들었으면 true, 직전 결과를 재사용했으면 false */
+            created: boolean;
+            /** @description 생성 전에 전달 완료를 확인한 BATON BRIEF 아웃박스 최대 ID */
+            deliveryWatermark: number;
+            /**
+             * Format: uuid
+             * @description BRIEF가 반환한 주간 요약 UUID
+             */
+            editionId: string;
+            /**
+             * Format: uuid
+             * @description 재시도해도 유지되는 BATON 생성 요청 UUID
+             */
+            executionId: string;
+            /** @description 작업 공간·시즌 단위 요약 버전 */
+            generation: number;
+            /** @description BRIEF 로컬 수신 순서 커서 */
+            sourceCursor: number;
+        };
+        Schema_022e517c9925a05a: {
+            /** @description 최신순 이력 */
+            changes: {
+                /**
+                 * Format: uuid
+                 * @description 변경 계정. 비로그인 공유 키 사용은 null
+                 */
+                actorAccountId: string | null;
+                /** @description 변경 당시 계정 이름 또는 공유 키 사용자 */
+                actorName: string;
+                /**
+                 * Format: date-time
+                 * @description 변경 시각
+                 */
+                changedAt: string;
+                /** @description 값이 바뀐 항목 */
+                fields: {
+                    /** @description 변경 후 값. 값이 없으면 null */
+                    afterValue: string | null;
+                    /** @description 변경 전 값. 값이 없으면 null */
+                    beforeValue: string | null;
+                    /** @description 항목 이름 */
+                    fieldName: string;
+                }[];
+                /**
+                 * Format: uuid
+                 * @description 변경 식별자
+                 */
+                id: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description 원본 기록 식별자
+             */
+            recordId: string;
+            /**
+             * @description 기록 종류
+             * @enum {string}
+             */
+            recordKind: "DECISION" | "ROLE_RESOURCE";
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+        };
+        Schema_27a7f932602250ee: {
+            invitation?: {
+                /**
+                 * Format: date-time
+                 * @description 수락 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: date-time
+                 * @description 생성 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 만료 시각
+                 */
+                expiresAt: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 초대할 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 초대 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /**
+                 * Format: date-time
+                 * @description 취소 시각
+                 */
+                revokedAt: string | null;
+            };
+            /** @description 43자 일회용 초대 토큰 */
+            token: string;
+        };
+        Schema_42b1cc7be118ed2a: {
+            /** @description 현재 표시할 원본 참조 1~100건 */
+            sources: {
+                /**
+                 * @description 신호 유형
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 빈 값이 아닌 원본 참조, 최대 512자 */
+                sourceReference: string;
+            }[];
+        };
+        Schema_42cfc9da02e36f49: {
+            /**
+             * @description 조회 결과의 최신성 및 감시 여부
+             * @enum {string}
+             */
+            availability: "AVAILABLE" | "PENDING" | "STALE" | "UNAVAILABLE" | "NOT_MONITORED";
+            /** @description 현재 자료의 재점검 접수 가능 여부 */
+            checkRequestAllowed: boolean;
+            /**
+             * Format: int32
+             * @description 연속된 확정적 연결 실패 횟수. 0 이상의 정수이며 최신 결과가 없으면 null
+             */
+            consecutiveFailures: number | null;
+            /**
+             * @description WATCH 도달 가능성 상태
+             * @enum {string}
+             */
+            health: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "BROKEN";
+            /**
+             * Format: date-time
+             * @description 최근 점검 시도 완료 UTC 시각. 시도가 없으면 null
+             */
+            lastCheckedAt: string | null;
+            /**
+             * Format: date-time
+             * @description 최근 연결 성공·실패 판정 UTC 시각. 내부 오류는 갱신하지 않으며 판정이 없으면 null
+             */
+            lastConclusiveAt: string | null;
+            /**
+             * @description 최근 WATCH 점검 결과 코드. 최신 결과가 없으면 null
+             * @enum {string|null}
+             */
+            lastOutcome: "SUCCESS" | "HTTP_CLIENT_ERROR" | "HTTP_SERVER_ERROR" | "DESTINATION_REJECTED" | "DNS_FAILURE" | "CONNECT_TIMEOUT" | "READ_TIMEOUT" | "TLS_FAILURE" | "REDIRECT_REJECTED" | "TOO_MANY_REDIRECTS" | "RESPONSE_TOO_LARGE" | "NETWORK_FAILURE" | "INTERNAL_FAILURE" | null;
+            /**
+             * @description 자동 점검 제외 또는 동기화 대기 사유. 해당하지 않으면 null
+             * @enum {string|null}
+             */
+            monitoringReason: "INTEGRATION_DISABLED" | "MONITORING_PAUSED" | "SEASON_ENDED" | "RESOURCE_ARCHIVED" | "URL_NOT_ELIGIBLE" | "MONITOR_INACTIVE" | "SYNC_PENDING" | null;
+            /**
+             * Format: uuid
+             * @description 요청한 자료 UUID
+             */
+            resourceId: string;
+        };
+        Schema_49a6bffb47d61ba7: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /**
+             * Format: uuid
+             * @description 확인한 주간 요약 UUID
+             */
+            editionId: string;
+            /**
+             * @description 추가 전달 있음·없음 또는 확인 근거 없음
+             * @enum {string}
+             */
+            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
+        };
+        Schema_056c9e55e5c84be6: {
+            /**
+             * Format: date
+             * @description 모임 날짜(ISO-8601 날짜)
+             */
+            meetingDate: string;
+            /** @description 시즌 안에서 유일한 회차 이름 */
+            name: string;
+        };
+        Schema_71d9598b6bc02fa6: {
+            /**
+             * Format: date-time
+             * @description 보관한 UTC 시각
+             */
+            archivedAt: string | null;
+            /**
+             * Format: date-time
+             * @description 서버가 기록한 UTC 생성 시각. V14 이전 기록은 null
+             */
+            createdAt: string | null;
+            /** @description 자료 자료 설명 */
+            description: string | null;
+            /**
+             * Format: uuid
+             * @description 자료 UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description 소유 역할 UUID
+             */
+            roleId: string;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description http 또는 https 외부 링크 */
+            url: string;
+        };
+        Schema_89a67e6a4a2dd84e: {
+            /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
+            csrfHeaderName: string;
+            /** @description 현재 브라우저 세션의 불투명 CSRF 토큰 */
+            csrfToken: string;
+        };
+        Schema_91f6fd2faac9e979: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당자 UUID
+             */
+            currentMemberId: string | null;
+            /**
+             * Format: uuid
+             * @description 역할 UUID
+             */
+            id: string;
+            /** @description 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당자 UUID
+             */
+            nextMemberId: string | null;
+            /**
+             * Format: uuid
+             * @description 복사·이관 원본 역할 UUID. 원본 연결이 없으면 null
+             */
+            previousRoleId: string | null;
+            /** @description 역할 목적 */
+            purpose: string;
+            /** @description 담당 업무 목록 */
+            responsibilities: string[];
+            /** @description 주의사항 */
+            risk: string | null;
+        };
+        Schema_93e0b0ccc2645f51: {
+            /** @description 요청 순서의 현재 업무 정보 */
+            sources: {
+                /**
+                 * @description 요청한 신호 유형
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 요청한 원본 참조 */
+                sourceReference: string;
+                /** @description 현재 업무. 이전 참조·삭제·범위 불일치는 null */
+                target: {
+                    /** @description 현재 루틴 보관 여부 */
+                    archived: boolean;
+                    /**
+                     * Format: uuid
+                     * @description 같은 팀·시즌 역할 UUID
+                     */
+                    roleId: string;
+                    /**
+                     * Format: uuid
+                     * @description 루틴이면 UUID, 역할이면 null
+                     */
+                    routineId: string | null;
+                    /** @description 현재 업무 이름. 주간 요약 생성 당시 이름이 아님 */
+                    title: string;
+                } | null;
+            }[];
+        };
+        Schema_94be7d47165b11ba: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 43자 초대 토큰 */
+            token: string;
+        };
+        Schema_132ab51f4bca16af: {
+            /**
+             * Format: date
+             * @description 배정 종료일
+             */
+            assignmentEndDate?: string | null;
+            /**
+             * Format: date
+             * @description 배정 시작일
+             */
+            assignmentStartDate?: string | null;
+            /**
+             * Format: uuid
+             * @description 현재 담당 구성원 UUID
+             */
+            currentMemberId?: string | null;
+            /** @description 팀에서 유일한 역할 이름 */
+            name: string;
+            /**
+             * Format: uuid
+             * @description 다음 담당 구성원 UUID
+             */
+            nextMemberId?: string | null;
+            /** @description 역할의 목적 */
+            purpose: string;
+            /** @description 담당 업무 목록 */
+            responsibilities: string[];
+            /** @description 역할 주의사항 */
+            risk?: string | null;
+        };
+        Schema_164d049e7f0ca10c: {
+            /** @description 재확인할 활성 자료 */
+            resources: {
+                /**
+                 * Format: uuid
+                 * @description 현재 활성 담당자 식별자. 없으면 null
+                 */
+                memberId: string | null;
+                /** @description 현재 활성 담당자 이름. 없으면 null */
+                memberName: string | null;
+                /** @description 다음 확인일 */
+                nextReviewOn: string;
+                /**
+                 * Format: uuid
+                 * @description 자료 식별자
+                 */
+                resourceId: string;
+                /**
+                 * Format: uuid
+                 * @description 소속 역할 식별자
+                 */
+                roleId: string;
+                /** @description 역할 이름 */
+                roleName: string;
+                /** @description 자료 이름 */
+                title: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 시즌 IANA 시간대 */
+            timeZone: string;
+            /** @description 시즌 현지 오늘 날짜 */
+            today: string;
+        };
+        Schema_190aeb236e459d98: {
+            /**
+             * Format: int64
+             * @description 다음 과거 페이지 커서, 마지막은 null
+             */
+            nextBeforeAggregateRevision: number | null;
+            /** @description 실제 적용 전이 목록 */
+            transitions: {
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /** @description 이 전이에서 새로 공백을 발견했는지 여부 */
+                detectedRevisionGap: boolean;
+                /**
+                 * Format: uuid
+                 * @description 전이를 만든 원본 이벤트 UUID
+                 */
+                eventId: string;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 전이에 저장된 원본 심각도. v1은 null
+                 * @enum {string|null}
+                 */
+                sourceSeverity: "CRITICAL" | "WARNING" | null;
+                /**
+                 * @description 전이의 원본 상태
+                 * @enum {string}
+                 */
+                state: "ACTIVE" | "RESOLVED";
+            }[];
+        };
+        Schema_316d1fabcd9119c2: {
+            /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
+            ended: boolean;
+        };
+        Schema_491e14a825d07254: {
+            /** @description 자료 자료 설명 */
+            description?: string | null;
+            /**
+             * Format: uuid
+             * @description 자료를 소유하는 역할 UUID
+             */
+            roleId: string;
+            /** @description 자료 제목 */
+            title: string;
+            /** @description 사용자 정보가 없는 http 또는 https 외부 링크 */
+            url: string;
+        };
+        Schema_570a39d889e9996f: {
+            /**
+             * Format: date-time
+             * @description 최초로 영속 수신한 UTC 시각
+             */
+            acceptedAt: string;
+            /**
+             * Format: uuid
+             * @description 수신한 이벤트 UUID
+             */
+            eventId: string;
+        };
+        Schema_647b579478fb2e28: {
+            /** @description true면 보관, false면 복원 */
+            archived: boolean;
+        };
+        Schema_671b40434414e7d8: {
+            /** @description 팀 안에서 유일한 구성원 이름 */
+            name: string;
+        };
+        Schema_703deb264b81337c: {
+            /** @description 전이 뒤 역할 인수인계 */
+            handoff: {
+                /**
+                 * Format: date-time
+                 * @description 수락한 UTC 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 수락을 확인했다고 선언한 구성원 UUID
+                 */
+                acceptedByMemberId: string | null;
+                /** @description 전달 시점의 활성 인수인계 항목 수 */
+                activeItemCount: number | null;
+                /**
+                 * Format: date-time
+                 * @description 취소한 UTC 시각
+                 */
+                cancelledAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 취소를 확인했다고 선언한 구성원 UUID
+                 */
+                cancelledByMemberId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 이전 담당자 UUID
+                 */
+                fromMemberId: string;
+                /**
+                 * Format: uuid
+                 * @description 역할 인수인계 UUID
+                 */
+                id: string;
+                /**
+                 * Format: date
+                 * @description 수락 뒤 적용할 다음 담당 종료일
+                 */
+                incomingAssignmentEndDate: string | null;
+                /**
+                 * Format: date
+                 * @description 수락 뒤 적용할 다음 담당 시작일
+                 */
+                incomingAssignmentStartDate: string;
+                /** @description 전달 시점의 미완료 항목 수 */
+                incompleteItemCount: number | null;
+                /**
+                 * Format: date
+                 * @description 준비 시점의 이전 담당 종료일
+                 */
+                outgoingAssignmentEndDate: string | null;
+                /**
+                 * Format: date
+                 * @description 준비 시점의 이전 담당 시작일
+                 */
+                outgoingAssignmentStartDate: string;
+                /**
+                 * Format: date-time
+                 * @description 준비한 UTC 시각
+                 */
+                preparedAt: string;
+                /** @description 전달 시점의 역할 자료 수 */
+                resourceCount: number | null;
+                /**
+                 * Format: uuid
+                 * @description 대상 역할 UUID
+                 */
+                roleId: string;
+                /**
+                 * @description PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
+                 * @enum {string}
+                 */
+                status: "PREPARING" | "TRANSFERRED" | "ACCEPTED" | "CANCELLED";
+                /**
+                 * Format: uuid
+                 * @description 다음 담당자 UUID
+                 */
+                toMemberId: string;
+                /**
+                 * Format: date-time
+                 * @description 전달한 UTC 시각
+                 */
+                transferredAt: string | null;
+                /**
+                 * Format: uuid
+                 * @description 전달을 확인했다고 선언한 구성원 UUID
+                 */
+                transferredByMemberId: string | null;
+                /** @description 준비도 경고를 명시적으로 확인했는지 여부 */
+                warningAcknowledged: boolean;
+            };
+            /** @description 전이 뒤 역할 */
+            role: {
+                /**
+                 * Format: date
+                 * @description 배정 종료일
+                 */
+                assignmentEndDate: string | null;
+                /**
+                 * Format: date
+                 * @description 배정 시작일
+                 */
+                assignmentStartDate: string | null;
+                /**
+                 * Format: uuid
+                 * @description 현재 담당자 UUID
+                 */
+                currentMemberId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 역할 UUID
+                 */
+                id: string;
+                /** @description 역할 이름 */
+                name: string;
+                /**
+                 * Format: uuid
+                 * @description 다음 담당자 UUID
+                 */
+                nextMemberId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 복사·이관 원본 역할 UUID. 원본 연결이 없으면 null
+                 */
+                previousRoleId: string | null;
+                /** @description 역할 목적 */
+                purpose: string;
+                /** @description 담당 업무 목록 */
+                responsibilities: string[];
+                /** @description 주의사항 */
+                risk: string | null;
+            };
+        };
+        Schema_721ee5b24f3a4ef0: {
+            /** @description 복구 시 한 번만 제공하는 새 워크스페이스 접근 키 */
+            accessKey: string;
+        };
+        Schema_809bfac6c8a82eaa: {
+            /**
+             * Format: date-time
+             * @description 만료 시각
+             */
+            expiresAt: string;
+            /**
+             * Format: uuid
+             * @description 구성원 식별자
+             */
+            memberId: string;
+            /** @description 구성원 이름 */
+            memberName: string;
+            /**
+             * @description 초대 권한
+             * @enum {string}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER";
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+            /** @description 팀 이름 */
+            teamName: string;
+        };
+        Schema_892abbd42867bf81: {
+            /**
+             * Format: uuid
+             * @description 구성원 연결을 확인한 화면의 계정 UUID. 실제 로그인 계정과 같아야 함
+             */
+            expectedAccountId: string;
+            /**
+             * Format: uuid
+             * @description 계정에 연결할 기존 구성원 UUID
+             */
+            memberId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 시즌 UUID
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 연결할 구성원의 팀 UUID
+             */
+            teamId: string;
+        };
+        Schema_910a28d176d2ff82: {
+            /**
+             * Format: uuid
+             * @description 수락을 확인했다고 선언한 다음 담당자 UUID
+             */
+            confirmedByMemberId: string;
+        };
+        Schema_970b7022a56df951: {
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 조회한 일정 버전. 미설정은 -1 */
+            expectedVersion: number;
+            /** @description 확인 간격 1~365일. 해제는 null */
+            intervalDays?: number | null;
+            /** @description 시즌 달력 기준 다음 확인일. 해제는 null */
+            nextReviewOn?: string | null;
+        };
+        Schema_2688cd5555c641f8: {
+            /**
+             * Format: uuid
+             * @description 주간 요약 UUID
+             */
+            editionId: string;
+            /**
+             * Format: date-time
+             * @description 주간 요약 생성 UTC 시각
+             */
+            generatedAt: string;
+            /** @description 작업 공간·시즌 단위 요약 버전 */
+            generation: number;
+            /** @description 저장된 주간 요약 항목 목록 */
+            items: {
+                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description BRIEF 선정 규칙 버전 */
+            ruleVersion: number;
+            /**
+             * Format: uuid
+             * @description BATON 시즌 UUID
+             */
+            seasonId: string;
+            /** @description BRIEF 로컬 수신 순서 커서 */
+            sourceCursor: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대 기준 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 종료 UTC 시각
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 구간 시작 UTC 시각
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description BATON 팀 UUID와 같은 BRIEF 작업 공간 UUID
+             */
+            workspaceId: string;
+            /**
+             * Format: uuid
+             * @description 생성 당시 IANA 시간대
+             */
+            zoneId: string;
+        };
+        Schema_2749ed0aebe2038f: {
+            /** @description 모임 날짜 기준 마감일 오프셋 */
+            deadlineDayOffset?: number | null;
+            /** @description 시즌 시간대 기준 마감 시각 */
+            deadlineTime?: string | null;
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 사용자에게 보일 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계: BEFORE, DURING, AFTER
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 반복 업무 제목 */
+            title: string;
+        };
         Schema_5411bd92352a352b: {
             /** @description 완료 여부 */
             completed: boolean;
@@ -3494,42 +3719,174 @@ export interface components {
              */
             timingStatus: "PLANNED" | "IN_PROGRESS" | "OVERDUE" | "COMPLETED";
         };
-        Schema_6569daaafc6922c9: {
-            /**
-             * Format: date-time
-             * @description BATON 확인 UTC 시각
-             */
-            checkedAt: string;
-            /**
-             * Format: uuid
-             * @description 확인한 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * @description 추가 전달 있음·없음 또는 확인 근거 없음
-             * @enum {string}
-             */
-            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
-        };
-        Schema_9615d143264cd2dc: {
-            /** @description 새 에디션을 만들었으면 true, 직전 상태를 재사용했으면 false */
-            created: boolean;
-            /** @description 생성 전에 완료를 확인한 BATON BRIEF outbox 최대 ID */
-            deliveryWatermark: number;
-            /**
-             * Format: uuid
-             * @description BRIEF가 반환한 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * Format: uuid
-             * @description BATON의 내구성 있는 생성 실행 UUID
-             */
-            executionId: string;
-            /** @description 작업공간·시즌 범위 에디션 세대 */
-            generation: number;
-            /** @description BRIEF 로컬 수신 순서 cursor */
-            sourceCursor: number;
+        Schema_22887dd3879d2843: {
+            /** @description 대상에만 포함된 항목 */
+            added: {
+                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description 고정 필드가 달라진 항목 */
+            changed: {
+                /** @description 대상에 저장된 항목 */
+                after: {
+                    /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                    aggregateRevision: number | null;
+                    /**
+                     * Format: date-time
+                     * @description 원본 상태 관찰 시각
+                     */
+                    observedAt: string;
+                    /** @description BATON 연속성 신호 유형 */
+                    reasonCode: string;
+                    /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                    revisionGap: boolean | null;
+                    /** @description 항목 투영 규칙 버전 */
+                    ruleVersion: number;
+                    /**
+                     * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                     * @enum {string|null}
+                     */
+                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                    /** @description BRIEF 표시 심각도 */
+                    severity: string;
+                    /** @description BATON 신호의 안정적인 원본 참조 */
+                    sourceReference: string;
+                    /** @description 생성 시점 신호 상태 */
+                    status: string;
+                };
+                /** @description 기준에 저장된 항목 */
+                before: {
+                    /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                    aggregateRevision: number | null;
+                    /**
+                     * Format: date-time
+                     * @description 원본 상태 관찰 시각
+                     */
+                    observedAt: string;
+                    /** @description BATON 연속성 신호 유형 */
+                    reasonCode: string;
+                    /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                    revisionGap: boolean | null;
+                    /** @description 항목 투영 규칙 버전 */
+                    ruleVersion: number;
+                    /**
+                     * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                     * @enum {string|null}
+                     */
+                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                    /** @description BRIEF 표시 심각도 */
+                    severity: string;
+                    /** @description BATON 신호의 안정적인 원본 참조 */
+                    sourceReference: string;
+                    /** @description 생성 시점 신호 상태 */
+                    status: string;
+                };
+            }[];
+            /** @description 비교 기준 주간 요약 */
+            from: {
+                /**
+                 * Format: uuid
+                 * @description 주간 요약 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            };
+            /** @description 대상에서 제외된 항목. 해소 판정이 아님 */
+            removed: {
+                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description 비교 대상 주간 요약 */
+            to: {
+                /**
+                 * Format: uuid
+                 * @description 주간 요약 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            };
         };
         Schema_59121c6eafa63b3f: {
             /** @description 계정 권한 전환 여부 */
@@ -3743,6 +4100,27 @@ export interface components {
              * @enum {string|null}
              */
             template?: "STUDY_V1" | "TEAM_V1" | null;
+        };
+        Schema_883049cd69ea4cd6: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /** @description 전달 영구 실패 이벤트 수 */
+            failedCount: number;
+            /**
+             * Format: date-time
+             * @description 마지막 전달 성공 시각. 성공 기록이 없으면 null
+             */
+            lastDeliveredAt: string | null;
+            /** @description 전달 대기·처리 중인 이벤트 수 */
+            pendingCount: number;
+            /**
+             * @description 전달·생성 요청 준비 상태
+             * @enum {string}
+             */
+            status: "READY" | "DELIVERY_PENDING" | "DELIVERY_FAILED" | "GENERATING" | "GENERATION_FAILED" | "SEASON_ENDED" | "DISABLED";
         };
         Schema_7384160ed9534c5f: {
             /** @description 다음 시즌으로 이어 갈 원본 역할 UUID 집합 */
@@ -4218,81 +4596,6 @@ export interface components {
             /** @description 새 비밀번호 */
             newPassword: string;
         };
-        Schema_d11ea1dcc29eeab5: {
-            /**
-             * Format: uuid
-             * @description 불변 에디션 UUID
-             */
-            editionId: string;
-            /**
-             * Format: date-time
-             * @description 에디션 생성 UTC 시각
-             */
-            generatedAt: string;
-            /** @description 작업공간·시즌 범위 에디션 세대 */
-            generation: number;
-            /** @description 불변 에디션 항목 목록 */
-            items: {
-                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
-                aggregateRevision: number | null;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
-                revisionGap: boolean | null;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /**
-                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
-                 * @enum {string|null}
-                 */
-                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description BRIEF 선정 규칙 버전 */
-            ruleVersion: number;
-            /**
-             * Format: uuid
-             * @description BATON 시즌 UUID
-             */
-            seasonId: string;
-            /** @description BRIEF 로컬 수신 순서 cursor */
-            sourceCursor: number;
-            /**
-             * Format: date
-             * @description 시즌 시간대 기준 월요일
-             */
-            weekStart: string;
-            /**
-             * Format: date-time
-             * @description 주간 구간 종료 UTC 시각
-             */
-            windowEnd: string;
-            /**
-             * Format: date-time
-             * @description 주간 구간 시작 UTC 시각
-             */
-            windowStart: string;
-            /**
-             * Format: uuid
-             * @description BATON 팀 UUID와 같은 BRIEF 작업공간 UUID
-             */
-            workspaceId: string;
-            /**
-             * Format: uuid
-             * @description 생성 당시 IANA 시간대
-             */
-            zoneId: string;
-        };
         Schema_d817bb4c7f28fd3d: {
             /** @description 항상 true인 요청 접수 표시. 계정 존재나 실제 발송 완료를 뜻하지 않는다 */
             accepted: boolean;
@@ -4424,6 +4727,68 @@ export interface components {
             /** @description 팀 안에서 유일한 새 표시 이름 */
             name: string;
         };
+        Schema_e51b023d67f2f7da: {
+            /**
+             * Format: date-time
+             * @description BRIEF 집계 확인 시각
+             */
+            evaluatedAt: string;
+            /** @description 이벤트 종류와 원본 참조 순으로 정렬한 해소 목록 */
+            items: {
+                /**
+                 * @description 해결한 점검 항목 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /**
+                 * Format: date-time
+                 * @description 활성 다음 리비전에서 해소로 바뀐 원본 시각
+                 */
+                resolvedAt: string;
+                /**
+                 * Format: int64
+                 * @description 해소로 바뀐 원본 리비전
+                 */
+                resolvedRevision: number;
+                /** @description 원본 참조 */
+                sourceReference: string;
+            }[];
+            /** @description 다음 페이지 배타 커서. 끝이면 null */
+            nextCursor: {
+                /**
+                 * @description 커서 이벤트 타입
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
+            /**
+             * Format: int64
+             * @description 커서와 무관한 현재 전체 해소 항목 수. 누락 증거가 있는 항목 제외
+             */
+            resolvedCount: number;
+            /**
+             * Format: date
+             * @description 시즌 시간대의 이번 주 월요일
+             */
+            weekStart: string;
+            /**
+             * Format: date-time
+             * @description 다음 주 시작 시각 미만
+             */
+            windowEnd: string;
+            /**
+             * Format: date-time
+             * @description 주간 시작 시각 이상
+             */
+            windowStart: string;
+            /**
+             * Format: uuid
+             * @description 시즌 IANA 시간대
+             */
+            zoneId: string;
+        };
         Schema_e249d91938b2aea4: {
             /** @enum {boolean} */
             claimed: false;
@@ -4484,175 +4849,6 @@ export interface components {
              */
             teamId: string;
         };
-        Schema_e193605dec9c8777: {
-            /** @description 대상에만 포함된 항목 */
-            added: {
-                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
-                aggregateRevision: number | null;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
-                revisionGap: boolean | null;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /**
-                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
-                 * @enum {string|null}
-                 */
-                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description 고정 필드가 달라진 항목 */
-            changed: {
-                /** @description 대상에 저장된 항목 */
-                after: {
-                    /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
-                    aggregateRevision: number | null;
-                    /**
-                     * Format: date-time
-                     * @description 원본 상태 관찰 시각
-                     */
-                    observedAt: string;
-                    /** @description BATON 연속성 신호 유형 */
-                    reasonCode: string;
-                    /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
-                    revisionGap: boolean | null;
-                    /** @description 항목 투영 규칙 버전 */
-                    ruleVersion: number;
-                    /**
-                     * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
-                     * @enum {string|null}
-                     */
-                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                    /** @description BRIEF 표시 심각도 */
-                    severity: string;
-                    /** @description BATON 신호의 안정적인 원본 참조 */
-                    sourceReference: string;
-                    /** @description 생성 시점 신호 상태 */
-                    status: string;
-                };
-                /** @description 기준에 저장된 항목 */
-                before: {
-                    /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
-                    aggregateRevision: number | null;
-                    /**
-                     * Format: date-time
-                     * @description 원본 상태 관찰 시각
-                     */
-                    observedAt: string;
-                    /** @description BATON 연속성 신호 유형 */
-                    reasonCode: string;
-                    /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
-                    revisionGap: boolean | null;
-                    /** @description 항목 투영 규칙 버전 */
-                    ruleVersion: number;
-                    /**
-                     * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
-                     * @enum {string|null}
-                     */
-                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                    /** @description BRIEF 표시 심각도 */
-                    severity: string;
-                    /** @description BATON 신호의 안정적인 원본 참조 */
-                    sourceReference: string;
-                    /** @description 생성 시점 신호 상태 */
-                    status: string;
-                };
-            }[];
-            /** @description 비교 기준 브리프 */
-            from: {
-                /**
-                 * Format: uuid
-                 * @description 불변 에디션 UUID
-                 */
-                editionId: string;
-                /**
-                 * Format: date-time
-                 * @description 생성 UTC 시각
-                 */
-                generatedAt: string;
-                /** @description 시즌 안에서 증가하는 생성 순번 */
-                generation: number;
-                /** @description 고정된 항목 수 */
-                itemCount: number;
-                /** @description 선정 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 로컬 수신 경계 */
-                sourceCursor: number;
-                /** @description 주간 시작 월요일 */
-                weekStart: string;
-                /**
-                 * Format: uuid
-                 * @description 저장된 IANA 시간대
-                 */
-                zoneId: string;
-            };
-            /** @description 대상에서 제외된 항목. 해소 판정이 아님 */
-            removed: {
-                /** @description 원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null */
-                aggregateRevision: number | null;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null */
-                revisionGap: boolean | null;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /**
-                 * @description 생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null
-                 * @enum {string|null}
-                 */
-                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description 비교 대상 브리프 */
-            to: {
-                /**
-                 * Format: uuid
-                 * @description 불변 에디션 UUID
-                 */
-                editionId: string;
-                /**
-                 * Format: date-time
-                 * @description 생성 UTC 시각
-                 */
-                generatedAt: string;
-                /** @description 시즌 안에서 증가하는 생성 순번 */
-                generation: number;
-                /** @description 고정된 항목 수 */
-                itemCount: number;
-                /** @description 선정 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 로컬 수신 경계 */
-                sourceCursor: number;
-                /** @description 주간 시작 월요일 */
-                weekStart: string;
-                /**
-                 * Format: uuid
-                 * @description 저장된 IANA 시간대
-                 */
-                zoneId: string;
-            };
-        };
         Schema_eb67d7974bb5c307: {
             /**
              * Format: uuid
@@ -4694,202 +4890,6 @@ export interface components {
              * @description 다음 담당 구성원 UUID
              */
             toMemberId: string;
-        };
-        Schema_f4fe7b6ee878ff86: {
-            /** @description 전이 뒤 역할 인수인계 */
-            handoff: {
-                /**
-                 * Format: date-time
-                 * @description 수락한 UTC 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 수락을 확인했다고 선언한 구성원 UUID
-                 */
-                acceptedByMemberId: string | null;
-                /** @description 전달 시점의 활성 인수인계 항목 수 */
-                activeItemCount: number | null;
-                /**
-                 * Format: date-time
-                 * @description 취소한 UTC 시각
-                 */
-                cancelledAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 취소를 확인했다고 선언한 구성원 UUID
-                 */
-                cancelledByMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 이전 담당자 UUID
-                 */
-                fromMemberId: string;
-                /**
-                 * Format: uuid
-                 * @description 역할 인수인계 UUID
-                 */
-                id: string;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 종료일
-                 */
-                incomingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 수락 뒤 적용할 다음 담당 시작일
-                 */
-                incomingAssignmentStartDate: string;
-                /** @description 전달 시점의 미완료 항목 수 */
-                incompleteItemCount: number | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 종료일
-                 */
-                outgoingAssignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 준비 시점의 이전 담당 시작일
-                 */
-                outgoingAssignmentStartDate: string;
-                /**
-                 * Format: date-time
-                 * @description 준비한 UTC 시각
-                 */
-                preparedAt: string;
-                /** @description 전달 시점의 역할 자료 수 */
-                resourceCount: number | null;
-                /**
-                 * Format: uuid
-                 * @description 대상 역할 UUID
-                 */
-                roleId: string;
-                /**
-                 * @description PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED
-                 * @enum {string}
-                 */
-                status: "PREPARING" | "TRANSFERRED" | "ACCEPTED" | "CANCELLED";
-                /**
-                 * Format: uuid
-                 * @description 다음 담당자 UUID
-                 */
-                toMemberId: string;
-                /**
-                 * Format: date-time
-                 * @description 전달한 UTC 시각
-                 */
-                transferredAt: string | null;
-                /**
-                 * Format: uuid
-                 * @description 전달을 확인했다고 선언한 구성원 UUID
-                 */
-                transferredByMemberId: string | null;
-                /** @description 준비도 경고를 명시적으로 확인했는지 여부 */
-                warningAcknowledged: boolean;
-            };
-            /** @description 전이 뒤 역할 */
-            role: {
-                /**
-                 * Format: date
-                 * @description 배정 종료일
-                 */
-                assignmentEndDate: string | null;
-                /**
-                 * Format: date
-                 * @description 배정 시작일
-                 */
-                assignmentStartDate: string | null;
-                /**
-                 * Format: uuid
-                 * @description 현재 담당자 UUID
-                 */
-                currentMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 역할 UUID
-                 */
-                id: string;
-                /** @description 역할 이름 */
-                name: string;
-                /**
-                 * Format: uuid
-                 * @description 다음 담당자 UUID
-                 */
-                nextMemberId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 복사·이관 원본 역할 UUID. 원본 연결이 없으면 null
-                 */
-                previousRoleId: string | null;
-                /** @description 역할 목적 */
-                purpose: string;
-                /** @description 역할 책임 목록 */
-                responsibilities: string[];
-                /** @description 위험 신호 */
-                risk: string | null;
-            };
-        };
-        Schema_f6b1b4550edbee50: {
-            /**
-             * Format: date-time
-             * @description BRIEF 집계 확인 시각
-             */
-            evaluatedAt: string;
-            /** @description 복합 정체성 오름차순 해소 목록 */
-            items: {
-                /**
-                 * @description 해소한 관심 항목 종류
-                 * @enum {string}
-                 */
-                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /**
-                 * Format: date-time
-                 * @description 활성 다음 리비전에서 해소로 바뀐 원본 시각
-                 */
-                resolvedAt: string;
-                /**
-                 * Format: int64
-                 * @description 해소로 바뀐 원본 리비전
-                 */
-                resolvedRevision: number;
-                /** @description 원본 참조 */
-                sourceReference: string;
-            }[];
-            /** @description 다음 페이지 배타 커서. 끝이면 null */
-            nextCursor: {
-                /**
-                 * @description 커서 이벤트 타입
-                 * @enum {string}
-                 */
-                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 커서 원본 참조 */
-                sourceReference: string;
-            } | null;
-            /**
-             * Format: int64
-             * @description 커서와 무관한 현재 전체 해소 항목 수. 누락 증거가 있는 항목 제외
-             */
-            resolvedCount: number;
-            /**
-             * Format: date
-             * @description 시즌 시간대의 이번 주 월요일
-             */
-            weekStart: string;
-            /**
-             * Format: date-time
-             * @description 다음 주 시작 시각 미만
-             */
-            windowEnd: string;
-            /**
-             * Format: date-time
-             * @description 주간 시작 시각 이상
-             */
-            windowStart: string;
-            /**
-             * Format: uuid
-             * @description 시즌 IANA 시간대
-             */
-            zoneId: string;
         };
         Schema_f8f286f6a4bb5ab7: {
             /**
@@ -5032,7 +5032,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5045,7 +5045,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5078,7 +5078,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5102,7 +5102,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5177,7 +5177,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5221,7 +5221,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5232,7 +5232,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5278,7 +5278,7 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 현재 JSESSIONID를 즉시 만료하는 쿠키 */
                     "Set-Cookie"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5289,7 +5289,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5302,7 +5302,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5346,7 +5346,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5390,7 +5390,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5401,7 +5401,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5445,7 +5445,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5458,7 +5458,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5502,7 +5502,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5513,7 +5513,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5555,7 +5555,7 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 기존 JSESSIONID를 즉시 만료하는 쿠키 */
                     "Set-Cookie"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5577,7 +5577,7 @@ export interface operations {
                 headers: {
                     /** @description 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5601,7 +5601,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5643,7 +5643,7 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 현재 JSESSIONID를 즉시 만료하는 쿠키 */
                     "Set-Cookie"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5668,7 +5668,7 @@ export interface operations {
                 headers: {
                     /** @description 브라우저 응답 저장 금지 */
                     "Cache-Control"?: string;
-                    /** @description 요청 진단 식별자 */
+                    /** @description 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5705,7 +5705,7 @@ export interface operations {
             /** @description 202 */
             202: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5716,7 +5716,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5731,7 +5731,7 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description WATCH 수신기 전용 Bearer 인증 요구 */
                     "WWW-Authenticate"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5742,7 +5742,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5876,7 +5876,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5925,7 +5925,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5973,7 +5973,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -5995,7 +5995,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6343,7 +6343,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6354,7 +6354,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6365,7 +6365,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6376,7 +6376,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6387,7 +6387,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6427,7 +6427,7 @@ export interface operations {
                 headers: {
                     /** @description 민감한 응답을 저장하지 않도록 하는 no-store 지시자 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6438,7 +6438,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6478,7 +6478,7 @@ export interface operations {
                 headers: {
                     /** @description 민감한 응답을 저장하지 않도록 하는 no-store 지시자 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6489,7 +6489,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6537,12 +6537,12 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 요청 진단 식별자 */
+                    /** @description 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_19f6740e091bbe3d"];
+                    "application/json": components["schemas"]["Schema_1d3be7104c4d77c4"];
                 };
             };
         };
@@ -6579,12 +6579,12 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 요청 진단 식별자 */
+                    /** @description 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f6b1b4550edbee50"];
+                    "application/json": components["schemas"]["Schema_e51b023d67f2f7da"];
                 };
             };
         };
@@ -6614,7 +6614,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 요청 진단 식별자 */
+                    /** @description 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6627,7 +6627,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 요청 진단 식별자 */
+                    /** @description 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6642,11 +6642,11 @@ export interface operations {
             query: {
                 /** @description 이 리비전보다 작은 과거 전이 */
                 beforeAggregateRevision?: number;
-                /** @description 관심 항목의 원본 신호 종류 */
+                /** @description 점검 항목의 원본 신호 종류 */
                 eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
                 /** @description 1~100, 기본 20 */
                 limit?: number;
-                /** @description 관심 항목의 불투명 원본 참조 */
+                /** @description 점검 항목의 원본 참조 문자열 */
                 sourceReference: string;
             };
             header?: {
@@ -6671,7 +6671,7 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 요청 진단 식별자 */
+                    /** @description 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -6712,7 +6712,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_3e546778723d69d3"];
+                    "application/json": components["schemas"]["Schema_7f96165b3d93f31b"];
                 };
             };
         };
@@ -6757,16 +6757,16 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description 생성 결과 BRIEF 에디션 검증자 */
+                    /** @description 생성한 주간 요약 검증자 */
                     ETag?: string;
-                    /** @description 최신 BRIEF 에디션 조회 경로 */
+                    /** @description 최신 주간 요약 조회 경로 */
                     Location?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_9615d143264cd2dc"];
+                    "application/json": components["schemas"]["Schema_19b8ad8665adeba8"];
                 };
             };
         };
@@ -6782,7 +6782,7 @@ export interface operations {
                 "X-Baton-Access-Key"?: string;
             };
             path: {
-                /** @description 선택한 브리프 UUID */
+                /** @description 선택한 주간 요약 UUID */
                 editionId: string;
                 /** @description 시즌 UUID */
                 seasonId: string;
@@ -6798,14 +6798,14 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description BRIEF 불변 에디션 검증자 */
+                    /** @description 저장된 주간 요약 검증자 */
                     ETag?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
+                    "application/json": components["schemas"]["Schema_2688cd5555c641f8"];
                 };
             };
         };
@@ -6813,7 +6813,7 @@ export interface operations {
     compareBriefEditions: {
         parameters: {
             query: {
-                /** @description 기준 브리프 UUID */
+                /** @description 기준 주간 요약 UUID */
                 fromEditionId: string;
             };
             header?: {
@@ -6824,7 +6824,7 @@ export interface operations {
                 "X-Baton-Access-Key"?: string;
             };
             path: {
-                /** @description 선택한 브리프 UUID */
+                /** @description 선택한 주간 요약 UUID */
                 editionId: string;
                 /** @description 시즌 UUID */
                 seasonId: string;
@@ -6841,7 +6841,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_e193605dec9c8777"];
+                    "application/json": components["schemas"]["Schema_22887dd3879d2843"];
                 };
             };
         };
@@ -6857,7 +6857,7 @@ export interface operations {
                 "X-Baton-Access-Key"?: string;
             };
             path: {
-                /** @description 선택한 브리프 UUID */
+                /** @description 선택한 주간 요약 UUID */
                 editionId: string;
                 /** @description 시즌 UUID */
                 seasonId: string;
@@ -6874,7 +6874,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_6569daaafc6922c9"];
+                    "application/json": components["schemas"]["Schema_49a6bffb47d61ba7"];
                 };
             };
         };
@@ -6890,7 +6890,7 @@ export interface operations {
                 "X-Baton-Access-Key"?: string;
             };
             path: {
-                /** @description 비교 대상 브리프 UUID */
+                /** @description 비교 대상 주간 요약 UUID */
                 editionId: string;
                 /** @description 시즌 UUID */
                 seasonId: string;
@@ -6906,14 +6906,14 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description BRIEF 불변 에디션 검증자 */
+                    /** @description 저장된 주간 요약 검증자 */
                     ETag?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
+                    "application/json": components["schemas"]["Schema_2688cd5555c641f8"];
                 };
             };
         };
@@ -6943,14 +6943,14 @@ export interface operations {
                 headers: {
                     /** @description 민감 응답 캐시 금지 */
                     "Cache-Control"?: string;
-                    /** @description BRIEF 불변 에디션 검증자 */
+                    /** @description 저장된 주간 요약 검증자 */
                     ETag?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_d11ea1dcc29eeab5"];
+                    "application/json": components["schemas"]["Schema_2688cd5555c641f8"];
                 };
             };
         };
@@ -6981,7 +6981,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_7aa2fa2c6585a4d7"];
+                    "application/json": components["schemas"]["Schema_883049cd69ea4cd6"];
                 };
             };
         };
@@ -7031,7 +7031,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_129aea6c22399f87"];
+                    "application/json": components["schemas"]["Schema_93e0b0ccc2645f51"];
                 };
             };
         };
@@ -7269,7 +7269,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7314,7 +7314,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7325,7 +7325,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7336,7 +7336,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7381,7 +7381,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7392,7 +7392,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7403,7 +7403,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7481,7 +7481,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7492,7 +7492,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7503,7 +7503,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7514,7 +7514,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7525,7 +7525,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7573,7 +7573,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7618,7 +7618,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7629,7 +7629,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7640,7 +7640,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7685,7 +7685,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7696,7 +7696,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7707,7 +7707,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7752,7 +7752,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7763,7 +7763,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7774,7 +7774,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7822,7 +7822,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7833,7 +7833,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7844,7 +7844,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7855,7 +7855,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7866,7 +7866,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7911,7 +7911,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7922,7 +7922,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7933,7 +7933,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7978,7 +7978,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -7989,7 +7989,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8000,7 +8000,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8037,7 +8037,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8048,7 +8048,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8059,7 +8059,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8070,7 +8070,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8081,7 +8081,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8234,7 +8234,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8245,7 +8245,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8325,7 +8325,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8336,7 +8336,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8347,7 +8347,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8392,7 +8392,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8716,25 +8716,25 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_9d26cd80bf5240ea"];
+                "application/json": components["schemas"]["Schema_132ab51f4bca16af"];
             };
         };
         responses: {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_78f1554c32b35a98"];
+                    "application/json": components["schemas"]["Schema_91f6fd2faac9e979"];
                 };
             };
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8772,25 +8772,25 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_9d26cd80bf5240ea"];
+                "application/json": components["schemas"]["Schema_132ab51f4bca16af"];
             };
         };
         responses: {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_78f1554c32b35a98"];
+                    "application/json": components["schemas"]["Schema_91f6fd2faac9e979"];
                 };
             };
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8801,7 +8801,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8853,18 +8853,18 @@ export interface operations {
                 headers: {
                     /** @description 준비한 역할 인수인계 URI */
                     Location?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f4fe7b6ee878ff86"];
+                    "application/json": components["schemas"]["Schema_703deb264b81337c"];
                 };
             };
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8911,18 +8911,18 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f4fe7b6ee878ff86"];
+                    "application/json": components["schemas"]["Schema_703deb264b81337c"];
                 };
             };
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8933,7 +8933,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -8980,18 +8980,18 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f4fe7b6ee878ff86"];
+                    "application/json": components["schemas"]["Schema_703deb264b81337c"];
                 };
             };
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9002,7 +9002,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9049,18 +9049,18 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_f4fe7b6ee878ff86"];
+                    "application/json": components["schemas"]["Schema_703deb264b81337c"];
                 };
             };
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9071,7 +9071,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9114,7 +9114,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9125,7 +9125,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9136,7 +9136,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9147,7 +9147,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9158,7 +9158,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9206,7 +9206,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9217,7 +9217,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9228,7 +9228,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9273,7 +9273,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9284,7 +9284,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9295,7 +9295,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9306,7 +9306,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9317,7 +9317,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9362,7 +9362,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9373,7 +9373,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9384,7 +9384,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9395,7 +9395,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9406,7 +9406,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9453,7 +9453,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9464,7 +9464,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9475,7 +9475,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9523,7 +9523,7 @@ export interface operations {
             /** @description 201 */
             201: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9534,7 +9534,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9545,7 +9545,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9590,7 +9590,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9601,7 +9601,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9612,7 +9612,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9657,7 +9657,7 @@ export interface operations {
             /** @description 200 */
             200: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9668,7 +9668,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9679,7 +9679,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9690,7 +9690,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9701,7 +9701,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9751,7 +9751,7 @@ export interface operations {
                 headers: {
                     /** @description 생성한 다음 시즌 워크스페이스 URI */
                     Location?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9762,7 +9762,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9773,7 +9773,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9784,7 +9784,7 @@ export interface operations {
             /** @description 404 */
             404: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9795,7 +9795,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9836,18 +9836,18 @@ export interface operations {
                 headers: {
                     /** @description 민감한 응답을 저장하지 않도록 하는 no-store 지시자 */
                     "Cache-Control"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_4907c7cda751d086"];
+                    "application/json": components["schemas"]["Schema_2fe02c76e0fc59e0"];
                 };
             };
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9888,7 +9888,7 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 생성한 워크스페이스 조회 URI */
                     Location?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9899,7 +9899,7 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9910,7 +9910,7 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9921,7 +9921,7 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9932,7 +9932,7 @@ export interface operations {
             /** @description 500 */
             500: {
                 headers: {
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
@@ -9970,7 +9970,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["Schema_3a58b37054fe25db"];
+                "application/json": components["schemas"]["Schema_1cc1e45b99fe0049"];
             };
         };
         responses: {
@@ -9981,7 +9981,7 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 방 경로에 한정한 HttpOnly 참여권 쿠키 */
                     "Set-Cookie"?: string;
-                    /** @description 서버가 생성한 불투명 요청 진단 식별자 */
+                    /** @description 서버가 생성한 요청 추적 ID */
                     "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };

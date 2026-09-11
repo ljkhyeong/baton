@@ -149,7 +149,7 @@ class RoundAuthorizationRestDocsTest {
                 .build();
     }
 
-    @DisplayName("현재 membership 조회 API는 연결되지 않은 계정을 정상 상태로 반환한다")
+    @DisplayName("현재 구성원 연결 조회 API는 연결되지 않은 계정을 정상 상태로 반환한다")
     @Test
     void documentsUnclaimedCurrentMembership() throws Exception {
         when(roundAdministrationUseCase.findCurrentMembership(new CurrentMembershipQuery(
@@ -183,7 +183,7 @@ class RoundAuthorizationRestDocsTest {
                         )));
     }
 
-    @DisplayName("현재 membership 조회 API는 연결된 계정과 구성원 snapshot을 반환한다")
+    @DisplayName("현재 구성원 연결 조회 API는 연결된 계정과 구성원 정보를 반환한다")
     @Test
     void documentsClaimedCurrentMembership() throws Exception {
         when(roundAdministrationUseCase.findCurrentMembership(new CurrentMembershipQuery(
@@ -354,7 +354,7 @@ class RoundAuthorizationRestDocsTest {
         verifyNoInteractions(roundAdministrationUseCase);
     }
 
-    @DisplayName("현재 ROUND room mappings 조회 API는 팀과 시즌의 active room snapshots를 반환한다")
+    @DisplayName("현재 ROUND 방 매핑 조회 API는 팀과 시즌의 사용 중인 방 정보를 반환한다")
     @Test
     void documentsCurrentRoundRoomMappings() throws Exception {
         when(roundAdministrationUseCase.findCurrentRoomMappings(new CurrentRoomMappingsQuery(
@@ -550,22 +550,22 @@ class RoundAuthorizationRestDocsTest {
                                 requestField(
                                         ParticipationGrantRequest.class,
                                         "teamId",
-                                        "서버 권위 매핑과 대조할 팀 UUID"
+                                        "서버 저장 매핑과 대조할 팀 UUID"
                                 ),
                                 requestField(
                                         ParticipationGrantRequest.class,
                                         "seasonId",
-                                        "서버 권위 매핑과 대조할 시즌 UUID"
+                                        "서버 저장 매핑과 대조할 시즌 UUID"
                                 ),
                                 requestField(
                                         ParticipationGrantRequest.class,
                                         "resourceId",
-                                        "서버 권위 매핑과 대조할 역할 자료 UUID"
+                                        "서버 저장 매핑과 대조할 역할 자료 UUID"
                                 )
                         ),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지"),
                                 headerWithName(HttpHeaders.SET_COOKIE)
@@ -693,7 +693,7 @@ class RoundAuthorizationRestDocsTest {
     private Snippet noStoreResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
-                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                        .description("서버가 생성한 요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL)
                         .description("민감 응답 캐시 금지")
         );

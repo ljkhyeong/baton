@@ -142,7 +142,7 @@ class WatchHealthEventRestDocsTest {
                         ),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자")
+                                        .description("서버가 생성한 요청 추적 ID")
                         ),
                         responseFields(
                                 fieldWithPath("eventId").description("수신한 이벤트 UUID"),
@@ -325,7 +325,7 @@ class WatchHealthEventRestDocsTest {
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
     }
 
-    @DisplayName("WATCH bearer token이 없으면 본문 처리 전에 일반화된 401 오류를 반환한다")
+    @DisplayName("WATCH Bearer 토큰이 없으면 본문 처리 전에 일반화된 401 오류를 반환한다")
     @Test
     void documentsUnauthorizedRequest() throws Exception {
         mockMvc.perform(post(WatchHealthEventController.PATH)
@@ -408,7 +408,7 @@ class WatchHealthEventRestDocsTest {
                 SUMMARY,
                 responseHeaders(Stream.concat(
                         Stream.of(headerWithName(RequestIdFilter.HEADER_NAME)
-                                .description("서버가 생성한 불투명 요청 진단 식별자")),
+                                .description("서버가 생성한 요청 추적 ID")),
                         Stream.of(additionalHeaders)
                 ).toArray(HeaderDescriptor[]::new)),
                 responseFields(

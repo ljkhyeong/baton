@@ -73,7 +73,7 @@ class SystemStatusRestDocsTest {
                         "시스템 상태 조회",
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자")
+                                        .description("서버가 생성한 요청 추적 ID")
                         ),
                         responseFields(
                                 fieldWithPath("service").description("서비스 식별자"),

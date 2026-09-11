@@ -171,7 +171,7 @@ class AuthRestDocsTest {
                 .build();
     }
 
-    @DisplayName("CSRF bootstrap API는 mutation header 이름과 opaque token을 반환한다")
+    @DisplayName("CSRF 초기화 API는 변경 요청 헤더 이름과 일회용 토큰을 반환한다")
     @Test
     void documentsCsrfBootstrap() throws Exception {
         mockMvc.perform(get(AuthController.CSRF_PATH)
@@ -186,7 +186,7 @@ class AuthRestDocsTest {
                         "인증 CSRF 토큰 준비",
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지")
                         ),
@@ -211,7 +211,7 @@ class AuthRestDocsTest {
                         GET_SESSION_SUMMARY,
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지")
                         ),
@@ -221,7 +221,7 @@ class AuthRestDocsTest {
                         )));
     }
 
-    @DisplayName("인증 session API는 canonical account UUID와 현재 CSRF token을 반환한다")
+    @DisplayName("로그인 상태 API는 기준 계정 UUID와 현재 CSRF 토큰을 반환한다")
     @Test
     void documentsAuthenticatedSession() throws Exception {
         TestAccountPrincipal principal = new TestAccountPrincipal(ACCOUNT_ID);
@@ -245,7 +245,7 @@ class AuthRestDocsTest {
                         GET_SESSION_SUMMARY,
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지")
                         ),
@@ -277,7 +277,7 @@ class AuthRestDocsTest {
                         "로그인 공급자 목록 조회",
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("응답 캐시 금지")
                         ),
@@ -328,7 +328,7 @@ class AuthRestDocsTest {
                         ),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지")
                         ),
@@ -380,7 +380,7 @@ class AuthRestDocsTest {
                 ));
     }
 
-    @DisplayName("자체 이메일 검증 API는 일회성 token으로 최초 credential을 만든다")
+    @DisplayName("자체 이메일 검증 API는 일회용 토큰으로 최초 로그인 정보를 만든다")
     @Test
     void documentsLocalEmailVerification() throws Exception {
         mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_EMAIL_VERIFICATIONS_PATH))
@@ -412,7 +412,7 @@ class AuthRestDocsTest {
                         ),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지")
                         )));
@@ -531,7 +531,7 @@ class AuthRestDocsTest {
     private Snippet errorResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
-                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                        .description("서버가 생성한 요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL)
                         .description("민감 응답 캐시 금지")
         );
@@ -737,7 +737,7 @@ class AuthSessionRestDocsTest {
                         sessionMutationHeaders(),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지"),
                                 headerWithName(HttpHeaders.SET_COOKIE)
@@ -846,7 +846,7 @@ class AuthSessionRestDocsTest {
                         ),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지"),
                                 headerWithName(HttpHeaders.SET_COOKIE)
@@ -945,7 +945,7 @@ class AuthSessionRestDocsTest {
                         sessionMutationHeaders(),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                                        .description("서버가 생성한 요청 추적 ID"),
                                 headerWithName(HttpHeaders.CACHE_CONTROL)
                                         .description("민감 응답 캐시 금지"),
                                 headerWithName(HttpHeaders.SET_COOKIE)
@@ -995,7 +995,7 @@ class AuthSessionRestDocsTest {
     private Snippet noStoreResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
-                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                        .description("서버가 생성한 요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL)
                         .description("민감 응답 캐시 금지")
         );

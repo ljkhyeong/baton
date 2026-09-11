@@ -58,7 +58,7 @@ class PublicHolidayRestDocsTest {
                         "한국천문연구원 공휴일을 조회한다. 한국 시각 기준 작년부터 내년까지 지원한다.", "대한민국 공휴일 조회",
                         queryParameters(parameterWithName("year").description("조회 연도")),
                         responseHeaders(headerWithName("Cache-Control").description("브라우저 응답 저장 금지"),
-                                headerWithName("X-Request-ID").description("요청 진단 식별자")),
+                                headerWithName("X-Request-ID").description("요청 추적 ID")),
                         responseFields(fieldWithPath("year").description("조회 연도"),
                                 new EnumFields(Status.class).withPath("status").description("READY: 조회 성공, UNAVAILABLE: 공급자 장애·미발표, DISABLED: 연동 꺼짐, OUT_OF_RANGE: 지원 연도 밖"),
                                 fieldWithPath("checkedAt").type(JsonFieldType.STRING).optional().description("공급자 조회 성공 시각(UTC), 성공 자료가 없으면 null"),

@@ -104,8 +104,8 @@ class BriefAttentionRestDocsTest {
                                 fieldWithPath("windowEnd").description("다음 주 시작 시각 미만"),
                                 fieldWithPath("evaluatedAt").description("BRIEF 집계 확인 시각"),
                                 fieldWithPath("resolvedCount").description("커서와 무관한 현재 전체 해소 항목 수. 누락 증거가 있는 항목 제외"),
-                                fieldWithPath("items").description("복합 정체성 오름차순 해소 목록").attributes(key("itemsType").value("object")),
-                                new EnumFields(EventType.class).withPath("items[].reasonCode").description("해소한 관심 항목 종류"),
+                                fieldWithPath("items").description("이벤트 종류와 원본 참조 순으로 정렬한 해소 목록").attributes(key("itemsType").value("object")),
+                                new EnumFields(EventType.class).withPath("items[].reasonCode").description("해결한 점검 항목 종류"),
                                 fieldWithPath("items[].sourceReference").description("원본 참조"),
                                 fieldWithPath("items[].resolvedAt").description("활성 다음 리비전에서 해소로 바뀐 원본 시각"),
                                 fieldWithPath("items[].resolvedRevision").description("해소로 바뀐 원본 리비전"),
@@ -115,7 +115,7 @@ class BriefAttentionRestDocsTest {
     }
 
     @Test
-    @DisplayName("활성 관심 항목 요약과 조회 실패는 서로 다른 HTTP 결과로 반환한다")
+    @DisplayName("미해결 점검 항목 요약과 조회 실패는 서로 다른 HTTP 결과로 반환한다")
     void documentsSummaryAndUnavailable() throws Exception {
         when(useCase.summarizeAttention(SCOPE)).thenReturn(new BriefAttentionSummary(2L, 3L, 1L));
         mvc.perform(get(BriefAttentionController.SUMMARY_PATH, TEAM, SEASON)
@@ -123,7 +123,7 @@ class BriefAttentionRestDocsTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.highCount").value(2))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionSummary",
-                        "권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.", "BRIEF 관심 항목 요약",
+                        "권한을 확인한 팀·시즌의 미해결 항목을 심각도별로 집계하고 담당 공백 항목 수를 반환한다.", "BRIEF 점검 항목 요약",
                         paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()),
                         headers(), responseFields(
                                 fieldWithPath("highCount").description("활성 HIGH 항목 수"),
@@ -134,13 +134,13 @@ class BriefAttentionRestDocsTest {
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account())))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("BRIEF_UNAVAILABLE"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionSummaryUnavailable",
-                        "권한을 확인한 팀·시즌의 활성 심각도별 개수와 공백 항목 수를 중계한다.", "BRIEF 관심 항목 요약",
+                        "권한을 확인한 팀·시즌의 미해결 항목을 심각도별로 집계하고 담당 공백 항목 수를 반환한다.", "BRIEF 점검 항목 요약",
                         paths(), headers(), responseFields(fieldWithPath("code").description("오류 코드"),
                                 fieldWithPath("message").description("사용자 안내"))));
     }
 
     @Test
-    @DisplayName("관심 항목 필터와 배타 커서를 중계하고 반쪽 커서는 거부한다")
+    @DisplayName("점검 항목 필터와 페이지 커서를 전달하고 불완전한 커서는 거부한다")
     void documentsFilteredPage() throws Exception {
         var filter = new Filter(Status.RESOLVED, Severity.HIGH, true,
                 new Cursor(EventType.ROLE_UNASSIGNED, "role:1"), 1);
@@ -156,7 +156,7 @@ class BriefAttentionRestDocsTest {
                 .andExpect(jsonPath("$.nextCursor.sourceReference").value("role:2"))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionItems",
-                        "상태·심각도·공백 조건의 현재 관심 항목을 키셋으로 중계한다. 조건 변경 시 커서를 초기화한다.", "BRIEF 관심 항목 목록",
+                        "상태·심각도·담당 공백 조건으로 현재 점검 항목을 페이지 단위 조회한다. 조건을 바꾸면 첫 페이지부터 조회한다.", "BRIEF 점검 항목 목록",
                         paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()), headers(),
                         queryParameters(
                                 parameterWithName("status").optional().description("ACTIVE(기본) 또는 RESOLVED")
@@ -168,10 +168,10 @@ class BriefAttentionRestDocsTest {
                                         .attributes(key("enumValues").value(Arrays.stream(EventType.values()).map(Enum::name).toList())),
                                 parameterWithName("afterSourceReference").optional().description("이전 페이지 커서의 sourceReference. afterEventType과 함께 제공"),
                                 parameterWithName("limit").optional().description("1~100, 기본 20")),
-                        responseFields(fieldWithPath("items").description("현재 관심 항목"),
+                        responseFields(fieldWithPath("items").description("현재 점검 항목"),
                                 new EnumFields(EventType.class).withPath("items[].reasonCode").description("원본 신호 종류"),
                                 new EnumFields(Severity.class).withPath("items[].severity").description("표시 심각도"),
-                                fieldWithPath("items[].sourceReference").description("불투명 원본 참조"),
+                                fieldWithPath("items[].sourceReference").description("원본 참조 문자열"),
                                 new EnumFields(Status.class).withPath("items[].status").description("현재 상태"),
                                 fieldWithPath("items[].observedAt").description("원본 관측 UTC 시각"),
                                 fieldWithPath("items[].aggregateRevision").description("적용한 원본 리비전"),
@@ -209,10 +209,10 @@ class BriefAttentionRestDocsTest {
                 .andExpect(jsonPath("$.nextBeforeAggregateRevision").value(7))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionTransitions",
-                        "같은 관심 항목에 적용된 상태 전이를 원본 리비전 역순으로 중계한다.", "BRIEF 관심 항목 상태 전이",
+                        "같은 점검 항목의 상태 변경 이력을 원본 변경 번호 역순으로 조회한다.", "BRIEF 점검 항목 상태 변경 이력",
                         paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()), headers(),
-                        queryParameters(parameterWithName("eventType").description("관심 항목의 원본 신호 종류"),
-                                parameterWithName("sourceReference").description("관심 항목의 불투명 원본 참조"),
+                        queryParameters(parameterWithName("eventType").description("점검 항목의 원본 신호 종류"),
+                                parameterWithName("sourceReference").description("점검 항목의 원본 참조 문자열"),
                                 parameterWithName("beforeAggregateRevision").optional().description("이 리비전보다 작은 과거 전이"),
                                 parameterWithName("limit").optional().description("1~100, 기본 20")),
                         responseFields(fieldWithPath("transitions").description("실제 적용 전이 목록"),
@@ -246,7 +246,7 @@ class BriefAttentionRestDocsTest {
     }
 
     private Snippet headers() {
-        return responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("요청 진단 식별자"),
+        return responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL).description("민감 응답 캐시 금지"));
     }
 
