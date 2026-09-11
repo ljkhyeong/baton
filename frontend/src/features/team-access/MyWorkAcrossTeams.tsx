@@ -8,6 +8,7 @@ import { workspaceKeys } from '@/features/workspace/queries'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
 import { personalWork } from '@/features/workspace/personalWork'
 import { getMyTeams } from './api'
+import { MyRecentRecordsAcrossTeams } from './MyRecentRecordsAcrossTeams'
 
 type Teams = Awaited<ReturnType<typeof getMyTeams>>['teams']
 type WorkKind = 'overdue' | 'soon' | 'routine' | 'handoff'
@@ -40,14 +41,17 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
   const all = [...primary, ...others]
   const workspaces = all.flatMap(query => query.data && !query.isError && !query.data.season.endedAt
     && !blockedTeams.has(query.data.team.id) ? [query.data] : [])
+  const available = workspaces.flatMap(workspace => {
+    const team = teams.find(value => value.teamId === workspace.team.id)
+    return team && workspace.members.some(member => member.id === team.memberId && isActiveMember(member))
+      ? [{ workspace, memberId: team.memberId }] : []
+  })
   const pending = all.filter(query => query.isPending).length
   const failed = all.filter(query => query.isError)
   const now = Date.now()
   const dueSoonAt = preferences.data ? now + preferences.data.deadlineLeadHours * 60 * 60 * 1_000 : null
-  const tasks = workspaces.flatMap(workspace => {
-    const team = teams.find(value => value.teamId === workspace.team.id)
-    if (!team || !workspace.members.some(member => member.id === team.memberId && isActiveMember(member))) return []
-    const { unfinished, awaiting } = personalWork(workspace, team.memberId)
+  const tasks = available.flatMap(({ workspace, memberId }) => {
+    const { unfinished, awaiting } = personalWork(workspace, memberId)
     const base = `/teams/${workspace.team.id}/seasons/${workspace.season.id}`
     return [
       ...unfinished.map(({ round, execution }) => {
@@ -73,7 +77,7 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
   }).sort((a, b) => taskOrder[a.kind] - taskOrder[b.kind]
     || (a.deadline ?? 'z').localeCompare(b.deadline ?? 'z') || a.key.localeCompare(b.key))
   const visible = tasks.filter(task => filter === 'all' || task.kind === filter)
-  return <section className="my-work-across-teams" aria-labelledby="all-my-work-title">
+  return <><section className="my-work-across-teams" aria-labelledby="all-my-work-title">
     <div className="my-teams-heading"><h2 id="all-my-work-title">모든 팀의 내 할 일</h2>
       <button type="button" className="text-button" disabled={preferences.isFetching || all.some(query => query.isFetching)}
         onClick={() => { void preferences.refetch(); all.forEach(query => { void query.refetch() }) }}>업무 새로고침</button></div>
@@ -91,4 +95,6 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
         </Link>
       </li>)}</ul>}
   </section>
+    <MyRecentRecordsAcrossTeams workspaces={available.map(item => item.workspace)} partial={pending > 0 || failed.length > 0} />
+  </>
 }

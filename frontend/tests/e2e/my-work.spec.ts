@@ -7,7 +7,7 @@ const OTHER_SEASON = '00000000-0000-4000-8000-000000000903'
 const ACTIVE_SEASON = '00000000-0000-4000-8000-000000000904'
 const ENDED_SEASON = '00000000-0000-4000-8000-000000000905'
 
-test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동하고 접근이 거부된 팀은 제외한다', async ({ page }, testInfo) => {
+test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본으로 이동하고 접근이 거부된 팀은 제외한다', async ({ page }, testInfo) => {
   await page.clock.install({ time: new Date('2026-07-18T00:00:00Z') })
   const current = makeProjection()
   current.team.accountAccessEnabled = true; current.team.permission = 'MEMBER'
@@ -16,6 +16,8 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
   other.season = { ...other.season, id: OTHER_SEASON, name: '가을 시즌' }
   other.seasons = [other.season]
   other.rounds[0]!.routineExecutions[1]!.title = '두 번째 팀 회고 정리'
+  other.decisions[0]!.title = '두 번째 팀 최근 결정'
+  other.decisions[0]!.createdAt = '2026-07-17T12:00:00Z'
   const active = structuredClone(current)
   active.season = { ...active.season, id: ACTIVE_SEASON, name: '추가 진행 시즌' }
   const ended = { ...current.season, id: ENDED_SEASON, name: '종료 시즌', endedAt: '2026-09-01T00:00:00Z' }
@@ -53,6 +55,14 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
   await expect(work.getByRole('link', { name: /문제 5개 선정/ })).toHaveCount(0)
   await work.getByLabel('업무 구분').selectOption('all')
   await expect(work.getByRole('link', { name: /다른 진행 시즌의 회고/ })).toBeVisible()
+  const recent = page.getByRole('region', { name: '최근 추가된 기록' })
+  const recentDecision = recent.getByRole('link', { name: /두 번째 팀 최근 결정/ })
+  await expect(recentDecision).toContainText('두 번째 운영 팀 · 가을 시즌')
+  await recentDecision.click()
+  await expect(page).toHaveURL(new RegExp(`/teams/${OTHER_TEAM}/seasons/${OTHER_SEASON}\\?recordKind=decision`))
+  await expect(page.getByRole('heading', { name: '두 번째 팀 최근 결정' })).toBeVisible()
+  await page.getByRole('link', { name: '내 팀', exact: true }).filter({ visible: true }).click()
+  await expect(task).toBeVisible()
   expect(api.calls.some(call => call.path.includes(ENDED_SEASON))).toBe(false)
   await expect(task).toHaveAttribute('href', new RegExp(`/teams/${OTHER_TEAM}/seasons/${OTHER_SEASON}\\?workKind=execution`))
   const first = work.getByRole('link', { name: /알고리즘 한 바퀴/ }).first()
