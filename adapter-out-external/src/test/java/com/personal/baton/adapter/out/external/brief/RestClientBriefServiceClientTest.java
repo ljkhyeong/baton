@@ -159,8 +159,9 @@ class RestClientBriefServiceClientTest {
     }
 
     @DisplayName("BATON이 계산한 주차와 시간대만 기존 BRIEF 생성 명령에 보낸다")
-    @Test
-    void sendsAuthoritativeEditionCommand() {
+    @ParameterizedTest
+    @ValueSource(ints = {200, 201})
+    void sendsAuthoritativeEditionCommand(int status) {
         String path = "/api/v1/workspaces/" + TEAM_ID
                 + "/seasons/" + SEASON_ID + "/editions";
         server.expect(requestTo(BASE_URL + path))
@@ -175,7 +176,7 @@ class RestClientBriefServiceClientTest {
                         """,
                         JsonCompareMode.STRICT
                 ))
-                .andRespond(withStatus(HttpStatus.CREATED)
+                .andRespond(withStatus(HttpStatus.valueOf(status))
                         .contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
                         .body(editionJson()));
@@ -188,7 +189,7 @@ class RestClientBriefServiceClientTest {
         );
 
         assertThat(result.outcome()).isEqualTo(Outcome.COMPLETED);
-        assertThat(result.created()).isTrue();
+        assertThat(result.created()).isEqualTo(status == 201);
         server.verify();
     }
 
@@ -207,15 +208,16 @@ class RestClientBriefServiceClientTest {
         server.verify();
     }
 
-    @DisplayName("BRIEF 조회 없음과 잘못된 생성 요청을 계약 결과로 구분한다")
-    @Test
-    void classifiesNotFoundAndInvalidGenerationRequest() {
+    @DisplayName("BRIEF 조회 없음과 생성 요청의 400·404 실패를 구분한다")
+    @ParameterizedTest
+    @ValueSource(ints = {400, 404})
+    void classifiesNotFoundAndInvalidGenerationRequest(int generationStatus) {
         String generationPath = "/api/v1/workspaces/" + TEAM_ID
                 + "/seasons/" + SEASON_ID + "/editions";
         server.expect(requestTo(BASE_URL + latestPath()))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
         server.expect(requestTo(BASE_URL + generationPath))
-                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+                .andRespond(withStatus(HttpStatus.valueOf(generationStatus)));
 
         assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
                 .isEqualTo(Outcome.NOT_FOUND);
@@ -224,7 +226,7 @@ class RestClientBriefServiceClientTest {
                 SEASON_ID,
                 LocalDate.parse("2026-08-24"),
                 ZoneId.of("Asia/Seoul")
-        ).outcome()).isEqualTo(Outcome.INVALID_REQUEST);
+        ).outcome()).isEqualTo(generationStatus == 400 ? Outcome.INVALID_REQUEST : Outcome.PERMANENT_FAILURE);
         server.verify();
     }
 
@@ -269,12 +271,13 @@ class RestClientBriefServiceClientTest {
     }
 
     @DisplayName("BRIEF가 잘못된 성공 상태·필수 필드·JSON 형식으로 응답하면 영구 실패로 처리한다")
-    @Test
-    void rejectsUnexpectedSuccessAndIncompleteResponse() {
+    @ParameterizedTest(name = "생성 요청={0}")
+    @ValueSource(booleans = {false, true})
+    void rejectsUnexpectedSuccessAndIncompleteResponse(boolean generation) {
         String generationPath = "/api/v1/workspaces/" + TEAM_ID
                 + "/seasons/" + SEASON_ID + "/editions";
-        server.expect(requestTo(BASE_URL + generationPath))
-                .andRespond(withStatus(HttpStatus.ACCEPTED)
+        server.expect(requestTo(BASE_URL + (generation ? generationPath : latestPath())))
+                .andRespond(withStatus(generation ? HttpStatus.ACCEPTED : HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
                         .body(editionJson()));
@@ -289,12 +292,12 @@ class RestClientBriefServiceClientTest {
                         .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
                         .body("{"));
 
-        var unexpectedSuccess = client.generateEdition(
+        var unexpectedSuccess = generation ? client.generateEdition(
                 TEAM_ID,
                 SEASON_ID,
                 LocalDate.parse("2026-08-24"),
                 ZoneId.of("Asia/Seoul")
-        );
+        ) : client.findLatestEdition(TEAM_ID, SEASON_ID);
         var incompleteResponse = client.findLatestEdition(TEAM_ID, SEASON_ID);
         var malformedResponse = client.generateEdition(
                 TEAM_ID,

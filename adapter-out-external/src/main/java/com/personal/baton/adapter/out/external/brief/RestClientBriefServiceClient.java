@@ -75,10 +75,10 @@ public final class RestClientBriefServiceClient
 
     @Override
     public Result findLatestEditionForWeek(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
-        return readEdition(() -> restClient.get().uri(builder -> builder
+        return requestEdition(() -> restClient.get().uri(builder -> builder
                 .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
                 .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).build(workspaceId, seasonId))
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class));
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class), true);
     }
 
     @Override
@@ -179,15 +179,15 @@ public final class RestClientBriefServiceClient
 
     @Override
     public Result findLatestEdition(UUID workspaceId, UUID seasonId) {
-        return readEdition(() -> restClient.get()
+        return requestEdition(() -> restClient.get()
                 .uri("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/latest", workspaceId, seasonId)
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class));
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class), true);
     }
 
     @Override
     public Result findEdition(UUID editionId) {
-        return readEdition(() -> restClient.get().uri("/api/v1/editions/{editionId}", editionId)
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class));
+        return requestEdition(() -> restClient.get().uri("/api/v1/editions/{editionId}", editionId)
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class), true);
     }
 
     @Override
@@ -230,14 +230,15 @@ public final class RestClientBriefServiceClient
                 && summary.sourceCursor() >= 0 && summary.ruleVersion() > 0 && summary.itemCount() >= 0;
     }
 
-    private Result readEdition(Supplier<ResponseEntity<BriefEditionSnapshot>> request) {
+    private Result requestEdition(Supplier<ResponseEntity<BriefEditionSnapshot>> request, boolean query) {
         try {
             ResponseEntity<BriefEditionSnapshot> response = request.get();
-            return response.getStatusCode().value() == 200
-                    ? completed(response, false)
+            int status = response.getStatusCode().value();
+            return status == 200 || (!query && status == 201)
+                    ? completed(response, status == 201)
                     : invalidResponse();
         } catch (RestClientResponseException exception) {
-            return failure(exception.getStatusCode(), true);
+            return failure(exception.getStatusCode(), query);
         } catch (ResourceAccessException exception) {
             return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
         } catch (RestClientException exception) {
@@ -255,8 +256,7 @@ public final class RestClientBriefServiceClient
             LocalDate weekStart,
             ZoneId zoneId
     ) {
-        try {
-            ResponseEntity<BriefEditionSnapshot> response = restClient.post()
+        return requestEdition(() -> restClient.post()
                     .uri(
                             "/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions",
                             workspaceId,
@@ -266,21 +266,7 @@ public final class RestClientBriefServiceClient
                     .accept(MediaType.APPLICATION_JSON)
                     .body(new EditionWeekRequest(weekStart, zoneId))
                     .retrieve()
-                    .toEntity(BriefEditionSnapshot.class);
-            int status = response.getStatusCode().value();
-            return status == 200 || status == 201
-                    ? completed(response, status == 201)
-                    : invalidResponse();
-        } catch (RestClientResponseException exception) {
-            return failure(exception.getStatusCode(), false);
-        } catch (ResourceAccessException exception) {
-            return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
-        } catch (RestClientException exception) {
-            if (exception.getMostSpecificCause() instanceof IOException) {
-                return Result.failure(Outcome.RETRYABLE_FAILURE, "BRIEF_NETWORK_FAILURE");
-            }
-            return Result.failure(Outcome.PERMANENT_FAILURE, "BRIEF_RESPONSE_FAILURE");
-        }
+                    .toEntity(BriefEditionSnapshot.class), false);
     }
 
     private Result completed(

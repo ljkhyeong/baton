@@ -57,7 +57,6 @@ public class TeamInvitation {
     public UUID getTeamId() { return teamId; }
     public UUID getMemberId() { return memberId; }
     public TeamPermission getPermission() { return permission; }
-    public UUID getCreatedBy() { return createdBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getExpiresAt() { return expiresAt; }
     public Instant getAcceptedAt() { return acceptedAt; }
