@@ -693,6 +693,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 
 네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 규칙 집합 또는 분기 보호에서 이 검사를 필수로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. 프로덕션 이미지의 DB 설정 누락 시 폐쇄형 실패, 로컬 CA TLS 종단, 빈 DB 마이그레이션과 현재 스키마의 복원 키 무효화 SQL은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 전체 복원과 팀별 새 링크 배포는 배포 후 별도로 확인한다.
 
+[Dependabot](.github/dependabot.yml)은 Java·npm·GitHub Actions·Dockerfile과 Compose의 MySQL·Caddy 업데이트를 주 1회 점검한다. Compose 제안은 PR 하나로 묶어 기존 품질 게이트에서 검증한다. 대상·버전 범위·무료 사용 조건은 [운영 이미지 업데이트](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)를 따른다.
+
 ## 로컬 설정
 
 - 기본 Spring 프로필: `local`

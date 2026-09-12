@@ -14,6 +14,7 @@
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP | 기존 지표의 경보 규칙과 SMTP 수신 설정을 추가했다. 알림 묶기·재통지·해제는 표준 도구가 처리한다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
+| 라이브러리·운영 이미지 업데이트 점검 | GitHub Dependabot | 기존 Java·npm·Actions·Dockerfile 점검에 Compose의 MySQL·Caddy를 추가했다. 새 버전 조회와 PR 생성은 GitHub가 처리한다. |
 | 자료 URL 점검·인수인계·주간 요약 | WATCH·BATON·BRIEF | 팀 권한·변경 이력과 연결된 제품 기능이다. 무료 모니터의 제한된 슬롯이나 일반 자동화 서비스로 대체하지 않는다. |
 
 공휴일 설정은 [README](../../README.md#무료-공휴일-연동), 캘린더는 [CAL 계약](../PRD/0006_calendar-integration-contract/spec.md)을 따른다. 새 알림 채널은 RELAY가 소유하므로 BATON에 별도 발송 경로를 만들지 않는다. 화상회의는 기존 ROUND를 유지한다. 무료 사용량 이후 종량 과금이 발생할 수 있는 외부 TURN·SMS·AI API는 추가하지 않는다.
@@ -129,6 +130,21 @@ Google 계정의 무료 저장 공간은 Gmail·Drive·Photos가 공유하는 [1
 - 업로드 후와 로컬 보존 기간 만료 시 [rclone check --download](https://rclone.org/commands/rclone_check/)로 해당 덤프·체크섬만 비교한다. 암호화 저장소에서도 복호화한 실제 내용을 비교하며 원격 파일은 수정하지 않는다.
 
 용량 부족·OAuth 해제·암호화 키 유실은 각각 업로드 실패·접근 실패·복구 불가로 이어진다. 파일럿 데이터 투입 전 별도 환경의 복원 훈련은 계속 필요하다.
+
+## 운영 이미지 업데이트: GitHub Dependabot
+
+[Dependabot 설정](../../.github/dependabot.yml)에 `docker-compose` 점검을 추가했다. GitHub는 [Dockerfile과 Compose를 별도 대상으로 지원](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories)한다. 기존 `docker` 설정만으로 빠져 있던 다음 파일의 MySQL·Caddy 이미지 버전과 고정 해시를 주 1회 확인한다.
+
+- [개발 DB](../../docker-compose.yml)
+- [운영 DB](../../compose.production.yml)
+- [전체 스택 테스트 DB](../../compose.fullstack-e2e.yml)
+- [ROUND 테스트 DB·Caddy](../../compose.round-fullstack-e2e.yml)
+
+Compose 업데이트는 한 그룹으로 묶고 동시에 열린 PR을 1개로 제한한다. MySQL `8.5` 이상과 Caddy 메이저 버전 변경은 제외한다. MySQL 8.4 LTS·Caddy 2 범위 안의 제안을 기존 CI와 함께 검토하며, DB 상위 계열 전환은 별도 마이그레이션 작업으로 다룬다. 이미지 버전·해시는 이번에 변경하지 않았다.
+
+[일반 GitHub 실행기의 Dependabot 업데이트 작업](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-on-actions)은 포함된 Actions 실행 시간을 사용하지 않는다. 업데이트 PR의 별도 CI에는 [기존 Actions 요금 기준](https://docs.github.com/en/billing/concepts/product-billing/github-actions)이 적용되므로 비공개 저장소에서는 무료 한도와 초과 사용 차단을 유지한다. 유료 대형 실행기를 연결하지 않는다.
+
+설정이 기본 브랜치에 반영된 뒤 첫 Dependabot 실행에서 대상 파일과 업데이트 PR을 확인한다. 설정 검증과 대상 파일 확인은 완료했으며 실제 GitHub 업데이트 작업은 아직 실행하지 않았다. 셸 스크립트의 도구 이미지 버전과 ROUND의 계약·릴리스 고정값은 이 Compose 점검 대상에 포함되지 않는다.
 
 ## 활성화 전 남은 항목
 
