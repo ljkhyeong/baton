@@ -11,6 +11,7 @@ blackbox_image="quay.io/prometheus/blackbox-exporter:v0.28.0"
 docker run --rm --network none --read-only \
   -v "$ops_dir:/ops:ro" -w /ops/integrations \
   --entrypoint /bin/promtool "$prometheus_image" check config prometheus.yml
+bash "$script_dir/integration-metrics-scrape-test.sh" "$prometheus_image"
 docker run --rm --network none --read-only --tmpfs /tmp \
   -v "$ops_dir:/ops:ro" -w /ops/tests \
   --entrypoint /bin/promtool "$prometheus_image" test rules integration-alerts.test.yml https-alerts.test.yml
