@@ -21,6 +21,20 @@
 
 공휴일 설정은 [README](../../README.md#무료-공휴일-연동), 캘린더는 [CAL 계약](../PRD/0006_calendar-integration-contract/spec.md)을 따른다. 새 알림 채널은 RELAY가 소유하므로 BATON에 별도 발송 경로를 만들지 않는다. 화상회의는 기존 ROUND를 유지한다. 무료 사용량 이후 종량 과금이 발생할 수 있는 외부 TURN·SMS·AI API는 추가하지 않는다.
 
+## 추가 후보와 도입 조건
+
+아래 세 항목은 구현하지 않은 후보다. 현재 구현과 공식 문서를 대조했으며, 도입 조건이 충족되면 해당 범위부터 진행한다.
+
+| 우선순위 | 후보 | 줄일 수 있는 작업과 도입 조건 |
+| --- | --- | --- |
+| 공개 가입 전 우선 검토 | Cloudflare Turnstile | 가입·비밀번호 재설정 메일을 요청하는 봇을 판별한다. 직접 봇 판별 로직을 만들 필요가 없다. [무료 플랜](https://developers.cloudflare.com/turnstile/plans/)은 검증 요청 무제한, 위젯 20개·위젯당 호스트 10개를 제공한다. |
+| 운영자가 Discord를 사용할 때 | Alertmanager → Discord Webhook | 장애·복구 알림을 운영 채널에 보낸다. [기본 Discord 수신 설정](https://prometheus.io/docs/alerting/latest/configuration/#discord_config)이 발송을 처리하므로 봇 서버나 별도 HTTP 발송기를 만들지 않는다. 채널 웹훅과 수신 담당자가 필요하다. |
+| 방문·로딩 통계가 필요할 때 | Cloudflare Web Analytics | 방문과 실제 페이지 로딩 성능을 [무료 통계 서비스](https://www.cloudflare.com/web-analytics/)에서 확인한다. 공개 소개 화면부터 검토하며 수집할 경로와 URL·토큰 제외 기준을 먼저 정한다. |
+
+Turnstile은 현재 [IP·이메일별 요청 제한](../../adapter-in-web/src/main/java/com/personal/baton/adapter/in/web/auth/AuthRateLimiter.java)을 보완한다. 두 메일 요청은 이미 같은 제한을 사용하지만 여러 IP·이메일을 쓰는 봇까지 판별하지는 않는다. 도입 시 해당 두 폼과 서버의 [Siteverify 검증](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)을 함께 연결하고 기존 요청 제한은 유지한다. 사이트 키·비밀 키, 허용 호스트와 CSP 설정이 필요하다.
+
+Discord는 운영 경보의 선택 수신 채널이다. 사용자 업무·인수인계 알림의 외부 발송은 기존 RELAY 범위로 유지한다. 방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [동일 출처 CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
+
 ## 도메인 기준
 
 | 서비스 | 공개 주소 |
