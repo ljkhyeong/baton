@@ -5,6 +5,30 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ops_dir="$(dirname -- "$script_dir")"
 prometheus_image="${1:?Prometheus 검사 이미지가 필요합니다.}"
 caddy_image="$(sed -n 's/^ARG CADDY_IMAGE=//p' "$ops_dir/../frontend/Dockerfile")"
+case "${2:-app}" in
+  app)
+    config_file="$ops_dir/integrations/prometheus.yml"
+    job=baton
+    expressions=(
+      'count(baton_integration_delivery_actionable_failed_items{job="baton",integration="email"} == 0)'
+      'count(baton_email_delivery_receipts{job="baton",event="hard_bounce"} == 1)'
+      'count(absent(http_server_requests_seconds_count{job="baton"}))'
+    )
+    ;;
+  host)
+    config_file="$ops_dir/integrations/prometheus-host.yml.example"
+    job=baton-host
+    expressions=(
+      'count(node_filesystem_avail_bytes{job="baton-host",mountpoint="/srv"} == 9)'
+      'count(node_filesystem_size_bytes{job="baton-host",mountpoint="/srv"} == 100)'
+      'count(node_filesystem_device_error{job="baton-host",mountpoint="/srv"} == 0)'
+      'count(node_scrape_collector_success{job="baton-host",collector="filesystem"} == 1)'
+      'count(absent(node_filesystem_avail_bytes{job="baton-host",fstype="tmpfs"}))'
+      'count(absent(node_cpu_seconds_total{job="baton-host"}))'
+    )
+    ;;
+  *) printf '알 수 없는 수집 검사 대상입니다.\n' >&2; exit 2 ;;
+esac
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/baton-metrics-scrape.XXXXXXXX")"
 metrics_container="$(basename "$test_root")-source"
 prometheus_container="$(basename "$test_root")-prometheus"
@@ -26,20 +50,30 @@ baton_integration_delivery_actionable_failed_items{integration="email"} 0
 baton_email_delivery_receipts{event="hard_bounce"} 1
 http_server_requests_seconds_count{uri="/private/example"} 7
 METRICS
+cat > "$test_root/metrics" <<'METRICS'
+node_filesystem_avail_bytes{device="/dev/test",fstype="ext4",mountpoint="/srv"} 9
+node_filesystem_size_bytes{device="/dev/test",fstype="ext4",mountpoint="/srv"} 100
+node_filesystem_device_error{device="/dev/test",fstype="ext4",mountpoint="/srv"} 0
+node_scrape_collector_success{collector="filesystem"} 1
+node_filesystem_avail_bytes{device="tmpfs",fstype="tmpfs",mountpoint="/run"} 1
+node_cpu_seconds_total{cpu="0",mode="idle"} 100
+METRICS
 cat > "$test_root/Caddyfile" <<'CADDY'
 {
   admin off
   auto_https off
 }
-:8080 {
+:8080, :9100 {
   root * /fixture
   header Content-Type "text/plain; version=0.0.4; charset=utf-8"
   file_server
 }
 CADDY
-# 운영 수집 경로·필터를 그대로 사용하고 테스트 대기 시간만 줄인다.
+# 운영 수집 경로·필터를 유지하고 테스트 주소와 대기 시간만 바꾼다.
 sed -e 's/30s/1s/g' -e 's/scrape_timeout: 10s/scrape_timeout: 1s/' \
-  "$ops_dir/integrations/prometheus.yml" > "$test_root/prometheus.yml"
+  -e 's/scrape_interval: 1m/scrape_interval: 1s/' \
+  -e 's/node-exporter:9100/127.0.0.1:9100/' \
+  "$config_file" > "$test_root/prometheus.yml"
 
 docker run --detach --name "$metrics_container" --network none --read-only \
   --tmpfs /config --tmpfs /data \
@@ -57,20 +91,16 @@ query() {
     http://127.0.0.1:9090 "$1"
 }
 for ((attempt = 0; attempt < 30; attempt++)); do
-  if [[ "$(query 'count(up{job="baton"} == 1)' 2>/dev/null || true)" == '{} => 1 @'* ]]; then
+  if [[ "$(query "count(up{job=\"$job\"} == 1)" 2>/dev/null || true)" == '{} => 1 @'* ]]; then
     break
   fi
   sleep 1
 done
-for expression in \
-  'count(up{job="baton"} == 1)' \
-  'count(baton_integration_delivery_actionable_failed_items{job="baton",integration="email"} == 0)' \
-  'count(baton_email_delivery_receipts{job="baton",event="hard_bounce"} == 1)' \
-  'count(absent(http_server_requests_seconds_count{job="baton"}))'; do
+for expression in "count(up{job=\"$job\"} == 1)" "${expressions[@]}"; do
   result="$(query "$expression")"
   if [[ "$result" != '{} => 1 @'* ]]; then
     printf '지표 수집 검증 실패: %s\n%s\n' "$expression" "$result" >&2
     exit 1
   fi
 done
-printf '연동·메일 결과 지표 수집과 요청 지표 제외 확인\n'
+printf '%s의 필수 지표 수집과 불필요한 지표 제외 확인\n' "$job"

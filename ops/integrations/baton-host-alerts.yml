@@ -1,0 +1,40 @@
+groups:
+  - name: baton-host
+    rules:
+      - alert: BatonHostDiskMetricsUnavailable
+        expr: |
+          (up{job="baton-host"} == 0)
+          or absent(up{job="baton-host"})
+          or (
+            (up{job="baton-host"} == 1)
+            unless on (job, instance)
+              (node_scrape_collector_success{job="baton-host", collector="filesystem"} == 1)
+          )
+          or (max by (job, instance) (node_filesystem_device_error{job="baton-host"}) > 0)
+          or (
+            (up{job="baton-host"} == 1)
+            unless on (job, instance) (node_filesystem_size_bytes{job="baton-host"} > 0)
+          )
+        for: 2m
+        labels:
+          service: baton
+          severity: warning
+        annotations:
+          summary: 홈서버 디스크 상태를 확인할 수 없습니다.
+          description: node_exporter 수집 상태와 호스트 파일시스템 접근을 확인하세요.
+
+      - alert: BatonHostDiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{job="baton-host"} / node_filesystem_size_bytes{job="baton-host"} < 0.10)
+          and on (job, instance) (up{job="baton-host"} == 1)
+          and on (job, instance)
+            (node_scrape_collector_success{job="baton-host", collector="filesystem"} == 1)
+          and on (job, instance, device, mountpoint)
+            (node_filesystem_device_error{job="baton-host"} == 0)
+        for: 10m
+        labels:
+          service: baton
+          severity: warning
+        annotations:
+          summary: '홈서버 {{ $labels.mountpoint }}의 여유 공간이 10% 미만입니다.'
+          description: DB·백업 저장 공간을 확인하세요. 파일이나 백업을 자동으로 삭제하지 않습니다.

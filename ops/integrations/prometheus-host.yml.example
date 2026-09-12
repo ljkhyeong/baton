@@ -1,0 +1,19 @@
+# node_exporter 준비 후 두 목록을 기존 prometheus.yml의 같은 항목에 추가한다.
+# 기존 수집·알림 설정을 이 파일로 덮어쓰지 않는다.
+rule_files:
+  - baton-host-alerts.yml
+
+scrape_configs:
+  - job_name: baton-host
+    scrape_interval: 1m
+    scrape_timeout: 10s
+    static_configs:
+      # 홈서버의 node_exporter 내부 주소를 지정한다. 공개 도메인은 사용하지 않는다.
+      - targets: ['node-exporter:9100']
+    metric_relabel_configs:
+      - source_labels: [__name__, collector]
+        regex: 'node_filesystem_(avail_bytes|size_bytes|device_error);|node_scrape_collector_success;filesystem'
+        action: keep
+      - source_labels: [fstype]
+        regex: tmpfs|ramfs|overlay|squashfs|nsfs
+        action: drop

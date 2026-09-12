@@ -1,0 +1,119 @@
+rule_files:
+  - ../integrations/baton-host-alerts.yml
+evaluation_interval: 1m
+
+tests:
+  - name: 여유 공간이 10퍼센트면 경보를 보내지 않는다
+    interval: 1m
+    input_series:
+      - &up
+        series: up{job="baton-host",instance="host"}
+        values: 1x25
+      - &collector
+        series: node_scrape_collector_success{job="baton-host",instance="host",collector="filesystem"}
+        values: 1x25
+      - &size
+        series: node_filesystem_size_bytes{job="baton-host",instance="host",device="/dev/test",fstype="ext4",mountpoint="/srv"}
+        values: 100x25
+      - &available
+        series: node_filesystem_avail_bytes{job="baton-host",instance="host",device="/dev/test",fstype="ext4",mountpoint="/srv"}
+        values: 10x25
+      - &device_error
+        series: node_filesystem_device_error{job="baton-host",instance="host",device="/dev/test",fstype="ext4",mountpoint="/srv"}
+        values: 0x25
+    alert_rule_test:
+      - {eval_time: 15m, alertname: BatonHostDiskSpaceLow, exp_alerts: []}
+      - {eval_time: 15m, alertname: BatonHostDiskMetricsUnavailable, exp_alerts: []}
+
+  - name: 10퍼센트 미만이 10분 지속되면 알리고 공간 확보 후 해제한다
+    interval: 1m
+    input_series:
+      - *up
+      - *collector
+      - *size
+      - *device_error
+      - <<: *available
+        values: 10x4 9x12 20x7
+    alert_rule_test:
+      - {eval_time: 14m, alertname: BatonHostDiskSpaceLow, exp_alerts: []}
+      - eval_time: 15m
+        alertname: BatonHostDiskSpaceLow
+        exp_alerts:
+          - exp_labels:
+              job: baton-host
+              instance: host
+              device: /dev/test
+              fstype: ext4
+              mountpoint: /srv
+              service: baton
+              severity: warning
+            exp_annotations:
+              summary: 홈서버 /srv의 여유 공간이 10% 미만입니다.
+              description: DB·백업 저장 공간을 확인하세요. 파일이나 백업을 자동으로 삭제하지 않습니다.
+      - {eval_time: 18m, alertname: BatonHostDiskSpaceLow, exp_alerts: []}
+
+  - name: 서버 수집 중단 시 과거 용량으로 판단하지 않는다
+    interval: 1m
+    input_series:
+      - <<: *up
+        values: 0x25
+      - *collector
+      - *size
+      - *device_error
+      - <<: *available
+        values: 9x25
+    alert_rule_test:
+      - {eval_time: 1m, alertname: BatonHostDiskMetricsUnavailable, exp_alerts: []}
+      - eval_time: 2m
+        alertname: BatonHostDiskMetricsUnavailable
+        exp_alerts:
+          - &unavailable
+            exp_labels: {job: baton-host, instance: host, service: baton, severity: warning}
+            exp_annotations: &unavailable_annotations
+              summary: 홈서버 디스크 상태를 확인할 수 없습니다.
+              description: node_exporter 수집 상태와 호스트 파일시스템 접근을 확인하세요.
+      - {eval_time: 15m, alertname: BatonHostDiskSpaceLow, exp_alerts: []}
+
+  - name: 파일시스템 수집 실패는 용량 부족과 구분한다
+    interval: 1m
+    input_series:
+      - *up
+      - <<: *collector
+        values: 0x25
+      - *size
+      - *device_error
+      - <<: *available
+        values: 9x25
+    alert_rule_test:
+      - {eval_time: 2m, alertname: BatonHostDiskMetricsUnavailable, exp_alerts: [*unavailable]}
+      - {eval_time: 15m, alertname: BatonHostDiskSpaceLow, exp_alerts: []}
+
+  - name: 개별 디스크 조회 오류도 확인 불가로 알린다
+    interval: 1m
+    input_series:
+      - *up
+      - *collector
+      - *size
+      - <<: *device_error
+        values: 1x25
+      - <<: *available
+        values: 9x25
+    alert_rule_test:
+      - {eval_time: 2m, alertname: BatonHostDiskMetricsUnavailable, exp_alerts: [*unavailable]}
+      - {eval_time: 15m, alertname: BatonHostDiskSpaceLow, exp_alerts: []}
+
+  - name: 파일시스템 지표가 없으면 정상으로 판단하지 않는다
+    interval: 1m
+    input_series: [*up, *collector]
+    alert_rule_test:
+      - {eval_time: 2m, alertname: BatonHostDiskMetricsUnavailable, exp_alerts: [*unavailable]}
+
+  - name: 수집 대상이 빠져도 확인 불가로 알린다
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonHostDiskMetricsUnavailable
+        exp_alerts:
+          - exp_labels: {job: baton-host, service: baton, severity: warning}
+            exp_annotations: *unavailable_annotations
