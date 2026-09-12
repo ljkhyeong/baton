@@ -1,11 +1,9 @@
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react'
 
 export type WorkspaceModal = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
@@ -13,21 +11,22 @@ export type OpenWorkspaceModal = Exclude<WorkspaceModal, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 
 function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
+  const [matches, setMatches] = useState(false)
   const notifyBeforeChange = useEffectEvent((matches: boolean) => {
     onBeforeChange?.(matches)
   })
-  const subscribe = useCallback((notify: () => void) => {
+  useLayoutEffect(() => {
     const mediaQuery = window.matchMedia(query)
-    const updateMatches = (event: MediaQueryListEvent) => {
-      notifyBeforeChange(event.matches)
-      notify()
+    const updateMatches = () => {
+      notifyBeforeChange(mediaQuery.matches)
+      setMatches(mediaQuery.matches)
     }
+    updateMatches()
     mediaQuery.addEventListener('change', updateMatches)
     return () => mediaQuery.removeEventListener('change', updateMatches)
   }, [query])
-  const getSnapshot = useCallback(() => window.matchMedia(query).matches, [query])
 
-  return useSyncExternalStore(subscribe, getSnapshot, () => false)
+  return matches
 }
 
 export function canReceiveWorkspaceFocus(element: HTMLElement | null) {
