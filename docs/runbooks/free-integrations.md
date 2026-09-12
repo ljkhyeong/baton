@@ -33,17 +33,20 @@
 ## 추가 후보와 도입 조건
 
 아래 항목은 구현하지 않은 후보다. 현재 구현과 공식 문서를 대조했으며, 도입 조건이 충족되면 해당 범위부터 진행한다.
+현재는 기존 연동의 실제 지표·알림·메일·백업 연결을 마치는 일을 우선한다. 남은 설정과 운영 검증은 [HANDOFF](../../HANDOFF.md)를 따른다.
 
 | 우선순위 | 후보 | 줄일 수 있는 작업과 도입 조건 |
 | --- | --- | --- |
 | Drive 자료 사용이 많을 때 | Google Picker | Google의 파일 선택창으로 자료 이름과 링크를 가져온다. [공식 선택창](https://developers.google.com/workspace/drive/picker/guides/overview)을 사용하지만 OAuth 동의·프로젝트 설정이 추가된다. 현재는 링크 입력만으로 충분해 보류한다. |
 | 방문·로딩 통계가 필요할 때 | Cloudflare Web Analytics | 방문과 실제 페이지 로딩 성능을 [무료 통계 서비스](https://www.cloudflare.com/web-analytics/)에서 확인한다. 공개 소개 화면부터 검토하며 수집할 경로와 URL·토큰 제외 기준을 먼저 정한다. |
+| 신규 비밀번호의 유출 이력을 검사할 때 | Have I Been Pwned Pwned Passwords | [무료 API](https://haveibeenpwned.com/API/V3#PwnedPasswords)는 가입·API 키 없이 해시 앞 5자리로 조회한다. 현재 Spring 구현의 장애 처리·패딩 판정을 보완해야 해 보류한다. 이메일 유출 조회용 유료 API는 도입하지 않는다. |
 
 방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
 
 ### 추가 검토 근거
 
 - [자료 등록 화면](../../frontend/src/features/workspace/WorkspaceRecordModals.tsx)은 이름과 주소를 입력받는다. Picker는 이 입력을 줄이지만 파일 접근 권한은 Drive가 계속 관리한다. Google 로그인과 파일 접근 동의는 별개이며, BATON 팀 공유만으로 Drive 파일 권한이 생기지는 않는다. Drive API를 함께 사용할 경우 아래 사용 한도 조건을 따른다.
+- 사용 중인 [Spring Security에 유출 비밀번호 검사 기능](https://docs.spring.io/spring-security/reference/7.0/features/authentication/password-storage.html)이 있다. 현재 빌드의 `spring-security-web:7.0.6` 구현은 HTTP 조회 실패를 빈 결과로 바꾸고, 일치하는 해시 접미부가 있으면 발견 건수를 확인하지 않고 유출로 판정한다. 공급자의 `Add-Padding` 응답에는 발견 건수 `0`인 보조 항목이 있으므로 그대로 조합하지 않는다. 재검토할 때는 조회 실패와 유출 없음의 구분, 0건 항목 제외, 가입·변경·재설정의 적용 범위를 먼저 확인한다. 실제 비밀번호나 해시를 외부 API로 보내 검증하지 않았다.
 
 ## 오류 수집: Sentry
 
