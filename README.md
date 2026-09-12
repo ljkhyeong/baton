@@ -711,6 +711,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 
 [Dependabot](.github/dependabot.yml)은 Java·npm·GitHub Actions·Dockerfile과 Compose의 MySQL·Caddy 업데이트를 주 1회 점검한다. Compose 제안은 PR 하나로 묶어 기존 품질 게이트에서 검증한다. 대상·버전 범위·무료 사용 조건은 [운영 이미지 업데이트](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)를 따른다.
 
+[Java 의존성 취약점 알림](docs/runbooks/free-integrations.md#java-의존성-취약점-알림)을 켜면 `main` 푸시의 기존 백엔드 빌드에서 실제 버전·간접 의존성을 수집해 GitHub에 전달한다. 저장소 변수 `BATON_DEPENDENCY_GRAPH_ENABLED=true`로 켜며, 무료 Actions 한도와 초과 사용 차단을 먼저 확인한다. 기본 비활성이고 PR·수동 실행에서는 제출하지 않는다.
+
 ## 로컬 설정
 
 - 기본 Spring 프로필: `local`

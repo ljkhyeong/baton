@@ -24,6 +24,7 @@
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
 | 배포 이미지 취약점 검사 | Trivy | 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 검사하고 JSON 보고서를 남긴다. GitHub Actions 실행은 추가하지 않는다. |
 | 라이브러리·운영 이미지 업데이트 점검 | GitHub Dependabot | 기존 Java·npm·Actions·Dockerfile 점검에 Compose의 MySQL·Caddy를 추가했다. 새 버전 조회와 PR 생성은 GitHub가 처리한다. |
+| 실제 Java 의존성 취약점 알림 | Gradle Actions → GitHub Dependency Submission API | 기존 빌드에서 선택된 버전과 간접 의존성 목록을 전달해 Dependabot 알림에 활용한다. 기본 비활성이며 별도 API 키는 필요 없다. |
 | 자료 URL 점검·인수인계·주간 요약 | WATCH·BATON·BRIEF | 팀 권한·변경 이력과 연결된 제품 기능이다. 무료 모니터의 제한된 슬롯이나 일반 자동화 서비스로 대체하지 않는다. |
 
 공휴일 설정은 [README](../../README.md#무료-공휴일-연동), 캘린더는 [CAL 계약](../PRD/0006_calendar-integration-contract/spec.md)을 따른다. 사용자 업무 알림의 외부 발송은 RELAY가 소유하며 운영 경보는 Alertmanager가 맡는다. 화상회의는 기존 ROUND를 유지한다. 무료 사용량 이후 종량 과금이 발생할 수 있는 외부 TURN·SMS·AI API는 추가하지 않는다.
@@ -384,6 +385,25 @@ Compose 업데이트는 한 그룹으로 묶고 동시에 열린 PR을 1개로 �
 [일반 GitHub 실행기의 Dependabot 업데이트 작업](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-on-actions)은 포함된 Actions 실행 시간을 사용하지 않는다. 업데이트 PR의 별도 CI에는 [기존 Actions 요금 기준](https://docs.github.com/en/billing/concepts/product-billing/github-actions)이 적용되므로 비공개 저장소에서는 무료 한도와 초과 사용 차단을 유지한다. 유료 대형 실행기를 연결하지 않는다.
 
 설정이 기본 브랜치에 반영된 뒤 첫 Dependabot 실행에서 대상 파일과 업데이트 PR을 확인한다. 설정 검증과 대상 파일 확인은 완료했으며 실제 GitHub 업데이트 작업은 아직 실행하지 않았다. 셸 스크립트의 도구 이미지 버전과 ROUND의 계약·릴리스 고정값은 이 Compose 점검 대상에 포함되지 않는다.
+
+## Java 의존성 취약점 알림
+
+Spring Boot가 정한 버전과 라이브러리가 함께 가져오는 간접 의존성을 기존 `build checkApiContract` 실행에서 수집한다. [공식 Gradle Actions](https://github.com/gradle/actions/blob/9c971963bec38e04b3d30dcc455b5382be2fdbfb/docs/dependency-submission.md)가 GitHub Dependency Submission API로 목록을 전달한다. 이 빌드가 실제로 해석한 의존성이 대상이며, 실행하지 않은 구성까지 전부 확인하는 검사는 아니다. 테스트·빌드 도구도 포함하므로 경보는 실제 운영 사용 여부를 확인해 처리한다.
+
+[품질 게이트](../../.github/workflows/quality-gate.yml)의 선택 기능이며 기본 비활성이다. 활성화 순서는 다음과 같다.
+
+1. 저장소 설정에서 **Dependency graph**와 **Dependabot alerts**를 켠다. GitHub가 제공하는 자동 의존성 제출은 함께 켜지 않아 중복 빌드를 피한다.
+2. 저장소 소유 계정의 [Actions 무료 한도와 초과 사용 차단](https://docs.github.com/en/billing/concepts/product-billing/github-actions)을 확인한다. 공개 저장소의 일반 실행기는 무료이며, 비공개 저장소는 실행 시간·저장 용량 한도 안에서 사용한다. 유료 대형 실행기는 사용하지 않는다.
+3. 저장소의 Actions **변수**에 `BATON_DEPENDENCY_GRAPH_ENABLED=true`를 설정한다. 앱 환경 변수나 비밀값이 아니다. 별도 PAT는 필요 없으며 Actions의 `GITHUB_TOKEN`을 사용한다.
+4. 다음 `main` 푸시에서 `Java 의존성 목록을 GitHub에 연결` 작업의 성공과 저장소 `Insights → Dependency graph`의 실제 버전·간접 의존성을 확인한다. `Security`의 Dependabot 알림도 확인하고 개인 알림 설정에서 보안 알림을 켠다. PR·수동 실행에서는 제출하지 않는다.
+
+목록 생성에는 기존 백엔드 빌드를 재사용한다. 백엔드 검증이 성공하면 별도 제출 작업이 같은 실행의 결과를 받아 전달한다. `contents: write`는 이 제출 작업에만 부여하며 해당 작업은 저장소 코드를 내려받거나 빌드하지 않는다. 목록 누락·제출 오류는 실패로 표시한다. 기존 네 검증을 집계하는 `contract` 결과와 제출 작업 결과는 별개다.
+
+공식 액션은 v6.3.0의 커밋으로 고정했다. 기존 Java 설정의 캐시를 유지하고 새 액션은 `basic`·캐시 비활성으로 중복 캐시와 상용 캐시 사용을 피한다. Build Scan은 게시하지 않으며 전달용 파일은 1일 보관한다. 제출 작업과 파일 보관에는 기존 Actions 사용 한도가 적용된다.
+
+[Dependabot 알림](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-alerts)은 목록 변경이나 새 취약점 등록 시 알려준다. 최초 활성화에서 발견한 항목은 화면에서 직접 확인한다. 간접 의존성 알림이 자동 수정 PR까지 보장하지는 않으므로 관련 Spring Boot·상위 라이브러리 업데이트를 검토한다. 중단할 때는 변수를 `false`로 바꾼다. 이후 목록 갱신이 멈추며 기존 GitHub 목록은 삭제되지 않는다.
+
+로컬에서는 공식 수집 스크립트를 적용한 전체 빌드·API 계약 검사와 의존성 목록 생성을 검증했다. 실제 GitHub 전송·알림 수신은 저장소 설정 후 확인해야 한다.
 
 ## 활성화 전 남은 항목
 
