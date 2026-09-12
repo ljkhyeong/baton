@@ -13,13 +13,13 @@ import com.personal.baton.adapter.in.web.brief.BriefAttentionController;
 import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
-import java.util.Set;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
+import static org.springframework.security.web.csrf.CsrfFilter.DEFAULT_CSRF_MATCHER;
 import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
 
 public final class AccountSessionRequestMatchers {
@@ -87,9 +87,8 @@ public final class AccountSessionRequestMatchers {
     private static final RequestMatcher NOTIFICATION_PREFERENCES = pathPattern(NotificationPreferencesController.PATH);
     private static final RequestMatcher TEAM_ACCESS = new OrRequestMatcher(pathPattern("/api/v1/team-access/**"), pathPattern("/api/v1/team-invitations/**"));
     private static final RequestMatcher HAS_ACCOUNT_SESSION = request -> CurrentAuthenticatedAccount.accountId().isPresent();
-    private static final RequestMatcher UNSAFE = request -> !Set.of("GET", "HEAD", "OPTIONS", "TRACE").contains(request.getMethod());
     private static final RequestMatcher WORKSPACE_ACCOUNT_MUTATION = new AndRequestMatcher(
-            pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**"), HAS_ACCOUNT_SESSION, UNSAFE);
+            pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**"), HAS_ACCOUNT_SESSION, DEFAULT_CSRF_MATCHER);
     private static final RequestMatcher NOTIFICATION_READ = pathPattern(HttpMethod.POST, WorkspaceNotificationController.READ_PATH);
     private static final RequestMatcher NOTIFICATION_INBOX = pathPattern(HttpMethod.GET, WorkspaceNotificationController.PATH);
     private static final RequestMatcher RESOURCE_VERIFICATION = new OrRequestMatcher(
@@ -97,9 +96,9 @@ public final class AccountSessionRequestMatchers {
             pathPattern(HttpMethod.POST, ResourceVerificationController.SCHEDULE_PATH));
     private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
             AUTH_MUTATION,
-            new AndRequestMatcher(NOTIFICATION_PREFERENCES, UNSAFE),
+            new AndRequestMatcher(NOTIFICATION_PREFERENCES, DEFAULT_CSRF_MATCHER),
             WORKSPACE_ACCOUNT_MUTATION,
-            new AndRequestMatcher(TEAM_ACCESS, UNSAFE),
+            new AndRequestMatcher(TEAM_ACCESS, DEFAULT_CSRF_MATCHER),
             NOTIFICATION_READ,
             RESOURCE_VERIFICATION,
             ROUND_MEMBERSHIP_CLAIM,
@@ -141,6 +140,8 @@ public final class AccountSessionRequestMatchers {
             CALENDAR_READ,
             CALENDAR_MUTATION
     );
+    private static final RequestMatcher WORKSPACE_ACCOUNT_HEADER_REQUIRED = new AndRequestMatcher(
+            WORKSPACE_ACCOUNT_MUTATION, new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED));
     private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =
             new AndRequestMatcher(
                     pathPattern(
@@ -154,7 +155,7 @@ public final class AccountSessionRequestMatchers {
     }
 
     public static RequestMatcher workspaceAccountMutation() {
-        return new AndRequestMatcher(WORKSPACE_ACCOUNT_MUTATION, new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED));
+        return WORKSPACE_ACCOUNT_HEADER_REQUIRED;
     }
 
     public static RequestMatcher localLogin() {
