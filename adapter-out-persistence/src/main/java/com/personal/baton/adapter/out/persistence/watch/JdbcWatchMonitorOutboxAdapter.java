@@ -26,6 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
     private static final String PROCESSING = "PROCESSING";
+    private static final String SELECT_CANDIDATE = """
+            SELECT
+                BIN_TO_UUID(resource_record.id) AS resource_id,
+                resource_record.url AS target_url,
+                season.ended_at IS NOT NULL OR resource_record.archived_at IS NOT NULL AS inactive
+            FROM role_resources resource_record
+            JOIN roles role_record
+                ON role_record.id = resource_record.role_id
+            JOIN seasons season
+                ON season.id = role_record.season_id
+            """;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -353,40 +364,29 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         if (limit < 1) {
             throw new IllegalArgumentException("WATCH reconciliation page limit은 1 이상이어야 합니다");
         }
-        String select = """
-                SELECT
-                    BIN_TO_UUID(resource_record.id) AS resource_id,
-                    resource_record.url AS target_url,
-                    season.ended_at IS NOT NULL OR resource_record.archived_at IS NOT NULL AS inactive
-                FROM role_resources resource_record
-                JOIN roles role_record
-                    ON role_record.id = resource_record.role_id
-                JOIN seasons season
-                    ON season.id = role_record.season_id
-                """;
         if (afterResourceId == null) {
             return jdbcTemplate.query(
-                    select + """
+                    SELECT_CANDIDATE + """
                 ORDER BY resource_record.id
                 LIMIT ?
                 """,
-                    (resultSet, rowNumber) -> reconciliationCandidate(resultSet),
+                    this::reconciliationCandidate,
                     limit
             );
         }
         return jdbcTemplate.query(
-                select + """
+                SELECT_CANDIDATE + """
                 WHERE resource_record.id > UUID_TO_BIN(?)
                 ORDER BY resource_record.id
                 LIMIT ?
                 """,
-                (resultSet, rowNumber) -> reconciliationCandidate(resultSet),
+                this::reconciliationCandidate,
                 afterResourceId.toString(),
                 limit
         );
     }
 
-    private WatchMonitorCandidate reconciliationCandidate(ResultSet resultSet) throws SQLException {
+    private WatchMonitorCandidate reconciliationCandidate(ResultSet resultSet, int rowNumber) throws SQLException {
         return new WatchMonitorCandidate(
                 UUID.fromString(resultSet.getString("resource_id")),
                 resultSet.getString("target_url"),
@@ -429,23 +429,10 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
     private Optional<WatchMonitorCandidate> findCurrentCandidate(UUID resourceId) {
         return DataAccessUtils.optionalResult(jdbcTemplate.query(
-                """
-                SELECT
-                    BIN_TO_UUID(resource_record.id) AS resource_id,
-                    resource_record.url AS target_url,
-                    season.ended_at IS NOT NULL OR resource_record.archived_at IS NOT NULL AS inactive
-                FROM role_resources resource_record
-                JOIN roles role_record
-                    ON role_record.id = resource_record.role_id
-                JOIN seasons season
-                    ON season.id = role_record.season_id
+                SELECT_CANDIDATE + """
                 WHERE resource_record.id = UUID_TO_BIN(?)
                 """,
-                (resultSet, rowNumber) -> new WatchMonitorCandidate(
-                        UUID.fromString(resultSet.getString("resource_id")),
-                        resultSet.getString("target_url"),
-                        resultSet.getBoolean("inactive")
-                ),
+                this::reconciliationCandidate,
                 resourceId.toString()
         ));
     }
