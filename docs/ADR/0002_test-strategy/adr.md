@@ -19,7 +19,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 | 유스케이스 통합 | `usecase` | Spring 조립, DB, Flyway, 트랜잭션과 어댑터 협력 | `./gradlew --no-daemon :application:useCaseTest` |
 | HTTP 계약 | `restdocs` | 공개 요청·응답과 상태 코드 | `./gradlew --no-daemon :adapter-in-web:restDocsTest` |
 | ROUND 소비자 계약 | `crossservice` | BATON 서명기·JWK 회전과 외부 ROUND 시그널링 런타임 호환성 | `ROUND_REPOSITORY_ROOT=/absolute/path/to/round bash ops/tests/round-consumer-contract.sh` |
-| CAL 소비자 계약 | `calendar-crossservice` | BATON 일정·시즌 이름·복구 완료 직렬화와 외부 CAL 사전 릴리스 호환성 | `BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 bash ops/tests/calendar-consumer-contract.sh` |
+| CAL 소비자 계약 | `calendar-crossservice` | BATON 일정·시즌 이름·복구 완료 직렬화와 외부 CAL 사전 릴리스 호환성 | `BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.2 bash ops/tests/calendar-consumer-contract.sh` |
 | 전체 회귀 | 전체 | 여러 모듈에 걸친 변경 | `./gradlew --no-daemon test` 또는 `./gradlew --no-daemon build` |
 
 `useCaseTest`는 MySQL 8 Testcontainers에서 파일럿 워크스페이스 생성, 워크스페이스·구성원을 포함한 콘텐츠 생성과 접근 키 변경의 멱등성, 생성·복구 비밀 분리, 동시 멱등 요청과 접근 키 변경 충돌, 구성원·시즌·역할·역할 자료·반복 업무 정의·회차·실행·결정·인수인계 항목·역할 인수인계 저장과 조회 프로젝션을 검증한다. Flyway 변경은 대상 이전 버전까지 적용한 대표 데이터를 최신 마이그레이션으로 올린 뒤 데이터·참조·제약·인덱스 같은 실제 이관 사후조건을 확인하는 전용 테스트가 소유한다. 개별 버전의 제품·연동 기대값은 [제품 명세](../../PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](../../PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](../../PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에 두며 이 문서에는 반복해 열거하지 않는다. 선택한 태스크가 실제 대상 테스트를 실행했는지 항상 확인한다.
