@@ -13,10 +13,11 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
   const [copied, setCopied] = useState(false)
   const [manualLink, setManualLink] = useState('')
   const [copying, setCopying] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const time = new Intl.DateTimeFormat('ko-KR', { timeZone: edition.zoneId, dateStyle: 'medium', timeStyle: 'short' })
+  const link = new URL(`/teams/${scope.teamId}/seasons/${scope.seasonId}`, window.location.origin)
+  link.searchParams.set('brief', edition.editionId)
   const copyLink = async () => {
-    const link = new URL(`/teams/${scope.teamId}/seasons/${scope.seasonId}`, window.location.origin)
-    link.searchParams.set('brief', edition.editionId)
     setCopied(false); setManualLink(''); setCopying(true)
     try {
       await navigator.clipboard.writeText(link.href)
@@ -25,14 +26,25 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
       setManualLink(link.href)
     } finally { setCopying(false) }
   }
+  const shareLink = async () => {
+    if (loading || copying || sharing) return
+    if (!navigator.share) { await copyLink(); return }
+    setCopied(false); setManualLink(''); setSharing(true)
+    try {
+      await navigator.share({ url: link.href })
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) setManualLink(link.href)
+    } finally { setSharing(false) }
+  }
   return <>
     <div className="brief-pagination" aria-label="선택한 주간 요약 공유와 출력">
-      <button type="button" disabled={loading || copying} onClick={() => void copyLink()}>요약 링크 복사</button>
+      <button type="button" disabled={loading || copying || sharing} onClick={() => void shareLink()}>요약 공유</button>
+      <button type="button" disabled={loading || copying || sharing} onClick={() => void copyLink()}>요약 링크 복사</button>
       <button type="button" disabled={loading || sourcesLoading} onClick={printEdition}>인쇄·PDF 저장</button>
     </div>
     <p className="brief-note">링크를 열려면 로그인과 해당 팀의 접근 권한이 필요합니다. PDF는 인쇄 창의 저장 옵션에서 선택할 수 있습니다.</p>
     {copied && <p role="status">선택한 주간 요약 링크를 복사했습니다.</p>}
-    {manualLink && <label className="brief-copy-fallback">자동 복사를 사용할 수 없습니다. 아래 링크를 직접 복사해 주세요.
+    {manualLink && <label className="brief-copy-fallback">아래 링크를 선택해 직접 복사하세요.
       <input aria-label="직접 복사할 주간 요약 링크" value={manualLink} readOnly onFocus={(event) => event.currentTarget.select()} />
     </label>}
     {!loading && createPortal(<article className="brief-print-sheet" aria-label="인쇄할 주간 요약">

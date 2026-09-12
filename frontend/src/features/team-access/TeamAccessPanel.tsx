@@ -28,7 +28,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const [memberId, setMemberId] = useState('')
   const [permission, setPermission] = useState<Permission>('MEMBER')
   const [invitationLink, setInvitationLink] = useState<InvitationLink | null>(null)
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [linkStatus, setLinkStatus] = useState<'idle' | 'sharing' | 'copied' | 'copyFailed' | 'shareFailed'>('idle')
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     const invitations = query.data?.invitations
@@ -47,18 +47,28 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     updateExpiration()
     return () => { if (timeoutId !== undefined) window.clearTimeout(timeoutId) }
   }, [query.data?.invitations])
-  const copyInvitationUrl = async () => {
-    if (!invitationLink) return
-    setCopyStatus('idle')
+  const copyInvitationUrl = async (url: string) => {
+    setLinkStatus('idle')
     if (!navigator.clipboard?.writeText) {
-      setCopyStatus('failed')
+      setLinkStatus('copyFailed')
       return
     }
     try {
-      await navigator.clipboard.writeText(invitationLink.url)
-      setCopyStatus('copied')
+      await navigator.clipboard.writeText(url)
+      setLinkStatus('copied')
     } catch {
-      setCopyStatus('failed')
+      setLinkStatus('copyFailed')
+    }
+  }
+  const shareInvitationUrl = async (url: string) => {
+    if (linkStatus === 'sharing') return
+    if (!navigator.share) { await copyInvitationUrl(url); return }
+    setLinkStatus('sharing')
+    try {
+      await navigator.share({ url })
+      setLinkStatus('idle')
+    } catch (error) {
+      setLinkStatus(error instanceof DOMException && error.name === 'AbortError' ? 'idle' : 'shareFailed')
     }
   }
   const mutation = useMutation({ mutationFn: async (action: { kind: 'activate' | 'invite' | 'revoke' | 'permission'; id?: string; permission?: Permission | null }) => {
@@ -70,10 +80,10 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     if (action.kind === 'invite') {
       const created = await createTeamInvitation(scope, memberId, permission)
       setInvitationLink({ invitationId: created.invitation.id, url: `${window.location.origin}/join#invite=${created.token}` })
-      setCopyStatus('idle')
+      setLinkStatus('idle')
       return getTeamAccess(scope)
     }
-    if (action.kind === 'revoke') { setCopyStatus('idle'); return revokeTeamInvitation(scope, action.id!) }
+    if (action.kind === 'revoke') { setLinkStatus('idle'); return revokeTeamInvitation(scope, action.id!) }
     return changeTeamPermission(scope, action.id!, action.permission ?? null)
   }, onSuccess: data => {
     client.setQueryData(queryKey, data)
@@ -126,9 +136,13 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         <button type="submit" disabled={!invitationMemberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
       {visibleInvitationLink && <div><label>생성한 초대 링크<input readOnly value={visibleInvitationLink.url} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
-        <button type="button" onClick={() => void copyInvitationUrl()}>초대 링크 복사</button>
-        {copyStatus === 'copied' && <p role="status">초대 링크를 복사했습니다.</p>}
-        {copyStatus === 'failed' && <p role="alert">자동으로 복사하지 못했습니다. 위 링크를 선택해 직접 복사해 주세요.</p>}
+        <div className="team-invitation-actions">
+          <button type="button" disabled={mutation.isPending || linkStatus === 'sharing'} onClick={() => void shareInvitationUrl(visibleInvitationLink.url)}>초대 링크 공유</button>
+          <button type="button" disabled={mutation.isPending || linkStatus === 'sharing'} onClick={() => void copyInvitationUrl(visibleInvitationLink.url)}>초대 링크 복사</button>
+        </div>
+        {linkStatus === 'copied' && <p role="status">초대 링크를 복사했습니다.</p>}
+        {linkStatus === 'copyFailed' && <p role="alert">자동으로 복사하지 못했습니다. 위 링크를 선택해 직접 복사해 주세요.</p>}
+        {linkStatus === 'shareFailed' && <p role="alert">공유 창을 열지 못했습니다. 링크를 복사해 전달하세요.</p>}
         <p>초대한 구성원에게 전달하세요. 7일 동안 사용할 수 있습니다. 새 링크를 만들면 같은 구성원의 미수락 초대는 취소됩니다.</p>
       </div>}
       <h4>초대 목록</h4>

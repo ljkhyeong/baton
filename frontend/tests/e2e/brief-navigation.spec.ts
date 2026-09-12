@@ -399,6 +399,56 @@ test('복사한 링크는 비밀값 없이 특정 주간 요약을 열고 로그
   await expect(page.locator('.brief-print-sheet')).toHaveCount(0)
 })
 
+test('기기 공유는 선택한 요약 주소만 전달하고 취소·차단·미지원을 처리한다 @smoke @responsive', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => {
+      document.documentElement.dataset.sharedBrief = JSON.stringify(data)
+      if (document.documentElement.dataset.holdShare === 'true') {
+        await new Promise<void>(resolve => document.addEventListener('complete-share', () => resolve(), { once: true }))
+      }
+      const failure = document.documentElement.dataset.shareFailure
+      if (failure) throw new DOMException('시험용 공유 실패', failure)
+    } })
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async (value: string) => { document.documentElement.dataset.copiedBrief = value },
+    } })
+  })
+  await installSharedEdition(page)
+  const target = `${WORKSPACE_PATH}?brief=${OLD}`
+  await page.goto(`${target}#accessKey=${ACCESS_KEY}`)
+  const panel = page.locator('.brief-attention')
+  const share = panel.getByRole('button', { name: '요약 공유', exact: true })
+  const copy = panel.getByRole('button', { name: '요약 링크 복사' })
+  const manualLink = panel.getByRole('textbox', { name: '직접 복사할 주간 요약 링크' })
+  await expect(share).toBeEnabled()
+  await page.evaluate(() => { document.documentElement.dataset.holdShare = 'true' })
+  await share.focus()
+  await share.press('Enter')
+  await expect(share).toBeDisabled()
+  await expect(copy).toBeDisabled()
+  expect(await page.evaluate(() => JSON.parse(document.documentElement.dataset.sharedBrief!)))
+    .toEqual({ url: new URL(target, page.url()).href })
+  await page.evaluate(() => {
+    delete document.documentElement.dataset.holdShare
+    document.dispatchEvent(new Event('complete-share'))
+  })
+  await expect(share).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath('brief-share-actions.png') })
+  await page.evaluate(() => { document.documentElement.dataset.shareFailure = 'AbortError' })
+  await share.click()
+  await expect(share).toBeEnabled()
+  await expect(manualLink).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.dataset.copiedBrief)).toBeUndefined()
+  await page.evaluate(() => { document.documentElement.dataset.shareFailure = 'NotAllowedError' })
+  await share.click()
+  await expect(manualLink).toHaveValue(new URL(target, page.url()).href)
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }))
+  await share.click()
+  await expect(panel.getByRole('status').filter({ hasText: '선택한 주간 요약 링크를 복사했습니다.' })).toBeVisible()
+  await expect(manualLink).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.dataset.copiedBrief)).toBe(new URL(target, page.url()).href)
+})
+
 test('잘못된 주간 요약 링크와 조회 거부 시 최신 주간 요약으로 바꾸지 않는다 @smoke', async ({ page }) => {
   await installSharedEdition(page)
   await openSharedWorkspace(page)
@@ -407,6 +457,7 @@ test('잘못된 주간 요약 링크와 조회 거부 시 최신 주간 요약�
     await page.goto(`${WORKSPACE_PATH}?${query}`)
     await expect(panel.getByRole('alert')).toContainText('주간 요약 링크가 올바르지 않습니다.')
     await expect(panel.getByRole('button', { name: '요약 링크 복사' })).toHaveCount(0)
+    await expect(panel.getByRole('button', { name: '요약 공유', exact: true })).toHaveCount(0)
   }
   for (const status of [404, 403]) {
     await page.route(`**/brief/editions/${OLD}`, (route) => route.fulfill({ status, json: {
@@ -415,6 +466,7 @@ test('잘못된 주간 요약 링크와 조회 거부 시 최신 주간 요약�
     await expect(panel.getByText(status === 404 ? '선택한 주간 요약을 찾을 수 없습니다.' : '선택한 주간 요약을 확인할 수 없습니다.')).toBeVisible()
     await expect(panel.getByRole('heading', { name: '2026-08-31 시작 주 · 요약 버전 3', exact: true })).toHaveCount(0)
     await expect(panel.getByRole('button', { name: '인쇄·PDF 저장' })).toHaveCount(0)
+    await expect(panel.getByRole('button', { name: '요약 공유', exact: true })).toHaveCount(0)
     await expect(page.locator('.brief-print-sheet')).toHaveCount(0)
   }
 })

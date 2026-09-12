@@ -8,6 +8,8 @@
   .team-access-confirm { display: flex; align-items: flex-start; }
   input[type="checkbox"] { width: auto; margin-top: 4px; }
   button { min-height: 40px; }
+  .team-invitation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .team-invitation-actions button { min-height: 44px; }
   ul { padding: 0; list-style: none; }
   li { display: flex; align-items: center; gap: 10px; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 8px 0; }
   li select { width: auto; }

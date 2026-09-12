@@ -22,6 +22,16 @@ async function accountApi(page: Page) {
 }
 
 test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 둔 목록에서 만료 상태를 확인한다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => {
+      document.documentElement.dataset.sharedInvitation = JSON.stringify(data)
+      const failure = document.documentElement.dataset.shareFailure
+      if (failure) throw new DOMException('시험용 공유 실패', failure)
+    } })
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async (value: string) => { document.documentElement.dataset.copiedInvitation = value },
+    } })
+  })
   await page.clock.install({ time: new Date('2026-09-12T02:00:00Z') })
   const projection = makeProjection()
   await installApi(page, projection)
@@ -92,6 +102,25 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   await dialog.getByLabel('초대 권한').selectOption('VIEWER')
   await invitationButton.click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveValue(new RegExp(`/join#invite=${TOKEN}$`))
+  const share = dialog.getByRole('button', { name: '초대 링크 공유', exact: true })
+  await share.focus()
+  await share.press('Enter')
+  const invitationUrl = new URL(`/join#invite=${TOKEN}`, page.url()).href
+  expect(await page.evaluate(() => JSON.parse(document.documentElement.dataset.sharedInvitation!))).toEqual({ url: invitationUrl })
+  await expect(share).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath('team-invitation-share.png') })
+  await page.evaluate(() => { document.documentElement.dataset.shareFailure = 'AbortError' })
+  await share.click()
+  await expect(share).toBeEnabled()
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.dataset.copiedInvitation)).toBeUndefined()
+  await page.evaluate(() => { document.documentElement.dataset.shareFailure = 'NotAllowedError' })
+  await share.click()
+  await expect(dialog.getByRole('alert')).toContainText('공유 창을 열지 못했습니다.')
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }))
+  await share.click()
+  await expect(dialog.getByRole('status')).toHaveText('초대 링크를 복사했습니다.')
+  expect(await page.evaluate(() => document.documentElement.dataset.copiedInvitation)).toBe(invitationUrl)
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true,
     value: { writeText: async () => { throw new DOMException('복사 권한 없음', 'NotAllowedError') } } }))
   await dialog.getByRole('button', { name: '초대 링크 복사' }).click()
@@ -116,6 +145,7 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   page.once('dialog', confirmation => confirmation.accept())
   await dialog.getByRole('button', { name: '초대 취소', exact: true }).click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
+  await expect(share).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
   await expect(dialog.getByText('초대 취소', { exact: true })).toBeVisible()
   expect(revokeRequestCount).toBe(2)
@@ -125,6 +155,7 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   await expect(dialog.getByText('기간 만료', { exact: true })).toBeVisible()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveCount(0)
+  await expect(share).toHaveCount(0)
 })
 
 test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람자는 기록을 읽고 변경할 수 없다', async ({ page }, testInfo) => {
