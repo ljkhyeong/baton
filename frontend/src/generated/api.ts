@@ -344,6 +344,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/brevo/email-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Brevo 메일 전달 결과 수신
+         * @description Brevo SMTP 전달 결과를 전용 Bearer로 수신한다. 같은 메일·결과는 중복 저장하지 않는다.
+         */
+        post: operations["receiveBrevoEmailEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/internal/resource-health-events": {
         parameters: {
             query?: never;
@@ -3036,6 +3056,14 @@ export interface components {
              */
             status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
         };
+        Schema_52a89d3094b88db6: {
+            /** @description delivered, soft_bounce, hard_bounce, blocked, invalid_email, error, deferred, spam. 나머지는 무시 */
+            event: string;
+            /** @description UTC 이벤트 시각, Unix 초 정수 1..253402300799 */
+            ts_event: number;
+            /** @description SMTP 헤더 baton-delivery-id:<발송 ID>. 없으면 무시 */
+            "X-Mailin-custom"?: string | null;
+        };
         Schema_056c9e55e5c84be6: {
             /**
              * Format: date
@@ -5719,6 +5747,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_e1cc89d3e81f1381"];
+                };
+            };
+        };
+    };
+    receiveBrevoEmailEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Brevo 전용 Bearer 토큰
+                 * @example Bearer brevo-receiver-token-at-least-32-characters
+                 */
+                Authorization: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Schema_52a89d3094b88db6"];
+            };
+        };
+        responses: {
+            /** @description 204 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    /** @description Bearer 인증 필요 */
+                    "WWW-Authenticate"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json;charset=UTF-8": components["schemas"]["ErrorResponse"];
                 };
             };
         };

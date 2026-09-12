@@ -1,5 +1,6 @@
 package com.personal.baton.bootstrap.observability;
 
+import com.personal.baton.application.identity.EmailDeliveryEvent;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.MeterBinder;
@@ -38,6 +39,13 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
 
     @Override
     public void bindTo(MeterRegistry registry) {
+        for (EmailDeliveryEvent event : EmailDeliveryEvent.values()) {
+            Gauge.builder("baton.email.delivery.receipts", this,
+                            metrics -> metrics.snapshot.emailReceipts().getOrDefault(event, 0L))
+                    .description("최근 24시간의 메일별 전달 결과 수; 재전송 중복 제외")
+                    .tag("event", event.name().toLowerCase(java.util.Locale.ROOT))
+                    .register(registry);
+        }
         for (Integration integration : Integration.values()) {
             for (DeliveryStatus status : DeliveryStatus.values()) {
                 Gauge.builder(
@@ -139,7 +147,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
             WatchInboxSnapshot watchInbox = readWatchInboxSnapshot();
             Instant refreshedAt = clock.instant();
 
-            snapshot = new Snapshot(Map.copyOf(deliveries), watchInbox);
+            snapshot = new Snapshot(Map.copyOf(deliveries), watchInbox, readEmailReceipts(refreshedAt));
             lastSuccessfulRefreshEpochSeconds = epochSeconds(refreshedAt);
             refreshSuccessful = true;
         } catch (DataAccessException exception) {
@@ -150,6 +158,18 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     exception
             );
         }
+    }
+
+    private Map<EmailDeliveryEvent, Long> readEmailReceipts(Instant now) {
+        EnumMap<EmailDeliveryEvent, Long> receipts = new EnumMap<>(EmailDeliveryEvent.class);
+        jdbcTemplate.query("""
+                SELECT event, COUNT(*) AS count FROM email_delivery_receipts
+                WHERE occurred_at > ? AND occurred_at <= ? GROUP BY event
+                """, (org.springframework.jdbc.core.RowCallbackHandler) row ->
+                        receipts.put(EmailDeliveryEvent.valueOf(row.getString("event")), row.getLong("count")),
+                LocalDateTime.ofInstant(now.minus(Duration.ofHours(24)), ZoneOffset.UTC),
+                LocalDateTime.ofInstant(now, ZoneOffset.UTC));
+        return Map.copyOf(receipts);
     }
 
     private DeliverySnapshot readDeliverySnapshot(Integration integration) {
@@ -335,7 +355,8 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
 
     private record Snapshot(
             Map<Integration, DeliverySnapshot> deliveries,
-            WatchInboxSnapshot watchInbox
+            WatchInboxSnapshot watchInbox,
+            Map<EmailDeliveryEvent, Long> emailReceipts
     ) {
 
         private DeliverySnapshot delivery(Integration integration) {
@@ -343,7 +364,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
         }
 
         private static Snapshot empty() {
-            return new Snapshot(Map.of(), WatchInboxSnapshot.empty());
+            return new Snapshot(Map.of(), WatchInboxSnapshot.empty(), Map.of());
         }
     }
 }

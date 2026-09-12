@@ -73,6 +73,9 @@ services:
       BATON_AUTH_OAUTH2_NAVER_CLIENT_ID: ${BATON_AUTH_OAUTH2_NAVER_CLIENT_ID:-}
       BATON_AUTH_LOCAL_REGISTRATION_ENABLED: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:-false}
       BATON_AUTH_PASSWORD_RESET_ENABLED: ${BATON_AUTH_PASSWORD_RESET_ENABLED:-false}
+      BATON_SENTRY_DSN: ${BATON_SENTRY_DSN:-}
+      BATON_SENTRY_ENVIRONMENT: ${BATON_SENTRY_ENVIRONMENT:-production}
+      BATON_BREVO_WEBHOOK_ENABLED: ${BATON_BREVO_WEBHOOK_ENABLED:-false}
       BATON_TURNSTILE_ENABLED: ${BATON_TURNSTILE_ENABLED:-false}
       BATON_TURNSTILE_SITE_KEY: ${BATON_TURNSTILE_SITE_KEY:-}
       BATON_TURNSTILE_EXPECTED_HOSTNAME: ${BATON_TURNSTILE_EXPECTED_HOSTNAME:-}
@@ -104,6 +107,11 @@ services:
       BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_PATH: ${BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH:-}
       TZ: UTC
     secrets:
+      - source: baton_brevo_webhook_bearer_token
+        target: /run/baton-config/baton.brevo.webhook.bearer-token
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
       - source: baton_turnstile_secret_key
         target: /run/baton-config/baton.auth.turnstile.secret-key
         uid: "10001"
@@ -178,6 +186,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_SENTRY_DSN: ${BATON_SENTRY_BROWSER_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${BATON_SENTRY_ENVIRONMENT:-production}
     restart: unless-stopped
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
@@ -215,6 +226,8 @@ volumes:
   baton_caddy_config:
 
 secrets:
+  baton_brevo_webhook_bearer_token:
+    environment: BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN
   baton_turnstile_secret_key:
     environment: BATON_SECRET_TURNSTILE_SECRET_KEY
   baton_holidays_service_key:

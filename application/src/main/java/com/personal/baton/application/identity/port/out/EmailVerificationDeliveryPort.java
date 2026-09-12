@@ -9,6 +9,7 @@ public interface EmailVerificationDeliveryPort {
     void deliver(EmailVerificationDelivery delivery);
 
     record EmailVerificationDelivery(
+            long deliveryId,
             UUID accountId,
             String email,
             String verificationToken,

@@ -52,6 +52,7 @@ class EmailVerificationOutboxDispatchServiceTest {
         assertThat(result.deliveredCount()).isOne();
         assertThat(result.failedCount()).isZero();
         verify(deliveryPort).deliver(new EmailVerificationDelivery(
+                delivery.deliveryId(),
                 delivery.protectionContext().accountId(),
                 PLAIN_PAYLOAD.email(),
                 PLAIN_PAYLOAD.verificationToken(),

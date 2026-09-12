@@ -203,6 +203,7 @@ read_secret_or_placeholder() {
   printf '%s' "$(< "$target")"
 }
 
+brevo_webhook_secret_file="$(env_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE)"
 turnstile_secret_file="$(env_value BATON_TURNSTILE_SECRET_KEY_FILE)"
 google_secret_file="$(env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
 naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
@@ -234,6 +235,7 @@ if [[ "$round_runtime_enabled" == "true" \
   exit 1
 fi
 
+brevo_webhook_secret="$(read_secret_or_placeholder "$brevo_webhook_secret_file" disabled-brevo-webhook-token)"
 turnstile_secret_key="$(
   read_secret_or_placeholder "$turnstile_secret_file" disabled-turnstile-secret-key
 )"
@@ -429,6 +431,7 @@ env \
   -u BUILDKIT_HOST \
   -u DOCKER_BUILDKIT \
   COMPOSE_MENU=false \
+  BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
   BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \

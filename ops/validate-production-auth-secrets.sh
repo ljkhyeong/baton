@@ -27,6 +27,8 @@ env_file="$1"
 [[ -f "$env_file" && -r "$env_file" && ! -L "$env_file" ]] \
   || fail "production environment file must be a readable regular file"
 
+brevo_webhook_enabled="false"
+brevo_webhook_secret_file=""
 turnstile_enabled="false"
 turnstile_site_key=""
 turnstile_secret_file=""
@@ -75,6 +77,8 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
   key="${PRODUCTION_VALIDATION_ENV_KEYS[$env_index]}"
   value="${PRODUCTION_VALIDATION_ENV_VALUES[$env_index]}"
   case "$key" in
+    BATON_BREVO_WEBHOOK_ENABLED) brevo_webhook_enabled="$value" ;;
+    BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE) brevo_webhook_secret_file="$value" ;;
     BATON_HOST) baton_host="$value" ;;
     BATON_TURNSTILE_ENABLED) turnstile_enabled="$value" ;;
     BATON_TURNSTILE_SITE_KEY) turnstile_site_key="$value" ;;
@@ -384,6 +388,17 @@ if [[ -n "$holidays_service_key_file" ]]; then
   validate_scalar_secret_file BATON_HOLIDAYS_SERVICE_KEY_FILE "$holidays_service_key_file"
 fi
 
+[[ "$brevo_webhook_enabled" == true || "$brevo_webhook_enabled" == false ]] \
+  || fail "BATON_BREVO_WEBHOOK_ENABLED must be true or false"
+if [[ "$brevo_webhook_enabled" == true ]]; then
+  require_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE "$brevo_webhook_secret_file"
+  [[ "$email_delivery" == smtp && "$smtp_host" == smtp-relay.brevo.com ]] \
+    || fail "Brevo webhook requires Brevo SMTP delivery"
+fi
+if [[ -n "$brevo_webhook_secret_file" ]]; then
+  validate_bearer_token_file BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE "$brevo_webhook_secret_file"
+fi
+
 [[ "$turnstile_enabled" == true || "$turnstile_enabled" == false ]] \
   || fail "BATON_TURNSTILE_ENABLED must be true or false"
 if [[ "$turnstile_enabled" == true ]]; then
@@ -486,6 +501,10 @@ fi
 
 scalar_secret_files=()
 scalar_secret_count=0
+if [[ -n "$brevo_webhook_secret_file" ]]; then
+  scalar_secret_files+=("$brevo_webhook_secret_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
 if [[ -n "$turnstile_secret_file" ]]; then
   scalar_secret_files+=("$turnstile_secret_file")
   scalar_secret_count=$((scalar_secret_count + 1))

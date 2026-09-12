@@ -1,6 +1,8 @@
 package com.personal.baton.bootstrap.observability;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.identity.EmailDeliveryEvent;
+import com.personal.baton.application.identity.port.in.ReceiveEmailDeliveryReceiptUseCase;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Instant;
@@ -60,6 +62,9 @@ class IntegrationDeliveryMetricsTest {
     @Autowired
     private MeterRegistry registry;
 
+    @Autowired
+    private ReceiveEmailDeliveryReceiptUseCase emailReceipts;
+
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM email_verification_delivery_outbox");
@@ -71,6 +76,49 @@ class IntegrationDeliveryMetricsTest {
         jdbcTemplate.update("DELETE FROM watch_monitor_outbox");
         jdbcTemplate.update("DELETE FROM calendar_snapshot_outbox");
         jdbcTemplate.update("DELETE FROM calendar_season_metadata_outbox");
+    }
+
+    @Test
+    @DisplayName("메일 결과 재전송과 역순 도착은 중복 저장하지 않고 SMTP 상태를 보존한다")
+    void deduplicatesEmailReceiptsWithoutChangingOutbox() {
+        insertEmail("DELIVERED", NOW.minusSeconds(60), null);
+        long id = jdbcTemplate.queryForObject("SELECT id FROM email_verification_delivery_outbox", Long.class);
+        emailReceipts.receive(id, EmailDeliveryEvent.HARD_BOUNCE, NOW);
+        emailReceipts.receive(id, EmailDeliveryEvent.HARD_BOUNCE, NOW);
+        emailReceipts.receive(id, EmailDeliveryEvent.HARD_BOUNCE, NOW.minusSeconds(10));
+        emailReceipts.receive(id, EmailDeliveryEvent.DELIVERED, NOW.minusSeconds(30));
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM email_delivery_receipts", Long.class)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT occurred_at FROM email_delivery_receipts WHERE event = 'HARD_BOUNCE'",
+                LocalDateTime.class)).isEqualTo(utc(NOW));
+        assertThat(jdbcTemplate.queryForObject("SELECT delivery_status FROM email_verification_delivery_outbox", String.class))
+                .isEqualTo("DELIVERED");
+        assertThat(jdbcTemplate.queryForObject("SELECT email_verified FROM account_identities", Boolean.class)).isFalse();
+        metrics.refresh();
+        assertThat(registry.get("baton.email.delivery.receipts").tag("event", "hard_bounce").gauge().value()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 발송 시도 전인 메일의 결과는 저장하지 않는다")
+    void ignoresUnknownOrUnsentEmail() {
+        insertEmail("PENDING", NOW, null);
+        long id = jdbcTemplate.queryForObject("SELECT id FROM email_verification_delivery_outbox", Long.class);
+        emailReceipts.receive(id, EmailDeliveryEvent.BLOCKED, NOW);
+        emailReceipts.receive(id + 100, EmailDeliveryEvent.BLOCKED, NOW);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM email_delivery_receipts", Long.class)).isZero();
+    }
+
+    @Test
+    @DisplayName("메일 결과 지표는 미래와 24시간 이전 이벤트를 제외한다")
+    void countsEmailReceiptsWithinLastDay() {
+        insertEmail("DELIVERED", NOW.minusSeconds(60), null);
+        long id = jdbcTemplate.queryForObject("SELECT id FROM email_verification_delivery_outbox", Long.class);
+        emailReceipts.receive(id, EmailDeliveryEvent.DELIVERED, NOW.minusSeconds(86400));
+        emailReceipts.receive(id, EmailDeliveryEvent.SOFT_BOUNCE, NOW.minusSeconds(86399));
+        emailReceipts.receive(id, EmailDeliveryEvent.HARD_BOUNCE, NOW.plusSeconds(1));
+        metrics.refresh();
+        assertThat(registry.get("baton.email.delivery.receipts").tag("event", "delivered").gauge().value()).isZero();
+        assertThat(registry.get("baton.email.delivery.receipts").tag("event", "soft_bounce").gauge().value()).isEqualTo(1);
+        assertThat(registry.get("baton.email.delivery.receipts").tag("event", "hard_bounce").gauge().value()).isZero();
     }
 
     @DisplayName("시즌 이름의 영구 실패는 일정 지표와 구분해 운영 점검에 노출한다")

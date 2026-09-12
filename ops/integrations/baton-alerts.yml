@@ -48,6 +48,18 @@ groups:
           summary: '{{ $labels.integration }} 전달에 조치가 필요합니다.'
           description: 재시도가 끝난 실패 항목이 있습니다. 연동 설정과 실패 원인을 확인하세요.
 
+      - alert: BatonEmailDeliveryRejected
+        expr: |
+          (sum by (job, instance) (baton_email_delivery_receipts{job="baton", event=~"hard_bounce|blocked|invalid_email|error|spam"}) > 0)
+          and on (job, instance) baton:integration_metrics_ready
+        for: 2m
+        labels:
+          service: baton
+          severity: warning
+        annotations:
+          summary: 최근 24시간에 메일 반송·차단이 발생했습니다.
+          description: Brevo 발송 내역과 발신 도메인 설정을 확인하세요. 자동 재발송은 하지 않습니다.
+
       - alert: BatonIntegrationProcessingExpired
         expr: |
           (baton_integration_delivery_expired_processing_items{job="baton"} > 0)

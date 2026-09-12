@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.mail.MailSender;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
@@ -72,7 +72,7 @@ public class IdentityInfrastructureConfig {
             havingValue = "smtp"
     )
     EmailVerificationDeliveryPort smtpEmailVerificationDeliveryPort(
-            MailSender mailSender,
+            JavaMailSender mailSender,
             IdentityEmailVerificationProperties properties
     ) {
         return new SmtpEmailVerificationDeliveryAdapter(

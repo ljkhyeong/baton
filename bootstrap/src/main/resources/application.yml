@@ -36,6 +36,10 @@ server:
   port: ${BATON_SERVER_PORT:8080}
   shutdown: graceful
 
+sentry:
+  dsn: ${BATON_SENTRY_DSN:}
+  environment: ${BATON_SENTRY_ENVIRONMENT:production}
+
 logging:
   pattern:
     correlation: "[requestId=%X{requestId:-system}] "
@@ -51,6 +55,10 @@ management:
         enabled: true
 
 baton:
+  brevo:
+    webhook:
+      enabled: ${BATON_BREVO_WEBHOOK_ENABLED:false}
+      bearer-token: ${BATON_BREVO_WEBHOOK_BEARER_TOKEN:}
   holidays:
     enabled: ${BATON_HOLIDAYS_ENABLED:false}
     service-key: ${BATON_HOLIDAYS_SERVICE_KEY:}

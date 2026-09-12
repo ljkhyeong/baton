@@ -14,6 +14,8 @@ COPY frontend/index.html frontend/tsconfig.json frontend/tsconfig.app.json front
 COPY frontend/public ./public
 COPY frontend/src ./src
 
+ARG VITE_SENTRY_DSN=
+ARG VITE_SENTRY_ENVIRONMENT=production
 RUN npm run build
 
 FROM ${CADDY_BUILDER_IMAGE} AS caddy-build

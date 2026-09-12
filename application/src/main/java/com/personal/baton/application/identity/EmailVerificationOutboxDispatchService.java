@@ -112,6 +112,7 @@ public class EmailVerificationOutboxDispatchService
 
         try {
             deliveryPort.deliver(new EmailVerificationDelivery(
+                    delivery.deliveryId(),
                     delivery.protectionContext().accountId(),
                     plainPayload.email(),
                     plainPayload.verificationToken(),

@@ -46,6 +46,7 @@ export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oau
 export BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-naver-oauth
 export BATON_SECRET_CAL_BEARER_TOKEN=runtime-smoke-disabled-cal-bearer-token
 export BATON_HOLIDAYS_ENABLED=false
+export BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN=disabled-brevo-webhook-token
 export BATON_SECRET_TURNSTILE_SECRET_KEY=runtime-smoke-disabled-turnstile-secret-key
 export BATON_SECRET_HOLIDAYS_SERVICE_KEY=runtime-smoke-disabled-holidays-service-key
 export BATON_SECRET_SMTP_PASSWORD=runtime-smoke-disabled-smtp-password

@@ -331,6 +331,7 @@ if [[ "${COMPOSE_MENU:-}" != "false" ]]; then
 fi
 
 for required_secret_name in \
+  BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN \
   BATON_SECRET_TURNSTILE_SECRET_KEY \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
@@ -834,6 +835,22 @@ preflight_env_output="$(PATH="$fake_bin:$PATH" \
   || fail 'BATON_PRODUCTION_ENV_FILE preflight failed'
 assert_contains 'Production preflight passed' "$preflight_env_output" \
   'BATON_PRODUCTION_ENV_FILE preflight'
+
+brevo_env="$test_root/brevo.env"
+write_valid_env "$brevo_env"
+append_enabled_auth "$brevo_env"
+sed 's/^BATON_SMTP_HOST=smtp.example.com$/BATON_SMTP_HOST=smtp-relay.brevo.com/' "$brevo_env" > "$test_root/brevo.tmp"
+mv "$test_root/brevo.tmp" "$brevo_env"
+printf '%s\n' 'BATON_BREVO_WEBHOOK_ENABLED=true' >> "$brevo_env"
+chmod 600 "$brevo_env"
+expect_preflight_failure 'Brevo token missing' "$brevo_env" 'BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE'
+brevo_secret_file="$auth_secret_dir/brevo-webhook"
+printf '%s' 'brevo-webhook-separate-test-token-0001' > "$brevo_secret_file"
+chmod 600 "$brevo_secret_file"
+printf '%s\n' "BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE=$brevo_secret_file" >> "$brevo_env"
+"$repo_root/ops/validate-production-auth-secrets.sh" "$brevo_env" > /dev/null
+printf '%s' short > "$brevo_secret_file"
+expect_preflight_failure 'Brevo short token' "$brevo_env" '32-200 URL-safe ASCII characters'
 
 turnstile_env="$test_root/turnstile.env"
 write_valid_env "$turnstile_env"
