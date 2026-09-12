@@ -15,7 +15,7 @@ bash "$script_dir/integration-metrics-scrape-test.sh" "$prometheus_image"
 bash "$script_dir/integration-metrics-scrape-test.sh" "$prometheus_image" host
 docker run --rm --network none --read-only --tmpfs /tmp \
   -v "$ops_dir:/ops:ro" -w /ops/tests \
-  --entrypoint /bin/promtool "$prometheus_image" test rules integration-alerts.test.yml https-alerts.test.yml host-alerts.test.yml
+  --entrypoint /bin/promtool "$prometheus_image" test rules integration-alerts.test.yml http-alerts.test.yml https-alerts.test.yml host-alerts.test.yml
 docker run --rm --network none --read-only \
   -v "$ops_dir:/ops:ro" -v /dev/null:/run/secrets/smtp-password:ro \
   --entrypoint /bin/amtool "$alertmanager_image" \
@@ -34,7 +34,7 @@ for target in 'alertmanager.yml.example operations-email monitoring-heartbeat-di
   'alertmanager-discord.yml.example operations-discord monitoring-heartbeat-disabled' \
   'alertmanager-heartbeat.yml.example operations-email monitoring-heartbeat'; do
   read -r config_file operations_receiver heartbeat_receiver <<< "$target"
-  for alert_name in BatonMonitoringWatchdog BatonMetricsUnavailable BatonEmailDeliveryRejected BatonTlsCertificateExpiring BatonHostDiskSpaceLow; do
+  for alert_name in BatonMonitoringWatchdog BatonMetricsUnavailable BatonEmailDeliveryRejected BatonApiServerErrorsHigh BatonTlsCertificateExpiring BatonHostDiskSpaceLow; do
     receiver="$operations_receiver"
     if [[ "$alert_name" == BatonMonitoringWatchdog ]]; then receiver="$heartbeat_receiver"; fi
     docker run --rm --network none --read-only \

@@ -1,0 +1,21 @@
+groups:
+  - name: baton-http
+    rules:
+      - alert: BatonApiServerErrorsHigh
+        expr: |
+          (
+            sum by (job, instance) (rate(http_server_requests_seconds_count{job="baton",uri=~"/api/v1(/.*)?",status=~"5.."}[5m]))
+            / sum by (job, instance) (rate(http_server_requests_seconds_count{job="baton",uri=~"/api/v1(/.*)?"}[5m]))
+            > 0.05
+          )
+          and on (job, instance) (
+            sum by (job, instance) (increase(http_server_requests_seconds_count{job="baton",uri=~"/api/v1(/.*)?",status=~"5.."}[5m])) >= 5
+          )
+          and on (job, instance) (up{job="baton"} == 1)
+        for: 5m
+        labels:
+          service: baton
+          severity: warning
+        annotations:
+          summary: BATON 업무 API에서 서버 오류가 반복되고 있습니다.
+          description: 최근 5분의 요청 중 5xx가 5%를 넘고 5건 이상인 상태가 5분 지속됐습니다. 오류가 난 API와 서버 로그·Sentry를 확인하세요.

@@ -5,6 +5,7 @@ global:
 
 rule_files:
   - baton-alerts.yml
+  - baton-http-alerts.yml
   - baton-https-alerts.yml
 
 alerting:
@@ -20,8 +21,9 @@ scrape_configs:
       # 수집기는 BATON 앱과 네트워크 공간을 공유해야 한다.
       - targets: ['127.0.0.1:8080']
     metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: baton_integration_.*|baton_email_delivery_receipts
+      - source_labels: [__name__, uri]
+        # 요청은 제품 API의 Spring 경로 패턴과 응답 건수만 수집한다.
+        regex: 'baton_integration_.*;.*|baton_email_delivery_receipts;.*|http_server_requests_seconds_count;/api/v1(/.*)?'
         action: keep
 
   - job_name: baton-https

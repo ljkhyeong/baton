@@ -12,7 +12,11 @@ case "${2:-app}" in
     expressions=(
       'count(baton_integration_delivery_actionable_failed_items{job="baton",integration="email"} == 0)'
       'count(baton_email_delivery_receipts{job="baton",event="hard_bounce"} == 1)'
-      'count(absent(http_server_requests_seconds_count{job="baton"}))'
+      'count(http_server_requests_seconds_count{job="baton",uri="/api/v1/seasons/{seasonId}",status="200"} == 7)'
+      'count(http_server_requests_seconds_count{job="baton",uri="/api/v1/seasons/{seasonId}",status="500"} == 3)'
+      'count(absent(http_server_requests_seconds_count{job="baton",uri!~"/api/v1(/.*)?"}))'
+      'count(absent(http_server_requests_seconds_sum{job="baton"}))'
+      'count(absent(jvm_memory_used_bytes{job="baton"}))'
     )
     ;;
   host)
@@ -49,6 +53,13 @@ cat > "$test_root/actuator/prometheus" <<'METRICS'
 baton_integration_delivery_actionable_failed_items{integration="email"} 0
 baton_email_delivery_receipts{event="hard_bounce"} 1
 http_server_requests_seconds_count{uri="/private/example"} 7
+http_server_requests_seconds_count{uri="/actuator/health",status="200"} 100
+http_server_requests_seconds_count{uri="UNKNOWN",status="500"} 9
+http_server_requests_seconds_count{uri="/api/v10/example",status="500"} 8
+http_server_requests_seconds_count{uri="/api/v1/seasons/{seasonId}",status="200"} 7
+http_server_requests_seconds_count{uri="/api/v1/seasons/{seasonId}",status="500"} 3
+http_server_requests_seconds_sum{uri="/api/v1/seasons/{seasonId}",status="200"} 2
+jvm_memory_used_bytes{area="heap"} 100
 METRICS
 cat > "$test_root/metrics" <<'METRICS'
 node_filesystem_avail_bytes{device="/dev/test",fstype="ext4",mountpoint="/srv"} 9

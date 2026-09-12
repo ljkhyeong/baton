@@ -1,0 +1,116 @@
+rule_files:
+  - ../integrations/baton-http-alerts.yml
+evaluation_interval: 30s
+
+tests:
+  - name: 요청이 없거나 첫 요청 전에는 서버 오류로 판단하지 않는다
+    interval: 30s
+    input_series:
+      - &up
+        series: up{job="baton",instance="127.0.0.1:8080"}
+        values: 1x40
+    alert_rule_test:
+      - {eval_time: 15m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 서버 오류가 지속되면 해당 앱만 알리고 오류가 줄면 해제한다
+    interval: 30s
+    input_series:
+      - *up
+      - &ok
+        series: http_server_requests_seconds_count{job="baton",instance="127.0.0.1:8080",uri="/api/v1/seasons/{seasonId}",status="200"}
+        values: 0+18x40
+      - &error
+        series: http_server_requests_seconds_count{job="baton",instance="127.0.0.1:8080",uri="/api/v1/teams",status="500"}
+        values: 0+2x20 40x20
+      - series: up{job="baton",instance="another-app:8080"}
+        values: 1x40
+      - series: http_server_requests_seconds_count{job="baton",instance="another-app:8080",uri="/api/v1/teams",status="200"}
+        values: 0+10000x40
+    alert_rule_test:
+      - {eval_time: 3m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+      - eval_time: 8m
+        alertname: BatonApiServerErrorsHigh
+        exp_alerts:
+          - exp_labels: &labels
+              job: baton
+              instance: 127.0.0.1:8080
+              service: baton
+              severity: warning
+            exp_annotations: &annotations
+              summary: BATON 업무 API에서 서버 오류가 반복되고 있습니다.
+              description: 최근 5분의 요청 중 5xx가 5%를 넘고 5건 이상인 상태가 5분 지속됐습니다. 오류가 난 API와 서버 로그·Sentry를 확인하세요.
+      - {eval_time: 16m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 오류 비율이 높아도 드문 요청의 오류 한 건으로는 알리지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - <<: *ok
+        values: 0 2x39
+      - <<: *error
+        values: 0 1x39
+    alert_rule_test:
+      - {eval_time: 3m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+      - {eval_time: 8m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 인증 실패나 요청 제한 같은 4xx는 서버 오류에 포함하지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - *ok
+      - series: http_server_requests_seconds_count{job="baton",instance="127.0.0.1:8080",uri="/api/v1/teams",status="401"}
+        values: 0+100x40
+      - series: http_server_requests_seconds_count{job="baton",instance="127.0.0.1:8080",uri="/api/v1/teams",status="429"}
+        values: 0+100x40
+    alert_rule_test:
+      - {eval_time: 15m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 오류가 5건 이상이어도 전체 요청의 5퍼센트 이하이면 알리지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - <<: *ok
+        values: 0+95x40
+      - <<: *error
+        values: 0+5x40
+    alert_rule_test:
+      - {eval_time: 15m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 재시작으로 초기화된 누적 오류 건수를 새 오류로 계산하지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - *ok
+      - <<: *error
+        values: 10000x10 0x30
+    alert_rule_test:
+      - {eval_time: 8m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+      - {eval_time: 15m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 수집이 끊기면 오래된 요청 지표로 서버 오류 경보를 유지하지 않는다
+    interval: 30s
+    input_series:
+      - <<: *up
+        values: 1x20 0x20
+      - *ok
+      - <<: *error
+        values: 0+2x40
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: BatonApiServerErrorsHigh
+        exp_alerts:
+          - exp_labels: *labels
+            exp_annotations: *annotations
+      - {eval_time: 10m30s, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
+
+  - name: 상태 확인과 제품 API 외부의 오류는 업무 오류율에 포함하지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - *ok
+      - series: http_server_requests_seconds_count{job="baton",instance="127.0.0.1:8080",uri="/actuator/health",status="500"}
+        values: 0+100x40
+      - series: http_server_requests_seconds_count{job="baton",instance="127.0.0.1:8080",uri="/api/v10/teams",status="500"}
+        values: 0+100x40
+    alert_rule_test:
+      - {eval_time: 15m, alertname: BatonApiServerErrorsHigh, exp_alerts: []}
