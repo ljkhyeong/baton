@@ -3,6 +3,7 @@ import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, MEMBER_TWO_ID, WORKSPACE_PATH, SCOPE
   installApi, makeProjection, navigation, openSharedWorkspace, recordedCall } from './support/workspaceApiHarness'
 
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
+const OTHER_ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22c'
 const TOKEN = 'a'.repeat(43)
 const INVITATION = '00000000-0000-4000-8000-000000000099'
 const SECOND_INVITATION = '00000000-0000-4000-8000-000000000100'
@@ -30,7 +31,8 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
     teamId: TEAM_ID, accountId: ACCOUNT, accountAccessEnabled: false, memberId: MEMBER_ONE_ID,
     permission: null as 'ADMIN' | null,
     members: projection.members.map(member => ({ memberId: member.id, memberName: member.name, active: true,
-      accountId: member.id === MEMBER_ONE_ID ? ACCOUNT : null, permission: null as 'ADMIN' | null })),
+      accountId: member.id === MEMBER_ONE_ID ? ACCOUNT : OTHER_ACCOUNT,
+      permission: null as 'ADMIN' | 'MEMBER' | 'VIEWER' | null })),
     invitations: [] as { id: string; memberId: string; permission: 'VIEWER'; createdAt: string; expiresAt: string; acceptedAt: null; revokedAt: string | null }[], audit: [],
   }
   let revokeRequestCount = 0
@@ -48,6 +50,8 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
       state.members[0]!.permission = 'ADMIN'
       projection.team.accountAccessEnabled = true
       projection.team.permission = 'ADMIN'
+    } else if (request.method() === 'PUT' && path.endsWith(`/members/${MEMBER_TWO_ID}/permission`)) {
+      state.members[1]!.permission = request.postDataJSON().permission
     } else if (request.method() === 'POST' && path.endsWith('/invitations')) {
       expect(request.postDataJSON()).toMatchObject({ memberId: MEMBER_TWO_ID, permission: 'VIEWER' })
       const invitation = { id: state.invitations.length === 0 ? INVITATION : SECOND_INVITATION,
@@ -72,9 +76,21 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   await dialog.getByLabel('운영자 복구 키').fill('operator-recovery-key')
   await dialog.getByRole('checkbox', { name: '기존 공유 링크를 막고 내 계정을 관리자로 지정하는 데 동의합니다.' }).check()
   await dialog.getByRole('button', { name: '계정 로그인으로 전환' }).click()
-  await dialog.getByLabel('초대할 구성원').selectOption(MEMBER_TWO_ID)
+  const invitationMember = dialog.getByLabel('초대할 구성원')
+  const invitationButton = dialog.getByRole('button', { name: '초대 링크 만들기' })
+  const memberPermission = dialog.getByLabel('김준호 접근 권한')
+  await invitationMember.selectOption(MEMBER_TWO_ID)
+  page.once('dialog', confirmation => confirmation.accept())
+  await memberPermission.selectOption('VIEWER')
+  await expect(memberPermission).toHaveValue('VIEWER')
+  await expect(invitationMember).toHaveValue('')
+  await expect(invitationButton).toBeDisabled()
+  page.once('dialog', confirmation => confirmation.accept())
+  await memberPermission.selectOption('')
+  await expect(memberPermission).toHaveValue('')
+  await invitationMember.selectOption(MEMBER_TWO_ID)
   await dialog.getByLabel('초대 권한').selectOption('VIEWER')
-  await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
+  await invitationButton.click()
   await expect(dialog.getByLabel('생성한 초대 링크')).toHaveValue(new RegExp(`/join#invite=${TOKEN}$`))
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true,
     value: { writeText: async () => { throw new DOMException('복사 권한 없음', 'NotAllowedError') } } }))
@@ -103,7 +119,7 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toHaveCount(0)
   await expect(dialog.getByText('초대 취소', { exact: true })).toBeVisible()
   expect(revokeRequestCount).toBe(2)
-  await dialog.getByRole('button', { name: '초대 링크 만들기' }).click()
+  await invitationButton.click()
   await expect(dialog.getByRole('button', { name: '초대 취소', exact: true })).toBeVisible()
   await page.clock.fastForward('02:00:00')
   await expect(dialog.getByText('기간 만료', { exact: true })).toBeVisible()

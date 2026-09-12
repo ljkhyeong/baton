@@ -83,6 +83,8 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   if (query.isError) return <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
+  const invitationCandidates = access.members.filter(member => member.active && !member.permission)
+  const invitationMemberId = invitationCandidates.some(member => member.memberId === memberId) ? memberId : ''
   const visibleInvitationLink = invitationLink && access.invitations.some(invitation =>
     invitation.id.toLowerCase() === invitationLink.invitationId.toLowerCase()
     && !invitation.acceptedAt && !invitation.revokedAt && Date.parse(invitation.expiresAt) > now)
@@ -113,15 +115,15 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         </select> : <span>연결된 계정 없음</span>}
       </li>)}</ul>
       <h4>구성원 초대</h4>
-      <form onSubmit={event => { event.preventDefault(); if (memberId && !mutation.isPending) mutation.mutate({ kind: 'invite' }) }}>
-        <label>초대할 구성원<select value={memberId} required onChange={event => setMemberId(event.target.value)}>
-          <option value="">구성원 선택</option>{access.members.filter(member => member.active && !member.permission).map(member => <option key={member.memberId} value={member.memberId}>{member.memberName}</option>)}
+      <form onSubmit={event => { event.preventDefault(); if (invitationMemberId && !mutation.isPending) mutation.mutate({ kind: 'invite' }) }}>
+        <label>초대할 구성원<select value={invitationMemberId} required onChange={event => setMemberId(event.target.value)}>
+          <option value="">구성원 선택</option>{invitationCandidates.map(member => <option key={member.memberId} value={member.memberId}>{member.memberName}</option>)}
         </select></label>
         <label>초대 권한<select value={permission} onChange={event => setPermission(event.target.value as Permission)}>
           {Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
         <p>열람자는 조회, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리를 할 수 있습니다.</p>
-        <button type="submit" disabled={!memberId || mutation.isPending}>초대 링크 만들기</button>
+        <button type="submit" disabled={!invitationMemberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
       {visibleInvitationLink && <div><label>생성한 초대 링크<input readOnly value={visibleInvitationLink.url} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
         <button type="button" onClick={() => void copyInvitationUrl()}>초대 링크 복사</button>
