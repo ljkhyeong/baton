@@ -39,7 +39,9 @@ public class JdbcCalendarBackfillAdapter implements CalendarBackfillPort {
     @Override
     @Transactional(readOnly = true)
     public List<CalendarBackfillCandidate> findCandidates(UUID afterRoundId, int limit) {
-        String select = """
+        String after = afterRoundId == null ? null : afterRoundId.toString();
+        return jdbcTemplate.query(
+                """
                 SELECT
                     BIN_TO_UUID(round_record.id) AS round_id,
                     BIN_TO_UUID(round_record.season_id) AS season_id
@@ -56,39 +58,17 @@ public class JdbcCalendarBackfillAdapter implements CalendarBackfillPort {
                         WHERE snapshot.source_item_id = round_record.id
                     )
                 )
-                """;
-        if (afterRoundId == null) {
-            return jdbcTemplate.query(
-                    select + """
+                AND (? IS NULL OR round_record.id > UUID_TO_BIN(?))
                 ORDER BY round_record.id
                 LIMIT ?
                 """,
-                    (resultSet, rowNumber) -> candidate(
-                            resultSet.getString("round_id"),
-                            resultSet.getString("season_id")
-                    ),
-                    limit
-            );
-        }
-        return jdbcTemplate.query(
-                select + """
-                AND round_record.id > UUID_TO_BIN(?)
-                ORDER BY round_record.id
-                LIMIT ?
-                """,
-                (resultSet, rowNumber) -> candidate(
-                        resultSet.getString("round_id"),
-                        resultSet.getString("season_id")
+                (resultSet, rowNumber) -> new CalendarBackfillCandidate(
+                        UUID.fromString(resultSet.getString("round_id")),
+                        UUID.fromString(resultSet.getString("season_id"))
                 ),
-                afterRoundId.toString(),
+                after,
+                after,
                 limit
-        );
-    }
-
-    private CalendarBackfillCandidate candidate(String roundId, String seasonId) {
-        return new CalendarBackfillCandidate(
-                UUID.fromString(roundId),
-                UUID.fromString(seasonId)
         );
     }
 }

@@ -2,6 +2,7 @@ package com.personal.baton.application.calendar;
 
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.calendar.port.in.BackfillCalendarSnapshotsUseCase;
+import com.personal.baton.application.calendar.port.out.CalendarBackfillPort;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
@@ -95,6 +96,9 @@ class CalendarOutboxPersistenceTest {
 
     @Autowired
     private BackfillCalendarSnapshotsUseCase backfillCalendarSnapshots;
+
+    @Autowired
+    private CalendarBackfillPort backfillPort;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -288,6 +292,29 @@ class CalendarOutboxPersistenceTest {
                 "SELECT calendar_status FROM calendar_snapshot_outbox ORDER BY id",
                 String.class
         )).containsExactly("ACTIVE", "ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED", "ACTIVE", "ACTIVE");
+    }
+
+    @DisplayName("보정 대상은 날짜 없는 기록과 미전송 보관 회차를 제외하고 다음 페이지를 이어 조회한다")
+    @Test
+    void pagesBackfillCandidatesWithoutRepeatingOrIncludingExcludedRounds() {
+        insertRound();
+        UUID scheduledRoundId = UUID.fromString("60000000-0000-0000-0000-000000000002");
+        LocalDateTime scheduledAt = LocalDateTime.of(2026, 8, 26, 12, 0);
+        jdbcTemplate.update("""
+                INSERT INTO season_rounds (id, season_id, name, meeting_date, origin,
+                        scheduled_occurrence_date, scheduled_at, archived_at)
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), '시각만 정한 회차', NULL, 'AUTOMATIC', ?, ?, NULL),
+                       (UUID_TO_BIN(?), UUID_TO_BIN(?), '전송 전에 보관한 회차', ?, 'MANUAL', NULL, NULL, ?)
+                """,
+                scheduledRoundId.toString(), SEASON_ID.toString(), scheduledAt.toLocalDate(), scheduledAt,
+                "80000000-0000-0000-0000-000000000002", SEASON_ID.toString(),
+                LocalDate.of(2026, 8, 27), scheduledAt);
+
+        assertThat(backfillPort.findCandidates(null, 1))
+                .containsExactly(new CalendarBackfillCandidate(ROUND_ID, SEASON_ID));
+        assertThat(backfillPort.findCandidates(ROUND_ID, 1))
+                .containsExactly(new CalendarBackfillCandidate(scheduledRoundId, SEASON_ID));
+        assertThat(backfillPort.findCandidates(scheduledRoundId, 1)).isEmpty();
     }
 
     @DisplayName("기존 활성 회차는 한 번만 보정하고 보관 뒤 취소 스냅샷을 추가한다")
