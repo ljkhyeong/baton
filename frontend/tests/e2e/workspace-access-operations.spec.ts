@@ -686,7 +686,9 @@ test('손상된 회전 임시 기록 저장소를 무시하고 정상 멱등 키
   const pendingStorageKey = `baton-pending-access-key-change:v1:${TEAM_ID}`
   const malformedIdempotencyKey = 'invalid key'
   await page.addInitScript(({ storageKey, invalidKey }) => {
-    localStorage.setItem(storageKey, JSON.stringify({ operation: 'recover', idempotencyKey: invalidKey }))
+    if (!localStorage.getItem(storageKey)) {
+      localStorage.setItem(storageKey, JSON.stringify({ operation: 'recover', idempotencyKey: invalidKey }))
+    }
   }, { storageKey: pendingStorageKey, invalidKey: malformedIdempotencyKey })
 
   const api = await installApi(page)
@@ -697,16 +699,13 @@ test('손상된 회전 임시 기록 저장소를 무시하고 정상 멱등 키
     : page.locator('.sidebar')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
 
-  const rotate = async () => {
-    const rotateButton = page.getByRole('dialog', { name: '공유 링크 관리' })
-      .getByRole('button', { name: '공유 링크 재발급' })
-    await rotateButton.focus()
-    page.once('dialog', (dialog) => dialog.accept())
-    await page.keyboard.press('Enter')
-  }
-  await rotate()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog', { name: '공유 링크 관리' })
+    .getByRole('button', { name: '공유 링크 재발급' }).click()
   await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
-  await rotate()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
 
   await expect.poll(() => api.calls.filter(
