@@ -245,6 +245,8 @@ openssl rand -hex 32
 - ROUND 런타임을 켜면 고정 다이제스트의 이미지를 가져온다. 두 이미지의 릴리스 리비전·태그 객체가 같고 웹 이미지가 BATON 모드인지 확인한다.
 - 실제 `up`, `create`, `pull`에서는 `production-compose.sh`가 배포 잠금을 잡고 환경 파일의 `0600` 스냅샷을 만든다. 설정과 ROUND 이미지 호환성을 다시 검사하고 Compose도 이 스냅샷만 사용한다. 실행 중 바뀐 원본은 읽지 않으며 종료 시 스냅샷을 제거한다.
 
+[Trivy 이미지 검사](docs/runbooks/free-integrations.md#배포-이미지-취약점-검사-trivy)는 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 JSON 보고서로 남긴다. `./ops/scan-images.sh IMAGE [IMAGE ...]`로 실행하며 GitHub Actions 작업은 추가하지 않는다.
+
 고정 다이제스트는 운영자가 선택한 이미지를 식별한다. 게시자 서명이나 빌드 출처를 증명하지는 않는다. 실제 DNS 연결, 외부 80/443 접근, 공인 인증서 발급과 호스트 디스크 여유는 운영자가 별도로 확인한다.
 
 `production-compose.sh`는 매번 환경 설정을 검사하고 충돌할 수 있는 셸의 배포·Compose 변수를 제거한다. Docker는 Linux 로컬 `unix:///var/run/docker.sock`, 프로젝트와 DB 볼륨은 `baton-production`, Compose 파일은 저장소의 프로덕션 설정으로 고정한다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
@@ -300,7 +302,7 @@ chmod 0600 \
   /srv/baton/secrets/round-current-public.pem
 ```
 
-Google 리디렉션 URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver 콜백은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 콘솔에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 시작 시 SMTP 연결을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. 서버의 인증 기능 응답과 화면은 이 게이트를 그대로 반영하므로, 게이트가 닫힌 동안 기존 이메일 로그인은 유지하면서 새 계정 만들기만 숨긴다. SMTP는 587/TCP, 인증, STARTTLS 필수, 서버 신원 검증과 2초 연결·읽기·쓰기 시간 초과로 고정된다. 실제 수신함에서 프래그먼트 토큰 링크와 비밀번호 설정까지 확인한다.
+Google 리디렉션 URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver 콜백은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 콘솔에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 시작 시 SMTP 연결을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. 공개 가입·재설정 요청에 Turnstile을 사용하려면 [무료 외부 연동](docs/runbooks/free-integrations.md#가입재설정-봇-방지-cloudflare-turnstile)의 사이트 키·비밀 키·허용 호스트와 CSP를 함께 준비한다. 서버의 인증 기능 응답과 화면은 이 게이트를 그대로 반영하므로, 게이트가 닫힌 동안 기존 이메일 로그인은 유지하면서 새 계정 만들기만 숨긴다. SMTP는 587/TCP, 인증, STARTTLS 필수, 서버 신원 검증과 2초 연결·읽기·쓰기 시간 초과로 고정된다. 실제 수신함에서 프래그먼트 토큰 링크와 비밀번호 설정까지 확인한다.
 
 비밀번호 재설정 메일 요청은 가입 게이트와 별개인 `BATON_AUTH_PASSWORD_RESET_ENABLED=false`가
 기본값이다. V30 마이그레이션과 실제 SMTP·공개 HTTPS 검증을 마친 뒤 별도로 켠다. 요청을 닫아도

@@ -2,6 +2,8 @@
 
 ## 공통 운영 준비
 
+- 실제 배포할 BATON·웹·MySQL 이미지에 [Trivy 검사](docs/runbooks/free-integrations.md#배포-이미지-취약점-검사-trivy)를 실행하고 HIGH·CRITICAL 발견 항목을 조치한다. 로컬 테스트 이미지 검사 결과를 운영 이미지 검사 결과로 대신하지 않는다.
+
 - [무료 외부 연동](docs/runbooks/free-integrations.md)에 따라 Brevo 무료 SMTP·Better Stack 공개 상태/백업 하트비트·Google Drive crypt 원격 저장소의 계정과 비밀값을 준비한다. `b4ton.com`의 실제 HTTPS·메일 수신·첫 하트비트·원격 업로드/복원을 확인한다.
 - 외부 상태 감시는 Better Stack 또는 기존 GitHub Actions 중 하나를 선택한다. GitHub Actions를 사용하면 `BATON_HEALTH_URL=https://b4ton.com/actuator/health`로 수동 성공을 확인한 뒤 예약 검사를 켠다. Better Stack 전환 후에는 `BATON_EXTERNAL_MONITOR_ENABLED=false`로 기존 예약 검사를 끈다.
 - [내부 연동 장애 알림](docs/runbooks/free-integrations.md#내부-연동-장애-알림-prometheus--alertmanager)의 수집기를 앱과 같은 네트워크 공간에 연결하고 Alertmanager 내부 주소·SMTP 비밀·운영자 수신 주소를 준비한다. 실제 지표 수집과 장애·해제 메일을 확인한 뒤 중복되는 `baton-integration-delivery.timer`를 끈다. 외부 Better Stack 감시는 유지한다.
@@ -41,6 +43,7 @@
 
 ## 로그인·계정 보안
 
+- [Turnstile 설정](docs/runbooks/free-integrations.md#가입재설정-봇-방지-cloudflare-turnstile)에 따라 Managed 위젯·허용 호스트·사이트 키·비밀 키를 준비한다. 공개 HTTPS에서 가입·재설정 토큰의 성공·만료·재사용·공급자 장애와 실제 메일 수신을 확인한 뒤 활성화한다. k3s Ingress에도 문서의 CSP를 적용한다.
 - 실제 Google·Naver·SMTP 자격 증명과 공개 HTTPS에서 로그인 세 가지, 콜백 로그 비노출, 이메일 수신·인증과 세션 쿠키를 확인한다. `integration="email"`의 조치 대상 실패가 `0`이고 전달 점검이 성공한 뒤 계정 인증 기능을 활성화한다.
 - V30 배포 후 비밀번호 재설정 메일 수신, 새 비밀번호 로그인과 두 브라우저의 기존 세션 거부를 확인한다. 성공 후 `BATON_AUTH_PASSWORD_RESET_ENABLED=true`로 가입 기능과 별도 활성화한다. 재설정으로 공유 키·발급된 ROUND 참여권은 폐기되지 않는다.
 - `/account`에서 잘못된 현재 비밀번호는 기존 비밀번호·세션을 유지하는지 확인한다. 올바른 비밀번호 변경과 모든 기기 로그아웃은 현재 브라우저를 로그아웃하고 다른 세션을 다음 요청에서 거부해야 한다. 같은 기기의 공유 키는 유지돼야 한다.

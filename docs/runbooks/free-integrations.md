@@ -10,12 +10,14 @@
 | 외부 캘린더 | CAL의 ICS 구독 → Google·Apple·Outlook | 기존 구독 기능을 사용한다. 갱신 주기는 캘린더 앱이 정하므로 실시간 양방향 동기화로 안내하지 않는다. |
 | 작업 공간 공유 | Web Share API | 기기의 공유 창에서 설치된 메신저·메일 앱을 선택한다. 공급자 SDK·계정·서비스 키가 필요 없다. |
 | 가입·비밀번호 재설정 메일 | Brevo 무료 SMTP | 기존 Spring Mail 어댑터에 접속 설정만 연결한다. 공급자 전용 HTTP 클라이언트는 추가하지 않는다. |
+| 가입·재설정 요청 봇 방지 | Cloudflare Turnstile | 브라우저 위젯과 서버 Siteverify 검증을 연결했다. 기존 IP·이메일 요청 제한을 함께 사용한다. |
 | 로그인 | Google OIDC·Naver OAuth2 | 이미 구현되어 있다. 기존 공급자 설정과 콜백을 사용한다. |
 | 서비스 장애 감시 | Better Stack 무료 모니터 | 상태 조회·이력·이메일 알림을 외부 서비스가 처리한다. BATON 등록용 API 요청 파일을 추가했다. |
 | 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 기존 SMTP로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP | 기존 지표의 경보 규칙과 SMTP 수신 설정을 추가했다. 알림 묶기·재통지·해제는 표준 도구가 처리한다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
+| 배포 이미지 취약점 검사 | Trivy | 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 검사하고 JSON 보고서를 남긴다. GitHub Actions 실행은 추가하지 않는다. |
 | 라이브러리·운영 이미지 업데이트 점검 | GitHub Dependabot | 기존 Java·npm·Actions·Dockerfile 점검에 Compose의 MySQL·Caddy를 추가했다. 새 버전 조회와 PR 생성은 GitHub가 처리한다. |
 | 자료 URL 점검·인수인계·주간 요약 | WATCH·BATON·BRIEF | 팀 권한·변경 이력과 연결된 제품 기능이다. 무료 모니터의 제한된 슬롯이나 일반 자동화 서비스로 대체하지 않는다. |
 
@@ -23,17 +25,34 @@
 
 ## 추가 후보와 도입 조건
 
-아래 세 항목은 구현하지 않은 후보다. 현재 구현과 공식 문서를 대조했으며, 도입 조건이 충족되면 해당 범위부터 진행한다.
+아래 두 항목은 구현하지 않은 후보다. 현재 구현과 공식 문서를 대조했으며, 도입 조건이 충족되면 해당 범위부터 진행한다.
 
 | 우선순위 | 후보 | 줄일 수 있는 작업과 도입 조건 |
 | --- | --- | --- |
-| 공개 가입 전 우선 검토 | Cloudflare Turnstile | 가입·비밀번호 재설정 메일을 요청하는 봇을 판별한다. 직접 봇 판별 로직을 만들 필요가 없다. [무료 플랜](https://developers.cloudflare.com/turnstile/plans/)은 검증 요청 무제한, 위젯 20개·위젯당 호스트 10개를 제공한다. |
 | 운영자가 Discord를 사용할 때 | Alertmanager → Discord Webhook | 장애·복구 알림을 운영 채널에 보낸다. [기본 Discord 수신 설정](https://prometheus.io/docs/alerting/latest/configuration/#discord_config)이 발송을 처리하므로 봇 서버나 별도 HTTP 발송기를 만들지 않는다. 채널 웹훅과 수신 담당자가 필요하다. |
 | 방문·로딩 통계가 필요할 때 | Cloudflare Web Analytics | 방문과 실제 페이지 로딩 성능을 [무료 통계 서비스](https://www.cloudflare.com/web-analytics/)에서 확인한다. 공개 소개 화면부터 검토하며 수집할 경로와 URL·토큰 제외 기준을 먼저 정한다. |
 
-Turnstile은 현재 [IP·이메일별 요청 제한](../../adapter-in-web/src/main/java/com/personal/baton/adapter/in/web/auth/AuthRateLimiter.java)을 보완한다. 두 메일 요청은 이미 같은 제한을 사용하지만 여러 IP·이메일을 쓰는 봇까지 판별하지는 않는다. 도입 시 해당 두 폼과 서버의 [Siteverify 검증](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)을 함께 연결하고 기존 요청 제한은 유지한다. 사이트 키·비밀 키, 허용 호스트와 CSP 설정이 필요하다.
+Discord는 운영 경보의 선택 수신 채널이다. 사용자 업무·인수인계 알림의 외부 발송은 기존 RELAY 범위로 유지한다. 방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
 
-Discord는 운영 경보의 선택 수신 채널이다. 사용자 업무·인수인계 알림의 외부 발송은 기존 RELAY 범위로 유지한다. 방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [동일 출처 CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
+## 가입·재설정 봇 방지: Cloudflare Turnstile
+
+가입과 비밀번호 재설정 요청 폼은 Turnstile 사이트 키가 있을 때 위젯을 표시한다. 서버는
+[Siteverify API](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)로 token을 확인하고 `b4ton.com`과 요청별 `action`이 일치할 때만 메일 요청을 처리한다. token은 재사용하지 않으며 요청 실패 뒤 위젯을 초기화한다.
+
+```dotenv
+BATON_TURNSTILE_ENABLED=true
+BATON_TURNSTILE_SITE_KEY=<공개 사이트 키>
+BATON_TURNSTILE_SECRET_KEY_FILE=/srv/baton/secrets/turnstile-secret-key
+BATON_TURNSTILE_EXPECTED_HOSTNAME=b4ton.com
+```
+
+운영자는 Cloudflare에서 Managed 위젯과 허용 호스트 `b4ton.com`을 만든다. [무료 플랜](https://developers.cloudflare.com/turnstile/plans/)의 위젯을 사용한다. Compose는 저장소 밖 소유자 전용 비밀 파일을 Spring configtree로 전달한다. 키가 없거나 호스트가 `BATON_HOST`와 다르면 사전점검이 실패한다. 기본값은 비활성이다.
+
+향후 k3s에서는 비밀 키를 Kubernetes Secret에서 `BATON_TURNSTILE_SECRET_KEY` 환경변수로 주입하고 나머지 세 설정을 함께 전달한다. `_FILE`은 Compose 래퍼의 입력이며 Spring이 직접 읽는 속성이 아니다.
+
+[Caddy 설정](../../ops/Caddyfile)은 [공식 CSP 기준](https://developers.cloudflare.com/turnstile/reference/content-security-policy/)에 맞춰 `script-src`·`frame-src`에 `https://challenges.cloudflare.com`만 추가 허용한다. SPA 화면 전환을 위해 기본 문서 정책에 적용하며 실제 스크립트는 두 메일 요청 폼에서만 불러온다. ROUND 방 문서의 별도 정책은 유지한다. 다른 Ingress에서도 같은 정책을 적용한다.
+
+코드 검증은 공급자 대역으로 성공·실패·만료·재시도와 메일 미발송을 확인한다. 실제 위젯과 Siteverify, 공개 HTTPS·실제 메일 수신은 운영 키를 연결한 뒤 확인해야 한다.
 
 ## 도메인 기준
 
@@ -170,6 +189,22 @@ Google 계정의 무료 저장 공간은 Gmail·Drive·Photos가 공유하는 [1
 - 업로드 후와 로컬 보존 기간 만료 시 [rclone check --download](https://rclone.org/commands/rclone_check/)로 해당 덤프·체크섬만 비교한다. 암호화 저장소에서도 복호화한 실제 내용을 비교하며 원격 파일은 수정하지 않는다.
 
 용량 부족·OAuth 해제·암호화 키 유실은 각각 업로드 실패·접근 실패·복구 불가로 이어진다. 파일럿 데이터 투입 전 별도 환경의 복원 훈련은 계속 필요하다.
+
+## 배포 이미지 취약점 검사: Trivy
+
+[Trivy](https://trivy.dev/)는 무료 오픈소스 검사 도구다. [공식 설치 안내](https://trivy.dev/docs/latest/getting-started/installation/)에 따라 로컬 실행 파일을 준비한다. 이 연동은 Trivy `0.74.0`으로 검증했다. 홈서버 설치나 유료 스캔 서비스 가입은 필요하지 않다.
+
+배포할 이미지를 빌드하거나 내려받은 뒤 [검사 스크립트](../../ops/scan-images.sh)에 이미지 이름 또는 ID를 전달한다. 운영 MySQL은 `compose.production.yml`의 고정 다이제스트와 일치하는 이미지를 선택한다.
+
+```bash
+./ops/scan-images.sh baton-production-app:latest baton-production-web:latest mysql:8.4.11
+```
+
+- 로컬 Docker 이미지만 검사한다. 이미지를 다시 빌드하거나 원격 검사 서버에 업로드하지 않는다. 공개 취약점 DB·Java 인덱스 다운로드에는 네트워크를 사용하며 캐시는 다음 검사에서 재사용한다. 사용 통계 전송은 끈다.
+- HIGH·CRITICAL을 대상으로 하며 수정 버전이 없는 취약점도 보고한다. 결과는 `output/security/images.*/`의 이미지별 JSON, 대상 목록과 Trivy 버전에 남고 Git에서는 제외한다.
+- 종료 코드 `0`은 해당 기준의 발견 없음, `10`은 취약점 발견, `1`은 이미지·DB 조회 등 검사 실패, `2`는 입력·도구 누락이다. 한 이미지가 실패해도 나머지를 검사하며, 검사 실패를 취약점 없음으로 처리하지 않는다.
+- 발견 내용을 확인한 뒤 이미지 업데이트·재빌드 여부를 결정한다. 자동 업데이트나 배포는 하지 않는다. 현재 운영 중인 이미지와 새로 빌드한 이미지가 같은지는 운영자가 확인한다.
+- GitHub Actions 작업을 추가하지 않아 실행 시간 과금이 늘지 않는다. 배포 전 로컬 검사로 사용한다. Dependabot은 업데이트 후보를 제안하고 Trivy는 실제 이미지 안의 패키지를 검사한다.
 
 ## 운영 이미지 업데이트: GitHub Dependabot
 
