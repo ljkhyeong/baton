@@ -31,13 +31,48 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: 실제 Java 의존성 목록 수집 준비
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.BATON_DEPENDENCY_GRAPH_ENABLED == 'true' }}
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+          cache-disabled: true
+          dependency-graph: generate-and-upload
+          dependency-graph-report-dir: build/reports/dependency-graph
+          dependency-graph-continue-on-failure: false
+          artifact-retention-days: 1
       - name: Testcontainers용 Docker 확인
         run: docker info
       - name: API 계약 도구 설치
         working-directory: frontend
         run: npm ci
       - name: 백엔드 회귀 테스트 및 API 계약 드리프트 확인
+        env:
+          GITHUB_DEPENDENCY_GRAPH_JOB_CORRELATOR: baton-backend
         run: ./gradlew --no-daemon build checkApiContract
+      - name: Java 의존성 목록 생성 확인
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.BATON_DEPENDENCY_GRAPH_ENABLED == 'true' }}
+        run: test -s build/reports/dependency-graph/baton-backend.json
+
+  dependency_graph_submission:
+    name: Java 의존성 목록을 GitHub에 연결
+    needs: backend_contract
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.BATON_DEPENDENCY_GRAPH_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: 검증한 의존성 목록 전달
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-provider: basic
+          cache-disabled: true
+          dependency-graph: download-and-submit
+          dependency-graph-report-dir: build/reports/dependency-graph
+          dependency-graph-continue-on-failure: false
+      - name: 전달할 의존성 목록 누락 확인
+        run: test -s build/reports/dependency-graph/baton-backend.json
 
   frontend:
     name: 프런트엔드 프로덕션 빌드 및 E2E
