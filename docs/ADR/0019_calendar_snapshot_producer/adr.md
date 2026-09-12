@@ -14,7 +14,7 @@ BATON의 회차와 반복 업무 마감은 MySQL 트랜잭션에서 확정되고
 
 ### 계약 고정과 계층
 
-BATON은 고정 사전 릴리스 `contracts-v1.1.0-rc.1` 자산과 SHA-256을 생산자 검증 기준으로 고정한다.
+BATON은 고정 사전 릴리스 `contracts-v1.1.0-rc.2` 자산과 SHA-256을 생산자 검증 기준으로 고정한다.
 운영 안정 기준은 정식 버전 승격 전까지 `1.0.0`을 유지한다. 애플리케이션 계층은 외부
 라이브러리를 모르는 `CalendarSnapshot` 합 타입과 `CalendarSnapshotFactory`를 소유하고, 외부
 어댑터가 이를 CAL JSON 요청으로 바꾼다. 생산자 테스트는 고정한 실제 JSON Schema로 결과를
@@ -25,7 +25,7 @@ SeasonRound / RoutineExecution
   └─ CalendarSnapshotFactory
        └─ CalendarSnapshot
             └─ 외부 어댑터 요청 DTO
-                 └─ BATON CAL 사전 릴리스 `1.1.0-rc.1` JSON Schema
+                 └─ BATON CAL 사전 릴리스 `1.1.0-rc.2` JSON Schema
 ```
 
 공유 DTO JAR, CAL 내부 Kotlin 타입 복사와 런타임 JSON Schema 검증기는 도입하지 않는다. 스키마
@@ -131,9 +131,9 @@ BATON은 CAL 아웃박스의 상태별 수, 만료 임대, 가장 오래된 대�
 ### 비용과 한계
 
 - 계약 스키마 사본과 핀 정보를 BATON 저장소에서 갱신해야 한다.
-- 실제 CAL 사전 릴리스 `1.1.0-rc.1` 컨테이너와 BATON 운영 클라이언트의 교차 서비스 검증은 로컬 Docker 경계까지
+- 실제 CAL 사전 릴리스 `1.1.0-rc.2` 컨테이너와 BATON 운영 클라이언트의 교차 서비스 검증은 로컬 Docker 경계까지
   완료했다. 공인 HTTPS 운영 환경의 첫 전달과 실제 시즌 피드 확인은 별도로 수행해야 한다.
-- 시즌 이름과 복구 완료 요청은 게시된 `1.1.0-rc.1` 계약에 고정해 선택 실행 테스트로 검증한다.
+- 시즌 이름과 복구 완료 요청은 게시된 `1.1.0-rc.2` 계약에 고정해 선택 실행 테스트로 검증한다.
   정식 버전 승격과 실제 운영 활성화는 남아 있다.
 - 이름 보정은 기본 `OFF`인 `BACKFILL`·`REPLAY` 모드로 명시한다. 전체 시즌을 100개씩 점검하고
   기존 시즌 수정 잠금 안에서 현재 이름을 비교한다. 이름이 같으면 새 개정 번호를 만들지 않는다.

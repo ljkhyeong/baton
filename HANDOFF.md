@@ -24,10 +24,11 @@
 ## CAL
 
 - 전용 Bearer를 소유자 전용 파일에 저장하고 `BATON_CAL_BEARER_TOKEN_FILE`에 절대 경로를 설정한다. 운영 사전점검과 기존 문자열의 NFC·제어 문자 검사를 통과한 뒤 [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md) 순서로 캡처·보정·전달을 활성화한다.
-- 계약 `1.1.0-rc.1`의 자산·증명은 확인했지만 운영 안정 기준은 정식 승격 전까지 `1.0.0`이다. CAL V7 배포를 확인하기 전까지 `BATON_CAL_SEASON_METADATA_ENABLED=false`, 보정 모드 `OFF`를 유지한다.
+- 계약 `1.1.0-rc.2`의 자산·증명은 확인했지만 운영 안정 기준은 정식 승격 전까지 `1.0.0`이다. CAL V7 배포를 확인하기 전까지 `BATON_CAL_SEASON_METADATA_ENABLED=false`, 보정 모드 `OFF`를 유지한다.
 - 실제 시즌 피드와 캘린더 앱의 이름·일정 변경을 확인한다. 전달을 켜기 전에 `./ops/check-integration-delivery.sh`, `./ops/show-integration-metrics.sh`와 DB 상태를 확인한다.
 - 복원 훈련에서는 같은 복구 ID로 준비·전달을 실행한다. 최신 아웃박스의 전달과 CAL `COMPLETED`를 확인한 뒤 복구 모드를 해제한다. 이름 `REPLAY` 준비나 대기 행 수만으로 완료 처리하지 않는다.
-- 개인 구독은 `1.1.0-rc.2` 개발 소스로만 검증했다. `contracts/baton-cal/candidate/source.properties`의 후보 해시를 공식 릴리스 자산·증명과 대조한 뒤 계약을 채택한다. 그전에는 구독 기본 비활성을 유지한다.
+- 개인 구독·복구 진단은 공식 `1.1.0-rc.2`에 고정했다. 실제 CAL 배포와 앱 검증 전에는 구독 기본 비활성을 유지한다.
+- CAL의 100건 묶음 API는 준비됐지만 BATON 아웃박스는 단건 전달을 유지한다. 운영 수신량·복구 목표와 실패 항목 분리 방식을 정한 뒤 묶음 전송을 연결한다.
 - 팀 권한과 개인 구독을 함께 배포할 때는 V34·V35가 필요하다. 공개 HTTPS·실제 앱에서 등록·변경·취소·이름 갱신과 본인 구독 해제를 확인한다.
 - 앱별 안내 링크와 실제 구독 등록은 Google·Apple·Outlook 계정에서 확인한다. 브라우저 대역 검증에는 외부 계정 등록이 포함되지 않는다.
 

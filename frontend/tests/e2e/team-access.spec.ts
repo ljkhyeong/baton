@@ -22,6 +22,7 @@ async function accountApi(page: Page) {
 }
 
 test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 둔 목록에서 만료 상태를 확인한다', async ({ page }, testInfo) => {
+  test.slow(testInfo.project.name === 'webkit', '초대 생성·취소·재시도·만료를 한 흐름에서 확인한다')
   await page.clock.install({ time: new Date('2026-09-12T02:00:00Z') })
   const projection = makeProjection()
   await installApi(page, projection)
