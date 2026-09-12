@@ -4,10 +4,39 @@ type ReactErrorHandler = ReturnType<typeof import('@sentry/react')['reactErrorHa
 let reactErrorHandler: ReactErrorHandler | undefined
 let ready = Promise.resolve()
 
+function errorFileUrl(filename?: string) {
+  if (!filename) return null
+  try {
+    const url = new URL(filename, window.location.origin)
+    return url.origin === window.location.origin && /^\/(assets|src)\//.test(url.pathname)
+      ? url.origin + url.pathname : null
+  } catch {
+    return null
+  }
+}
+
 // 요청·화면 주소와 오류 메시지를 제외하고 배포 파일의 오류 위치만 수집한다.
 export const errorLocationOnly: NonNullable<BrowserOptions['beforeSend']> = (event, hint) => {
   hint.attachments = []
   if (!event.exception?.values?.length) return null
+  const values = event.exception.values.map((exception) => ({
+    type: /^[\w.$]{1,100}$/.test(exception.type ?? '') ? exception.type : 'Error',
+    stacktrace: {
+      frames: exception.stacktrace?.frames?.flatMap((frame) => {
+        const filename = errorFileUrl(frame.filename)
+        return filename ? [{ filename, lineno: frame.lineno, colno: frame.colno,
+          function: /^[\w.$<> ]{1,120}$/.test(frame.function ?? '') ? frame.function : undefined,
+          in_app: true }] : []
+      }),
+    },
+  }))
+  const files = new Set(values.flatMap((exception) => exception.stacktrace.frames?.map((frame) => frame.filename) ?? []))
+  const images = event.debug_meta?.images?.flatMap((image) => {
+    if (image.type !== 'sourcemap' || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(image.debug_id)) return []
+    const codeFile = errorFileUrl(image.code_file)
+    return codeFile && files.has(codeFile)
+      ? [{ type: 'sourcemap' as const, code_file: codeFile, debug_id: image.debug_id }] : []
+  })
   return {
     type: undefined,
     event_id: event.event_id,
@@ -16,25 +45,8 @@ export const errorLocationOnly: NonNullable<BrowserOptions['beforeSend']> = (eve
     level: event.level,
     environment: event.environment,
     release: event.release,
-    exception: {
-      values: event.exception.values.map((exception) => ({
-        type: /^[\w.$]{1,100}$/.test(exception.type ?? '') ? exception.type : 'Error',
-        stacktrace: {
-          frames: exception.stacktrace?.frames?.flatMap((frame) => {
-            if (!frame.filename) return []
-            try {
-              const url = new URL(frame.filename, window.location.origin)
-              if (url.origin !== window.location.origin || !/^\/(assets|src)\//.test(url.pathname)) return []
-              return [{ filename: url.origin + url.pathname, lineno: frame.lineno, colno: frame.colno,
-                function: /^[\w.$<> ]{1,120}$/.test(frame.function ?? '') ? frame.function : undefined,
-                in_app: true }]
-            } catch {
-              return []
-            }
-          }),
-        },
-      })),
-    },
+    exception: { values },
+    debug_meta: images?.length ? { images } : undefined,
   }
 }
 

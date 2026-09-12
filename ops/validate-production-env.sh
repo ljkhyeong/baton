@@ -258,12 +258,15 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_BRIEF_SERVICE_TRUSTSTORE_FILE)
       seen_baton_brief_service_truststore_file=true
       ;;
-    BATON_STATUS_PAGE_ENABLED)
+    BATON_STATUS_PAGE_ENABLED|BATON_SENTRY_SOURCEMAPS_UPLOAD)
       production_validation_validate_boolean fail "$key" "$value"
       ;;
     BATON_SENTRY_DSN|\
       BATON_SENTRY_BROWSER_DSN|\
       BATON_SENTRY_ENVIRONMENT|\
+      BATON_SENTRY_ORG|\
+      BATON_SENTRY_PROJECT|\
+      BATON_SENTRY_AUTH_TOKEN_FILE|\
       BATON_BREVO_WEBHOOK_ENABLED|\
       BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE|\
       BATON_TURNSTILE_ENABLED|\

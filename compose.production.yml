@@ -190,6 +190,11 @@ services:
         VITE_SENTRY_DSN: ${BATON_SENTRY_BROWSER_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${BATON_SENTRY_ENVIRONMENT:-production}
         VITE_STATUS_PAGE_ENABLED: ${BATON_STATUS_PAGE_ENABLED:-false}
+        SENTRY_SOURCEMAPS_UPLOAD: ${BATON_SENTRY_SOURCEMAPS_UPLOAD:-false}
+        SENTRY_ORG: ${BATON_SENTRY_ORG:-}
+        SENTRY_PROJECT: ${BATON_SENTRY_PROJECT:-}
+      secrets:
+        - sentry_auth_token
     restart: unless-stopped
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
@@ -227,6 +232,8 @@ volumes:
   baton_caddy_config:
 
 secrets:
+  sentry_auth_token:
+    file: ${BATON_SENTRY_AUTH_TOKEN_FILE:-/dev/null}
   baton_brevo_webhook_bearer_token:
     environment: BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN
   baton_turnstile_secret_key:

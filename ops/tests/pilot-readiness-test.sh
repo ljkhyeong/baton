@@ -713,6 +713,13 @@ write_valid_env "$status_page_invalid_env"
 printf '%s\n' 'BATON_STATUS_PAGE_ENABLED=yes' >> "$status_page_invalid_env"
 expect_preflight_failure '서비스 상태 링크 설정 오타' "$status_page_invalid_env" 'BATON_STATUS_PAGE_ENABLED'
 
+sentry_build_env="$test_root/sentry-build.env"
+write_valid_env "$sentry_build_env"
+printf '%s\n' 'BATON_SENTRY_SOURCEMAPS_UPLOAD=true' 'BATON_SENTRY_ORG=baton' \
+  'BATON_SENTRY_PROJECT=web' 'BATON_SENTRY_AUTH_TOKEN_FILE=/srv/baton/secrets/sentry-build-token' >> "$sentry_build_env"
+"$production_env_validator_script" "$sentry_build_env" >/dev/null \
+  || fail 'Sentry 빌드 설정 거부'
+
 round_runtime_enabled_env="$test_root/round-runtime-enabled.env"
 write_valid_env "$round_runtime_enabled_env"
 append_enabled_round_runtime "$round_runtime_enabled_env"

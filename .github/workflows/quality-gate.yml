@@ -58,6 +58,9 @@ jobs:
       - name: 프런트엔드와 Playwright 타입 검사
         working-directory: frontend
         run: npm run typecheck
+      - name: 소스맵 업로드·배포 파일 검증
+        working-directory: frontend
+        run: npm run check:sourcemaps
       - name: 프런트엔드 빌드
         working-directory: frontend
         run: npm run build

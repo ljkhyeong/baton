@@ -17,7 +17,10 @@ COPY frontend/src ./src
 ARG VITE_SENTRY_DSN=
 ARG VITE_SENTRY_ENVIRONMENT=production
 ARG VITE_STATUS_PAGE_ENABLED=false
-RUN npm run build
+ARG SENTRY_SOURCEMAPS_UPLOAD=false
+ARG SENTRY_ORG=
+ARG SENTRY_PROJECT=
+RUN --mount=type=secret,id=sentry_auth_token,env=SENTRY_AUTH_TOKEN npm run build
 
 FROM ${CADDY_BUILDER_IMAGE} AS caddy-build
 ARG CADDY_VERSION

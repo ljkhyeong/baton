@@ -16,6 +16,7 @@
     "api:check": "openapi-typescript ../docs/api/openapi3.yaml --output src/generated/api.ts --alphabetize --check",
     "preview": "vite preview",
     "typecheck": "tsc -b",
+    "check:sourcemaps": "node --test tests/sentry-sourcemaps.test.mjs",
     "e2e": "playwright test",
     "e2e:focus": "playwright test --project=chromium --workers=2 --max-failures=1",
     "e2e:failed": "playwright test --last-failed --workers=2",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@sentry/vite-plugin": "5.4.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
