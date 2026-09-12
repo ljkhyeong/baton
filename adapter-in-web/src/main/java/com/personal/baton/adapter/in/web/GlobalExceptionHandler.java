@@ -51,12 +51,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(AccountDeactivationBlockedException.class)
     public ResponseEntity<ErrorResponse> accountDeactivationBlocked(AccountDeactivationBlockedException exception, HttpServletRequest request) {
-        return error(HttpStatus.CONFLICT, "ACCOUNT_DEACTIVATION_BLOCKED", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "ACCOUNT_DEACTIVATION_BLOCKED", exception, request);
     }
 
     @ExceptionHandler(AccountDeactivatedException.class)
     public ResponseEntity<ErrorResponse> accountDeactivated(AccountDeactivatedException exception, HttpServletRequest request) {
-        return error(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", exception.getMessage(), exception, request);
+        return error(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", exception, request);
     }
 
     @ExceptionHandler(AccountMembershipConflictException.class)
@@ -64,7 +64,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             AccountMembershipConflictException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "ACCOUNT_MEMBERSHIP_CONFLICT", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "ACCOUNT_MEMBERSHIP_CONFLICT", exception, request);
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
@@ -96,7 +96,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.FORBIDDEN,
                 "WORKSPACE_CREATION_DENIED",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -110,7 +109,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.FORBIDDEN,
                 "WORKSPACE_RECOVERY_DENIED",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -124,7 +122,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.FORBIDDEN,
                 "WORKSPACE_ACCESS_DENIED",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -138,7 +135,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "WORKSPACE_ACCESS_KEY_CONFLICT",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -152,7 +148,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "WORKSPACE_CONTENT_CONFLICT",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -166,7 +161,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.NOT_FOUND,
                 exception.getCode(),
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -180,7 +174,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "MEMBER_NAME_CONFLICT",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -191,7 +184,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             RoleNameConflictException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception, request);
     }
 
     @ExceptionHandler({
@@ -205,7 +198,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "ROLE_HANDOFF_STATE_CONFLICT",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -219,7 +211,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -230,7 +221,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             SeasonNameConflictException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "SEASON_NAME_CONFLICT", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "SEASON_NAME_CONFLICT", exception, request);
     }
 
     @ExceptionHandler(SeasonEndedException.class)
@@ -238,7 +229,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             SeasonEndedException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "SEASON_ENDED", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "SEASON_ENDED", exception, request);
     }
 
     @ExceptionHandler(SeasonSuccessorExistsException.class)
@@ -249,7 +240,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "SEASON_SUCCESSOR_EXISTS",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -260,7 +250,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             SeasonRoundNameConflictException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "ROUND_NAME_CONFLICT", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "ROUND_NAME_CONFLICT", exception, request);
     }
 
     @ExceptionHandler(IdempotencyKeyReusedException.class)
@@ -268,7 +258,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             IdempotencyKeyReusedException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", exception, request);
     }
 
     @ExceptionHandler(IdempotencyKeyConflictException.class)
@@ -276,7 +266,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             IdempotencyKeyConflictException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_CONFLICT", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_CONFLICT", exception, request);
     }
 
     @ExceptionHandler(IdempotencyReplayExpiredException.class)
@@ -284,7 +274,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             IdempotencyReplayExpiredException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED", exception.getMessage(), exception, request);
+        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED", exception, request);
     }
 
     @ExceptionHandler(WatchHealthEventIdMismatchException.class)
@@ -295,7 +285,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.BAD_REQUEST,
                 "IDEMPOTENCY_KEY_MISMATCH",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -309,7 +298,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.BAD_REQUEST,
                 "WATCH_RESOURCE_REFERENCE_INVALID",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -320,7 +308,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             WatchHealthEventChangedAtOutOfRangeException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception.getMessage(), exception, request);
+        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception, request);
     }
 
     @ExceptionHandler(WatchHealthEventConflictException.class)
@@ -331,7 +319,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return error(
                 HttpStatus.CONFLICT,
                 "WATCH_EVENT_ID_CONFLICT",
-                exception.getMessage(),
                 exception,
                 request
         );
@@ -344,11 +331,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request
     ) {
-        return mvcError(
-                status,
-                headers,
-                new ErrorResponse("INVALID_INPUT", "요청 본문 형식이 올바르지 않습니다"),
+        return handleExceptionInternal(
                 exception,
+                new ErrorResponse("INVALID_INPUT", "요청 본문 형식이 올바르지 않습니다"),
+                headers,
+                status,
                 request
         );
     }
@@ -364,7 +351,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .sorted(Comparator.comparing(error -> error.getField()))
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        return mvcError(status, headers, new ErrorResponse("INVALID_INPUT", message), exception, request);
+        return handleExceptionInternal(exception, new ErrorResponse("INVALID_INPUT", message), headers, status, request);
     }
 
     @Override
@@ -374,11 +361,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpStatusCode status,
             WebRequest request
     ) {
-        return mvcError(
-                status,
-                headers,
-                new ErrorResponse("INVALID_INPUT", "요청 값 형식이 올바르지 않습니다"),
+        return handleExceptionInternal(
                 exception,
+                new ErrorResponse("INVALID_INPUT", "요청 값 형식이 올바르지 않습니다"),
+                headers,
+                status,
                 request
         );
     }
@@ -388,7 +375,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             DomainValidationException exception,
             HttpServletRequest request
     ) {
-        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception.getMessage(), exception, request);
+        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception, request);
     }
 
     @Override
@@ -447,22 +434,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private ResponseEntity<ErrorResponse> error(
             HttpStatus status,
             String code,
-            String message,
             Exception exception,
             HttpServletRequest request
     ) {
         HttpObservationErrors.mark(request, exception);
-        return ResponseEntity.status(status).body(new ErrorResponse(code, message));
-    }
-
-    private ResponseEntity<Object> mvcError(
-            HttpStatusCode status,
-            HttpHeaders headers,
-            ErrorResponse response,
-            Exception exception,
-            WebRequest request
-    ) {
-        return handleExceptionInternal(exception, response, headers, status, request);
+        return ResponseEntity.status(status).body(new ErrorResponse(code, exception.getMessage()));
     }
 
     private ErrorResponse frameworkError(HttpStatusCode status) {
