@@ -1,0 +1,21 @@
+route:
+  receiver: operations-discord
+  group_by: [job, instance]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+
+receivers:
+  - name: operations-discord
+    discord_configs:
+      - webhook_url_file: /run/secrets/discord-webhook-url
+        send_resolved: true
+        username: BATON
+        title: 'BATON · 조치 필요 {{ len .Alerts.Firing }}건 · 해제 {{ len .Alerts.Resolved }}건'
+        message: |-
+          {{ range .Alerts }}
+          **{{ if eq .Status "firing" }}조치 필요{{ else }}경보 해제{{ end }}** · {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        http_config:
+          follow_redirects: false

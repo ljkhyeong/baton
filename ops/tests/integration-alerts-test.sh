@@ -19,5 +19,9 @@ docker run --rm --network none --read-only \
   --entrypoint /bin/amtool "$alertmanager_image" \
   check-config /ops/integrations/alertmanager.yml.example
 docker run --rm --network none --read-only \
+  -v "$ops_dir:/ops:ro" -v /dev/null:/run/secrets/discord-webhook-url:ro \
+  --entrypoint /bin/amtool "$alertmanager_image" \
+  check-config /ops/integrations/alertmanager-discord.yml.example
+docker run --rm --network none --read-only \
   -v "$ops_dir:/ops:ro" "$blackbox_image" \
   --config.file=/ops/integrations/blackbox.yml --config.check
