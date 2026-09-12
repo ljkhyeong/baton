@@ -106,6 +106,7 @@ npm run e2e:fullstack
 - ROUND 참여권 서명기·JWK·클레임 또는 소비자 인증 계약을 바꾸면 `bash ops/tests/round-consumer-contract.sh`를 실행한다.
 - CAL 일정 스냅샷 DTO·직렬화·개정과 상태 의미, CAL 응답 분류 또는 고정한 안정 계약 버전을 바꾸면 `bash ops/tests/calendar-consumer-contract.sh`를 실행한다.
 - 배포 환경·Compose 래퍼, 서비스 상태·백업 최신성 또는 운영 systemd 경계를 바꾸면 `bash ops/tests/pilot-readiness-test.sh`와 해당 유닛 정적 검증을 실행한다.
+- Prometheus 수집·경보 규칙이나 Alertmanager 설정을 바꾸면 `bash ops/tests/integration-alerts-test.sh`로 공식 도구의 설정 검사와 장애 시나리오를 검증한다. 실제 SMTP 발송은 포함하지 않는다.
 - 모듈 구조와 임포트 경계 변경은 정책 테스트를 실행한다.
 - 공통 빌드·런타임 설정이나 여러 모듈에 걸친 동작을 바꾸면 마지막에 전체 `build`를 실행한다. 변경 파일 수나 문구 수정만으로 전체 검증을 선택하지 않는다.
 

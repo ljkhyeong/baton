@@ -472,6 +472,8 @@ journalctl --user \
 
 CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애플리케이션 컨테이너의 Prometheus 지표로 확인한다. 다음 명령은 검증된 프로덕션 Compose 경계 안에서 `127.0.0.1:8080`의 `GET /actuator/prometheus`만 호출하며, 호스트에는 애플리케이션 포트를 게시하지 않고 Caddy도 이 경로를 프록시하지 않는다.
 
+상시 경보는 [Prometheus·Alertmanager 연동 설정](docs/runbooks/free-integrations.md#내부-연동-장애-알림-prometheus--alertmanager)을 사용할 수 있다. 기존 지표의 수집·갱신 장애와 전달 실패·처리 지연을 판단하고 무료 SMTP로 운영자에게 알린다. 설정·장애 시나리오 검증을 마쳤으며 실제 수집과 메일 수신 확인은 남아 있다.
+
 ```bash
 ./ops/show-integration-metrics.sh
 ```
@@ -653,6 +655,7 @@ bash ops/check-shell-scripts.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/integration-delivery-check-test.sh
+bash ops/tests/integration-alerts-test.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer ops/systemd/baton-integration-delivery.service ops/systemd/baton-integration-delivery.timer
 ./ops/production-compose.sh config --quiet
