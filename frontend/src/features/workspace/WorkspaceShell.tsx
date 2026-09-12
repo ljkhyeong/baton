@@ -112,7 +112,7 @@ export function Sidebar({
           <span className="avatar avatar-dark">{activeMemberCount}</span>
           <span><strong>{activeMemberCount}명 활동 중</strong><small>{workspace.season.name}</small></span>
           <span className="profile-actions">
-            <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
+            <button type="button" onClick={onShare} title="작업 공간 공유">공유</button>
             <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
           </span>
         </div>

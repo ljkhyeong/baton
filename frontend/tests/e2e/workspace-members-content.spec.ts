@@ -205,6 +205,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
 test('@smoke 서버 작업 공간에서 역할을 만들고 새로고침 후에도 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: () => Promise.reject(new Error('denied')) },

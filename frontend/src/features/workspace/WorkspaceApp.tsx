@@ -281,6 +281,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   })
   const {
     copyShareLink,
+    shareWorkspaceLink,
     pendingRotationIdempotencyKey,
     recoverPendingAccessKeyRotation,
     retryRotationJournalCleanup,
@@ -843,10 +844,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
         <div className="workspace-toolbar">
           <div className="workspace-breadcrumb" aria-label="현재 작업 공간">
             <span>{workspace.team.name}</span><span aria-hidden="true">/</span><span>{workspace.season.name}</span>
@@ -1273,7 +1274,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onClose={closeModal}
         />
       )}
-      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
+      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} accountAccessEnabled={accountAccessEnabled} onClose={closeModal} />}
       {modal === 'accessKey' && (
         <AccessKeyModal
           pending={rotationPending}

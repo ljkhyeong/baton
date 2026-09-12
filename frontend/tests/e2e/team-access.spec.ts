@@ -128,6 +128,11 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
 })
 
 test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람자는 기록을 읽고 변경할 수 없다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => {
+      document.documentElement.dataset.sharedWorkspace = JSON.stringify(data)
+    } })
+  })
   const projection = makeProjection()
   projection.team.accountAccessEnabled = true
   projection.team.permission = 'VIEWER'
@@ -151,6 +156,10 @@ test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람�
   await expect(page.getByRole('button', { name: '결정 남기기' })).toBeDisabled()
   expect((await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)).headers['x-baton-access-key'] ?? '').toBe('')
   expect(await page.evaluate(() => sessionStorage.getItem('baton:team-invitation:v1'))).toBeNull()
+  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+  await chrome.getByRole('button', { name: '공유', exact: true }).click()
+  const shared = await page.evaluate(() => JSON.parse(document.documentElement.dataset.sharedWorkspace ?? 'null'))
+  expect(shared).toEqual({ url: new URL(WORKSPACE_PATH, page.url()).href })
 })
 
 test('@memory @webkit 구성원은 공유 키 없이 현재 계정과 CSRF를 확인한 뒤 결정을 남긴다', async ({ page }, testInfo) => {

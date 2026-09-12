@@ -73,6 +73,7 @@ test('공유 링크의 URL 접근 키를 지울 때 React Router 이력을 보�
 
 test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 교체한다', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: () => Promise.reject(new Error('denied')) },

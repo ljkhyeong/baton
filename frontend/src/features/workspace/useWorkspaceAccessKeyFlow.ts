@@ -59,6 +59,7 @@ export function useWorkspaceAccessKeyFlow({
   const [rotationCleanupRetryKey, setRotationCleanupRetryKey] = useState<string | null>(null)
   const [rotationLockPending, setRotationLockPending] = useState(false)
   const rotationRequestInFlightRef = useRef(false)
+  const shareRequestInFlightRef = useRef(false)
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
   const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(currentAccessKey)}`}`
 
@@ -204,6 +205,21 @@ export function useWorkspaceAccessKeyFlow({
     }
   }
 
+  const shareWorkspaceLink = async () => {
+    if (shareRequestInFlightRef.current) return
+    shareRequestInFlightRef.current = true
+    try {
+      if (navigator.share) await navigator.share({ url: shareUrl })
+      else await copyShareLink()
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        await copyShareLink()
+      }
+    } finally {
+      shareRequestInFlightRef.current = false
+    }
+  }
+
   const rotateWorkspaceAccessKey = async () => {
     if (rotationRequestInFlightRef.current || rotateAccessKeyMutation.isPending) return false
     rotationRequestInFlightRef.current = true
@@ -249,6 +265,7 @@ export function useWorkspaceAccessKeyFlow({
 
   return {
     copyShareLink,
+    shareWorkspaceLink,
     pendingRotationIdempotencyKey,
     recoverPendingAccessKeyRotation,
     retryRotationJournalCleanup,
