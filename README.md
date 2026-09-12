@@ -70,7 +70,9 @@ BATON은 팀·시즌·역할·업무 기록과 최종 접근 권한을 관리한
 
 작업 공간의 `공유` 버튼은 기기의 공유 창에서 메신저·메일 앱을 선택하도록 연결한다. 별도 서비스 키나 요금이 없으며, 지원하지 않는 브라우저에서는 링크를 복사한다. [지원 조건](docs/runbooks/free-integrations.md#기기-앱-공유-web-share-api)
 
-추가 비용 없이 연결할 이메일·외부 장애 감시·백업 저장소와 `b4ton.com`의 서비스별 주소는 [무료 외부 연동](docs/runbooks/free-integrations.md)에 정리했다. 기존 SMTP·CAL·rclone을 재사용하며, 백업 완료 신호를 Better Stack 하트비트 API에 보내는 기능은 비밀 URL 파일을 설정하면 사용할 수 있다.
+추가 비용 없이 연결할 이메일·오류 수집·외부 장애 감시·백업 저장소와 `b4ton.com`의 서비스별 주소는 [무료 외부 연동](docs/runbooks/free-integrations.md)에 정리했다. 기존 SMTP·CAL·rclone을 재사용하며, 백업 완료 신호를 Better Stack 하트비트 API에 보내는 기능은 비밀 URL 파일을 설정하면 사용할 수 있다.
+
+Sentry 오류 수집과 Brevo 메일 전달 결과 수신은 기본 비활성이다. [설정 방법](docs/runbooks/free-integrations.md#오류-수집-sentry)에 따라 DSN·전용 웹훅 토큰을 연결한다. 메일 반송은 기존 Prometheus·Alertmanager로 확인한다.
 
 다음 운영 작업은 [HANDOFF](HANDOFF.md), 장기 개발 순서는 [개발 우선순위](docs/PRD/0003_product-roadmap/spec.md)를 기준으로 한다.
 

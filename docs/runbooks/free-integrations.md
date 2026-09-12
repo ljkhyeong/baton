@@ -10,6 +10,8 @@
 | 외부 캘린더 | CAL의 ICS 구독 → Google·Apple·Outlook | 기존 구독 기능을 사용한다. 갱신 주기는 캘린더 앱이 정하므로 실시간 양방향 동기화로 안내하지 않는다. |
 | 작업 공간 공유 | Web Share API | 기기의 공유 창에서 설치된 메신저·메일 앱을 선택한다. 공급자 SDK·계정·서비스 키가 필요 없다. |
 | 가입·비밀번호 재설정 메일 | Brevo 무료 SMTP | 기존 Spring Mail 어댑터에 접속 설정만 연결한다. 공급자 전용 HTTP 클라이언트는 추가하지 않는다. |
+| 오류 발생 위치 수집 | Sentry React·Spring Boot SDK | 오류 종류·파일·줄만 전송한다. DSN이 없으면 비활성이다. |
+| 메일 전달·반송 결과 | Brevo Webhook | 기존 SMTP 발송 ID로 결과를 연결하고 중복 수신을 합친다. 24시간 결과 지표와 경보를 추가했다. |
 | 가입·재설정 요청 봇 방지 | Cloudflare Turnstile | 브라우저 위젯과 서버 Siteverify 검증을 연결했다. 기존 IP·이메일 요청 제한을 함께 사용한다. |
 | 로그인 | Google OIDC·Naver OAuth2 | 이미 구현되어 있다. 기존 공급자 설정과 콜백을 사용한다. |
 | 서비스 장애 감시 | Better Stack 무료 모니터 | 상태 조회·이력·이메일 알림을 외부 서비스가 처리한다. BATON 등록용 API 요청 파일을 추가했다. |
@@ -29,8 +31,6 @@
 
 | 우선순위 | 후보 | 줄일 수 있는 작업과 도입 조건 |
 | --- | --- | --- |
-| 우선 권장 | Sentry 오류 수집 SDK | 브라우저·서버 오류 수집과 같은 오류 묶기를 맡긴다. [Developer 무료 플랜](https://sentry.io/pricing/)은 운영자 1명·월 오류 5,000건이며 [종량 과금을 지원하지 않는다](https://www.sentry.help/en/articles/13965037-can-i-set-up-an-on-demand-pay-as-you-go-budget-for-my-free-developer-plan). 유료 플랜으로 전환하지 않고 오류 수집부터 연결한다. |
-| 메일 운영 시 권장 | Brevo 발송 결과 Webhook | SMTP 접수 이후 반송·차단·전달 결과를 공급자가 알려 준다. [무료 플랜에 포함](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans)되며 별도 상태 조회 작업을 만들지 않아도 된다. 수신 인증·중복 처리와 발송 기록 연결은 필요하다. |
 | Drive 자료 사용이 많을 때 | Google Picker | Google의 파일 선택창으로 자료 이름과 링크를 가져온다. [공식 선택창](https://developers.google.com/workspace/drive/picker/guides/overview)을 사용하지만 OAuth 동의·프로젝트 설정이 추가된다. 현재는 링크 입력만으로 충분해 보류한다. |
 | 운영자가 Discord를 사용할 때 | Alertmanager → Discord Webhook | 장애·복구 알림을 운영 채널에 보낸다. [기본 Discord 수신 설정](https://prometheus.io/docs/alerting/latest/configuration/#discord_config)이 발송을 처리하므로 봇 서버나 별도 HTTP 발송기를 만들지 않는다. 채널 웹훅과 수신 담당자가 필요하다. |
 | 방문·로딩 통계가 필요할 때 | Cloudflare Web Analytics | 방문과 실제 페이지 로딩 성능을 [무료 통계 서비스](https://www.cloudflare.com/web-analytics/)에서 확인한다. 공개 소개 화면부터 검토하며 수집할 경로와 URL·토큰 제외 기준을 먼저 정한다. |
@@ -39,9 +39,43 @@ Discord는 운영 경보의 선택 수신 채널이다. 사용자 업무·인수
 
 ### 추가 검토 근거
 
-- [AppErrorBoundary](../../frontend/src/app/AppErrorBoundary.tsx)는 복구 화면만 표시하며 오류를 외부에 모으지 않는다. Sentry는 기존 상태 감시·Prometheus 지표에 오류 발생 위치와 반복 횟수를 보완한다. React SDK와 [Spring Boot 4용 공식 연동](https://github.com/getsentry/sentry-java/tree/main/sentry-spring-boot-4-starter)을 사용할 수 있다. 연결 시 공유 키·인증 토큰·입력 본문을 제외하고 화면 녹화·AI 분석은 켜지 않는다. 프로젝트·DSN과 실제 오류 수신 확인이 필요하다.
-- [SMTP 어댑터](../../adapter-out-external/src/main/java/com/personal/baton/adapter/out/external/identity/SmtpEmailVerificationDeliveryAdapter.java)는 발송 요청이 접수되면 반환한다. [Brevo 이벤트](https://developers.brevo.com/docs/transactional-webhooks)를 받으면 이후 반송·차단을 확인할 수 있다. 현재 아웃박스에는 공급자 메시지 ID 연결이 없으므로 설정만으로 끝나지 않는다. 기존 SMTP 전송 상태와 공급자 결과를 분리하고, 전달 이벤트를 사용자의 읽음·이메일 인증 완료로 처리하지 않는다.
 - [자료 등록 화면](../../frontend/src/features/workspace/WorkspaceRecordModals.tsx)은 이름과 주소를 입력받는다. Picker는 이 입력을 줄이지만 파일 접근 권한은 Drive가 계속 관리한다. Google 로그인과 파일 접근 동의는 별개이며, BATON 팀 공유만으로 Drive 파일 권한이 생기지는 않는다. Drive API를 함께 사용할 경우 아래 사용 한도 조건을 따른다.
+
+## 오류 수집: Sentry
+
+[Developer 무료 플랜](https://sentry.io/pricing/)의 운영자 1명·월 오류 5,000건 범위로 사용한다.
+무료 플랜은 [종량 과금을 지원하지 않는다](https://www.sentry.help/en/articles/13965037-can-i-set-up-an-on-demand-pay-as-you-go-budget-for-my-free-developer-plan).
+유료 플랜·자동 결제로 전환하지 않는다. 한도 도달 시 누락될 수 있는 오류는 기존 서버 로그와 상태 감시로 확인한다.
+
+1. 무료 조직에 React와 Spring Boot 프로젝트를 만들고 각각의 공개 DSN을 복사한다. 개인 API 토큰은 BATON에 필요 없다.
+2. `.env.production`에 `BATON_SENTRY_DSN`(서버), `BATON_SENTRY_BROWSER_DSN`(브라우저), `BATON_SENTRY_ENVIRONMENT=production`을 설정한다. 두 DSN은 독립적이며 빈 값이면 해당 수집을 끈다.
+3. 브라우저 DSN은 **빌드 시 반영**된다. Compose의 `web` 이미지를 다시 빌드한다. k3s에서도 웹 이미지 빌드 인자 `VITE_SENTRY_DSN`·`VITE_SENTRY_ENVIRONMENT`를 사용하고, 서버 DSN은 앱 환경 변수로 주입한다.
+4. 공개 HTTPS에서 테스트 오류 1건의 수신과 실제 배포 파일·줄을 확인한다. 오류 메시지·이메일·토큰·현재 화면 주소가 보고에 없는지 확인한다.
+
+React 루트 오류와 브라우저 미처리 오류를 공식 SDK로 수집한다. DSN이 있을 때만 SDK를 불러오며, 로딩 중 발생한 React 오류는 로딩 완료 후 보고한다. 서버는 [Spring Boot 4 SDK](https://github.com/getsentry/sentry-java/tree/main/sentry-spring-boot-4-starter)와 기존 HTTP Observation을 연결해 응답이 확정된 **5xx 예외**를 수집한다. 예상된 4xx 오류는 보내지 않는다. 같은 예외의 중복 제거와 전송은 SDK가 처리한다.
+
+수집 항목은 예외 종류·스택의 파일/줄·배포 환경이다. 예외 메시지, 요청 URL·본문·헤더, 사용자, 탐색 기록, 폼 값, 첨부 파일과 스택 지역 변수는 보내지 않는다. 세션·성능 추적·프로파일링·로그·화면 녹화는 켜지 않는다. 브라우저 오류 위치는 현재 서비스의 `/assets/`와 개발용 `/src/` 파일만 허용하고 쿼리·fragment를 제거한다. 소스맵 업로드는 자동화하지 않아 배포 JS에서는 압축 파일의 위치로 표시될 수 있다.
+
+Caddy의 `connect-src`는 Sentry의 `*.ingest.sentry.io`, `*.ingest.us.sentry.io`, `*.ingest.de.sentry.io` HTTPS 수집 주소를 허용한다. k3s Ingress에서 CSP를 관리하면 같은 허용 목록을 병합한다. 전체 외부 출처를 허용하지 않는다. 비활성화할 때 서버 DSN을 지우고, 브라우저 DSN을 지운 웹 이미지를 다시 배포한다.
+
+## 메일 전달 결과: Brevo Webhook
+
+Brevo [무료 플랜의 outbound webhook](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans)을 사용한다.
+메일 발송은 기존 SMTP를 유지하며 상태 조회용 API 키·주기 작업을 추가하지 않는다.
+
+1. V40 마이그레이션과 새 SMTP 어댑터를 배포한다. 이후 발송 메일에는 `X-Mailin-custom: baton-delivery-id:<발송 ID>`가 붙는다. 이전 메일에는 결과 연결이 소급 적용되지 않는다.
+2. `openssl rand -hex 32` 결과를 줄바꿈 없이 저장소 밖 0600 파일에 저장한다. 상위 디렉터리는 0700으로 두고 `BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE`에 절대 경로를 지정한다. 기존 SMTP·다른 연동의 비밀값을 재사용하지 않는다.
+3. [Webhook 생성 API](https://developers.brevo.com/reference/create-webhook)로 transactional 웹훅을 등록한다. URL은 `https://b4ton.com/api/v1/integrations/brevo/email-events`, 인증은 [Bearer 방식](https://developers.brevo.com/docs/secured-webhooks)의 `auth.type=bearer`, `auth.token=<전용 토큰>`이다. 등록용 Brevo API 키는 앱에 보관하지 않는다. 단일 이벤트 POST를 사용하며 batch 모드는 사용하지 않는다.
+4. 전달·일시 반송·영구 반송·차단·잘못된 주소·발송 오류·지연·스팸 신고 이벤트만 선택한다. 열람·클릭 추적은 연결하지 않는다. 이벤트 선택 이름은 등록 API의 열거형을 따르고, 수신 본문의 값은 아래 계약을 따른다.
+5. Brevo SMTP 설정과 토큰 파일을 사전점검한 뒤 `BATON_BREVO_WEBHOOK_ENABLED=true`로 앱을 재시작한다. 실제 테스트 메일의 발송 ID, `delivered` 결과, 중복 재전송 후 기록 한 건을 확인한다. k3s에서는 같은 설정 이름으로 Secret을 연결한다. 전용 토큰 없이도 접근되는 경로를 만들지 않는다.
+
+인증 실패·기본 비활성은 `401`, 잘못된 ID·시각 형식은 `400`, 수신 완료는 본문 없는 `204`다. BATON 발송 ID가 없거나 알려지지 않은 결과·발송 전 ID는 `204`로 무시한다. JSON 본문의 `email`, `subject`, `reason` 등은 저장하지 않는다. 상세 HTTP 계약은 [PRD-0002](../PRD/0002_api-contract/spec.md#brevo-메일-전달-결과)를 따른다.
+
+[Brevo 이벤트](https://developers.brevo.com/docs/transactional-webhooks)의 `ts_event`(UTC Unix 초)를 저장한다. 같은 발송 ID·결과별로 가장 나중 시각 하나를 보존하며, `id`는 웹훅 ID이므로 중복 제거 키로 사용하지 않는다. 결과는 `email_delivery_receipts`에 저장하고 SMTP 아웃박스 상태나 계정 인증 상태를 바꾸지 않는다. `delivered`는 사용자가 읽었거나 가입을 완료했다는 뜻이 아니다. SMTP 재시도도 같은 발송 ID를 쓰므로 이 기록은 시도별 전체 로그가 아니다.
+
+`baton_email_delivery_receipts{event="hard_bounce"}` 등은 **최근 24시간에 해당 결과가 발생한 메일 수**다. 동일 메일에 전달과 반송이 모두 있으면 각 결과에 집계된다. 기존 운영 지표 갱신 상태가 정상이고 영구 반송·차단·주소 오류·발송 오류·스팸 신고가 2분간 보이면 `BatonEmailDeliveryRejected`가 알린다. 일시 반송·지연에는 즉시 경보를 내거나 자동 재발송하지 않는다. 해당 결과가 24시간 창에서 빠지면 경보가 해제된다.
+
+문제 메일의 발송 ID·결과·시각은 운영 DB에서 `email_delivery_receipts`를 조회하고, 자세한 원인은 Brevo 발송 내역과 대조한다. 중단할 때는 공급자 웹훅부터 끈 다음 BATON 수신을 비활성화해 불필요한 재전송을 줄인다. 실제 공급자 수신·HTTPS·경보 메일 검증은 운영 설정 후 진행한다.
 
 ## 가입·재설정 봇 방지: Cloudflare Turnstile
 

@@ -26,6 +26,18 @@
 
 `X-Request-ID`는 서버가 요청마다 생성하는 UUID 형태의 진단 식별자다. 클라이언트는 값의 내부 구조를 해석하지 않고 운영 문의와 관련 로그를 찾는 데만 사용한다. 외부 요청의 같은 이름 헤더는 신뢰하거나 재사용하지 않고, 이 값으로 인증·권한·멱등성 판단 또는 메트릭 레이블을 만들지 않는다. Spring이 처리한 응답은 애플리케이션이 생성한 값을 유지하고, 요청 본문 제한이나 업스트림 장애처럼 Caddy가 직접 응답할 때만 Caddy가 누락된 헤더를 자체 UUID로 채운다.
 
+### Brevo 메일 전달 결과
+
+`POST /api/v1/integrations/brevo/email-events`는 Brevo 전용 Bearer 인증으로 단일 JSON 이벤트를 수신한다. 계정 세션·공유 키·CSRF 토큰은 이 콜백의 인증 수단이 아니다. 기본 비활성이며, 잘못된 토큰·미설정·비활성은 `401 UNAUTHORIZED`와 `WWW-Authenticate: Bearer`를 반환한다.
+
+| 필드 | 계약 |
+| --- | --- |
+| `event` | 필수 문자열, 1~64자. `delivered`, `soft_bounce`, `hard_bounce`, `blocked`, `invalid_email`, `error`, `deferred`, `spam` 지원. 나머지는 무시 |
+| `X-Mailin-custom` | 선택 문자열. 있으면 `baton-delivery-id:`와 0이 아닌 1~18자리 정수. 없으면 다른 메일로 보고 무시 |
+| `ts_event` | 필수 Unix 초 정수, `1..253402300799`. UTC 저장 |
+
+성공과 무시 결과는 본문 없는 `204`, 형태 검증 실패는 `400 INVALID_INPUT`이다. 제공자의 나머지 필드는 읽거나 저장하지 않는다. 동일 발송 ID·결과별 가장 늦은 시각만 유지하며 존재하지 않거나 시도 전인 발송 ID는 무시한다. 별도 `Idempotency-Key`는 요구하지 않는다. 공급자 결과는 SMTP 접수·계정 인증·재발송 상태를 변경하지 않는다. 운영 설정은 [무료 외부 연동](../../runbooks/free-integrations.md#메일-전달-결과-brevo-webhook)을 따른다.
+
 ### 역할 자료 연결 상태와 재점검
 
 | 메서드와 경로 | 성공 | 동작 |

@@ -2,6 +2,9 @@
 
 ## 공통 운영 준비
 
+- [Sentry 오류 수집](docs/runbooks/free-integrations.md#오류-수집-sentry): 무료 Developer 조직·서버/React DSN을 준비하고 실제 HTTPS에서 오류 1건의 수신과 개인정보 비노출을 확인한다. 브라우저 DSN 변경에는 웹 이미지 재빌드가 필요하다.
+- [Brevo 결과 웹훅](docs/runbooks/free-integrations.md#메일-전달-결과-brevo-webhook): V40 배포, 전용 토큰·공급자 웹훅을 준비하고 새 테스트 메일의 전달·중복 수신·반송 경보를 확인한 뒤 운영 수신을 활성화한다. 기본 비활성이다.
+
 - 실제 배포할 BATON·웹·MySQL 이미지에 [Trivy 검사](docs/runbooks/free-integrations.md#배포-이미지-취약점-검사-trivy)를 실행하고 HIGH·CRITICAL 발견 항목을 조치한다. 로컬 테스트 이미지 검사 결과를 운영 이미지 검사 결과로 대신하지 않는다.
 
 - [무료 외부 연동](docs/runbooks/free-integrations.md)에 따라 Brevo 무료 SMTP·Better Stack 공개 상태/백업 하트비트·Google Drive crypt 원격 저장소의 계정과 비밀값을 준비한다. `b4ton.com`의 실제 HTTPS·메일 수신·첫 하트비트·원격 업로드/복원을 확인한다.
