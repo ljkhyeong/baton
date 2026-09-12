@@ -5,7 +5,6 @@ import type { FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { Icon } from '@/shared/ui/Icon'
-import { handoffCategoryLabel } from './records/recordSearch'
 import {
   CreationFormFeedback,
   FormActions,
@@ -16,6 +15,7 @@ import {
 import type { SaveResult } from './WorkspaceModalPrimitives'
 import { clampToSeason } from './seasonCalendar'
 import {
+  categoryCopy,
   getMember,
   isActiveMember,
   memberDisplayName,
@@ -381,7 +381,7 @@ export function HandoffPreview({
                   {items.map((item) => (
                     <li key={item.id}>
                       <span>{item.label}</span>
-                      <small>{handoffCategoryLabel[item.category]} · {item.completed ? '완료' : '미완료'}</small>
+                      <small>{categoryCopy[item.category]} · {item.completed ? '완료' : '미완료'}</small>
                     </li>
                   ))}
                 </ul>

@@ -9,7 +9,6 @@ import type {
   WorkspaceProjection,
 } from '../types'
 import {
-  handoffCategoryLabel,
   compareRecordSearchResults,
   isRecordSearchDateRangeValid,
   searchWorkspaceRecords,
@@ -43,12 +42,6 @@ function formatRecordTime(value: string | null, timeZone: string) {
     timeZone,
     year: 'numeric',
   }).format(date)
-}
-
-function resultSecondaryText(result: RecordSearchResult) {
-  if (result.kind !== 'handoff' || !result.secondaryText) return result.secondaryText
-  return handoffCategoryLabel[result.secondaryText as keyof typeof handoffCategoryLabel]
-    ?? result.secondaryText
 }
 
 function resultActionLabel(result: RecordSearchResult) {
@@ -269,7 +262,7 @@ export function RecordSearchView({
                       {result.secondaryLabel && result.secondaryText && (
                         <div>
                           <dt>{result.secondaryLabel}</dt>
-                          <dd>{resultSecondaryText(result)}</dd>
+                          <dd>{result.secondaryText}</dd>
                         </div>
                       )}
                     </dl>

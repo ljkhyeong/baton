@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { WorkspaceScope } from './api'
 import { useWorkspaceQuery } from './queries'
 import { FormError } from './WorkspaceModalPrimitives'
-import { handoffCategoryLabel } from './records/recordSearch'
+import { categoryCopy } from './workspacePresentation'
 import type { RoleResource } from './types'
 import './previous-role-records.scss'
 
@@ -81,7 +81,7 @@ function PreviousRoleRecordContents({
       {items.length ? <ul>
         {items.map((item) => <li key={item.id}>
           <strong>{item.label}</strong>
-          <small>{handoffCategoryLabel[item.category]} · {item.completed ? '완료' : '미완료'}{item.archivedAt ? ' · 보관' : ''}</small>
+          <small>{categoryCopy[item.category]} · {item.completed ? '완료' : '미완료'}{item.archivedAt ? ' · 보관' : ''}</small>
         </li>)}
       </ul> : <p>이 역할에 남긴 인수인계 항목이 없습니다.</p>}
     </div>

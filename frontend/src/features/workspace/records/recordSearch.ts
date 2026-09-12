@@ -1,4 +1,6 @@
 import { decisionVisibleText } from './decisionVisibleText'
+import { pilotCalendarDate } from '../seasonCalendar'
+import { categoryCopy } from '../workspacePresentation'
 import type {
   Decision,
   HandoffItem,
@@ -44,31 +46,12 @@ type RecordSearchSource = {
   roles: Role[]
 }
 
-export const handoffCategoryLabel = {
-  RESPONSIBILITY: '담당 업무',
-  ROUTINE: '반복 업무',
-  RESOURCE: '자료',
-  ADVICE: '조언',
-} satisfies Record<HandoffItem['category'], string>
-
 function normalizeSearchText(value: string) {
   return value
     .normalize('NFKC')
     .toLocaleLowerCase('ko-KR')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-function recordCalendarDate(value: string, timeZone: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone,
-    year: 'numeric',
-  }).formatToParts(new Date(value))
-  const part = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((candidate) => candidate.type === type)!.value
-  return `${part('year')}-${part('month')}-${part('day')}`
 }
 
 function roleName(roleId: string, rolesById: Map<string, Role>) {
@@ -120,7 +103,7 @@ function buildSearchResults({
       primaryLabel: '인수인계 상태',
       primaryText: item.completed ? '준비 완료한 항목' : '아직 준비가 필요한 항목',
       secondaryLabel: '분류',
-      secondaryText: item.category,
+      secondaryText: categoryCopy[item.category],
       createdAt: item.createdAt,
       archivedAt: item.archivedAt,
       roleId: item.roleId,
@@ -129,7 +112,7 @@ function buildSearchResults({
       searchableText: normalizeSearchText([
         item.label,
         item.category,
-        handoffCategoryLabel[item.category],
+        categoryCopy[item.category],
         ownerRoleName,
       ].join(' ')),
     }
@@ -184,11 +167,10 @@ export function searchWorkspaceRecords(
     .filter((result) => {
       if (!filters.fromDate && !filters.toDate) return true
       if (!result.createdAt) return false
-      const calendarDate = recordCalendarDate(result.createdAt, timeZone)
+      const calendarDate = pilotCalendarDate(new Date(result.createdAt), timeZone)
       return (!filters.fromDate || calendarDate >= filters.fromDate)
         && (!filters.toDate || calendarDate <= filters.toDate)
     })
-    .sort(compareRecordSearchResults)
 }
 
 export function compareRecordSearchResults(left: RecordSearchResult, right: RecordSearchResult) {
