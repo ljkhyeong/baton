@@ -18,6 +18,7 @@
 | 사용자용 서비스 상태 페이지 | Better Stack 무료 상태 페이지 | 기존 공개 모니터의 상태·이력을 `status.b4ton.com`에 표시한다. 시작·로그인·오류 화면의 링크는 공개 확인 후 켠다. |
 | 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 선택한 운영 채널로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP 또는 Discord | 기존 지표의 경보 규칙과 수신 설정을 사용한다. Discord를 선택하면 SMTP 장애 중에도 운영 알림을 받을 수 있다. |
+| 업무 API 서버 오류 알림 | Spring 요청 지표 → Prometheus·Alertmanager | 상태 확인이 정상이어도 업무 API의 5xx 오류가 반복되면 기존 운영 채널로 알린다. 별도 수집 코드·유료 APM을 추가하지 않는다. |
 | 감시 시스템 중단 확인 | Prometheus → Alertmanager → Better Stack 하트비트 | 감시 경로에서 5분마다 신호를 보낸다. 신호가 끊기면 홈서버 밖에서 알린다. 별도 예약 작업이나 발송기는 추가하지 않는다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
 | 홈서버 저장 공간 감시 | Node Exporter → Prometheus·Alertmanager | 디스크 여유가 10% 미만으로 10분 지속되면 기존 운영 채널로 알린다. 수집·디스크 조회 오류도 구분한다. 선택 설정이며 서버 설치는 포함하지 않는다. |
@@ -259,8 +260,9 @@ CAL·WATCH·BRIEF·이메일 전달은 공개 상태가 `UP`이어도 실패할 
 
 ### 연결 설정
 
-- [prometheus.yml](../../ops/integrations/prometheus.yml): 30초마다 연동 상태와 메일 전달 결과 지표를 수집하고 Alertmanager에 경보를 전달한다. [수집 필터](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)는 `baton_integration_*`와 `baton_email_delivery_receipts`만 허용한다. 지표를 외부 저장 서비스로 전송하지 않는다.
+- [prometheus.yml](../../ops/integrations/prometheus.yml): 30초마다 연동 상태·메일 전달 결과·업무 API 응답 건수를 수집하고 Alertmanager에 경보를 전달한다. [수집 필터](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)는 `baton_integration_*`, `baton_email_delivery_receipts`와 `/api/v1` 경로의 `http_server_requests_seconds_count`만 허용한다. 지표를 외부 저장 서비스로 전송하지 않는다.
 - [baton-alerts.yml](../../ops/integrations/baton-alerts.yml): 수집·갱신 장애, 전달 실패와 처리 지연을 판단한다. `prometheus.yml`과 같은 디렉터리에 둔다.
+- [baton-http-alerts.yml](../../ops/integrations/baton-http-alerts.yml): 아래 업무 API 오류율을 판단한다. 수집 설정과 함께 반영하고 기존 규칙 파일과 같은 디렉터리에 둔다.
 - [alertmanager.yml.example](../../ops/integrations/alertmanager.yml.example): SMTP 로그인과 운영자 이메일을 실제 값으로 바꾸고 비밀 파일을 연결한다. [표준 SMTP 설정](https://prometheus.io/docs/alerting/latest/configuration/#file-layout-and-global-settings)으로 STARTTLS를 사용하며 비밀번호 원문은 설정에 넣지 않는다. Alertmanager는 예시의 문자열이나 환경 변수 참조를 자동 치환하지 않으므로 실행 전에 실제 값으로 작성한다.
 - [alertmanager-discord.yml.example](../../ops/integrations/alertmanager-discord.yml.example): SMTP를 거치지 않는 선택 설정이다. 아래 절차로 Discord 웹훅 비밀 파일을 연결한다.
 - [alertmanager-heartbeat.yml.example](../../ops/integrations/alertmanager-heartbeat.yml.example): SMTP 운영 알림과 감시 시스템 하트비트를 분리한 선택 설정이다. 위 하트비트 연결 절차를 따른다.
@@ -283,6 +285,20 @@ Alertmanager는 같은 앱의 경보를 묶어 최초 30초 대기 후 보내고
 
 실제 수집·장애·해제 알림 수신을 확인한 뒤 `baton-integration-delivery.timer`를 사용 중이라면 해당 예약 검사만 끈다. 수동 `check-integration-delivery.sh`는 초기 점검과 진단에 계속 사용할 수 있다. 이 구성은 같은 홈서버가 중단되면 알릴 수 없으므로 외부 Better Stack 감시는 유지한다.
 
+### 업무 API 오류 알림
+
+상태 확인은 정상이지만 저장·조회 API에서 오류가 반복되는 경우를 감시한다. [Spring의 기본 요청 관측](https://docs.spring.io/spring-framework/reference/integration/observability.html)을 사용하므로 BATON에 별도 카운터·요청 필터를 추가하지 않는다. 기존 Prometheus·Alertmanager와 SMTP 또는 Discord를 사용하며 공급자 계정·API 키를 추가할 필요가 없다.
+
+`BatonApiServerErrorsHigh`는 **최근 5분간 5xx 비율이 5%를 넘고 오류가 5건 이상인 상태가 5분 지속**되면 알린다. 요청 수는 카운터의 증가량으로 추정한다. 앱별로 계산하며 4xx는 서버 오류로 세지 않는다. 요청이 없거나 오류가 드물면 알리지 않고, 조건이 해소되면 기존 채널로 해제 알림을 보낸다.
+
+수집 대상은 Spring이 `/api/v1` 아래의 컨트롤러에 매핑한 요청이다. `uri`는 `/api/v1/seasons/{seasonId}` 같은 경로 패턴이며 실제 ID·쿼리·요청 본문을 넣지 않는다. 상태 확인·정적 파일·경로 미상 요청은 제외한다. 따라서 매핑 전 필터 오류나 Caddy가 반환한 502·503은 이 경보에 포함되지 않는다. 외부 HTTPS 감시와 서버 로그를 함께 확인한다.
+
+1. `prometheus.yml`의 수집 필터와 `baton-http-alerts.yml`을 함께 반영한다. 기존 수집·알림 주소는 유지한다.
+2. 시험 환경에서 업무 API를 호출한 뒤 내부 Prometheus의 `http_server_requests_seconds_count{job="baton"}`에 `uri`·`status`가 보이는지 확인한다. 이전 설정은 요청 지표를 버리므로 경보 파일만 추가해서는 동작하지 않는다.
+3. 시험 오류와 회복의 실제 알림 수신을 확인한다. 오류가 난 경로는 해당 지표를 `instance`·`uri`·`status`별로 조회하고 서버 로그 또는 연결한 Sentry와 대조한다. 수집 중단 시에는 API 오류 경보가 해제될 수 있으므로 `BatonMetricsUnavailable`도 함께 확인한다.
+
+로컬에서는 HTTP 대역을 통한 실제 Prometheus 저장·필터 처리, 오류 지속·회복·저트래픽·4xx·재시작·앱별 집계·수집 장애를 검증했다. 실행 중인 BATON의 지표와 실제 운영 채널 수신은 연결 후 확인해야 한다.
+
 ### 운영 알림: Discord 웹훅
 
 메일 장애나 Brevo 발송 한도 때문에 운영 경보까지 누락되는 상황을 줄이는 선택지다. Discord의 [기본 채널 웹훅](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)을 직접 사용하므로 유료 봇·중계 서비스나 별도 발송 서버가 필요 없다. BATON 애플리케이션에는 Discord SDK·토큰을 추가하지 않는다.
@@ -304,7 +320,7 @@ bash ops/tests/integration-alerts-test.sh
 
 Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·Discord·하트비트·HTTPS 설정과 장애 시나리오를 검사한다. 정기 신호의 지속 발생과 세 설정에서 정기 신호·일반 장애가 각각 의도한 수신자로 분리되는지도 확인한다.
 
-[수집 테스트](../../ops/tests/integration-metrics-scrape-test.sh)는 실제 Prometheus를 실행해 HTTP 대역의 연동·메일 결과 지표가 저장되고 요청 지표는 제외되는지 확인한다. Caddy 이미지는 웹 Dockerfile의 고정 버전을 재사용한다. 운영 수집 경로·필터는 유지하고 테스트 주기만 줄인다. 임시 저장소와 컨테이너는 종료 시 제거한다.
+[수집 테스트](../../ops/tests/integration-metrics-scrape-test.sh)는 실제 Prometheus를 실행해 HTTP 대역의 연동·메일 결과·업무 API 응답 건수가 저장되고 나머지 요청·JVM 지표는 제외되는지 확인한다. Caddy 이미지는 웹 Dockerfile의 고정 버전을 재사용한다. 운영 수집 경로·필터는 유지하고 테스트 주기만 줄인다. 임시 저장소와 컨테이너는 종료 시 제거한다.
 
 Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 외부 통신과 공개 포트가 없는 임시 컨테이너에서 실행하며 실제 메일·Discord·하트비트를 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 선택한 채널의 실제 수신은 활성화 전에 별도로 확인해야 한다.
 
