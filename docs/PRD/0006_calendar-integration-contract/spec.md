@@ -12,15 +12,15 @@ BATON이 확정한 운영 회차와 반복 업무 실행 마감을 BATON CAL의 
 ## 2. 고정한 외부 계약
 
 BATON은 공개 고정 사전 릴리스
-[`contracts-v1.1.0-rc.1`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.1.0-rc.1)를
+[`contracts-v1.1.0-rc.2`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.1.0-rc.2)를
 생산자 검증 기준으로 고정한다. 운영 안정 기준은 계약 의미를 검증해 정식 버전으로 승격하기 전까지
 `1.0.0`으로 유지한다.
 
 | 항목 | 값 |
 | --- | --- |
-| 태그 커밋 | `f1573edef1adf900570cd55f9bd7d7044566b6bd` |
-| 자산 | `baton-cal-contracts-1.1.0-rc.1.zip` |
-| 자산 SHA-256 | `7ac97568c8b10e4ac2dadb9d463312c1a5985c424a3a3a9e69c2bd8ee6dd376f` |
+| 태그 커밋 | `3ba5889b6396749df74ac0e181da24337221fa56` |
+| 자산 | `baton-cal-contracts-1.1.0-rc.2.zip` |
+| 자산 SHA-256 | `6b2feb97eae937a930e39d1cd4dbe7e156777a5e314bbce1a27600f20426c208` |
 | 일정 스키마 SHA-256 | `eec43ba76727cab8b5c1daa3af9ed014b8a8590e65b0a66b42e8f9ed9ba41309` |
 | 시즌 이름 스키마 SHA-256 | `4fa9aa1d2f20969bbca97ad2272ca5d07ac026073de60742c6b242f17c2361f5` |
 | 시즌 복구 스키마 SHA-256 | `96c347e2e721164636b57003ffd78af685978124ca71fe7e50b44a1f7fdbd8f8` |
@@ -31,7 +31,7 @@ BATON은 공개 고정 사전 릴리스
 
 ### 시즌 표시 이름 계약
 
-시즌 이름은 CAL의 고정 사전 릴리스 `1.1.0-rc.1`에서 제공하는
+시즌 이름은 CAL의 고정 사전 릴리스 `1.1.0-rc.2`에서 제공하는
 `PUT /internal/api/v1/seasons/{seasonId}/calendar-metadata`로 전달한다. 현재 BATON에는
 `CalendarSeasonMetadataClient` 포트, HTTP 어댑터와 원본 변경의 아웃박스 전달이 구현되어 있다.
 최초 시즌 생성·이름 수정·다음 시즌 생성은 원본 저장 트랜잭션 안에서 이름을 기록한다.
@@ -129,11 +129,12 @@ CAL과 동일하게 UUID 문자열 순서, UTF-8 길이 접두 문자열, big-en
 목록 JSON이나 별도 체크섬 구현을 만들지 않는다. CAL의 `COMPLETED` 응답은 그 검증 시점의 저장 상태와 BATON
 매니페스트가 일치했다는 증거이며 런타임의 복구 모드를 자동 해제하지 않는다.
 
-### 개인 캘린더 구독과 응답 유실 복구 후보
+### 개인 캘린더 구독과 응답 유실 복구
 
-`BATON_CAL_SUBSCRIPTIONS_ENABLED`는 기본 `false`다. 개발 소스 `1.1.0-rc.2`를 대상으로 구독·진단
-소비 코드를 추가했으며 게시된 계약을 교체하거나 운영 활성화를 완료한 상태는 아니다.
-`contracts/baton-cal/candidate/source.properties`에 검증한 CAL 소스 커밋과 스키마 해시를 기록한다.
+`BATON_CAL_SUBSCRIPTIONS_ENABLED`는 기본 `false`다. 구독·진단 소비 코드는 공식 `1.1.0-rc.2`의
+릴리스·자산 증명과 기존 스키마 9개의 바이트 일치를 확인해 고정했다. 실제 CAL 컨테이너 연동도 검증했다.
+`contracts/baton-cal/candidate/source.properties`에 검증한 태그 커밋과 스키마 해시를 기록한다.
+운영 활성화는 실제 CAL 배포와 앱 검증 후 별도로 진행한다.
 발급을 켜려면 일정 캡처와 CAL 전달도 켜져 있어야 한다.
 
 화면의 계정 UUID가 현재 세션 계정과 같은지 먼저 확인한다. 주소 발급·재발급에는 열린 시즌의
@@ -220,7 +221,7 @@ Outlook은 개인·회사/학교 계정별 캘린더, Apple은 공식 등록 안
 `CAL_RECOVERY_COMPLETION_RECHECK_REQUIRED`로 대기하며 다음 주기에 현재 BATON 매니페스트를 다시
 검증한다. 진단으로 원본 기대값을 덮거나 CAL의 복구 모드를 자동 해제하지 않는다.
 
-후보 소비 검증은 다음과 같이 실행한다. 기존 기본 실행은 계속 게시된 `1.1.0-rc.1` 소스를 요구한다.
+소비 검증은 다음과 같이 실행한다. 기본 실행도 게시된 `1.1.0-rc.2` 소스를 요구한다.
 
 ```sh
 BATON_CAL_CONTRACT_VERSION=1.1.0-rc.2 \
@@ -344,7 +345,7 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 - Actuator Prometheus의 `baton_integration_delivery_items`와
   `baton_integration_delivery_actionable_failed_items`가 `integration="calendar"` 범위에서 MySQL
   아웃박스의 상태별 현재 행 수와 조치 대상 실패 수를 노출하는지 공통 운영 지표 테스트로 검증한다.
-- `./ops/tests/calendar-consumer-contract.sh`가 CAL 고정 사전 릴리스 `1.1.0-rc.1` 소스의 실제
+- `./ops/tests/calendar-consumer-contract.sh`가 CAL 고정 사전 릴리스 `1.1.0-rc.2` 소스의 실제
   PostgreSQL 컨테이너를 띄우고 BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순
   전달을 검증한다.
 - 같은 실행에서 시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 고정한 스키마에

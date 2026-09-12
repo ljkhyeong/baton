@@ -119,7 +119,7 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
   await page.getByLabel('시작일').fill('2026-09-01')
   await page.getByLabel('종료일').fill('2026-11-30')
   await page.getByLabel('구성원 이름').fill('박민서\n김준호, 최유진')
-  await page.getByLabel('작업 공간 생성 코드 (선택)').fill('pilot-only-code')
+  await page.getByLabel('운영자 생성 코드').fill('pilot-only-code')
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
@@ -869,8 +869,8 @@ test('불러온 온보딩 입력이 바뀌면 명시적 확인 전 새 요청으
   }, { prefix: PENDING_CREATION_STORAGE_PREFIX, entry: pendingEntry })
   await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
 
-  await expect(page.getByRole('alert')).toContainText('다른 탭에서 임시 기록이 변경됐습니다.')
-  await expect(page.getByText('다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다.')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('다른 탭에서 임시 기록을 변경했습니다.')
+  await expect(page.getByRole('status').filter({ hasText: '다른 탭에서 임시 기록을 변경했습니다.' })).toBeVisible()
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
@@ -943,7 +943,9 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 임시 기록
   api.releaseWorkspaceCreation()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(peerPage)).length).toBe(0)
-  await expect(peerPage.getByText('다른 탭에서 생성 결과를 확인했거나 임시 기록을 삭제했습니다.')).toBeVisible()
+  await expect(peerPage.getByRole('status').filter({
+    hasText: '다른 탭에서 생성 결과를 확인했거나 임시 기록을 삭제했습니다.',
+  })).toBeVisible()
   await expect(peerPage.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(peerPage.getByRole('link', { name: new RegExp(pendingRequest.teamName) })).toBeVisible()
   expect(api.calls.filter((call) =>
@@ -1237,7 +1239,7 @@ test('최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록�
   await forgetButton.click()
 
   await expect(forgetButton).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('공유 링크는 지웠지만 최근 방문 목록을 지우지 못했습니다.')
+  await expect(page.getByRole('alert')).toContainText('공유 링크는 삭제했지만 최근 방문 목록은 남아 있습니다.')
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
     .toBeNull()
   expect(await page.evaluate(() =>

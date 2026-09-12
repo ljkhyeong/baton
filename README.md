@@ -57,7 +57,7 @@ BATON은 팀·시즌·역할·업무 기록과 최종 접근 권한을 관리한
 
 | 서비스 | 담당 기능 | 구현·검증 상태 |
 | --- | --- | --- |
-| CAL | 회차·마감 캘린더와 개인 구독 | 일정·시즌 이름 전달, 재시도와 복구 절차 구현. 개인 구독의 공식 계약 채택과 실제 캘린더 앱 검증은 남아 있다. [계약](docs/PRD/0006_calendar-integration-contract/spec.md) |
+| CAL | 회차·마감 캘린더와 개인 구독 | 일정·시즌 이름 전달, 개인 구독과 복구 절차 구현. 공식 `1.1.0-rc.2` 계약을 검증했으며 실제 캘린더 앱 검증은 남아 있다. [계약](docs/PRD/0006_calendar-integration-contract/spec.md) |
 | WATCH | 자료 URL 점검과 상태 변경 전달 | 송신·수신 기록과 자료 연결 상태 조회·재점검 구현. 공개 HTTPS 전달·조회 검증과 운영 활성화는 남아 있다. [계약](docs/PRD/0004_watch-integration-contract/spec.md) |
 | BRIEF | 업무 점검 항목과 주간 요약 | 점검 이벤트 전달·재시도·요약 조회·생성 구현. 로컬 서비스 간 검증을 마쳤으며 공개 HTTPS 검증과 운영 활성화는 남아 있다. [전달 계약](docs/PRD/0007_brief-continuity-signal-producer/spec.md) |
 | ROUND | 화상회의·시그널링·TURN | BATON의 방 매핑·참여권 발급과 로컬 서비스 간 검증 완료. 실제 릴리스·외부 coturn의 공개 HTTPS 검증은 남아 있다. [운영 구성](docs/ADR/0018_round-production-runtime/adr.md) |
@@ -562,7 +562,7 @@ gh variable set BATON_EXTERNAL_MONITOR_ENABLED --body true
   -PbriefBootJar=/absolute/path/to/baton-brief.jar
 ROUND_REPOSITORY_ROOT=/absolute/path/to/round \
   bash ops/tests/round-consumer-contract.sh
-BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 \
+BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.2 \
   bash ops/tests/calendar-consumer-contract.sh
 ```
 
@@ -572,7 +572,7 @@ BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.1 \
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
 - `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 두 DB를 연결해 이벤트 전달·재시도·해소 반영과 사용자 세션 기반 주간 요약 생성·조회·응답 유실 복구·서비스 토큰 교체를 확인하는 선택 실행 테스트
 - `round-consumer-contract.sh`: BATON의 실제 RS256 서명자·JWK를 현재 ROUND 시그널링 `bootJar`에 연결해 올바른 방의 TURN·WebSocket 수락, 다른 방·발급자·수신자·`kid`·만료 참여권 거부, 키 선게시·새 `kid` 즉시 재조회·이전 키 중첩과 반복되는 알 수 없는 `kid`의 JWK 갱신 제한을 검증하는 선택 실행 교차 서비스 테스트
-- `calendar-consumer-contract.sh`: CAL 고정 사전 릴리스 `1.1.0-rc.1`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
+- `calendar-consumer-contract.sh`: CAL 고정 사전 릴리스 `1.1.0-rc.2`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
 
 교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다.
 
@@ -582,7 +582,7 @@ BRIEF 테스트는 미리 빌드한 BRIEF 실행 JAR의 절대 경로를 `briefB
 
 ROUND 교차 서비스 경계는 실제 BATON 서명자와 ROUND의 Nimbus JWK 디코더·키 회전·캐시 누락·갱신 제한·쿠키·방 결속을 검증하며, 고정 시각 Nimbus 소스 테스트가 JVM 캐시의 60초 만료와 30초 구간당 소스 접근 상한을 별도로 고정한다. 이 ROUND 경계에는 BATON 세션·AccountMembership·공개 Caddy TLS 경로와 실제 SMTP 가입이 포함되지 않는다.
 
-CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.1`인 `contracts-v1.1.0-rc.1` 태그 checkout을
+CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.2`인 `contracts-v1.1.0-rc.2` 태그 checkout을
 사용한다. `BATON_CAL_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `baton-cal`을
 시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 고정 태그의 별도 절대 경로를
 지정한다. 버전 확인 뒤 실제 CAL 컨테이너를 띄워 일정과 시즌 이름 생산자 계약을 함께 검증한다.
@@ -752,7 +752,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   기본 연결 시간 제한은 `PT2S`, 읽기 시간 제한은 `PT5S`, 전달 간격은 `PT10S`이며 두 시간 제한의
   합은 45초를 넘을 수 없다. `401`·`403`은 아웃박스를 실패로 확정하지 않고 자격 증명 교체 뒤 같은
   행을 재시도한다. 로컬 교차 서비스 검증은 `./ops/tests/calendar-consumer-contract.sh`로
-  CAL 고정 사전 릴리스 `1.1.0-rc.1` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
+  CAL 고정 사전 릴리스 `1.1.0-rc.2` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
   `baton_integration_delivery_items{integration="calendar",status="..."}`는 `pending`,
   `processing`, `failed` 상태별 현재 행 수를 MySQL에서 읽고,
   `baton_integration_delivery_actionable_failed_items{integration="calendar"}`는 조치 대상 영구
@@ -762,7 +762,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   발급·복사·재발급·해제한다. 주소는 열린 화면에서만 보이며 서버와 브라우저 저장소에는 보관하지 않는다.
   Google·Apple·Outlook 중 사용할 앱을 선택하면 URL 구독 등록 절차를 안내한다. 갱신 주기는 앱마다 다르다.
   기본 `BATON_CAL_SUBSCRIPTIONS_ENABLED=false`이며 발급을 켤 때 일정 캡처·전달도 필요하다.
-  미게시 `1.1.0-rc.2` 후보의 실제 소비 검증은
+  공식 `1.1.0-rc.2`의 실제 소비 검증은
   `BATON_CAL_CONTRACT_VERSION=1.1.0-rc.2 bash ops/tests/calendar-consumer-contract.sh`다.
   계정 화면 `/account`에서 팀·시즌별 구독 기록과 해제한 구독을 모아 보고, 항목을 펼쳐 최신 상태 확인과
   개별 해제를 수행한다. 팀·시즌 검색과 해제된 구독 숨기기를 제공하며 확인한 상태와 시각은 항목을

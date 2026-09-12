@@ -8,7 +8,7 @@ COMMON_GIT_DIRECTORY="$(git -C "$REPOSITORY_ROOT" rev-parse --path-format=absolu
 DEFAULT_CAL_ROOT="$(dirname -- "$(dirname -- "$COMMON_GIT_DIRECTORY")")/baton-cal"
 CAL_ROOT="${BATON_CAL_REPOSITORY_ROOT:-$DEFAULT_CAL_ROOT}"
 CAL_IMAGE_OVERRIDE="${BATON_CAL_IMAGE:-}"
-CAL_CONTRACT_VERSION="${BATON_CAL_CONTRACT_VERSION:-1.1.0-rc.1}"
+CAL_CONTRACT_VERSION="${BATON_CAL_CONTRACT_VERSION:-1.1.0-rc.2}"
 CAL_MANAGEMENT_PORT=8081
 CONTRACT_TEST_OPTIONS=(
   :adapter-out-external:calendarConsumerContractTest
@@ -53,7 +53,7 @@ actual_contract_version="$(<"$CAL_ROOT/contracts/VERSION")"
 case "$CAL_CONTRACT_VERSION" in
   1.1.0-rc.1) log '게시된 1.1.0-rc.1 사전 릴리스 계약을 검증합니다.' ;;
   1.1.0-rc.2)
-    log '아직 게시하지 않은 1.1.0-rc.2 개발 소스의 구독·복구 진단 계약을 검증합니다.'
+    log '1.1.0-rc.2의 구독·복구 진단 계약을 검증합니다.'
     CONTRACT_TEST_OPTIONS+=( :application:calendarSubscriptionContractTest )
     ;;
   *) fail "지원하지 않는 CAL 계약 버전입니다: $CAL_CONTRACT_VERSION" ;;

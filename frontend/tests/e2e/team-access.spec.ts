@@ -22,6 +22,7 @@ async function accountApi(page: Page) {
 }
 
 test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 둔 목록에서 만료 상태를 확인한다', async ({ page }, testInfo) => {
+  test.slow(testInfo.project.name === 'webkit', '초대 생성·취소·재시도·만료를 한 흐름에서 확인한다')
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'share', { configurable: true, value: async (data: ShareData) => {
       document.documentElement.dataset.sharedInvitation = JSON.stringify(data)
