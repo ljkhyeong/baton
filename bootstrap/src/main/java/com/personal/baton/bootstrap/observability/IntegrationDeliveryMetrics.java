@@ -333,16 +333,14 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
             long expiredProcessingItems
     ) {
 
+        private static final DeliverySnapshot EMPTY = new DeliverySnapshot(0, 0, 0, 0, null, 0, 0);
+
         private long count(DeliveryStatus status) {
             return switch (status) {
                 case PENDING -> pendingItems;
                 case PROCESSING -> processingItems;
                 case FAILED -> failedItems;
             };
-        }
-
-        private static DeliverySnapshot empty() {
-            return new DeliverySnapshot(0, 0, 0, 0, null, 0, 0);
         }
     }
 
@@ -360,7 +358,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     ) {
 
         private DeliverySnapshot delivery(Integration integration) {
-            return deliveries.getOrDefault(integration, DeliverySnapshot.empty());
+            return deliveries.getOrDefault(integration, DeliverySnapshot.EMPTY);
         }
 
         private static Snapshot empty() {
