@@ -15,15 +15,15 @@
 | 가입·재설정 요청 봇 방지 | Cloudflare Turnstile | 브라우저 위젯과 서버 Siteverify 검증을 연결했다. 기존 IP·이메일 요청 제한을 함께 사용한다. |
 | 로그인 | Google OIDC·Naver OAuth2 | 이미 구현되어 있다. 기존 공급자 설정과 콜백을 사용한다. |
 | 서비스 장애 감시 | Better Stack 무료 모니터 | 상태 조회·이력·이메일 알림을 외부 서비스가 처리한다. BATON 등록용 API 요청 파일을 추가했다. |
-| 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 기존 SMTP로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
-| 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP | 기존 지표의 경보 규칙과 SMTP 수신 설정을 추가했다. 알림 묶기·재통지·해제는 표준 도구가 처리한다. |
+| 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 선택한 운영 채널로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
+| 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP 또는 Discord | 기존 지표의 경보 규칙과 수신 설정을 사용한다. Discord를 선택하면 SMTP 장애 중에도 운영 알림을 받을 수 있다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
 | 배포 이미지 취약점 검사 | Trivy | 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 검사하고 JSON 보고서를 남긴다. GitHub Actions 실행은 추가하지 않는다. |
 | 라이브러리·운영 이미지 업데이트 점검 | GitHub Dependabot | 기존 Java·npm·Actions·Dockerfile 점검에 Compose의 MySQL·Caddy를 추가했다. 새 버전 조회와 PR 생성은 GitHub가 처리한다. |
 | 자료 URL 점검·인수인계·주간 요약 | WATCH·BATON·BRIEF | 팀 권한·변경 이력과 연결된 제품 기능이다. 무료 모니터의 제한된 슬롯이나 일반 자동화 서비스로 대체하지 않는다. |
 
-공휴일 설정은 [README](../../README.md#무료-공휴일-연동), 캘린더는 [CAL 계약](../PRD/0006_calendar-integration-contract/spec.md)을 따른다. 새 알림 채널은 RELAY가 소유하므로 BATON에 별도 발송 경로를 만들지 않는다. 화상회의는 기존 ROUND를 유지한다. 무료 사용량 이후 종량 과금이 발생할 수 있는 외부 TURN·SMS·AI API는 추가하지 않는다.
+공휴일 설정은 [README](../../README.md#무료-공휴일-연동), 캘린더는 [CAL 계약](../PRD/0006_calendar-integration-contract/spec.md)을 따른다. 사용자 업무 알림의 외부 발송은 RELAY가 소유하며 운영 경보는 Alertmanager가 맡는다. 화상회의는 기존 ROUND를 유지한다. 무료 사용량 이후 종량 과금이 발생할 수 있는 외부 TURN·SMS·AI API는 추가하지 않는다.
 
 ## 추가 후보와 도입 조건
 
@@ -32,10 +32,9 @@
 | 우선순위 | 후보 | 줄일 수 있는 작업과 도입 조건 |
 | --- | --- | --- |
 | Drive 자료 사용이 많을 때 | Google Picker | Google의 파일 선택창으로 자료 이름과 링크를 가져온다. [공식 선택창](https://developers.google.com/workspace/drive/picker/guides/overview)을 사용하지만 OAuth 동의·프로젝트 설정이 추가된다. 현재는 링크 입력만으로 충분해 보류한다. |
-| 운영자가 Discord를 사용할 때 | Alertmanager → Discord Webhook | 장애·복구 알림을 운영 채널에 보낸다. [기본 Discord 수신 설정](https://prometheus.io/docs/alerting/latest/configuration/#discord_config)이 발송을 처리하므로 봇 서버나 별도 HTTP 발송기를 만들지 않는다. 채널 웹훅과 수신 담당자가 필요하다. |
 | 방문·로딩 통계가 필요할 때 | Cloudflare Web Analytics | 방문과 실제 페이지 로딩 성능을 [무료 통계 서비스](https://www.cloudflare.com/web-analytics/)에서 확인한다. 공개 소개 화면부터 검토하며 수집할 경로와 URL·토큰 제외 기준을 먼저 정한다. |
 
-Discord는 운영 경보의 선택 수신 채널이다. 사용자 업무·인수인계 알림의 외부 발송은 기존 RELAY 범위로 유지한다. 방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
+방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
 
 ### 추가 검토 근거
 
@@ -182,6 +181,7 @@ CAL·WATCH·BRIEF·이메일 전달은 공개 상태가 `UP`이어도 실패할 
 - [prometheus.yml](../../ops/integrations/prometheus.yml): 30초마다 BATON 연동 지표를 수집하고 Alertmanager에 경보를 전달한다. 지표를 외부 저장 서비스로 전송하지 않는다.
 - [baton-alerts.yml](../../ops/integrations/baton-alerts.yml): 수집·갱신 장애, 전달 실패와 처리 지연을 판단한다. `prometheus.yml`과 같은 디렉터리에 둔다.
 - [alertmanager.yml.example](../../ops/integrations/alertmanager.yml.example): SMTP 로그인과 운영자 이메일을 실제 값으로 바꾸고 비밀 파일을 연결한다. [표준 SMTP 설정](https://prometheus.io/docs/alerting/latest/configuration/#file-layout-and-global-settings)으로 STARTTLS를 사용하며 비밀번호 원문은 설정에 넣지 않는다. Alertmanager는 예시의 문자열이나 환경 변수 참조를 자동 치환하지 않으므로 실행 전에 실제 값으로 작성한다.
+- [alertmanager-discord.yml.example](../../ops/integrations/alertmanager-discord.yml.example): SMTP를 거치지 않는 선택 설정이다. 아래 절차로 Discord 웹훅 비밀 파일을 연결한다.
 
 BATON은 `/actuator/prometheus`를 `127.0.0.1`에서만 허용한다. **수집기는 앱과 같은 네트워크 공간에서 실행**해야 한다. 향후 k3s에서는 같은 Pod의 사이드카가 이 조건을 충족한다. 다른 Pod에서 `app:8080`을 조회하는 설정으로 바꾸면 접근이 거부된다. 수집기와 Alertmanager의 내부 통신을 허용하고 예시의 `alertmanager:9093`을 실제 내부 주소로 지정한다. 지표·관리 화면을 `b4ton.com`이나 서비스 공개 주소에 노출하지 않는다. 이 파일들은 연동 설정이며 서버·k3s 설치 파일은 아니다.
 
@@ -198,7 +198,20 @@ BATON은 `/actuator/prometheus`를 `127.0.0.1`에서만 허용한다. **수집�
 
 Alertmanager는 같은 앱의 경보를 묶어 최초 30초 대기 후 보내고, 변경 사항은 5분 간격, 같은 장애의 재통지는 12시간 간격으로 처리한다. 경보 조건이 해소되면 해제 알림을 보낸다. 지표 수집 자체가 끊겨도 개별 전달 경보는 해제될 수 있으므로 수집·갱신 경보와 함께 판단한다. 데이터나 작업을 자동 재처리하지 않는다.
 
-실제 수집·장애·해제 메일 수신을 확인한 뒤 `baton-integration-delivery.timer`를 사용 중이라면 해당 예약 검사만 끈다. 수동 `check-integration-delivery.sh`는 초기 점검과 진단에 계속 사용할 수 있다. 이 구성은 같은 홈서버가 중단되면 알릴 수 없으므로 외부 Better Stack 감시는 유지한다.
+실제 수집·장애·해제 알림 수신을 확인한 뒤 `baton-integration-delivery.timer`를 사용 중이라면 해당 예약 검사만 끈다. 수동 `check-integration-delivery.sh`는 초기 점검과 진단에 계속 사용할 수 있다. 이 구성은 같은 홈서버가 중단되면 알릴 수 없으므로 외부 Better Stack 감시는 유지한다.
+
+### 운영 알림: Discord 웹훅
+
+메일 장애나 Brevo 발송 한도 때문에 운영 경보까지 누락되는 상황을 줄이는 선택지다. Discord의 [기본 채널 웹훅](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks)을 직접 사용하므로 유료 봇·중계 서비스나 별도 발송 서버가 필요 없다. BATON 애플리케이션에는 Discord SDK·토큰을 추가하지 않는다.
+
+1. 운영자만 접근하는 Discord 텍스트 채널에서 웹훅을 만든다. 일반 텍스트 채널을 사용하며 별도 스레드 설정이 필요한 포럼·미디어 채널은 사용하지 않는다.
+2. 전체 웹훅 URL을 저장소 밖 비밀 파일에 저장한다. 컨테이너에서 `/run/secrets/discord-webhook-url`로 읽기 전용 연결하고 Alertmanager 실행 사용자만 읽을 수 있게 한다. URL 자체가 발송 권한이므로 설정 파일·명령 인자·Git에 직접 넣지 않는다.
+3. Discord 예시를 Alertmanager의 `--config.file`에 지정한다. SMTP 예시를 대체하면 운영 경보는 Discord만 사용한다. 메일도 함께 받으려면 기존 `operations-email` 수신자 아래에 예시의 `discord_configs` 블록을 추가한다. 두 설정 파일 전체를 단순히 이어 붙이지 않는다.
+4. 공식 `amtool check-config`로 실제 설정을 검사한 뒤 반영한다. 시험 경보 발생·해제의 실제 채널 수신을 확인한다. 웹훅을 바꾸면 비밀 파일을 교체하고 수신을 다시 확인한다. k3s에서는 같은 파일을 Secret 볼륨으로 연결한다.
+
+[Alertmanager 기본 연동](https://prometheus.io/docs/alerting/latest/configuration/#discord_config)이 웹훅 호출과 메시지 길이 제한을 처리한다. 알림에는 조치 필요·해제 건수, 경보 요약과 조치 설명을 표시한다. 전체 라벨·내부 관리 링크·사용자 업무 내용은 메시지에 추가하지 않는다. 경보가 해제됐다는 표시만으로 서비스 전체가 정상이라는 뜻은 아니므로 함께 온 수집 장애 경보도 확인한다.
+
+기존 묶음·재통지 간격을 그대로 사용한다. Discord의 [호출 제한](https://docs.discord.com/developers/topics/rate-limits)이나 채널 장애로 전송이 실패할 수 있으므로 무제한·즉시 전달을 보장하지 않는다. 실제 수신을 확인하기 전에는 기존 운영 알림을 끄지 않는다. 웹훅 파일과 설정을 연결하지 않으면 현재 운영 구성은 바뀌지 않는다.
 
 ### 로컬 검증
 
@@ -206,11 +219,11 @@ Alertmanager는 같은 앱의 경보를 묶어 최초 30초 대기 후 보내고
 bash ops/tests/integration-alerts-test.sh
 ```
 
-Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·HTTPS 설정과 장애 시나리오를 검사한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일을 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 실제 이메일 수신은 활성화 전에 별도로 확인해야 한다.
+Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·Discord·HTTPS 설정과 장애 시나리오를 검사한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일·Discord 메시지를 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 선택한 채널의 실제 수신은 활성화 전에 별도로 확인해야 한다.
 
 ## 공개 인증서 만료 알림: Blackbox Exporter
 
-[Blackbox Exporter](https://github.com/prometheus/blackbox_exporter)는 Apache 2.0 라이선스의 무료 검사 도구다. HTTPS 인증서의 유효기간을 읽고 기존 Prometheus·Alertmanager가 경보와 메일을 처리한다.
+[Blackbox Exporter](https://github.com/prometheus/blackbox_exporter)는 Apache 2.0 라이선스의 무료 검사 도구다. HTTPS 인증서의 유효기간을 읽고 기존 Prometheus·Alertmanager가 경보와 선택한 채널의 알림을 처리한다.
 
 - [blackbox.yml](../../ops/integrations/blackbox.yml)을 Exporter의 `--config.file`에 지정한다. `baton_https` 모듈은 유효한 인증서·HTTPS·HTTP 200을 요구하고 리디렉션을 따라가지 않는다. IPv4를 우선하며 IPv4 주소가 없으면 IPv6를 사용한다.
 - [prometheus.yml](../../ops/integrations/prometheus.yml)의 `baton-https` 작업은 1분마다 `https://b4ton.com/actuator/health`를 검사한다. `blackbox-exporter:9115`는 실제 내부 주소로 바꾼다. Exporter의 `/probe`와 관리 포트는 수집기에서만 접근하게 하고 인터넷에 공개하지 않는다.
@@ -220,7 +233,7 @@ Exporter와 공개 HTTPS 대상이 준비된 뒤 수집을 시작한다. 내부 
 
 이 검사는 접속 지점에서 보이는 인증서를 확인한다. Cloudflare 프록시를 사용하면 Cloudflare 인증서를 보므로 **홈서버 원본 인증서까지 검사한 결과가 아니다**. 홈서버 안에서 실행할 때는 NAT 루프백·분할 DNS에 따라 접속 경로가 달라질 수 있다. 같은 홈서버가 중단되면 알림도 멈추므로 외부 Better Stack 감시는 유지한다. 인증서 자동 갱신이나 도메인 등록 갱신은 수행하지 않는다.
 
-위 로컬 검증 명령에 만료 경계·갱신·검사 실패·수집 중단·지표 누락 사례를 포함했다. 실제 인증서 조회와 이메일 수신은 미검증이며 공개 환경에서 확인해야 한다. 제공 범위는 연동 설정으로, 홈서버나 k3s를 설치하지 않는다.
+위 로컬 검증 명령에 만료 경계·갱신·검사 실패·수집 중단·지표 누락 사례를 포함했다. 실제 인증서 조회와 알림 수신은 미검증이며 공개 환경에서 확인해야 한다. 제공 범위는 연동 설정으로, 홈서버나 k3s를 설치하지 않는다.
 
 ## 원격 백업: Google Drive + rclone
 
@@ -268,4 +281,4 @@ Compose 업데이트는 한 그룹으로 묶고 동시에 열린 PR을 1개로 �
 
 ## 활성화 전 남은 항목
 
-이번 변경은 공급자 연동 코드·설정 예시와 검증을 제공한다. 공급자 계정 생성, 자격 증명 발급, 실제 DNS 변경, 공개 HTTPS 감시·메일 수신·Google Drive 업로드와 내부 지표 수집 활성화는 실행하지 않았다. 해당 항목은 [HANDOFF](../../HANDOFF.md)에서 관리한다.
+이번 변경은 공급자 연동 코드·설정 예시와 검증을 제공한다. 공급자 계정 생성, 자격 증명 발급, 실제 DNS 변경, 공개 HTTPS 감시·메일/Discord 수신·Google Drive 업로드와 내부 지표 수집 활성화는 실행하지 않았다. 해당 항목은 [HANDOFF](../../HANDOFF.md)에서 관리한다.
