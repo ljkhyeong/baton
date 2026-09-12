@@ -476,6 +476,8 @@ CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애�
 
 상시 경보는 [Prometheus·Alertmanager 연동 설정](docs/runbooks/free-integrations.md#내부-연동-장애-알림-prometheus--alertmanager)을 사용할 수 있다. 기존 지표의 수집·갱신 장애와 전달 실패·처리 지연을 판단하고 무료 SMTP로 운영자에게 알린다. 설정·장애 시나리오 검증을 마쳤으며 실제 수집과 메일 수신 확인은 남아 있다.
 
+[공개 인증서 만료 알림](docs/runbooks/free-integrations.md#공개-인증서-만료-알림-blackbox-exporter)은 Blackbox Exporter를 연결해 만료 14일 전부터 같은 SMTP로 알린다. Cloudflare 프록시 사용 시 홈서버 원본 인증서는 별도 확인해야 한다.
+
 ```bash
 ./ops/show-integration-metrics.sh
 ```

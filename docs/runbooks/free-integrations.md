@@ -12,6 +12,7 @@
 | 가입·비밀번호 재설정 메일 | Brevo 무료 SMTP | 기존 Spring Mail 어댑터에 접속 설정만 연결한다. 공급자 전용 HTTP 클라이언트는 추가하지 않는다. |
 | 로그인 | Google OIDC·Naver OAuth2 | 이미 구현되어 있다. 기존 공급자 설정과 콜백을 사용한다. |
 | 서비스 장애 감시 | Better Stack 무료 모니터 | 상태 조회·이력·이메일 알림을 외부 서비스가 처리한다. BATON 등록용 API 요청 파일을 추가했다. |
+| 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 기존 SMTP로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP | 기존 지표의 경보 규칙과 SMTP 수신 설정을 추가했다. 알림 묶기·재통지·해제는 표준 도구가 처리한다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
@@ -80,6 +81,8 @@ curl -q --config /srv/baton/secrets/better-stack-api.curl \
 
 공개 HTTPS 검증 후 감시를 재개하고 실제 이메일 수신을 확인한다. 기존 GitHub Actions 예약 감시와 중복 운영할 필요는 없다. Better Stack으로 전환을 확인하면 `BATON_EXTERNAL_MONITOR_ENABLED=false`로 기존 예약 검사만 끈다.
 
+`verify_ssl`은 접속 시 인증서 유효성을 검사한다. [만료 사전 알림은 유료 플랜](https://betterstack.com/docs/uptime/ssl-certificate-monitor/)이므로 켜지 않는다. 아래 Blackbox Exporter 연동으로 보완한다.
+
 ### 백업 하트비트
 
 1. Better Stack에서 하트비트를 만든다. 기존 일일 백업은 기대 간격 24시간, 유예 3시간으로 설정한다. 백업 주기를 바꾸면 두 설정도 함께 바꾼다.
@@ -127,7 +130,21 @@ Alertmanager는 같은 앱의 경보를 묶어 최초 30초 대기 후 보내고
 bash ops/tests/integration-alerts-test.sh
 ```
 
-Prometheus 3.14.0의 `promtool`과 Alertmanager 0.34.0의 `amtool`로 수집·경보·SMTP 설정과 장애 시나리오를 검사한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일을 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 실제 이메일 수신은 활성화 전에 별도로 확인해야 한다.
+Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·HTTPS 설정과 장애 시나리오를 검사한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일을 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 실제 이메일 수신은 활성화 전에 별도로 확인해야 한다.
+
+## 공개 인증서 만료 알림: Blackbox Exporter
+
+[Blackbox Exporter](https://github.com/prometheus/blackbox_exporter)는 Apache 2.0 라이선스의 무료 검사 도구다. HTTPS 인증서의 유효기간을 읽고 기존 Prometheus·Alertmanager가 경보와 메일을 처리한다.
+
+- [blackbox.yml](../../ops/integrations/blackbox.yml)을 Exporter의 `--config.file`에 지정한다. `baton_https` 모듈은 유효한 인증서·HTTPS·HTTP 200을 요구하고 리디렉션을 따라가지 않는다. IPv4를 우선하며 IPv4 주소가 없으면 IPv6를 사용한다.
+- [prometheus.yml](../../ops/integrations/prometheus.yml)의 `baton-https` 작업은 1분마다 `https://b4ton.com/actuator/health`를 검사한다. `blackbox-exporter:9115`는 실제 내부 주소로 바꾼다. Exporter의 `/probe`와 관리 포트는 수집기에서만 접근하게 하고 인터넷에 공개하지 않는다.
+- [baton-https-alerts.yml](../../ops/integrations/baton-https-alerts.yml)은 만료까지 **14일 미만인 상태가 5분 지속**되면 알린다. 인증서를 갱신하면 해제한다. 검사 실패·수집 중단·지표 누락이 2분 지속되면 확인 불가를 알린다. 알림 간격·수신자는 기존 Alertmanager 설정을 따른다.
+
+Exporter와 공개 HTTPS 대상이 준비된 뒤 수집을 시작한다. 내부 연동 지표만 먼저 사용할 경우 `baton-https` 작업과 `baton-https-alerts.yml` 참조를 함께 제외한다. 다른 마이크로서비스는 공개 HTTPS 상태 주소를 확인한 뒤 대상에 추가한다. 공유 키·구독 토큰·인증 헤더는 사용하지 않는다.
+
+이 검사는 접속 지점에서 보이는 인증서를 확인한다. Cloudflare 프록시를 사용하면 Cloudflare 인증서를 보므로 **홈서버 원본 인증서까지 검사한 결과가 아니다**. 홈서버 안에서 실행할 때는 NAT 루프백·분할 DNS에 따라 접속 경로가 달라질 수 있다. 같은 홈서버가 중단되면 알림도 멈추므로 외부 Better Stack 감시는 유지한다. 인증서 자동 갱신이나 도메인 등록 갱신은 수행하지 않는다.
+
+위 로컬 검증 명령에 만료 경계·갱신·검사 실패·수집 중단·지표 누락 사례를 포함했다. 실제 인증서 조회와 이메일 수신은 미검증이며 공개 환경에서 확인해야 한다. 제공 범위는 연동 설정으로, 홈서버나 k3s를 설치하지 않는다.
 
 ## 원격 백업: Google Drive + rclone
 
