@@ -455,6 +455,18 @@ export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
 
 export function useHandoffCompletionMutation(scope: WorkspaceScope) {
   const { queryClient, queryKey, invalidate } = useInvalidateWorkspace(scope)
+  const setCompleted = (id: string, completed: boolean) =>
+    queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
+      current
+        ? {
+            ...current,
+            handoffItems: current.handoffItems.map((item) =>
+              item.id === id ? { ...item, completed } : item,
+            ),
+          }
+        : current,
+    )
+
   return useWorkspaceMutation(scope, {
     mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
       setHandoffItemCompletion(scope, id, completed),
@@ -462,31 +474,13 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
       await queryClient.cancelQueries({ queryKey })
       const previousCompleted = queryClient.getQueryData<WorkspaceProjection>(queryKey)
         ?.handoffItems.find((item) => item.id === id)?.completed
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              handoffItems: current.handoffItems.map((item) =>
-                item.id === id ? { ...item, completed } : item,
-              ),
-            }
-          : current,
-      )
+      setCompleted(id, completed)
       return { previousCompleted }
     },
     onError: (_error, { id }, context) => {
       const previousCompleted = context?.previousCompleted
       if (previousCompleted === undefined) return
-      queryClient.setQueryData<WorkspaceProjection>(queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              handoffItems: current.handoffItems.map((item) =>
-                item.id === id ? { ...item, completed: previousCompleted } : item,
-              ),
-            }
-          : current,
-      )
+      setCompleted(id, previousCompleted)
     },
     onSettled: invalidateUnlessContentConflict(invalidate),
   })
