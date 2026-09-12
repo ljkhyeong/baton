@@ -899,7 +899,7 @@ test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음
   )
   await secondDialog.getByRole('button', { name: '역할 만들기' }).click()
 
-  await expect(secondDialog.getByRole('alert')).toContainText('임시 기록을 정리했습니다.')
+  await expect(secondDialog.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,

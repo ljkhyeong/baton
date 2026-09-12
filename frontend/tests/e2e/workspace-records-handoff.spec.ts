@@ -831,7 +831,7 @@ test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전�
 
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리했습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
   expect(api.calls.filter(
     (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
