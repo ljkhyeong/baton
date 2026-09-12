@@ -36,3 +36,21 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    allow:
+      - dependency-name: mysql
+      - dependency-name: caddy
+    ignore:
+      # MySQL 8.4 LTS와 Caddy 2의 상위 계열 전환은 별도로 검토한다.
+      - dependency-name: mysql
+        versions: ['>= 8.5']
+      - dependency-name: caddy
+        update-types: ['version-update:semver-major']
+    groups:
+      compose-images:
+        patterns: ['*']
