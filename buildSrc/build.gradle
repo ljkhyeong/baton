@@ -15,5 +15,5 @@ java {
 dependencies {
 	implementation gradleApi()
 	implementation 'com.epages:restdocs-api-spec-openapi3-generator:0.20.1'
-	implementation 'tools.jackson.module:jackson-module-kotlin:3.0.2'
+	implementation 'tools.jackson.module:jackson-module-kotlin:3.2.2'
 }
