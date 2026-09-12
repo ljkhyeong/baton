@@ -17,6 +17,7 @@
 | 서비스 장애 감시 | Better Stack 무료 모니터 | 상태 조회·이력·이메일 알림을 외부 서비스가 처리한다. BATON 등록용 API 요청 파일을 추가했다. |
 | 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 선택한 운영 채널로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP 또는 Discord | 기존 지표의 경보 규칙과 수신 설정을 사용한다. Discord를 선택하면 SMTP 장애 중에도 운영 알림을 받을 수 있다. |
+| 감시 시스템 중단 확인 | Prometheus → Alertmanager → Better Stack 하트비트 | 감시 경로에서 5분마다 신호를 보낸다. 신호가 끊기면 홈서버 밖에서 알린다. 별도 예약 작업이나 발송기는 추가하지 않는다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
 | 배포 이미지 취약점 검사 | Trivy | 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 검사하고 JSON 보고서를 남긴다. GitHub Actions 실행은 추가하지 않는다. |
@@ -141,7 +142,7 @@ BATON_SMTP_PASSWORD_FILE=/srv/baton/secrets/smtp-password
 
 ## 장애 감시: Better Stack
 
-[무료 플랜](https://betterstack.com/pricing)은 모니터·하트비트 합계 10개와 이메일 알림을 제공한다. 우선 BATON 공개 상태 1개와 백업 하트비트 1개를 등록한다. 나머지 서비스는 공개 상태 경로를 확인한 뒤 남은 슬롯에 등록한다. CAL 구독 토큰·공유 링크·로그인 페이지는 상태 검사 대상으로 사용하지 않는다.
+[무료 플랜](https://betterstack.com/pricing)은 모니터·하트비트 합계 10개와 이메일 알림을 제공한다. BATON 공개 상태·백업 하트비트·감시 시스템 하트비트에 각각 1개씩 사용한다. 같은 항목이 이미 있으면 재사용하고, 나머지 서비스는 공개 상태 경로와 남은 슬롯을 확인한 뒤 등록한다. 유료 추가 슬롯을 구매하지 않는다. CAL 구독 토큰·공유 링크·로그인 페이지는 상태 검사 대상으로 사용하지 않는다.
 
 ### 공개 서비스 상태
 
@@ -174,6 +175,28 @@ BATON_BACKUP_HEARTBEAT_URL_FILE=/srv/baton/secrets/backup-heartbeat-url
 
 감시 API 장애는 백업 성공 상태를 취소하지 않는다. 로컬에 통보 실패를 남기며, 외부에서는 기한 안에 신호가 없으면 알림을 보낸다. **첫 신호를 받은 뒤부터 감시가 시작**되므로 실제 첫 수신을 확인해야 한다. Kubernetes 작업에서 재사용할 때도 완료 신호는 실제 백업·원격 검증의 마지막 단계에 연결한다. 기존 Compose용 백업 스크립트를 k3s 전용 스크립트로 간주하지 않는다.
 
+### 감시 시스템 하트비트
+
+앱의 공개 상태가 정상이어도 Prometheus·Alertmanager가 멈추면 내부 장애 알림을 놓칠 수 있다. `BatonMonitoringWatchdog`는 항상 발생하는 감시 확인용 신호다. Alertmanager가 이를 5분마다 [하트비트 URL로 POST](https://betterstack.com/community/guides/monitoring/what-is-cron-monitoring/)하고, 수신이 끊기면 Better Stack이 알린다. 앱의 정상 여부를 나타내는 경보가 아니다.
+
+1. Better Stack에서 **기대 간격 5분·유예 5분·이메일 알림**으로 백업과 별개의 하트비트를 만든다. [등록 요청 파일](../../ops/integrations/better-stack-monitoring-heartbeat.json)은 SMS·전화·푸시를 끄고 일시 정지 상태로 생성한다. [공식 생성 API](https://betterstack.com/docs/uptime/api/create-a-hearbeat/)를 사용할 때는 위와 같은 전용 curl 설정 파일로 다음 요청을 한 번 실행한다.
+
+   ```bash
+   curl -q --config /srv/baton/secrets/better-stack-api.curl \
+     --fail --silent --show-error \
+     --json @ops/integrations/better-stack-monitoring-heartbeat.json \
+     https://uptime.betterstack.com/api/v2/heartbeats
+   ```
+
+2. 발급된 기본 하트비트 URL을 저장소 밖 비밀 파일에 저장하고 `/run/secrets/monitoring-heartbeat-url`로 읽기 전용 연결한다. Alertmanager 실행 사용자만 읽을 수 있게 하며, 백업 하트비트 URL을 재사용하거나 `/fail`을 붙이지 않는다. API 응답의 URL도 비밀값이므로 공유 로그에 남기지 않는다.
+3. [하트비트 포함 Alertmanager 설정](../../ops/integrations/alertmanager-heartbeat.yml.example)의 SMTP 로그인·수신 주소를 지정하고 기존 설정 대신 사용한다. Discord를 사용 중이면 기존 설정에서 `monitoring-heartbeat-disabled` 하위 경로·빈 수신자를 예시의 `monitoring-heartbeat` 경로·수신자로 교체한다. 일반 운영 알림 수신자는 유지한다.
+4. **Alertmanager 설정을 먼저 검사·반영한 뒤** [경보 규칙](../../ops/integrations/baton-alerts.yml)을 반영한다. 기본 SMTP·Discord 예시는 이 신호를 빈 수신자로 보내므로 외부 연결 없이도 정기 신호가 운영자에게 발송되지 않는다. 이전 설정을 사용하는 운영 환경에도 이 제외 경로를 먼저 적용한다.
+5. 첫 신호가 도착한 것을 확인한 뒤 Better Stack 감시를 재개한다. 시험 환경에서 Prometheus 또는 Alertmanager를 멈춰 누락 이메일을 받고, 재시작 후 신호 수신과 장애 해제를 확인한다. 별도 cron이나 수동 주기 호출로 신호를 대신 보내면 감시 중단을 숨길 수 있으므로 사용하지 않는다.
+
+최종 신호 뒤 기대 간격·유예를 합한 10분 동안 수신이 없으면 누락 대상이 된다. Alertmanager는 [기본 웹훅 수신 설정](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config)으로 호출하며, 경보 해제 신호는 보내지 않는다. 전송 주기를 바꾸면 Better Stack의 기대 간격도 함께 바꾼다.
+
+기본 웹훅 본문에는 감시 라벨·발생 시각·Prometheus/Alertmanager 내부 주소가 포함된다. 업무 본문·계정·인증 토큰은 넣지 않으며 도구의 외부 라벨·주소에도 비밀값을 넣지 않는다. 이 신호는 감시 규칙 평가·전달·외부 통신 경로를 확인한다. 개별 지표 수집이나 실제 SMTP·Discord 수신 성공을 대신하지 않으므로 기존 경보와 공개 HTTPS 감시는 유지한다.
+
 ## 내부 연동 장애 알림: Prometheus + Alertmanager
 
 CAL·WATCH·BRIEF·이메일 전달은 공개 상태가 `UP`이어도 실패할 수 있다. 기존 Micrometer 지표를 [Prometheus 경보와 Alertmanager](https://prometheus.io/docs/alerting/latest/overview/)에 연결한다. 두 도구는 Apache 2.0 라이선스로 제공되며 자체 실행에 공급자 사용료가 없다. 메일은 위 Brevo 무료 한도를 가입·재설정 메일과 함께 사용한다.
@@ -184,6 +207,7 @@ CAL·WATCH·BRIEF·이메일 전달은 공개 상태가 `UP`이어도 실패할 
 - [baton-alerts.yml](../../ops/integrations/baton-alerts.yml): 수집·갱신 장애, 전달 실패와 처리 지연을 판단한다. `prometheus.yml`과 같은 디렉터리에 둔다.
 - [alertmanager.yml.example](../../ops/integrations/alertmanager.yml.example): SMTP 로그인과 운영자 이메일을 실제 값으로 바꾸고 비밀 파일을 연결한다. [표준 SMTP 설정](https://prometheus.io/docs/alerting/latest/configuration/#file-layout-and-global-settings)으로 STARTTLS를 사용하며 비밀번호 원문은 설정에 넣지 않는다. Alertmanager는 예시의 문자열이나 환경 변수 참조를 자동 치환하지 않으므로 실행 전에 실제 값으로 작성한다.
 - [alertmanager-discord.yml.example](../../ops/integrations/alertmanager-discord.yml.example): SMTP를 거치지 않는 선택 설정이다. 아래 절차로 Discord 웹훅 비밀 파일을 연결한다.
+- [alertmanager-heartbeat.yml.example](../../ops/integrations/alertmanager-heartbeat.yml.example): SMTP 운영 알림과 감시 시스템 하트비트를 분리한 선택 설정이다. 위 하트비트 연결 절차를 따른다.
 
 BATON은 `/actuator/prometheus`를 `127.0.0.1`에서만 허용한다. **수집기는 앱과 같은 네트워크 공간에서 실행**해야 한다. 향후 k3s에서는 같은 Pod의 사이드카가 이 조건을 충족한다. 다른 Pod에서 `app:8080`을 조회하는 설정으로 바꾸면 접근이 거부된다. 수집기와 Alertmanager의 내부 통신을 허용하고 예시의 `alertmanager:9093`을 실제 내부 주소로 지정한다. 지표·관리 화면을 `b4ton.com`이나 서비스 공개 주소에 노출하지 않는다. 이 파일들은 연동 설정이며 서버·k3s 설치 파일은 아니다.
 
@@ -221,7 +245,7 @@ Alertmanager는 같은 앱의 경보를 묶어 최초 30초 대기 후 보내고
 bash ops/tests/integration-alerts-test.sh
 ```
 
-Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·Discord·HTTPS 설정과 장애 시나리오를 검사한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일·Discord 메시지를 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 선택한 채널의 실제 수신은 활성화 전에 별도로 확인해야 한다.
+Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·Discord·하트비트·HTTPS 설정과 장애 시나리오를 검사한다. 정기 신호의 지속 발생과 세 설정에서 정기 신호·일반 장애가 각각 의도한 수신자로 분리되는지도 확인한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일·Discord·하트비트를 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 선택한 채널의 실제 수신은 활성화 전에 별도로 확인해야 한다.
 
 ## 공개 인증서 만료 알림: Blackbox Exporter
 
