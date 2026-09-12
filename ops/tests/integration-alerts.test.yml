@@ -1,0 +1,213 @@
+rule_files:
+  - ../integrations/baton-alerts.yml
+evaluation_interval: 30s
+
+tests:
+  - name: 정상 지표와 조치 대상이 아닌 과거 실패에는 알림을 보내지 않는다
+    interval: 30s
+    input_series:
+      - &up
+        series: up{job="baton",instance="app"}
+        values: 1x30
+      - &refresh
+        series: baton_integration_metrics_refresh_success{job="baton",instance="app"}
+        values: 1x30
+      - &time
+        series: baton_integration_metrics_last_successful_refresh_time_seconds{job="baton",instance="app"}
+        values: 0+30x30
+      - &calendar
+        series: baton_integration_delivery_actionable_failed_items{job="baton",instance="app",integration="calendar"}
+        values: 0x30
+      - &metadata
+        series: baton_integration_delivery_actionable_failed_items{job="baton",instance="app",integration="calendar_metadata"}
+        values: 0x30
+      - &watch
+        series: baton_integration_delivery_actionable_failed_items{job="baton",instance="app",integration="watch"}
+        values: 0x30
+      - &brief
+        series: baton_integration_delivery_actionable_failed_items{job="baton",instance="app",integration="brief"}
+        values: 0x30
+      - &email
+        series: baton_integration_delivery_actionable_failed_items{job="baton",instance="app",integration="email"}
+        values: 0x30
+      - &calendar_expired
+        series: baton_integration_delivery_expired_processing_items{job="baton",instance="app",integration="calendar"}
+        values: 0x30
+      - &metadata_expired
+        series: baton_integration_delivery_expired_processing_items{job="baton",instance="app",integration="calendar_metadata"}
+        values: 0x30
+      - &watch_expired
+        series: baton_integration_delivery_expired_processing_items{job="baton",instance="app",integration="watch"}
+        values: 0x30
+      - &brief_expired
+        series: baton_integration_delivery_expired_processing_items{job="baton",instance="app",integration="brief"}
+        values: 0x30
+      - &email_expired
+        series: baton_integration_delivery_expired_processing_items{job="baton",instance="app",integration="email"}
+        values: 0x30
+      - series: baton_integration_delivery_items{job="baton",instance="app",integration="email",status="failed"}
+        values: 100x30
+    alert_rule_test:
+      - {eval_time: 6m, alertname: BatonMetricsUnavailable, exp_alerts: []}
+      - {eval_time: 6m, alertname: BatonIntegrationMetricsInvalid, exp_alerts: []}
+      - {eval_time: 6m, alertname: BatonIntegrationDeliveryFailed, exp_alerts: []}
+      - {eval_time: 6m, alertname: BatonIntegrationProcessingExpired, exp_alerts: []}
+
+  - name: 지속된 장애만 알리고 정상 복구되면 알림을 해제한다
+    interval: 30s
+    input_series:
+      - *up
+      - *refresh
+      - *time
+      - <<: *calendar
+        values: 1x4 0x25
+      - <<: *metadata
+        values: 3x12 0x17
+      - <<: *watch
+        values: 2x12 0x17
+      - *brief
+      - *email
+      - *calendar_expired
+      - *metadata_expired
+      - *watch_expired
+      - <<: *brief_expired
+        values: 1x12 0x17
+      - *email_expired
+    alert_rule_test:
+      - {eval_time: 5m, alertname: BatonIntegrationDeliveryFailed, exp_alerts: []}
+      - {eval_time: 5m, alertname: BatonIntegrationProcessingExpired, exp_alerts: []}
+      - eval_time: 5m30s
+        alertname: BatonIntegrationDeliveryFailed
+        exp_alerts:
+          - exp_labels: {job: baton, instance: app, integration: calendar_metadata, service: baton, severity: warning}
+            exp_annotations:
+              summary: calendar_metadata 전달에 조치가 필요합니다.
+              description: 재시도가 끝난 실패 항목이 있습니다. 연동 설정과 실패 원인을 확인하세요.
+          - exp_labels: {job: baton, instance: app, integration: watch, service: baton, severity: warning}
+            exp_annotations:
+              summary: watch 전달에 조치가 필요합니다.
+              description: 재시도가 끝난 실패 항목이 있습니다. 연동 설정과 실패 원인을 확인하세요.
+      - eval_time: 5m30s
+        alertname: BatonIntegrationProcessingExpired
+        exp_alerts:
+          - exp_labels: {job: baton, instance: app, integration: brief, service: baton, severity: warning}
+            exp_annotations:
+              summary: brief 전달 처리가 지연되고 있습니다.
+              description: 처리 기한을 넘긴 항목이 남아 있습니다. 전달 작업자와 재처리를 확인하세요.
+      - {eval_time: 7m, alertname: BatonIntegrationDeliveryFailed, exp_alerts: []}
+      - {eval_time: 7m, alertname: BatonIntegrationProcessingExpired, exp_alerts: []}
+
+  - name: 수집이 실패하면 전달 건수 대신 수집 장애를 알린다
+    interval: 30s
+    input_series:
+      - <<: *up
+        values: 0x30
+    alert_rule_test:
+      - {eval_time: 1m30s, alertname: BatonMetricsUnavailable, exp_alerts: []}
+      - eval_time: 2m
+        alertname: BatonMetricsUnavailable
+        exp_alerts:
+          - exp_labels: {job: baton, instance: app, service: baton, severity: critical}
+            exp_annotations: &unavailable
+              summary: BATON 지표를 수집하지 못하고 있습니다.
+              description: 앱 상태와 루프백 수집 경로를 확인하세요.
+      - {eval_time: 6m, alertname: BatonIntegrationMetricsInvalid, exp_alerts: []}
+      - {eval_time: 6m, alertname: BatonIntegrationDeliveryFailed, exp_alerts: []}
+
+  - name: 수집 대상이 누락되어도 정상으로 판단하지 않는다
+    interval: 30s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonMetricsUnavailable
+        exp_alerts:
+          - exp_labels: {job: baton, service: baton, severity: critical}
+            exp_annotations: *unavailable
+
+  - name: 갱신 성공 값이 남아 있어도 120초가 지난 건수는 사용하지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - *refresh
+      - <<: *time
+        values: 0 30 60x28
+      - <<: *calendar
+        values: 2x30
+      - *metadata
+      - *watch
+      - *brief
+      - *email
+      - *calendar_expired
+      - *metadata_expired
+      - *watch_expired
+      - *brief_expired
+      - *email_expired
+    promql_expr_test:
+      - expr: baton:integration_metrics_ready
+        eval_time: 3m
+        exp_samples:
+          - labels: 'baton:integration_metrics_ready{job="baton",instance="app"}'
+            value: 1
+      - expr: baton:integration_metrics_ready
+        eval_time: 3m30s
+        exp_samples: []
+    alert_rule_test:
+      - {eval_time: 5m, alertname: BatonIntegrationMetricsInvalid, exp_alerts: []}
+      - eval_time: 5m30s
+        alertname: BatonIntegrationMetricsInvalid
+        exp_alerts: &invalid_alerts
+          - exp_labels: {job: baton, instance: app, service: baton, severity: warning}
+            exp_annotations:
+              summary: BATON 연동 상태를 확인할 수 없습니다.
+              description: 지표 누락, 갱신 실패 또는 갱신 시각을 확인하세요. 저장된 실패 건수가 0이어도 정상으로 판단할 수 없습니다.
+      - {eval_time: 6m, alertname: BatonIntegrationDeliveryFailed, exp_alerts: []}
+
+  - name: 한 연동 지표의 누락을 다른 앱의 지표로 채우지 않는다
+    interval: 30s
+    input_series:
+      - *up
+      - *refresh
+      - *time
+      - *calendar
+      - *metadata
+      - *watch
+      - *brief
+      - *email
+      - *calendar_expired
+      - *metadata_expired
+      - *watch_expired
+      - *brief_expired
+      - series: baton_integration_delivery_expired_processing_items{job="baton",instance="other-app",integration="email"}
+        values: 0x30
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonIntegrationMetricsInvalid
+        exp_alerts: *invalid_alerts
+
+  - name: 갱신 실패나 미래 시각은 전달 장애 판단에서 제외한다
+    interval: 30s
+    input_series:
+      - *up
+      - <<: *refresh
+        values: 0x5 1x24
+      - <<: *time
+        values: 0+30x5 3600x24
+      - *calendar
+      - *metadata
+      - <<: *watch
+        values: 2x30
+      - *brief
+      - *email
+      - *calendar_expired
+      - *metadata_expired
+      - *watch_expired
+      - *brief_expired
+      - *email_expired
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonIntegrationMetricsInvalid
+        exp_alerts: *invalid_alerts
+      - eval_time: 6m
+        alertname: BatonIntegrationMetricsInvalid
+        exp_alerts: *invalid_alerts
+      - {eval_time: 6m, alertname: BatonIntegrationDeliveryFailed, exp_alerts: []}
