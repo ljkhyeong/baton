@@ -9,6 +9,7 @@
 
 - [무료 외부 연동](docs/runbooks/free-integrations.md)에 따라 Brevo 무료 SMTP·Better Stack 공개 상태/백업 하트비트·Google Drive crypt 원격 저장소의 계정과 비밀값을 준비한다. `b4ton.com`의 실제 HTTPS·메일 수신·첫 하트비트·원격 업로드/복원을 확인한다.
 - 외부 상태 감시는 Better Stack 또는 기존 GitHub Actions 중 하나를 선택한다. GitHub Actions를 사용하면 `BATON_HEALTH_URL=https://b4ton.com/actuator/health`로 수동 성공을 확인한 뒤 예약 검사를 켠다. Better Stack 전환 후에는 `BATON_EXTERNAL_MONITOR_ENABLED=false`로 기존 예약 검사를 끈다.
+- [사용자용 서비스 상태 페이지](docs/runbooks/free-integrations.md#사용자용-서비스-상태-페이지)는 무료 페이지와 공개 HTTPS 모니터만 연결한다. `status.b4ton.com`의 DNS 전용 CNAME·HTTPS·공개 항목과 장애·복구 표시를 확인한 뒤 `BATON_STATUS_PAGE_ENABLED=true`로 웹 이미지를 다시 빌드한다. 실제 생성·게시·DNS 변경은 실행하지 않았다.
 - [내부 연동 장애 알림](docs/runbooks/free-integrations.md#내부-연동-장애-알림-prometheus--alertmanager)의 수집기를 앱과 같은 네트워크 공간에 연결하고 Alertmanager 내부 주소와 수신 채널을 준비한다. SMTP 비밀·수신 주소 또는 [Discord 웹훅](docs/runbooks/free-integrations.md#운영-알림-discord-웹훅) 비밀 파일이 필요하다. 실제 지표 수집과 장애·해제 알림을 확인한 뒤 중복되는 `baton-integration-delivery.timer`를 끈다. 외부 Better Stack 감시는 유지한다.
 - [감시 시스템 하트비트](docs/runbooks/free-integrations.md#감시-시스템-하트비트)는 Better Stack 무료 슬롯·별도 비밀 URL을 준비한다. Alertmanager의 정기 신호 전용 경로를 먼저 반영한 뒤 경보 규칙을 적용한다. 첫 수신, 감시 프로세스 중단 시 누락 이메일, 재시작 후 해제를 확인한다. 기본 SMTP·Discord 예시는 외부 하트비트를 보내지 않는다.
 - [공개 인증서 만료 알림](docs/runbooks/free-integrations.md#공개-인증서-만료-알림-blackbox-exporter)의 Blackbox Exporter 내부 주소와 설정을 연결한다. 실제 만료일 수집·경보·갱신 후 해제 알림을 확인한다. Cloudflare 프록시 사용 시 원본 인증서는 별도로 확인한다. Exporter 준비 전에는 `baton-https` 작업과 해당 경보 파일을 함께 제외한다.

@@ -15,6 +15,7 @@
 | 가입·재설정 요청 봇 방지 | Cloudflare Turnstile | 브라우저 위젯과 서버 Siteverify 검증을 연결했다. 기존 IP·이메일 요청 제한을 함께 사용한다. |
 | 로그인 | Google OIDC·Naver OAuth2 | 이미 구현되어 있다. 기존 공급자 설정과 콜백을 사용한다. |
 | 서비스 장애 감시 | Better Stack 무료 모니터 | 상태 조회·이력·이메일 알림을 외부 서비스가 처리한다. BATON 등록용 API 요청 파일을 추가했다. |
+| 사용자용 서비스 상태 페이지 | Better Stack 무료 상태 페이지 | 기존 공개 모니터의 상태·이력을 `status.b4ton.com`에 표시한다. 시작·로그인·오류 화면의 링크는 공개 확인 후 켠다. |
 | 공개 인증서 만료 알림 | Blackbox Exporter → Prometheus·Alertmanager | 만료 14일 전부터 선택한 운영 채널로 알린다. 유료 만료 알림이나 인증서 파싱 코드를 추가하지 않는다. |
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP 또는 Discord | 기존 지표의 경보 규칙과 수신 설정을 사용한다. Discord를 선택하면 SMTP 장애 중에도 운영 알림을 받을 수 있다. |
 | 감시 시스템 중단 확인 | Prometheus → Alertmanager → Better Stack 하트비트 | 감시 경로에서 5분마다 신호를 보낸다. 신호가 끊기면 홈서버 밖에서 알린다. 별도 예약 작업이나 발송기는 추가하지 않는다. |
@@ -160,6 +161,36 @@ curl -q --config /srv/baton/secrets/better-stack-api.curl \
 공개 HTTPS 검증 후 감시를 재개하고 실제 이메일 수신을 확인한다. 기존 GitHub Actions 예약 감시와 중복 운영할 필요는 없다. Better Stack으로 전환을 확인하면 `BATON_EXTERNAL_MONITOR_ENABLED=false`로 기존 예약 검사만 끈다.
 
 `verify_ssl`은 접속 시 인증서 유효성을 검사한다. [만료 사전 알림은 유료 플랜](https://betterstack.com/docs/uptime/ssl-certificate-monitor/)이므로 켜지 않는다. 아래 Blackbox Exporter 연동으로 보완한다.
+
+### 사용자용 서비스 상태 페이지
+
+홈서버가 중단돼도 사용자가 장애 여부를 확인하도록 [무료 상태 페이지 1개](https://betterstack.com/pricing)를 사용한다. 기존 공개 상태 모니터를 연결하므로 모니터 슬롯을 추가로 쓰지 않는다. 이미 상태 페이지가 있으면 재사용한다. 페이지 추가 구매·사용자 구독·유료 꾸미기·브랜드 표시 제거는 사용하지 않는다.
+
+1. [생성 요청](../../ops/integrations/better-stack-status-page.json)으로 페이지를 **미게시 상태**로 만든다. `subdomain`의 `b4ton`이 사용 중이면 공급자용 이름만 바꾸고 `custom_domain`은 `status.b4ton.com`으로 유지한다. 기존 페이지가 있으면 아래 생성 요청을 실행하지 않고 같은 설정을 적용한다. [공식 생성 API](https://betterstack.com/docs/uptime/api/create-a-new-status-page/):
+
+   ```bash
+   curl -q --config /srv/baton/secrets/better-stack-api.curl \
+     --fail --silent --show-error \
+     --json @ops/integrations/better-stack-status-page.json \
+     https://uptime.betterstack.com/api/v2/status-pages
+   ```
+
+2. [표시 항목 요청](../../ops/integrations/better-stack-status-page-resource.json)을 임시 파일에 복사해 `resource_id`를 위 공개 HTTPS 모니터 ID로 바꾼다. 기존 연결이 없다면 [항목 등록 API](https://betterstack.com/docs/uptime/api/create-a-new-status-page-resource/)에 보낸다. 아래 `REPLACE_WITH_STATUS_PAGE_ID`도 발급된 페이지 ID로 바꾼다.
+
+   ```bash
+   curl -q --config /srv/baton/secrets/better-stack-api.curl \
+     --fail --silent --show-error \
+     --json @/tmp/baton-status-page-resource.json \
+     https://uptime.betterstack.com/api/v2/status-pages/REPLACE_WITH_STATUS_PAGE_ID/resources
+   ```
+
+3. `BATON 접속` 항목에 상태·이력이 표시되는지 확인한다. CAL 등은 실제 공개 상태 경로를 확인한 모니터만 개별 항목으로 추가한다. 모니터 그룹 전체, 백업·감시 하트비트, 내부 주소·응답 본문·팀 자료는 공개하지 않는다. 자동 사고 보고서 생성은 끄고, 장애 원인·복구 공지는 공개 가능한 내용만 운영자가 작성한다.
+4. [공급자 도메인 안내](https://betterstack.com/docs/uptime/custom-subdomain/)에 따라 Cloudflare에 `CNAME status.b4ton.com → statuspage.betteruptime.com`을 **DNS 전용**으로 등록한다. 해당 이름의 기존 레코드를 먼저 확인한다. 홈서버 IP나 k3s Ingress로 연결하지 않는다. 공급자 화면에서 연결 상태를 확인하고 페이지를 게시한 뒤, 비로그인 브라우저에서 HTTPS·공개 항목·정상/장애/복구 표시를 확인한다.
+5. `.env.production`의 `BATON_STATUS_PAGE_ENABLED=true`로 바꾸고 웹 이미지를 다시 빌드한다. k3s용 이미지도 빌드 인자 `VITE_STATUS_PAGE_ENABLED=true`를 사용한다. 기본값은 `false`다. 시작·로그인·화면 오류 안내에 `서비스 상태` 링크가 나타나며 새 탭으로 열린다. 현재 경로·쿼리·접근 키와 Referer는 전달하지 않고 외부 스크립트·상태 조회 요청도 추가하지 않는다.
+
+상태 페이지는 3분 주기 공개 HTTPS 검사 결과를 보여 준다. 개별 업무 기능·SMTP·캘린더 전달의 정상 여부까지 의미하지 않는다. 홈서버가 완전히 중단되면 BATON 화면 자체도 열리지 않으므로 상태 페이지 주소를 미리 안내하거나 북마크한다. 실제 게시·DNS 변경·외부 수신은 아직 실행하지 않았다.
+
+로컬 화면 검증은 `frontend`에서 `npm run e2e -- tests/e2e/service-status.spec.ts tests/e2e/app-shell.spec.ts --project=chromium`으로 실행한다. 브라우저 테스트는 링크를 켜고 외부 페이지 응답을 대역 처리한다. 기본 숨김은 같은 명령 앞에 `VITE_STATUS_PAGE_ENABLED=false`를 붙여 확인한다. 실제 Better Stack 등록·공개 페이지 확인을 대신하지 않는다.
 
 ### 백업 하트비트
 

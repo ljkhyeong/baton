@@ -74,6 +74,8 @@ BATON은 팀·시즌·역할·업무 기록과 최종 접근 권한을 관리한
 
 운영 경보는 이메일 또는 [Discord 웹훅](docs/runbooks/free-integrations.md#운영-알림-discord-웹훅)으로 받을 수 있다. Discord를 선택하면 Brevo SMTP를 거치지 않고 Alertmanager가 직접 발송한다. 채널 웹훅 연결과 실제 수신 확인 후 사용하는 선택 설정이다.
 
+[서비스 상태 페이지](docs/runbooks/free-integrations.md#사용자용-서비스-상태-페이지)는 Better Stack 무료 페이지를 `status.b4ton.com`에 연결한다. 공개 확인 후 `BATON_STATUS_PAGE_ENABLED=true`로 웹 이미지를 다시 빌드하면 시작·로그인·오류 화면에 `서비스 상태` 링크가 나타난다. 기본값은 숨김이며 실제 페이지 생성·DNS 연결은 남아 있다.
+
 [감시 시스템 하트비트](docs/runbooks/free-integrations.md#감시-시스템-하트비트)는 Prometheus·Alertmanager가 계속 동작하는지 Better Stack에서 확인하는 선택 설정이다. 감시 경로가 보내는 5분 주기 신호가 끊기면 외부 이메일로 알린다. 백업 하트비트와 별도 무료 슬롯·URL을 사용한다.
 
 Sentry 오류 수집과 Brevo 메일 전달 결과 수신은 기본 비활성이다. [설정 방법](docs/runbooks/free-integrations.md#오류-수집-sentry)에 따라 DSN·전용 웹훅 토큰을 연결한다. 메일 반송은 기존 Prometheus·Alertmanager로 확인한다.
