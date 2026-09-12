@@ -10,7 +10,7 @@
 | 외부 캘린더 | CAL의 ICS 구독 → Google·Apple·Outlook | 기존 구독 기능을 사용한다. 갱신 주기는 캘린더 앱이 정하므로 실시간 양방향 동기화로 안내하지 않는다. |
 | 작업 공간·팀 초대·주간 요약 공유 | Web Share API | 기기의 공유 창에서 설치된 메신저·메일 앱을 선택한다. 공급자 SDK·계정·서비스 키가 필요 없다. |
 | 가입·비밀번호 재설정 메일 | Brevo 무료 SMTP | 기존 Spring Mail 어댑터에 접속 설정만 연결한다. 공급자 전용 HTTP 클라이언트는 추가하지 않는다. |
-| 오류 발생 위치 수집 | Sentry React·Spring Boot SDK | 오류 종류·파일·줄만 전송한다. DSN이 없으면 비활성이다. |
+| 오류 발생 위치 수집 | Sentry React·Spring Boot SDK·Vite 플러그인 | 오류 종류·파일·줄을 수집하며 소스맵 업로드를 켜면 원본 코드 위치를 연결한다. 오류 DSN과 빌드 전용 토큰을 구분한다. |
 | 메일 전달·반송 결과 | Brevo Webhook | 기존 SMTP 발송 ID로 결과를 연결하고 중복 수신을 합친다. 24시간 결과 지표와 경보를 추가했다. |
 | 가입·재설정 요청 봇 방지 | Cloudflare Turnstile | 브라우저 위젯과 서버 Siteverify 검증을 연결했다. 기존 IP·이메일 요청 제한을 함께 사용한다. |
 | 로그인 | Google OIDC·Naver OAuth2 | 이미 구현되어 있다. 기존 공급자 설정과 콜백을 사용한다. |
@@ -48,16 +48,37 @@
 무료 플랜은 [종량 과금을 지원하지 않는다](https://www.sentry.help/en/articles/13965037-can-i-set-up-an-on-demand-pay-as-you-go-budget-for-my-free-developer-plan).
 유료 플랜·자동 결제로 전환하지 않는다. 한도 도달 시 누락될 수 있는 오류는 기존 서버 로그와 상태 감시로 확인한다.
 
-1. 무료 조직에 React와 Spring Boot 프로젝트를 만들고 각각의 공개 DSN을 복사한다. 개인 API 토큰은 BATON에 필요 없다.
+1. 무료 조직에 React와 Spring Boot 프로젝트를 만들고 각각의 공개 DSN을 복사한다. 오류 수집은 DSN만 사용하며, 아래 소스맵 업로드에는 별도 빌드 토큰이 필요하다.
 2. `.env.production`에 `BATON_SENTRY_DSN`(서버), `BATON_SENTRY_BROWSER_DSN`(브라우저), `BATON_SENTRY_ENVIRONMENT=production`을 설정한다. 두 DSN은 독립적이며 빈 값이면 해당 수집을 끈다.
 3. 브라우저 DSN은 **빌드 시 반영**된다. Compose의 `web` 이미지를 다시 빌드한다. k3s에서도 웹 이미지 빌드 인자 `VITE_SENTRY_DSN`·`VITE_SENTRY_ENVIRONMENT`를 사용하고, 서버 DSN은 앱 환경 변수로 주입한다.
 4. 공개 HTTPS에서 테스트 오류 1건의 수신과 실제 배포 파일·줄을 확인한다. 오류 메시지·이메일·토큰·현재 화면 주소가 보고에 없는지 확인한다.
 
 React 루트 오류와 브라우저 미처리 오류를 공식 SDK로 수집한다. DSN이 있을 때만 SDK를 불러오며, 로딩 중 발생한 React 오류는 로딩 완료 후 보고한다. 서버는 [Spring Boot 4 SDK](https://github.com/getsentry/sentry-java/tree/main/sentry-spring-boot-4-starter)와 기존 HTTP Observation을 연결해 응답이 확정된 **5xx 예외**를 수집한다. 예상된 4xx 오류는 보내지 않는다. 같은 예외의 중복 제거와 전송은 SDK가 처리한다.
 
-수집 항목은 예외 종류·스택의 파일/줄·배포 환경이다. 예외 메시지, 요청 URL·본문·헤더, 사용자, 탐색 기록, 폼 값, 첨부 파일과 스택 지역 변수는 보내지 않는다. 세션·성능 추적·프로파일링·로그·화면 녹화는 켜지 않는다. 브라우저 오류 위치는 현재 서비스의 `/assets/`와 개발용 `/src/` 파일만 허용하고 쿼리·fragment를 제거한다. 소스맵 업로드는 자동화하지 않아 배포 JS에서는 압축 파일의 위치로 표시될 수 있다.
+수집 항목은 예외 종류·스택의 파일/줄·배포 환경이다. 예외 메시지, 요청 URL·본문·헤더, 사용자, 탐색 기록, 폼 값, 첨부 파일과 스택 지역 변수는 보내지 않는다. 세션·성능 추적·프로파일링·로그·화면 녹화는 켜지 않는다. 브라우저 오류 위치는 현재 서비스의 `/assets/`와 개발용 `/src/` 파일만 허용하고 쿼리·fragment를 제거한다. 소스맵 연결에는 해당 스택 파일의 UUID 식별자와 정리한 파일 주소만 추가한다.
 
 Caddy의 `connect-src`는 Sentry의 `*.ingest.sentry.io`, `*.ingest.us.sentry.io`, `*.ingest.de.sentry.io` HTTPS 수집 주소를 허용한다. k3s Ingress에서 CSP를 관리하면 같은 허용 목록을 병합한다. 전체 외부 출처를 허용하지 않는다. 비활성화할 때 서버 DSN을 지우고, 브라우저 DSN을 지운 웹 이미지를 다시 배포한다.
+
+### 원본 코드 위치 연결
+
+소스맵이 없으면 운영 오류는 압축된 JS의 위치로 표시될 수 있다. [공식 Vite 플러그인](https://www.npmjs.com/package/@sentry/vite-plugin)이 배포 JS와 소스맵에 같은 식별자를 붙여 업로드한다. **소스맵에는 원본 프런트엔드 코드가 포함**되므로 운영자만 접근하는 기존 무료 Sentry 프로젝트를 사용한다. 유료 플랜이나 추가 수집 상품은 켜지 않는다.
+
+1. 해당 조직의 [빌드용 토큰(`org:ci`)](https://docs.sentry.io/api/permissions/)을 발급하고 저장소 밖 0600 파일에 보관한다. 상위 디렉터리는 0700으로 둔다. 브라우저 DSN·앱 환경 변수·Docker 빌드 인자에는 토큰 원문을 넣지 않는다.
+2. `.env.production`에 다음 설정과 기존 `BATON_SENTRY_BROWSER_DSN`을 지정한다. 조직·프로젝트에는 화면의 표시 이름 대신 slug를 사용한다.
+
+   ```dotenv
+   BATON_SENTRY_SOURCEMAPS_UPLOAD=true
+   BATON_SENTRY_ORG=<조직 slug>
+   BATON_SENTRY_PROJECT=<React 프로젝트 slug>
+   BATON_SENTRY_AUTH_TOKEN_FILE=/srv/baton/secrets/sentry-build-token
+   ```
+
+3. 기존 웹 이미지 빌드를 실행한다. Compose가 토큰 파일을 [BuildKit 빌드 비밀](https://docs.docker.com/build/building/secrets/)로 전달하며 실행 중인 웹·서버 컨테이너에는 연결하지 않는다. k3s용 이미지도 같은 Dockerfile에 `--secret id=sentry_auth_token,src=/srv/baton/secrets/sentry-build-token`과 빌드 인자 `SENTRY_SOURCEMAPS_UPLOAD=true`, `SENTRY_ORG`, `SENTRY_PROJECT`, `VITE_SENTRY_DSN`을 지정한다.
+4. 업로드 성공 뒤 같은 빌드에서 나온 이미지를 배포한다. 공개 HTTPS에서 테스트 오류를 발생시켜 Sentry가 실제 원본 파일·줄을 표시하는지 확인한다. 이때 오류 보고의 메시지·계정·요청 주소 비노출과 웹 이미지에 `.map` 파일이 없는지도 확인한다. 소스맵 연결을 위해 별도로 재빌드한 JS를 섞어 배포하지 않는다.
+
+업로드 기본값은 `false`이며 production 빌드에서만 실행한다. 켰을 때 토큰·조직·프로젝트·DSN이 빠졌거나 업로드가 실패하면 빌드를 중단한다. 업로드 후 `.map` 파일은 배포 폴더에서 삭제한다. 소스맵 공개 링크와 플러그인의 자체 통계 전송은 사용하지 않으며, 별도 릴리스·커밋 등록 작업도 추가하지 않는다. 업로드를 끄고 다시 빌드해도 기존 DSN의 오류 수집은 유지되지만 원본 위치 연결은 보장하지 않는다.
+
+`frontend`의 `npm run check:sourcemaps`는 공식 플러그인을 로컬 대역 서버에 연결해 설정 누락·업로드 성공/실패·소스맵 제거·토큰 비포함을 확인한다. 검증용 `dist`를 만든 뒤 삭제하므로 이 명령 뒤 배포용 `npm run build`를 실행한다. 실제 Sentry 업로드·원본 위치 표시와 운영 빌드 토큰은 아직 확인하지 않았다.
 
 ## 메일 전달 결과: Brevo Webhook
 

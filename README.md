@@ -80,6 +80,8 @@ BATON은 팀·시즌·역할·업무 기록과 최종 접근 권한을 관리한
 
 Sentry 오류 수집과 Brevo 메일 전달 결과 수신은 기본 비활성이다. [설정 방법](docs/runbooks/free-integrations.md#오류-수집-sentry)에 따라 DSN·전용 웹훅 토큰을 연결한다. 메일 반송은 기존 Prometheus·Alertmanager로 확인한다.
 
+Sentry에서 [원본 코드 위치](docs/runbooks/free-integrations.md#원본-코드-위치-연결)를 보려면 빌드 전용 소스맵 업로드를 켠다. 공식 Vite 플러그인이 업로드와 파일 제거를 처리하며, 토큰과 소스맵은 실행 중인 웹 컨테이너에 남기지 않는다. 기본값은 비활성이다.
+
 다음 운영 작업은 [HANDOFF](HANDOFF.md), 장기 개발 순서는 [개발 우선순위](docs/PRD/0003_product-roadmap/spec.md)를 기준으로 한다.
 
 ## 기술 스택
