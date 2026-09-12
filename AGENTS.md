@@ -38,10 +38,17 @@
 
 관련 테스트부터 실행한다. [로컬 검증 순서](docs/ADR/0002_test-strategy/adr.md#로컬-검증-순서)에 따라 수정·빠른 확인·필요한 회귀 검증을 구분하고, 실패 원인이나 검증 대상이 바뀌었을 때만 재실행한다. 단순 문구 변경을 그대로 따라 쓰는 테스트나 라이브러리 자체를 재검증하는 테스트는 추가하지 않는다.
 
+### 변경 피드백 루프
+
+1. 파일을 작성하거나 수정한 직후 `git diff -- <파일>`로 그 파일만 확인한다. 의도하지 않은 변경, 패키지·import·타입 의존 방향, 생성 파일 직접 수정, 문서 링크와 설정 문법처럼 빠르게 판정할 수 있는 지역 규칙을 먼저 바로잡는다. 파일마다 전체 빌드나 전체 테스트를 반복하지 않는다.
+2. 하나의 동작 변경이 완성되면 해당 동작을 소유한 가장 좁은 컴파일·테스트·정적 검사를 실행한다. 실패를 고친 뒤에는 실패한 범위부터 다시 확인하고, 같은 리비전에서 이미 통과한 무관한 검사는 반복하지 않는다.
+3. 작업 종료 직전 `git diff --check`, `git diff --stat`과 전체 `git diff`를 확인한다. 요청 범위 밖 변경, 임시 파일, 빠진 호출자·문서·테스트와 여러 파일을 함께 봐야 드러나는 구조 위반을 검사한다.
+4. 전체 diff에 프로덕션 Java의 패키지·import·상속·필드·생성자 타입, Spring 빈 연결 또는 Gradle 모듈 의존 변경이 있으면 최종 코드 상태에서 `:application:policyTest`를 실행한다. `LayerDependencyPolicyTest`가 Controller를 포함한 웹 어댑터의 출력 포트·출력 어댑터 접근, application의 adapter·bootstrap 접근, domain의 외부 계층 접근과 출력 어댑터 간 결합을 자동으로 막는다. 이미 같은 최종 코드로 통과했고 이후 문서나 커밋만 바뀌었다면 다시 실행하지 않는다.
+
 | 변경 | 우선 검증 |
 | --- | --- |
 | 문서·지침 | 링크·참조 경로 확인, `git diff --check` |
-| 정책·아키텍처 | `./gradlew --no-daemon :application:policyTest` |
+| 프로덕션 Java 구조·정책·아키텍처 | `./gradlew --no-daemon :application:policyTest` |
 | Spring·DB·Flyway·트랜잭션 | `./gradlew --no-daemon :application:useCaseTest` |
 | HTTP 계약 | `./gradlew --no-daemon :adapter-in-web:restDocsTest`와 계약 생성·확인 |
 | 프런트 소스 | `cd frontend`에서 `npm run build`; 테스트 수정·UI 동작 변경에는 `npm run typecheck`도 실행 |
