@@ -376,7 +376,7 @@ test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 �
   try {
     const rotateButton = () => keyDialog.getByRole('button', { name: '공유 링크 재발급' })
     await rotateButton().click()
-    await expect(keyDialog.getByRole('alert')).toContainText('임시 기록을 지우지 못했습니다.')
+    await expect(keyDialog.getByRole('alert')).toContainText('임시 기록을 삭제하지 못했습니다.')
     const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
     expect(JSON.parse(await page.evaluate(
       (key) => localStorage.getItem(key) ?? 'null',
@@ -555,7 +555,7 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
   await expect(keyDialog.getByText(/이전 링크를 받을 수 없습니다/)).toBeVisible()
-  await expect(keyDialog.getByText(/이전 공유 링크의 임시 기록을 지우지 못했습니다/)).toBeVisible()
+  await expect(keyDialog.getByText(/이전 공유 링크의 임시 기록을 삭제하지 못했습니다/)).toBeVisible()
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
   expect(JSON.parse(await page.evaluate(
     (key) => localStorage.getItem(key) ?? 'null',
@@ -1050,6 +1050,7 @@ test('@operations 반복 업무와 회차를 안전하게 생성하고 선택한
 })
 
 test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행을 완료하고 복원한 정의는 다음 회차부터 사용한다', async ({ page }, testInfo) => {
+  test.slow(testInfo.project.name === 'webkit', '여러 화면에서 보관·완료·복원과 새 회차 생성을 확인한다')
   const initialProjection = makeProjection()
   initialProjection.season.roundSchedule = {
     firstMeetingDate: '2026-07-23',
