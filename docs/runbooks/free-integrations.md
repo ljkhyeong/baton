@@ -97,6 +97,8 @@ Brevo [무료 플랜의 outbound webhook](https://help.brevo.com/hc/en-us/articl
 
 `baton_email_delivery_receipts{event="hard_bounce"}` 등은 **최근 24시간에 해당 결과가 발생한 메일 수**다. 동일 메일에 전달과 반송이 모두 있으면 각 결과에 집계된다. 기존 운영 지표 갱신 상태가 정상이고 영구 반송·차단·주소 오류·발송 오류·스팸 신고가 2분간 보이면 `BatonEmailDeliveryRejected`가 알린다. 일시 반송·지연에는 즉시 경보를 내거나 자동 재발송하지 않는다. 해당 결과가 24시간 창에서 빠지면 경보가 해제된다.
 
+Prometheus의 수집 필터에도 `baton_email_delivery_receipts`를 허용해야 한다. 이전 설정을 사용 중이면 [prometheus.yml](../../ops/integrations/prometheus.yml)을 반영하고, 내부 조회 화면에서 해당 지표가 보이는지 확인한다. 경보 규칙만 추가하거나 BATON의 지표 주소에서 값이 보이는 것으로 수집 완료를 판단하지 않는다.
+
 문제 메일의 발송 ID·결과·시각은 운영 DB에서 `email_delivery_receipts`를 조회하고, 자세한 원인은 Brevo 발송 내역과 대조한다. 중단할 때는 공급자 웹훅부터 끈 다음 BATON 수신을 비활성화해 불필요한 재전송을 줄인다. 실제 공급자 수신·HTTPS·경보 메일 검증은 운영 설정 후 진행한다.
 
 ## 가입·재설정 봇 방지: Cloudflare Turnstile
@@ -255,7 +257,7 @@ CAL·WATCH·BRIEF·이메일 전달은 공개 상태가 `UP`이어도 실패할 
 
 ### 연결 설정
 
-- [prometheus.yml](../../ops/integrations/prometheus.yml): 30초마다 BATON 연동 지표를 수집하고 Alertmanager에 경보를 전달한다. 지표를 외부 저장 서비스로 전송하지 않는다.
+- [prometheus.yml](../../ops/integrations/prometheus.yml): 30초마다 연동 상태와 메일 전달 결과 지표를 수집하고 Alertmanager에 경보를 전달한다. [수집 필터](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs)는 `baton_integration_*`와 `baton_email_delivery_receipts`만 허용한다. 지표를 외부 저장 서비스로 전송하지 않는다.
 - [baton-alerts.yml](../../ops/integrations/baton-alerts.yml): 수집·갱신 장애, 전달 실패와 처리 지연을 판단한다. `prometheus.yml`과 같은 디렉터리에 둔다.
 - [alertmanager.yml.example](../../ops/integrations/alertmanager.yml.example): SMTP 로그인과 운영자 이메일을 실제 값으로 바꾸고 비밀 파일을 연결한다. [표준 SMTP 설정](https://prometheus.io/docs/alerting/latest/configuration/#file-layout-and-global-settings)으로 STARTTLS를 사용하며 비밀번호 원문은 설정에 넣지 않는다. Alertmanager는 예시의 문자열이나 환경 변수 참조를 자동 치환하지 않으므로 실행 전에 실제 값으로 작성한다.
 - [alertmanager-discord.yml.example](../../ops/integrations/alertmanager-discord.yml.example): SMTP를 거치지 않는 선택 설정이다. 아래 절차로 Discord 웹훅 비밀 파일을 연결한다.
@@ -271,6 +273,7 @@ BATON은 `/actuator/prometheus`를 `127.0.0.1`에서만 허용한다. **수집�
 | 연동 상태 확인 불가 | 갱신 실패, 갱신 시각 미설정·미래·120초 초과 또는 필수 지표 누락이 2분 지속 |
 | 조치 대상 전달 실패 | 영구 실패 항목이 5분 지속 |
 | 전달 처리 지연 | 처리 기한을 넘긴 항목이 5분 지속 |
+| 메일 반송·차단 | 최근 24시간의 영구 반송·차단·주소 오류·발송 오류·스팸 신고가 2분 지속 |
 
 연동 지표는 `calendar`, `calendar_metadata`, `watch`, `brief`, `email`의 실패·처리 지연 각 1개를 요구한다. 연동 종류나 지표를 변경하면 규칙과 테스트를 함께 갱신한다. 지표가 유효하지 않을 때는 과거 건수로 전달 장애를 판단하지 않고 상태 확인 불가를 알린다. `failed` 원시 이력은 사용하지 않으므로 만료된 이메일 인증과 해결된 과거 시즌 이름 실패를 다시 알리지 않는다.
 
@@ -297,7 +300,11 @@ Alertmanager는 같은 앱의 경보를 묶어 최초 30초 대기 후 보내고
 bash ops/tests/integration-alerts-test.sh
 ```
 
-Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·Discord·하트비트·HTTPS 설정과 장애 시나리오를 검사한다. 정기 신호의 지속 발생과 세 설정에서 정기 신호·일반 장애가 각각 의도한 수신자로 분리되는지도 확인한다. Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 네트워크가 차단된 임시 컨테이너에서 실행하며 실제 메일·Discord·하트비트를 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 선택한 채널의 실제 수신은 활성화 전에 별도로 확인해야 한다.
+Prometheus 3.14.0의 `promtool`, Alertmanager 0.34.0의 `amtool`, Blackbox Exporter 0.28.0의 `--config.check`로 수집·경보·SMTP·Discord·하트비트·HTTPS 설정과 장애 시나리오를 검사한다. 정기 신호의 지속 발생과 세 설정에서 정기 신호·일반 장애가 각각 의도한 수신자로 분리되는지도 확인한다.
+
+[수집 테스트](../../ops/tests/integration-metrics-scrape-test.sh)는 실제 Prometheus를 실행해 HTTP 대역의 연동·메일 결과 지표가 저장되고 요청 지표는 제외되는지 확인한다. Caddy 이미지는 웹 Dockerfile의 고정 버전을 재사용한다. 운영 수집 경로·필터는 유지하고 테스트 주기만 줄인다. 임시 저장소와 컨테이너는 종료 시 제거한다.
+
+Docker 이미지가 없으면 최초 실행에 다운로드가 필요하다. 검사는 외부 통신과 공개 포트가 없는 임시 컨테이너에서 실행하며 실제 메일·Discord·하트비트를 보내지 않는다. CI 품질 게이트에서도 같은 검사를 실행한다. 실행 중인 BATON의 수집과 선택한 채널의 실제 수신은 활성화 전에 별도로 확인해야 한다.
 
 ## 공개 인증서 만료 알림: Blackbox Exporter
 
