@@ -2017,14 +2017,6 @@ export interface components {
             /** @description 표시용 색상 */
             tone: string;
         };
-        Schema_0d017fd377479c28: {
-            /** @description 새 자체 이메일 계정 등록 가능 여부 */
-            localRegistrationEnabled: boolean;
-            /** @description 자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부 */
-            passwordResetEnabled: boolean;
-            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
-            providers: ("google" | "naver")[];
-        };
         Schema_0e0fd397be8f012d: {
             /**
              * Format: date-time
@@ -2672,10 +2664,6 @@ export interface components {
                 permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
             };
         };
-        Schema_3a4a0e7a2f90e51f: {
-            /** @description 가입한 이메일 */
-            email: string;
-        };
         Schema_3b8b9e297849dc60: {
             /**
              * Format: uuid
@@ -2795,15 +2783,6 @@ export interface components {
             authenticated: true;
             csrfHeaderName: string;
             csrfToken: string;
-        };
-        Schema_6a0ae0ae4f3b3839: {
-            /** @description BATON에 표시할 계정 이름 */
-            displayName: string;
-            /**
-             * Format: email
-             * @description 등록할 이메일 주소
-             */
-            email: string;
         };
         Schema_6c100ce885441212: {
             /** @description true면 활동 종료, false면 다시 활성화 */
@@ -3177,6 +3156,16 @@ export interface components {
             expectedAccountId: string;
             /** @description 43자 초대 토큰 */
             token: string;
+        };
+        Schema_94df345083b5e334: {
+            /** @description 새 자체 이메일 계정 등록 가능 여부 */
+            localRegistrationEnabled: boolean;
+            /** @description 자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부 */
+            passwordResetEnabled: boolean;
+            /** @description 고정 순서의 로그인 공급자 식별자: google, naver */
+            providers: ("google" | "naver")[];
+            /** @description 자동 요청 방지 위젯의 공개 사이트 키. 기능이 꺼지면 null */
+            turnstileSiteKey: string | null;
         };
         Schema_132ab51f4bca16af: {
             /**
@@ -3626,6 +3615,12 @@ export interface components {
             phase: "BEFORE" | "DURING" | "AFTER";
             /** @description 반복 업무 제목 */
             title: string;
+        };
+        Schema_4343cd869e5bb959: {
+            /** @description 가입한 이메일 */
+            email: string;
+            /** @description 위젯이 발급한 일회용 자동 요청 방지 token */
+            turnstileToken?: string | null;
         };
         Schema_4638c5064b4052d0: {
             /**
@@ -4183,6 +4178,17 @@ export interface components {
             password: string;
             /** @description 메일 링크에서 읽은 일회용 재설정 토큰 */
             token: string;
+        };
+        Schema_19066648567fd85d: {
+            /** @description BATON에 표시할 계정 이름 */
+            displayName: string;
+            /**
+             * Format: email
+             * @description 등록할 이메일 주소
+             */
+            email: string;
+            /** @description 위젯이 발급한 일회용 자동 요청 방지 token */
+            turnstileToken?: string | null;
         };
         Schema_9708540752768ac7: {
             /**
@@ -5337,7 +5343,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_3a4a0e7a2f90e51f"];
+                "application/json": components["schemas"]["Schema_4343cd869e5bb959"];
             };
         };
         responses: {
@@ -5352,6 +5358,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_d817bb4c7f28fd3d"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -5436,7 +5468,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_6a0ae0ae4f3b3839"];
+                "application/json": components["schemas"]["Schema_19066648567fd85d"];
             };
         };
         responses: {
@@ -5451,6 +5483,19 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Schema_2a4f2da12175b82c"];
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description 503 */
@@ -5582,7 +5627,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_0d017fd377479c28"];
+                    "application/json": components["schemas"]["Schema_94df345083b5e334"];
                 };
             };
         };

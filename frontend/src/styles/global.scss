@@ -218,6 +218,8 @@ a {
 .auth-form input { width: 100%; height: 44px; padding: 0 13px; border: 1px solid var(--rule-strong); border-radius: 6px; color: var(--ink); background: #fff; font-size: 13px; }
 .auth-form label small { color: var(--faint); font-size: 11px; line-height: 1.5; }
 .auth-verification-intro { padding: 13px 14px; border-left: 3px solid var(--success); color: var(--muted); background: var(--success-soft); font-size: 12px; line-height: 1.65; }
+.auth-turnstile { width: 100%; min-height: 65px; }
+.auth-turnstile iframe { max-width: 100%; }
 .auth-form .auth-submit { width: 100%; min-height: 46px; margin-top: 2px; }
 .auth-switch-copy { margin: 3px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
 .auth-switch-copy a { color: var(--baton-dark); font-weight: 700; }

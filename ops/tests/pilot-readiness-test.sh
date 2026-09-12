@@ -331,6 +331,7 @@ if [[ "${COMPOSE_MENU:-}" != "false" ]]; then
 fi
 
 for required_secret_name in \
+  BATON_SECRET_TURNSTILE_SECRET_KEY \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
   BATON_SECRET_CAL_BEARER_TOKEN \
@@ -352,6 +353,11 @@ for required_secret_name in \
     exit 73
   fi
 done
+if [[ -n "${FAKE_EXPECTED_TURNSTILE_SECRET_KEY:-}" \
+  && "$BATON_SECRET_TURNSTILE_SECRET_KEY" != "$FAKE_EXPECTED_TURNSTILE_SECRET_KEY" ]]; then
+  printf 'Turnstile 비밀 키가 보호된 환경으로 전달되지 않았습니다.\n' >&2
+  exit 80
+fi
 if [[ -n "${FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY:-}" \
   && "$BATON_SECRET_HOLIDAYS_SERVICE_KEY" != "$FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY" ]]; then
   printf 'Holiday service key was not passed through the protected environment.\n' >&2
@@ -828,6 +834,24 @@ preflight_env_output="$(PATH="$fake_bin:$PATH" \
   || fail 'BATON_PRODUCTION_ENV_FILE preflight failed'
 assert_contains 'Production preflight passed' "$preflight_env_output" \
   'BATON_PRODUCTION_ENV_FILE preflight'
+
+turnstile_env="$test_root/turnstile.env"
+write_valid_env "$turnstile_env"
+printf '%s\n' 'BATON_TURNSTILE_ENABLED=true' 'BATON_TURNSTILE_SITE_KEY=test-site-key' \
+  'BATON_TURNSTILE_EXPECTED_HOSTNAME=baton.example.com' >> "$turnstile_env"
+expect_preflight_failure 'Turnstile 비밀 키 누락' "$turnstile_env" 'BATON_TURNSTILE_SECRET_KEY_FILE is required'
+turnstile_secret_file="$auth_secret_dir/turnstile-secret"
+printf '%s' 'turnstile-private-test-key' > "$turnstile_secret_file"
+chmod 600 "$turnstile_secret_file"
+printf '%s\n' "BATON_TURNSTILE_SECRET_KEY_FILE=$turnstile_secret_file" >> "$turnstile_env"
+turnstile_output="$(PATH="$fake_bin:$PATH" FAKE_EXPECTED_TURNSTILE_SECRET_KEY=turnstile-private-test-key FAKE_DOCKER_LOG="$test_root/turnstile-docker.log" \
+  "$preflight_script" "$turnstile_env" 2>&1)" || fail 'Turnstile 운영 설정 연결 실패'
+assert_contains 'Production preflight passed' "$turnstile_output" 'Turnstile 활성 설정'
+assert_not_contains 'turnstile-private-test-key' "$turnstile_output" 'Turnstile 비밀 비노출'
+sed 's/BATON_TURNSTILE_EXPECTED_HOSTNAME=baton.example.com/BATON_TURNSTILE_EXPECTED_HOSTNAME=wrong.example.com/' \
+  "$turnstile_env" > "$test_root/turnstile-wrong-host.env"
+chmod 600 "$test_root/turnstile-wrong-host.env"
+expect_preflight_failure 'Turnstile 호스트 불일치' "$test_root/turnstile-wrong-host.env" 'must match BATON_HOST'
 
 holidays_enabled_env="$test_root/holidays-enabled.env"
 write_valid_env "$holidays_enabled_env"

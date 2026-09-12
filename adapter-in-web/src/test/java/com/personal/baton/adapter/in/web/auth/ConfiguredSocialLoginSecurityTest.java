@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.AccountView;
@@ -87,6 +88,9 @@ class ConfiguredSocialLoginSecurityTest {
     @MockitoBean
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
+    @MockitoBean
+    private HumanVerificationUseCase humanVerificationUseCase;
+
     @BeforeEach
     void acceptCurrentAccountSessions() {
         when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
@@ -145,7 +149,8 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .content().json(
                                 "{\"providers\":[\"google\"],"
-                                        + "\"localRegistrationEnabled\":false,\"passwordResetEnabled\":false}",
+                                        + "\"localRegistrationEnabled\":false,\"passwordResetEnabled\":false,"
+                                        + "\"turnstileSiteKey\":null}",
                                 true
                         ));
     }

@@ -45,5 +45,5 @@ export default function RegistrationGate() {
     )
   }
 
-  return <RegistrationForm />
+  return <RegistrationForm turnstileSiteKey={capabilitiesQuery.data.turnstileSiteKey} />
 }

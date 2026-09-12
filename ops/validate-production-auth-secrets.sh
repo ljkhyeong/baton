@@ -27,6 +27,11 @@ env_file="$1"
 [[ -f "$env_file" && -r "$env_file" && ! -L "$env_file" ]] \
   || fail "production environment file must be a readable regular file"
 
+turnstile_enabled="false"
+turnstile_site_key=""
+turnstile_secret_file=""
+turnstile_hostname=""
+baton_host=""
 oauth_enabled="false"
 google_client_id=""
 google_client_secret_file=""
@@ -70,6 +75,11 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
   key="${PRODUCTION_VALIDATION_ENV_KEYS[$env_index]}"
   value="${PRODUCTION_VALIDATION_ENV_VALUES[$env_index]}"
   case "$key" in
+    BATON_HOST) baton_host="$value" ;;
+    BATON_TURNSTILE_ENABLED) turnstile_enabled="$value" ;;
+    BATON_TURNSTILE_SITE_KEY) turnstile_site_key="$value" ;;
+    BATON_TURNSTILE_SECRET_KEY_FILE) turnstile_secret_file="$value" ;;
+    BATON_TURNSTILE_EXPECTED_HOSTNAME) turnstile_hostname="$value" ;;
     BATON_AUTH_OAUTH2_ENABLED)
       oauth_enabled="$value"
       ;;
@@ -374,6 +384,19 @@ if [[ -n "$holidays_service_key_file" ]]; then
   validate_scalar_secret_file BATON_HOLIDAYS_SERVICE_KEY_FILE "$holidays_service_key_file"
 fi
 
+[[ "$turnstile_enabled" == true || "$turnstile_enabled" == false ]] \
+  || fail "BATON_TURNSTILE_ENABLED must be true or false"
+if [[ "$turnstile_enabled" == true ]]; then
+  require_value BATON_TURNSTILE_SITE_KEY "$turnstile_site_key"
+  require_value BATON_TURNSTILE_SECRET_KEY_FILE "$turnstile_secret_file"
+  require_value BATON_TURNSTILE_EXPECTED_HOSTNAME "$turnstile_hostname"
+  [[ "$turnstile_hostname" == "$baton_host" ]] \
+    || fail "BATON_TURNSTILE_EXPECTED_HOSTNAME must match BATON_HOST"
+fi
+if [[ -n "$turnstile_secret_file" ]]; then
+  validate_scalar_secret_file BATON_TURNSTILE_SECRET_KEY_FILE "$turnstile_secret_file"
+fi
+
 oauth_material_count=0
 for value in \
   "$google_client_id" \
@@ -463,6 +486,10 @@ fi
 
 scalar_secret_files=()
 scalar_secret_count=0
+if [[ -n "$turnstile_secret_file" ]]; then
+  scalar_secret_files+=("$turnstile_secret_file")
+  scalar_secret_count=$((scalar_secret_count + 1))
+fi
 scalar_secret_files+=("$email_outbox_encryption_key_file")
 scalar_secret_count=$((scalar_secret_count + 1))
 if [[ -n "$google_client_secret_file" ]]; then

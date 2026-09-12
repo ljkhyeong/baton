@@ -31,7 +31,9 @@ export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
   if (!isJsonObject(value)
     || !Array.isArray(value.providers)
     || typeof value.localRegistrationEnabled !== 'boolean'
-    || typeof value.passwordResetEnabled !== 'boolean') {
+    || typeof value.passwordResetEnabled !== 'boolean'
+    || (value.turnstileSiteKey !== null
+      && (typeof value.turnstileSiteKey !== 'string' || !value.turnstileSiteKey))) {
     throw new Error('로그인 기능 응답 형식이 올바르지 않습니다.')
   }
 
@@ -47,6 +49,7 @@ export function decodeAuthCapabilities(value: unknown): AuthCapabilities {
     providers,
     localRegistrationEnabled: value.localRegistrationEnabled,
     passwordResetEnabled: value.passwordResetEnabled,
+    turnstileSiteKey: value.turnstileSiteKey,
   }
 }
 

@@ -1068,11 +1068,11 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/auth/csrf` | 없음 | `200 {csrfHeaderName, csrfToken}`. 토큰을 준비하기 위해 세션을 만들 수 있음 |
 | `GET` | `/api/v1/auth/session` | 없음 | 미인증 `200 {authenticated:false}` 또는 인증 `200 {authenticated:true,accountId,csrfHeaderName,csrfToken}` |
-| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false,passwordResetEnabled:true|false}`. 구성한 공급자, 새 가입과 재설정 메일 요청 가능 여부를 각각 반환 |
+| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false,passwordResetEnabled:true|false,turnstileSiteKey:string|null}`. 구성한 공급자, 새 가입·재설정 메일 요청 가능 여부와 자동 요청 방지 사이트 키를 반환 |
 | `GET` | `/api/v1/auth/account` | 없음 | `200 {accountId,displayName,identities:[{provider,email?,emailVerified}]}`. 로그인 계정과 연결된 로그인 방법 조회 |
-| `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName,turnstileToken?}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204`. 토큰 소비·이메일 검증·최초 자격 증명 생성을 한 트랜잭션으로 완료 |
-| `POST` | `/api/v1/auth/local/password-reset-requests` | JSON `{email}` | `202 {accepted:true}`. 계정 존재·검증 여부와 실제 메일 발송 완료를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/password-reset-requests` | JSON `{email,turnstileToken?}` | `202 {accepted:true}`. 계정 존재·검증 여부와 실제 메일 발송 완료를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/password-resets` | JSON `{token,password}` | `204`. 토큰 소비·비밀번호 변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료. 자동 로그인 없음 |
 | `POST` | `/api/v1/auth/local/password-changes` | JSON `{currentPassword,newPassword}` | `204`. 현재 비밀번호 확인·변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료하고 현재 세션도 종료 |
 | `POST` | `/api/v1/auth/local/session` | 폼 `{email,password}` | `204`. 인증 성공 시 세션 ID 교체 |
@@ -1084,6 +1084,11 @@ Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. �
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
 `Retry-After`를 반환한다.
+
+Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최대 2,048자의 일회용
+`turnstileToken`이 필요하다. 서버는 Siteverify 응답의 성공 여부, `hostname`과 요청별 `action`을
+확인한다. 실패는 `400 HUMAN_VERIFICATION_FAILED`, 공급자 연결·설정 장애는
+`503 HUMAN_VERIFICATION_UNAVAILABLE`로 반환하며 원시 공급자 오류는 노출하지 않는다.
 
 재설정 이메일도 최대 320자, 토큰은 32~512자, 새 비밀번호는 12~128자다. 인증된 자체 이메일
 계정만 메일을 발급하며 Google·Naver 신원이나 미인증 계정에는 발급하지 않는다. 링크는 발급 후

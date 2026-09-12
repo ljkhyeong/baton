@@ -132,6 +132,9 @@ BATON은 동일 공개 HTTPS 출처의 서버 측 `HttpSession`을 사용한다.
 
 공개 가입은 SMTP 또는 동등한 검증 메일 전달 어댑터, 발급 제한과 실패 관측이 구성된
 환경에서만 활성화한다. 저장소에 자격 증명을 넣지 않으며 설정이 불완전하면 안전하게 닫힌 상태로 실패한다.
+Turnstile을 활성화한 환경은 가입과 비밀번호 재설정 메일 요청에 서로 다른 `action`의 일회용
+token을 요구한다. 서버는 Siteverify의 성공 여부·허용 호스트·`action`을 확인한 뒤에만 기존
+애플리케이션 포트를 호출한다. IP·이메일 요청 제한은 외부 검증 API 남용 방지를 위해 유지한다.
 실패 관측은 공통 외부 연동 지표와 `./ops/check-integration-delivery.sh`를 사용한다. 원시
 `FAILED` 수는 모든 종료 원인을 보존하되, 이메일 검증 토큰의 자연 만료인
 `VERIFICATION_TOKEN_EXPIRED`는 조치 대상 영구 실패 지표에서 제외한다. `SUPERSEDED`는 실패가
@@ -257,9 +260,9 @@ PRD-0009의 계정 전환 팀은 공유 키 연결 진입점을 닫고 기존 �
 
 | 메서드·경로 | 요청 | 성공 |
 | --- | --- | --- |
-| `POST /api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}` |
+| `POST /api/v1/auth/local/registrations` | JSON `{email,displayName,turnstileToken?}` | `202 {verificationRequired:true}` |
 | `POST /api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204` |
-| `POST /api/v1/auth/local/password-reset-requests` | JSON `{email}` | `202 {accepted:true}` |
+| `POST /api/v1/auth/local/password-reset-requests` | JSON `{email,turnstileToken?}` | `202 {accepted:true}` |
 | `POST /api/v1/auth/local/password-resets` | JSON `{token,password}` | `204` |
 | `POST /api/v1/auth/local/password-changes` | JSON `{currentPassword,newPassword}` | `204` |
 | `POST /api/v1/auth/local/session` | 폼 `{email,password}` | `204` |

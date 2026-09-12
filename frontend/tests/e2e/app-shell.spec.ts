@@ -8,7 +8,12 @@ test('@smoke 라우트와 작업 공간에 맞는 문서 제목을 표시한다'
   await page.route('**/api/v1/auth/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path === '/api/v1/auth/providers') {
-      await route.fulfill({ json: { providers: [], localRegistrationEnabled: true, passwordResetEnabled: false } })
+      await route.fulfill({ json: {
+        providers: [],
+        localRegistrationEnabled: true,
+        passwordResetEnabled: false,
+        turnstileSiteKey: null,
+      } })
       return
     }
     await route.fulfill({ json: { authenticated: false } })

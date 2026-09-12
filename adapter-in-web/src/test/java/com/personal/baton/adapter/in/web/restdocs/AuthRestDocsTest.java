@@ -20,9 +20,11 @@ import com.personal.baton.application.identity.error.CurrentPasswordMismatchExce
 import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
 import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
+import com.personal.baton.application.identity.error.HumanVerificationRejectedException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.error.PasswordResetException;
 import com.personal.baton.adapter.in.web.auth.AuthRequests.PasswordResetRequest;
@@ -36,6 +38,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -121,12 +125,14 @@ class AuthRestDocsTest {
     private RegisterLocalAccountUseCase registerUseCase;
     private VerifyLocalEmailUseCase verifyUseCase;
     private PasswordResetUseCase resetUseCase;
+    private HumanVerificationUseCase humanVerificationUseCase;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
         registerUseCase = mock(RegisterLocalAccountUseCase.class);
         verifyUseCase = mock(VerifyLocalEmailUseCase.class);
         resetUseCase = mock(PasswordResetUseCase.class);
+        humanVerificationUseCase = mock(HumanVerificationUseCase.class);
         @SuppressWarnings("unchecked")
         ObjectProvider<SocialLoginProviderCatalog> registrations =
                 mock(ObjectProvider.class);
@@ -140,7 +146,8 @@ class AuthRestDocsTest {
                 resetUseCase,
                 registrations,
                 new AuthRateLimiter(),
-                new AuthFeatureProperties(true, true)
+                new AuthFeatureProperties(true, true),
+                humanVerificationUseCase
         );
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -271,6 +278,7 @@ class AuthRestDocsTest {
                 .andExpect(jsonPath("$.providers[1]").value("naver"))
                 .andExpect(jsonPath("$.localRegistrationEnabled").value(true))
                 .andExpect(jsonPath("$.passwordResetEnabled").value(true))
+                .andExpect(jsonPath("$.turnstileSiteKey").isEmpty())
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getAuthProviders",
                         "현재 서버에 완전히 구성된 로그인 공급자만 자격 증명 없이 조회한다.",
@@ -291,7 +299,11 @@ class AuthRestDocsTest {
                                         .description("새 자체 이메일 계정 등록 가능 여부"),
                                 fieldWithPath("passwordResetEnabled")
                                         .type(JsonFieldType.BOOLEAN)
-                                        .description("자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부")
+                                        .description("자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부"),
+                                fieldWithPath("turnstileSiteKey")
+                                        .type(JsonFieldType.STRING)
+                                        .optional()
+                                        .description("자동 요청 방지 위젯의 공개 사이트 키. 기능이 꺼지면 null")
                         )));
     }
 
@@ -303,7 +315,8 @@ class AuthRestDocsTest {
                         .content("""
                                 {
                                   "email": "member@example.com",
-                                  "displayName": "박민서"
+                                  "displayName": "박민서",
+                                  "turnstileToken": "verified-turnstile-token"
                                 }
                                 """))
                 .andExpect(status().isAccepted())
@@ -324,7 +337,12 @@ class AuthRestDocsTest {
                                         AuthRequests.LocalRegistrationRequest.class,
                                         "displayName",
                                         "BATON에 표시할 계정 이름"
-                                )
+                                ),
+                                requestField(
+                                        AuthRequests.LocalRegistrationRequest.class,
+                                        "turnstileToken",
+                                        "위젯이 발급한 일회용 자동 요청 방지 token"
+                                ).optional()
                         ),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
@@ -349,7 +367,8 @@ class AuthRestDocsTest {
                         .content("""
                                 {
                                   "email": "member@example.com",
-                                  "displayName": "박민서"
+                                  "displayName": "박민서",
+                                  "turnstileToken": "verified-turnstile-token"
                                 }
                                 """))
                 .andExpect(status().isServiceUnavailable())
@@ -373,7 +392,54 @@ class AuthRestDocsTest {
                                         AuthRequests.LocalRegistrationRequest.class,
                                         "displayName",
                                         "BATON에 표시할 계정 이름"
-                                )
+                                ),
+                                requestField(
+                                        AuthRequests.LocalRegistrationRequest.class,
+                                        "turnstileToken",
+                                        "위젯이 발급한 일회용 자동 요청 방지 token"
+                                ).optional()
+                        ),
+                        errorResponseHeaders(),
+                        errorResponseFields()
+                ));
+    }
+
+    @DisplayName("자체 이메일 등록 API는 자동 요청 방지 실패를 안정적인 400으로 반환한다")
+    @Test
+    void documentsLocalRegistrationHumanVerificationFailure() throws Exception {
+        doThrow(new HumanVerificationRejectedException())
+                .when(humanVerificationUseCase).verify(any());
+
+        mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "member@example.com",
+                                  "displayName": "박민서",
+                                  "turnstileToken": "expired-turnstile-token"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(jsonPath("$.code").value("HUMAN_VERIFICATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("자동 요청 방지 확인을 다시 완료해 주세요"))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "registerLocalAccountHumanVerificationFailed",
+                        "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.",
+                        "자체 이메일 계정 등록",
+                        sessionMutationHeaders(),
+                        requestFields(
+                                requestField(AuthRequests.LocalRegistrationRequest.class, "email", "등록할 이메일 주소"),
+                                requestField(
+                                        AuthRequests.LocalRegistrationRequest.class,
+                                        "displayName",
+                                        "BATON에 표시할 계정 이름"
+                                ),
+                                requestField(
+                                        AuthRequests.LocalRegistrationRequest.class,
+                                        "turnstileToken",
+                                        "위젯이 발급한 일회용 자동 요청 방지 token"
+                                ).optional()
                         ),
                         errorResponseHeaders(),
                         errorResponseFields()
@@ -460,6 +526,33 @@ class AuthRestDocsTest {
                 ));
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "registerLocalAccount,local/registrations,503",
+            "requestPasswordReset,local/password-reset-requests,400",
+            "requestPasswordReset,local/password-reset-requests,503"
+    })
+    @DisplayName("메일 요청의 검증 실패와 공급자 장애 계약을 문서화한다")
+    void documentsHumanVerificationErrors(String operation, String path, int statusCode) throws Exception {
+        boolean unavailable = statusCode == 503;
+        RuntimeException failure = unavailable
+                ? new com.personal.baton.application.identity.error.HumanVerificationUnavailableException()
+                : new HumanVerificationRejectedException();
+        doThrow(failure).when(humanVerificationUseCase).verify(any());
+        mockMvc.perform(sameOriginMutation(post("/api/v1/auth/" + path))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"member@example.com\",\"displayName\":\"사용자\",\"turnstileToken\":\"test-token\"}"))
+                .andExpect(status().is(statusCode))
+                .andExpect(jsonPath("$.code").value(unavailable
+                        ? "HUMAN_VERIFICATION_UNAVAILABLE" : "HUMAN_VERIFICATION_FAILED"))
+                .andDo(MockMvcRestDocumentationWrapper.document(operation + "HumanVerification" + statusCode,
+                        operation.equals("registerLocalAccount")
+                                ? "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다."
+                                : "인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.",
+                        operation.equals("registerLocalAccount") ? "자체 이메일 계정 등록" : "비밀번호 재설정 메일 요청",
+                        sessionMutationHeaders(), errorResponseHeaders(), errorResponseFields()));
+    }
+
     private MockHttpServletRequestBuilder sameOriginMutation(
             MockHttpServletRequestBuilder request
     ) {
@@ -474,14 +567,21 @@ class AuthRestDocsTest {
     void documentsPasswordResetRequest() throws Exception {
         mockMvc.perform(sameOriginMutation(post(AuthController.PASSWORD_RESET_REQUESTS_PATH))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\"}"))
+                        .content("{\"email\":\"member@example.com\",\"turnstileToken\":\"verified-turnstile-token\"}"))
                 .andExpect(status().isAccepted())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().json("{\"accepted\":true}", true))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "requestPasswordReset", "인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.",
                         "비밀번호 재설정 메일 요청", sessionMutationHeaders(), errorResponseHeaders(),
-                        requestFields(requestField(PasswordResetRequest.class, "email", "가입한 이메일")),
+                        requestFields(
+                                requestField(PasswordResetRequest.class, "email", "가입한 이메일"),
+                                requestField(
+                                        PasswordResetRequest.class,
+                                        "turnstileToken",
+                                        "위젯이 발급한 일회용 자동 요청 방지 token"
+                                ).optional()
+                        ),
                         responseFields(fieldWithPath("accepted").description("항상 true인 요청 접수 표시. 계정 존재나 실제 발송 완료를 뜻하지 않는다"))));
     }
 
@@ -582,6 +682,9 @@ class AuthSessionRestDocsTest {
 
     @MockitoBean
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @MockitoBean
+    private HumanVerificationUseCase humanVerificationUseCase;
 
     @BeforeEach
     void acceptCurrentAccountSessions() {

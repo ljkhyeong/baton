@@ -17,7 +17,10 @@ public final class AuthRequests {
 
             @NotBlank(message = "표시 이름은 필수입니다")
             @Size(max = 100, message = "표시 이름은 100자 이하여야 합니다")
-            String displayName
+            String displayName,
+
+            @Size(max = 2_048, message = "자동 요청 방지 token 길이가 올바르지 않습니다")
+            String turnstileToken
     ) {
     }
 
@@ -44,7 +47,10 @@ public final class AuthRequests {
             @NotBlank(message = "이메일은 필수입니다")
             @Email(message = "이메일 형식이 올바르지 않습니다")
             @Size(max = 320, message = "이메일은 320자 이하여야 합니다")
-            String email
+            String email,
+
+            @Size(max = 2_048, message = "자동 요청 방지 token 길이가 올바르지 않습니다")
+            String turnstileToken
     ) {
     }
 

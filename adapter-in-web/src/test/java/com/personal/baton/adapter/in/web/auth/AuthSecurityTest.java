@@ -14,6 +14,7 @@ import com.personal.baton.application.identity.error.EmailVerificationPayloadPro
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
@@ -81,6 +82,9 @@ class AuthSecurityTest {
 
     @MockitoBean
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @MockitoBean
+    private HumanVerificationUseCase humanVerificationUseCase;
 
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
@@ -239,7 +243,7 @@ class AuthSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().json(
-                        "{\"providers\":[],\"localRegistrationEnabled\":true,\"passwordResetEnabled\":true}",
+                        "{\"providers\":[],\"localRegistrationEnabled\":true,\"passwordResetEnabled\":true,\"turnstileSiteKey\":null}",
                         true
                 ));
     }
@@ -291,6 +295,35 @@ class AuthSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
 
+        verifyNoInteractions(registerLocalAccountUseCase);
+    }
+
+    @DisplayName("자동 요청 방지 실패는 가입과 재설정의 메일 처리를 모두 차단한다")
+    @Test
+    void rejectsEmailRequestsBeforeDispatch() throws Exception {
+        doThrow(new com.personal.baton.application.identity.error.HumanVerificationRejectedException())
+                .when(humanVerificationUseCase).verify(any());
+        for (String path : java.util.List.of(AuthController.LOCAL_REGISTRATIONS_PATH,
+                AuthController.PASSWORD_RESET_REQUESTS_PATH)) {
+            mockMvc.perform(sameOrigin(post(path)).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"challenge@example.com\",\"displayName\":\"사용자\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("HUMAN_VERIFICATION_FAILED"));
+        }
+        verifyNoInteractions(registerLocalAccountUseCase, passwordResetUseCase);
+    }
+
+    @DisplayName("검증 공급자 장애 시 메일을 보내지 않고 재시도 가능한 오류를 반환한다")
+    @Test
+    void stopsEmailRequestsWhenVerificationIsUnavailable() throws Exception {
+        doThrow(new com.personal.baton.application.identity.error.HumanVerificationUnavailableException())
+                .when(humanVerificationUseCase).verify(any());
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"challenge-outage@example.com\",\"displayName\":\"사용자\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("HUMAN_VERIFICATION_UNAVAILABLE"));
         verifyNoInteractions(registerLocalAccountUseCase);
     }
 

@@ -560,10 +560,25 @@ paths:
               requestPasswordReset:
                 value: |-
                   {
-                    "email" : "member@example.com"
+                    "email" : "member@example.com",
+                    "turnstileToken" : "verified-turnstile-token"
+                  }
+              requestPasswordResetHumanVerification400:
+                value: |-
+                  {
+                    "email" : "member@example.com",
+                    "displayName" : "사용자",
+                    "turnstileToken" : "test-token"
+                  }
+              requestPasswordResetHumanVerification503:
+                value: |-
+                  {
+                    "email" : "member@example.com",
+                    "displayName" : "사용자",
+                    "turnstileToken" : "test-token"
                   }
             schema:
-              $ref: '#/components/schemas/Schema_3a4a0e7a2f90e51f'
+              $ref: '#/components/schemas/Schema_4343cd869e5bb959'
         required: true
       responses:
         '202':
@@ -578,6 +593,50 @@ paths:
                     }
               schema:
                 $ref: '#/components/schemas/Schema_d817bb4c7f28fd3d'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 요청 추적 ID
+              schema:
+                type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                requestPasswordResetHumanVerification400:
+                  value: |-
+                    {
+                      "code" : "HUMAN_VERIFICATION_FAILED",
+                      "message" : "자동 요청 방지 확인을 다시 완료해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 요청 추적 ID
+              schema:
+                type: string
+        '503':
+          description: '503'
+          content:
+            application/json:
+              examples:
+                requestPasswordResetHumanVerification503:
+                  value: |-
+                    {
+                      "code" : "HUMAN_VERIFICATION_UNAVAILABLE",
+                      "message" : "자동 요청 방지 확인을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -706,16 +765,32 @@ paths:
                 value: |-
                   {
                     "email" : "member@example.com",
-                    "displayName" : "박민서"
+                    "displayName" : "박민서",
+                    "turnstileToken" : "verified-turnstile-token"
+                  }
+              registerLocalAccountHumanVerification503:
+                value: |-
+                  {
+                    "email" : "member@example.com",
+                    "displayName" : "사용자",
+                    "turnstileToken" : "test-token"
+                  }
+              registerLocalAccountHumanVerificationFailed:
+                value: |-
+                  {
+                    "email" : "member@example.com",
+                    "displayName" : "박민서",
+                    "turnstileToken" : "expired-turnstile-token"
                   }
               registerLocalAccountTemporarilyUnavailable:
                 value: |-
                   {
                     "email" : "member@example.com",
-                    "displayName" : "박민서"
+                    "displayName" : "박민서",
+                    "turnstileToken" : "verified-turnstile-token"
                   }
             schema:
-              $ref: '#/components/schemas/Schema_6a0ae0ae4f3b3839'
+              $ref: '#/components/schemas/Schema_19066648567fd85d'
         required: true
       responses:
         '202':
@@ -739,11 +814,39 @@ paths:
               description: 서버가 생성한 요청 추적 ID
               schema:
                 type: string
+        '400':
+          description: '400'
+          content:
+            application/json:
+              examples:
+                registerLocalAccountHumanVerificationFailed:
+                  value: |-
+                    {
+                      "code" : "HUMAN_VERIFICATION_FAILED",
+                      "message" : "자동 요청 방지 확인을 다시 완료해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 요청 추적 ID
+              schema:
+                type: string
         '503':
           description: '503'
           content:
             application/json:
               examples:
+                registerLocalAccountHumanVerification503:
+                  value: |-
+                    {
+                      "code" : "HUMAN_VERIFICATION_UNAVAILABLE",
+                      "message" : "자동 요청 방지 확인을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요"
+                    }
                 registerLocalAccountTemporarilyUnavailable:
                   value: |-
                     {
@@ -898,10 +1001,11 @@ paths:
                     {
                       "providers" : [ "google", "naver" ],
                       "localRegistrationEnabled" : true,
-                      "passwordResetEnabled" : true
+                      "passwordResetEnabled" : true,
+                      "turnstileSiteKey" : null
                     }
               schema:
-                $ref: '#/components/schemas/Schema_0d017fd377479c28'
+                $ref: '#/components/schemas/Schema_94df345083b5e334'
           headers:
             Cache-Control:
               description: 응답 캐시 금지
@@ -10054,27 +10158,6 @@ components:
         - name
         - tone
       type: object
-    Schema_0d017fd377479c28:
-      properties:
-        localRegistrationEnabled:
-          description: 새 자체 이메일 계정 등록 가능 여부
-          type: boolean
-        passwordResetEnabled:
-          description: 자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부
-          type: boolean
-        providers:
-          description: '고정 순서의 로그인 공급자 식별자: google, naver'
-          items:
-            enum:
-              - google
-              - naver
-            type: string
-          type: array
-      required:
-        - localRegistrationEnabled
-        - passwordResetEnabled
-        - providers
-      type: object
     Schema_0e0fd397be8f012d:
       properties:
         checkedAt:
@@ -10202,6 +10285,29 @@ components:
         - teamId
         - timeZone
         - today
+      type: object
+    Schema_19066648567fd85d:
+      properties:
+        displayName:
+          description: BATON에 표시할 계정 이름
+          maxLength: 100
+          minLength: 1
+          type: string
+        email:
+          description: 등록할 이메일 주소
+          format: email
+          maxLength: 320
+          minLength: 1
+          type: string
+        turnstileToken:
+          description: 위젯이 발급한 일회용 자동 요청 방지 token
+          maxLength: 2048
+          minLength: 0
+          nullable: true
+          type: string
+      required:
+        - displayName
+        - email
       type: object
     Schema_190aeb236e459d98:
       properties:
@@ -11820,16 +11926,6 @@ components:
         - status
         - subscriptionId
       type: object
-    Schema_3a4a0e7a2f90e51f:
-      properties:
-        email:
-          description: 가입한 이메일
-          maxLength: 320
-          minLength: 1
-          type: string
-      required:
-        - email
-      type: object
     Schema_3b8b9e297849dc60:
       properties:
         resourceId:
@@ -12020,6 +12116,22 @@ components:
         - lastOutcome
         - monitoringReason
         - resourceId
+      type: object
+    Schema_4343cd869e5bb959:
+      properties:
+        email:
+          description: 가입한 이메일
+          maxLength: 320
+          minLength: 1
+          type: string
+        turnstileToken:
+          description: 위젯이 발급한 일회용 자동 요청 방지 token
+          maxLength: 2048
+          minLength: 0
+          nullable: true
+          type: string
+      required:
+        - email
       type: object
     Schema_4638c5064b4052d0:
       properties:
@@ -12567,23 +12679,6 @@ components:
           type: string
       required:
         - name
-      type: object
-    Schema_6a0ae0ae4f3b3839:
-      properties:
-        displayName:
-          description: BATON에 표시할 계정 이름
-          maxLength: 100
-          minLength: 1
-          type: string
-        email:
-          description: 등록할 이메일 주소
-          format: email
-          maxLength: 320
-          minLength: 1
-          type: string
-      required:
-        - displayName
-        - email
       type: object
     Schema_6c100ce885441212:
       properties:
@@ -13244,6 +13339,32 @@ components:
       required:
         - expectedAccountId
         - token
+      type: object
+    Schema_94df345083b5e334:
+      properties:
+        localRegistrationEnabled:
+          description: 새 자체 이메일 계정 등록 가능 여부
+          type: boolean
+        passwordResetEnabled:
+          description: 자체 이메일 계정의 비밀번호 재설정 메일 요청 가능 여부
+          type: boolean
+        providers:
+          description: '고정 순서의 로그인 공급자 식별자: google, naver'
+          items:
+            enum:
+              - google
+              - naver
+            type: string
+          type: array
+        turnstileSiteKey:
+          description: 자동 요청 방지 위젯의 공개 사이트 키. 기능이 꺼지면 null
+          nullable: true
+          type: string
+      required:
+        - localRegistrationEnabled
+        - passwordResetEnabled
+        - providers
+        - turnstileSiteKey
       type: object
     Schema_9708540752768ac7:
       properties:

@@ -3,11 +3,20 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { requestPasswordReset } from '@/features/auth/api'
 import { useAuthCapabilities } from '@/features/auth/useAuthCapabilities'
+import TurnstileWidget from '@/features/auth/TurnstileWidget'
 
 export default function PasswordResetRequestForm() {
   const capabilities = useAuthCapabilities()
   const [email, setEmail] = useState('')
-  const mutation = useMutation({ mutationFn: () => requestPasswordReset(email) })
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0)
+  const mutation = useMutation({
+    mutationFn: () => requestPasswordReset(email, turnstileToken),
+    onError: () => {
+      setTurnstileToken(null)
+      setTurnstileResetKey(value => value + 1)
+    },
+  })
 
   if (mutation.isSuccess) {
     return (
@@ -58,6 +67,7 @@ export default function PasswordResetRequestForm() {
       className="auth-form auth-form-stack"
       onSubmit={(event) => {
         event.preventDefault()
+        if (mutation.isPending || (capabilities.data.turnstileSiteKey && !turnstileToken)) return
         mutation.mutate()
       }}
     >
@@ -74,13 +84,25 @@ export default function PasswordResetRequestForm() {
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
+      {capabilities.data.turnstileSiteKey && (
+        <TurnstileWidget
+          action="password_reset_request"
+          onTokenChange={setTurnstileToken}
+          resetKey={turnstileResetKey}
+          siteKey={capabilities.data.turnstileSiteKey}
+        />
+      )}
       <p>이메일로 가입한 계정의 비밀번호만 바꿀 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
       {mutation.isError && (
         <p className="form-error" role="alert">
           {mutation.error instanceof Error ? mutation.error.message : '요청 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'}
         </p>
       )}
-      <button className="primary-button auth-submit" type="submit" disabled={mutation.isPending}>
+      <button
+        className="primary-button auth-submit"
+        type="submit"
+        disabled={mutation.isPending || Boolean(capabilities.data.turnstileSiteKey && !turnstileToken)}
+      >
         {mutation.isPending ? '메일 요청 중' : '재설정 메일 받기'}
       </button>
       <Link className="auth-secondary-link" to="/login">로그인으로</Link>

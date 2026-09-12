@@ -14,9 +14,12 @@ import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
-import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase.Action;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase.HumanVerificationCommand;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase.ResetPasswordCommand;
+import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase.RegisterLocalAccountCommand;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase.VerifyLocalEmailCommand;
@@ -57,6 +60,7 @@ public class AuthController {
     private final ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider;
     private final AuthRateLimiter authRateLimiter;
     private final AuthFeatureProperties authFeatureProperties;
+    private final HumanVerificationUseCase humanVerificationUseCase;
 
     public AuthController(
             RegisterLocalAccountUseCase registerLocalAccountUseCase,
@@ -64,7 +68,8 @@ public class AuthController {
             PasswordResetUseCase passwordResetUseCase,
             ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider,
             AuthRateLimiter authRateLimiter,
-            AuthFeatureProperties authFeatureProperties
+            AuthFeatureProperties authFeatureProperties,
+            HumanVerificationUseCase humanVerificationUseCase
     ) {
         this.registerLocalAccountUseCase = registerLocalAccountUseCase;
         this.verifyLocalEmailUseCase = verifyLocalEmailUseCase;
@@ -72,6 +77,7 @@ public class AuthController {
         this.socialLoginProviderCatalogProvider = socialLoginProviderCatalogProvider;
         this.authRateLimiter = authRateLimiter;
         this.authFeatureProperties = authFeatureProperties;
+        this.humanVerificationUseCase = humanVerificationUseCase;
     }
 
     @GetMapping("/csrf")
@@ -115,7 +121,8 @@ public class AuthController {
                 .body(new AuthProvidersResponse(
                         providers,
                         authFeatureProperties.localRegistrationEnabled(),
-                        authFeatureProperties.passwordResetEnabled()
+                        authFeatureProperties.passwordResetEnabled(),
+                        humanVerificationUseCase.siteKey().orElse(null)
                 ));
     }
 
@@ -133,6 +140,11 @@ public class AuthController {
                 servletRequest.getRemoteAddr(),
                 request.email()
         );
+        humanVerificationUseCase.verify(new HumanVerificationCommand(
+                request.turnstileToken(),
+                servletRequest.getRemoteAddr(),
+                Action.LOCAL_REGISTRATION
+        ));
         try {
             registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
                     request.email(),
@@ -173,6 +185,11 @@ public class AuthController {
             throw new EmailVerificationDeliveryUnavailableException("비밀번호 재설정 요청이 비활성화됐습니다");
         }
         authRateLimiter.checkRegistration(servletRequest.getRemoteAddr(), request.email());
+        humanVerificationUseCase.verify(new HumanVerificationCommand(
+                request.turnstileToken(),
+                servletRequest.getRemoteAddr(),
+                Action.PASSWORD_RESET_REQUEST
+        ));
         passwordResetUseCase.requestPasswordReset(request.email());
         return ResponseEntity.accepted().cacheControl(CacheControl.noStore())
                 .body(new PasswordResetRequestResponse(true));
