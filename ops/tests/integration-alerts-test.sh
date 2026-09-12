@@ -23,5 +23,27 @@ docker run --rm --network none --read-only \
   --entrypoint /bin/amtool "$alertmanager_image" \
   check-config /ops/integrations/alertmanager-discord.yml.example
 docker run --rm --network none --read-only \
+  -v "$ops_dir:/ops:ro" -v /dev/null:/run/secrets/smtp-password:ro \
+  -v /dev/null:/run/secrets/monitoring-heartbeat-url:ro \
+  --entrypoint /bin/amtool "$alertmanager_image" \
+  check-config /ops/integrations/alertmanager-heartbeat.yml.example
+
+for target in 'alertmanager.yml.example operations-email monitoring-heartbeat-disabled' \
+  'alertmanager-discord.yml.example operations-discord monitoring-heartbeat-disabled' \
+  'alertmanager-heartbeat.yml.example operations-email monitoring-heartbeat'; do
+  read -r config_file operations_receiver heartbeat_receiver <<< "$target"
+  for alert_name in BatonMonitoringWatchdog BatonMetricsUnavailable BatonEmailDeliveryRejected BatonTlsCertificateExpiring; do
+    receiver="$operations_receiver"
+    if [[ "$alert_name" == BatonMonitoringWatchdog ]]; then receiver="$heartbeat_receiver"; fi
+    docker run --rm --network none --read-only \
+      -v "$ops_dir:/ops:ro" -v /dev/null:/run/secrets/smtp-password:ro \
+      -v /dev/null:/run/secrets/discord-webhook-url:ro \
+      -v /dev/null:/run/secrets/monitoring-heartbeat-url:ro \
+      --entrypoint /bin/amtool "$alertmanager_image" config routes test \
+      --config.file="/ops/integrations/$config_file" --verify.receivers="$receiver" \
+      "alertname=$alert_name" service=baton
+  done
+done
+docker run --rm --network none --read-only \
   -v "$ops_dir:/ops:ro" "$blackbox_image" \
   --config.file=/ops/integrations/blackbox.yml --config.check

@@ -1,4 +1,13 @@
 groups:
+  - name: baton-monitoring
+    rules:
+      - alert: BatonMonitoringWatchdog
+        expr: vector(1)
+        labels:
+          service: baton
+          severity: none
+        annotations:
+          summary: BATON 감시 경로가 동작 중입니다.
   - name: baton-integrations
     rules:
       # 오래된 캐시나 빠진 지표를 정상 전달 상태로 판단하지 않는다.

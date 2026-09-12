@@ -1,0 +1,11 @@
+{
+  "name": "BATON 감시 시스템",
+  "period": 300,
+  "grace": 300,
+  "email": true,
+  "sms": false,
+  "call": false,
+  "push": false,
+  "critical_alert": false,
+  "paused": true
+}

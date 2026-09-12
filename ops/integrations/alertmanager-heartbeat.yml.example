@@ -12,13 +12,23 @@ route:
   group_interval: 5m
   repeat_interval: 12h
   routes:
-    - receiver: monitoring-heartbeat-disabled
+    - receiver: monitoring-heartbeat
       matchers: ['alertname="BatonMonitoringWatchdog"']
+      group_by: [alertname]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 5m
 
 receivers:
-  # 외부 하트비트를 연결하지 않았을 때 정기 신호를 운영자에게 보내지 않는다.
-  - name: monitoring-heartbeat-disabled
   - name: operations-email
     email_configs:
       - to: replace-with-operator@example.invalid
         send_resolved: true
+  - name: monitoring-heartbeat
+    webhook_configs:
+      - url_file: /run/secrets/monitoring-heartbeat-url
+        send_resolved: false
+        max_alerts: 1
+        timeout: 10s
+        http_config:
+          follow_redirects: false

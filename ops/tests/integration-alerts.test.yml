@@ -3,6 +3,18 @@ rule_files:
 evaluation_interval: 30s
 
 tests:
+  - name: 감시 신호는 앱 지표와 관계없이 계속 발생한다
+    interval: 30s
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: BatonMonitoringWatchdog
+        exp_alerts:
+          - &watchdog
+            exp_labels: {service: baton, severity: none}
+            exp_annotations: {summary: BATON 감시 경로가 동작 중입니다.}
+      - eval_time: 10m
+        alertname: BatonMonitoringWatchdog
+        exp_alerts: [*watchdog]
   - name: 정상 지표와 조치 대상이 아닌 과거 실패에는 알림을 보내지 않는다
     interval: 30s
     input_series:
