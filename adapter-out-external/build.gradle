@@ -8,7 +8,7 @@ dependencies {
 	implementation 'org.springframework.security:spring-security-crypto'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation('com.networknt:json-schema-validator:3.0.6') {
+	testImplementation('com.networknt:json-schema-validator:3.0.7') {
 		exclude group: 'tools.jackson.dataformat', module: 'jackson-dataformat-yaml'
 	}
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
