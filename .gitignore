@@ -20,6 +20,7 @@ frontend/test-results/
 frontend/playwright-report/
 output/playwright/
 output/verification/
+output/security/
 .playwright-cli/
 
 # 로컬 Codex 워크플로는 의도적으로 버전 관리하지 않는다.
