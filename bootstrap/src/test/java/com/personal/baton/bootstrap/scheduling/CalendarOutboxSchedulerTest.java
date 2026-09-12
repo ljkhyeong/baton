@@ -18,7 +18,7 @@ class CalendarOutboxSchedulerTest {
             .withUserConfiguration(CalendarOutboxScheduler.class);
 
     @Test
-    @DisplayName("CAL 전달 scheduler는 전달을 켠 동안에만 등록된다")
+    @DisplayName("CAL 전달 스케줄러는 전달을 켠 동안에만 등록된다")
     void registersOnlyWhenDeliveryIsEnabled() {
         contextRunner
                 .withPropertyValues("baton.calendar.delivery-enabled=true")

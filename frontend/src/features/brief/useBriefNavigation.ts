@@ -23,7 +23,7 @@ export function useBriefNavigation(scopeKey: string) {
   const initial: Selection = { open: values.length > 0, filter: { status: 'ACTIVE' }, resolutionsOpen: false,
     editionOpen: values.length > 0, selectedId: linkedId, baseId: '', previousTargetId: '' }
   const [saved, setSaved] = useState({ identity, selection: initial })
-  // 계정·작업공간·링크가 바뀐 렌더부터 이전 선택을 사용하지 않는다.
+  // 계정·작업 공간·링크가 바뀐 렌더부터 이전 선택을 사용하지 않는다.
   if (saved.identity !== identity) setSaved({ identity, selection: initial })
   const selection = saved.identity === identity ? saved.selection : initial
   const update = (patch: Partial<Selection>) => setSaved((current) => ({ identity,

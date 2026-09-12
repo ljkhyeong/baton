@@ -3,16 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { acceptTeamInvitation, previewTeamInvitation, permissionNames } from '@/features/team-access/api'
-
-const PENDING_INVITATION = 'baton:team-invitation:v1'
-function readToken() {
-  const token = new URLSearchParams(window.location.hash.slice(1)).get('invite')
-  if (token !== null) return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : ''
-  try {
-    const stored = window.sessionStorage.getItem(PENDING_INVITATION) ?? ''
-    return /^[A-Za-z0-9_-]{43}$/.test(stored) ? stored : ''
-  } catch { return '' }
-}
+import { clearTeamInvitationToken, readTeamInvitationToken, storeTeamInvitationToken } from '@/features/team-access/pendingTeamInvitation'
 export default function TeamInvitationPage() {
   const location = useLocation()
   return <InvitationPageContent key={`${location.key}:${location.hash}`} />
@@ -20,15 +11,15 @@ export default function TeamInvitationPage() {
 
 function InvitationPageContent() {
   const session = useAuthSession()
-  const [token] = useState(readToken)
+  const [token] = useState(() => readTeamInvitationToken(window.location.hash))
   const [stored, setStored] = useState(false)
   useEffect(() => {
     if (!token) return
-    try {
-      window.sessionStorage.setItem(PENDING_INVITATION, token)
-      setStored(true)
+    const saved = storeTeamInvitationToken(token)
+    setStored(saved)
+    if (saved) {
       window.history.replaceState(window.history.state, '', '/join')
-    } catch { setStored(false) }
+    }
   }, [token])
   return <main className="remote-state-page"><title>팀 초대 — BATON</title><section className="remote-state">
     <span className="section-kicker">팀 초대</span><h1>팀 초대 확인</h1>
@@ -48,11 +39,15 @@ function InvitationContent({ accountId, token }: { accountId: string; token: str
   const preview = useMutation({ mutationFn: () => previewTeamInvitation(accountId, token) })
   useEffect(() => { preview.mutate() }, [accountId, token])
   const accept = useMutation({ mutationFn: () => acceptTeamInvitation(accountId, token, preview.data!), onSuccess: value => {
-    try { window.sessionStorage.removeItem(PENDING_INVITATION) } catch { /* 수락된 토큰은 권한을 다시 부여하지 않는다. */ }
+    clearTeamInvitationToken()
     void navigate(`/teams/${value.teamId}/seasons/${value.seasonId}`, { replace: true })
   } })
   if (preview.isPending || preview.isIdle) return <p role="status">초대 내용을 확인하고 있습니다.</p>
-  if (preview.isError) return <p role="alert">{preview.error.message} <button type="button" onClick={() => preview.mutate()}>다시 확인</button></p>
+  if (preview.isError) return <div><p role="alert">{preview.error.message} <button type="button" onClick={() => preview.mutate()}>다시 확인</button></p>
+    <button type="button" className="secondary-button" onClick={() => {
+      clearTeamInvitationToken()
+      void navigate('/my-teams', { replace: true })
+    }}>이 초대 지우기</button></div>
   const value = preview.data
   return <div>
     <h2>{value.teamName}</h2><p>{value.memberName} 구성원으로 참여합니다. 권한은 {permissionNames[value.permission]}입니다.</p>

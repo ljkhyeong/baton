@@ -94,7 +94,7 @@ export function RoleInspector({
         {activeResources.length ? (
           <ul className="resource-links">
             {activeResources.map((resource) => (
-              <li key={resource.id}>
+              <li key={resource.id} data-resource-id={resource.id}>
                 <span>
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}

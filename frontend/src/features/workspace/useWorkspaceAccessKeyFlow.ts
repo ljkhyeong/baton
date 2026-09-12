@@ -24,8 +24,8 @@ type WorkspaceAccessKeyFlowOptions = {
   notify: (message: string, tone?: ToastTone) => void
 }
 
-const rotationCleanupErrorMessage = '새 공유 링크를 발급했지만 임시 기록을 지우지 못했습니다. 새 링크를 보관하고 브라우저 저장을 허용한 뒤 다시 시도하세요.'
-const rotationJournalCleanupErrorMessage = '이전 공유 링크의 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.'
+const rotationCleanupErrorMessage = '새 공유 링크를 발급했지만 임시 기록을 삭제하지 못했습니다. 새 링크를 보관하고 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const rotationJournalCleanupErrorMessage = '이전 공유 링크의 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const staleRotationReplayMessage = '임시 기록을 지웠습니다. 새 링크는 아직 발급하지 않았습니다. ‘공유 링크 재발급’을 다시 누르세요.'
 const rotationBusyMessage = '다른 탭에서 새 공유 링크를 확인하고 있습니다. 그 탭에서 끝낸 뒤 다시 시도하세요.'
 const rotationLockUnsupportedMessage = '이 브라우저에서는 공유 링크를 재발급할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
@@ -59,6 +59,7 @@ export function useWorkspaceAccessKeyFlow({
   const [rotationCleanupRetryKey, setRotationCleanupRetryKey] = useState<string | null>(null)
   const [rotationLockPending, setRotationLockPending] = useState(false)
   const rotationRequestInFlightRef = useRef(false)
+  const shareRequestInFlightRef = useRef(false)
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
   const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(currentAccessKey)}`}`
 
@@ -105,7 +106,7 @@ export function useWorkspaceAccessKeyFlow({
         return
       }
       if (!lockResult.value) return
-      setRotationStorageError('브라우저의 임시 기록을 정리했습니다. 최신 공유 링크로 다시 열어 주세요.')
+      setRotationStorageError('임시 기록을 삭제했습니다. 최신 공유 링크로 다시 열어 주세요.')
     } finally {
       rotationRequestInFlightRef.current = false
       setRotationLockPending(false)
@@ -117,7 +118,7 @@ export function useWorkspaceAccessKeyFlow({
     if (rotatedAccessKey === currentAccessKey) {
       const message = pendingCleared
         ? staleRotationReplayMessage
-        : '임시 기록을 지우지 못해 새 링크를 발급하지 않았습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.'
+        : '임시 기록을 삭제하지 못해 새 링크를 발급하지 않았습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
       setRotationStorageError(message)
       notify(message, 'error')
       return
@@ -137,8 +138,8 @@ export function useWorkspaceAccessKeyFlow({
     } else {
       onOpenShareLink()
       const message = pendingCleared
-        ? '새 공유 링크를 브라우저에 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요.'
-        : '새 공유 링크가 브라우저에 저장됐는지 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요. 임시 기록도 지우지 못했습니다.'
+        ? '새 공유 링크를 이 기기에 저장하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요.'
+        : '새 공유 링크가 이 기기에 저장됐는지 확인하지 못했습니다. 표시된 링크를 안전한 곳에 보관하세요. 임시 기록도 지우지 못했습니다.'
       notify(message, 'error')
     }
   }
@@ -204,6 +205,21 @@ export function useWorkspaceAccessKeyFlow({
     }
   }
 
+  const shareWorkspaceLink = async () => {
+    if (shareRequestInFlightRef.current) return
+    shareRequestInFlightRef.current = true
+    try {
+      if (navigator.share) await navigator.share({ url: shareUrl })
+      else await copyShareLink()
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        await copyShareLink()
+      }
+    } finally {
+      shareRequestInFlightRef.current = false
+    }
+  }
+
   const rotateWorkspaceAccessKey = async () => {
     if (rotationRequestInFlightRef.current || rotateAccessKeyMutation.isPending) return false
     rotationRequestInFlightRef.current = true
@@ -249,6 +265,7 @@ export function useWorkspaceAccessKeyFlow({
 
   return {
     copyShareLink,
+    shareWorkspaceLink,
     pendingRotationIdempotencyKey,
     recoverPendingAccessKeyRotation,
     retryRotationJournalCleanup,

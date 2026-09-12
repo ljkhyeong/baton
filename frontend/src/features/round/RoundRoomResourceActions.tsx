@@ -84,7 +84,7 @@ export function RoundRoomResourceActions({
     onSuccess: async (mapping) => {
       await refreshCurrentMappings()
       if (!forgetRoundRoomEntryContext(scope, mapping.roomId)) {
-        setStorageError('방은 종료했지만 이 브라우저의 입장 정보를 지우지 못했습니다. 브라우저 저장을 확인해 주세요.')
+        setStorageError('방은 종료했지만 이 브라우저의 입장 정보를 삭제하지 못했습니다. 사이트 데이터 저장을 허용했는지 확인해 주세요.')
         return
       }
       setStorageError('')

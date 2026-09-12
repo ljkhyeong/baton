@@ -152,14 +152,14 @@ class WorkspaceUseCaseTest {
     @Test
     @DisplayName("템플릿 팀 생성은 역할과 반복 업무를 함께 저장하고 재전송 시 중복하지 않는다")
     void createsTemplateOnce() {
-        var command = new CreateWorkspaceCommand("템플릿 스터디", "첫 시즌", LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 8, 31), List.of("박민서"), WorkspaceTemplate.STUDY_V1);
-        var key = "workspace-study-template-0000000001";
+        var command = new CreateWorkspaceCommand("출시 준비 TF", "첫 시즌", LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 8, 31), List.of("박민서"), WorkspaceTemplate.TASK_FORCE_V1);
+        var key = "workspace-task-force-template-00001";
         var first = lifecycleUseCase.createWorkspace(key, CREATION_KEY, command);
         var repeated = lifecycleUseCase.createWorkspace(key, CREATION_KEY, command);
         assertThat(repeated).isEqualTo(first);
         var workspace = lifecycleUseCase.getWorkspace(first.teamId(), first.seasonId(), first.accessKey());
-        assertThat(workspace.roles()).extracting(role -> role.name()).containsExactlyInAnyOrder("진행 담당", "학습 준비 담당", "기록 담당");
+        assertThat(workspace.roles()).extracting(role -> role.name()).containsExactlyInAnyOrder("TF 리드", "실행 담당", "검토 담당");
         assertThat(workspace.roles()).allSatisfy(role -> assertThat(role.currentMemberId()).isNull());
         assertThat(workspace.routines()).hasSize(3);
         assertThat(workspace.rounds()).isEmpty();

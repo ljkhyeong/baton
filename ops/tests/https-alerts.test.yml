@@ -1,0 +1,110 @@
+rule_files:
+  - ../integrations/baton-https-alerts.yml
+evaluation_interval: 30s
+
+tests:
+  - name: 유효기간이 충분한 인증서에는 알림을 보내지 않는다
+    interval: 30s
+    input_series:
+      - &up
+        series: up{job="baton-https",instance="https://b4ton.com/actuator/health"}
+        values: 1x40
+      - &success
+        series: probe_success{job="baton-https",instance="https://b4ton.com/actuator/health"}
+        values: 1x40
+      - &expiry
+        series: probe_ssl_earliest_cert_expiry{job="baton-https",instance="https://b4ton.com/actuator/health"}
+        values: 2592000x40
+    alert_rule_test:
+      - {eval_time: 6m, alertname: BatonHttpsCheckUnavailable, exp_alerts: []}
+      - {eval_time: 6m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+
+  - name: 14일 미만이 5분 지속되어야 알리고 인증서가 갱신되면 해제한다
+    interval: 30s
+    input_series:
+      - *up
+      - *success
+      - <<: *expiry
+        values: 1210200x31 2592000x8
+    alert_rule_test:
+      - {eval_time: 10m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+      - {eval_time: 15m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+      - eval_time: 15m30s
+        alertname: BatonTlsCertificateExpiring
+        exp_alerts:
+          - exp_labels: &labels
+              job: baton-https
+              instance: https://b4ton.com/actuator/health
+              service: baton
+              severity: warning
+            exp_annotations:
+              summary: BATON 공개 인증서의 만료까지 14일 미만 남았습니다.
+              description: https://b4ton.com/actuator/health의 인증서 갱신 상태를 확인하세요. Cloudflare 프록시 사용 시 원본 서버 인증서는 별도 확인해야 합니다.
+      - {eval_time: 16m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+
+  - name: HTTPS 검사 실패 중에는 이전 만료일 대신 확인 불가를 알리고 복구되면 해제한다
+    interval: 30s
+    input_series:
+      - *up
+      - <<: *success
+        values: 0x5 1x34
+      - <<: *expiry
+        values: 1000x5 2592000x34
+    alert_rule_test:
+      - {eval_time: 1m30s, alertname: BatonHttpsCheckUnavailable, exp_alerts: []}
+      - eval_time: 2m
+        alertname: BatonHttpsCheckUnavailable
+        exp_alerts:
+          - exp_labels: *labels
+            exp_annotations: &unavailable
+              summary: BATON 공개 HTTPS 인증서를 확인할 수 없습니다.
+              description: Blackbox Exporter 수집, DNS·네트워크, HTTPS 응답과 인증서 유효성을 확인하세요.
+      - {eval_time: 2m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+      - {eval_time: 3m, alertname: BatonHttpsCheckUnavailable, exp_alerts: []}
+
+  - name: 수집 실패 시 남아 있는 검사 성공 값으로 만료 알림을 보내지 않는다
+    interval: 30s
+    input_series:
+      - <<: *up
+        values: 0x40
+      - *success
+      - <<: *expiry
+        values: 1000x40
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: BatonHttpsCheckUnavailable
+        exp_alerts:
+          - exp_labels: *labels
+            exp_annotations: *unavailable
+      - {eval_time: 6m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+
+  - name: 수집 대상이 빠져도 정상으로 판단하지 않는다
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonHttpsCheckUnavailable
+        exp_alerts:
+          - exp_labels: {job: baton-https, service: baton, severity: warning}
+            exp_annotations: *unavailable
+
+  - name: HTTPS 검사 성공이 누락되면 인증서를 확인할 수 없다고 알린다
+    interval: 30s
+    input_series: [*up, *expiry]
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonHttpsCheckUnavailable
+        exp_alerts:
+          - exp_labels: *labels
+            exp_annotations: *unavailable
+      - {eval_time: 6m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}
+
+  - name: 인증서 만료 지표가 누락되면 정상으로 판단하지 않는다
+    interval: 30s
+    input_series: [*up, *success]
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BatonHttpsCheckUnavailable
+        exp_alerts:
+          - exp_labels: *labels
+            exp_annotations: *unavailable
+      - {eval_time: 6m, alertname: BatonTlsCertificateExpiring, exp_alerts: []}

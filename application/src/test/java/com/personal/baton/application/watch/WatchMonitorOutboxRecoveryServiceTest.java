@@ -16,7 +16,7 @@ class WatchMonitorOutboxRecoveryServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-01T05:00:00Z");
 
-    @DisplayName("시작 복구는 기존 outbox와 다른 source namespace를 거절한다")
+    @DisplayName("시작 복구는 기존 아웃박스와 다른 원본 네임스페이스를 거절한다")
     @Test
     void rejectsChangedSourceNamespace() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);
@@ -32,7 +32,7 @@ class WatchMonitorOutboxRecoveryServiceTest {
 
         assertThatThrownBy(service::validateSourceNamespace)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("WATCH source namespace가 기존 outbox resource reference와 다릅니다");
+                .hasMessage("WATCH 원본 네임스페이스가 기존 아웃박스 자료 참조와 다릅니다");
     }
 
     @DisplayName("시작 복구는 현재 시각부터 운영 설정 실패를 다시 전달 가능하게 한다")

@@ -52,7 +52,7 @@ class BriefServiceApiConfigTest {
                 .isSameAs(DisabledBriefServiceClient.INSTANCE));
     }
 
-    @DisplayName("BRIEF 서비스 API를 활성화하면 별도 HTTPS origin과 Bearer로 client를 만든다")
+    @DisplayName("BRIEF 서비스 API를 활성화하면 별도 HTTPS 출처와 Bearer 토큰으로 클라이언트를 만든다")
     @Test
     void enablesServiceClientOnlyWithHttpsOrigin() {
         when(clientFactory.createEditionServiceClient(
@@ -72,7 +72,7 @@ class BriefServiceApiConfigTest {
                 .isSameAs(client));
     }
 
-    @DisplayName("BRIEF 서비스 API는 사설 주소라도 평문 HTTP origin을 거부한다")
+    @DisplayName("BRIEF 서비스 API는 사설 주소라도 HTTP 출처를 거부한다")
     @Test
     void rejectsPlainHttpOrigin() {
         contextRunner.withPropertyValues(

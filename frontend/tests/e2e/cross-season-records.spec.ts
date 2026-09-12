@@ -34,6 +34,7 @@ test('@records @responsive 모든 시즌 검색은 요청 시 조회하고 각 �
   const card = page.locator('.record-search-card').filter({ hasText: '지난 시즌의 문제 선정 기준' })
   await expect(card).toContainText('이전 운영 시즌')
   await page.getByLabel('무엇을 다시 찾고 있나요?').fill('지난 시즌')
+  await page.locator('.record-search-advanced > summary').click()
   await page.getByLabel('작성일(시작)', { exact: true }).fill('2026-07-03')
   await page.getByLabel('작성일(종료)', { exact: true }).fill('2026-07-03')
   await expect(card).toBeVisible()

@@ -60,8 +60,8 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
               <p>현재 업무명: {source?.target?.title ?? '확인할 수 없음'}</p>
               <p>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'} · 상태 기록 {time.format(new Date(item.observedAt))}</p>
               <p className="brief-print-evidence">원본 항목 ID: {item.sourceReference}<br />
-                {item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 이력 미기록'
-                  : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '누락 이력 있음' : '누락 이력 없음'}`}</p>
+                {item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
+                  : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`}</p>
             </li>
           })}</ol>
         </section>

@@ -8,6 +8,9 @@ if (!creationKey) {
 
 test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라우저와 공유한다', async ({ browser, context, page }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
+  })
   await page.goto('/')
 
   await page.getByLabel('팀 이름').fill('풀스택 검증 스터디')
@@ -15,7 +18,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await page.getByLabel('시작일').fill('2026-07-01')
   await page.getByLabel('종료일').fill('2026-12-31')
   await page.getByLabel('구성원 이름').fill('박민서\n김준호')
-  await page.getByLabel(/작업 공간 생성 코드/).fill(creationKey)
+  await page.getByLabel(/운영자 생성 코드/).fill(creationKey)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page).toHaveURL(/\/teams\/[0-9a-f-]+\/seasons\/[0-9a-f-]+$/)
@@ -305,7 +308,7 @@ test('시작 템플릿으로 만든 역할과 반복 업무를 실제 DB에서 �
   await page.getByLabel('시작일').fill('2026-07-01')
   await page.getByLabel('종료일').fill('2026-12-31')
   await page.getByLabel('구성원 이름').fill('박민서')
-  await page.getByLabel(/작업 공간 생성 코드/).fill(creationKey)
+  await page.getByLabel(/운영자 생성 코드/).fill(creationKey)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page).toHaveURL(/\/teams\/[0-9a-f-]+\/seasons\/[0-9a-f-]+$/)
   await page.reload()

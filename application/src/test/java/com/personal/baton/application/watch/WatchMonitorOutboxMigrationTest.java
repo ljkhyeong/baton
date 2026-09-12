@@ -36,7 +36,7 @@ class WatchMonitorOutboxMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V16은 기존 역할 자료를 보존하고 제약을 갖춘 빈 WATCH outbox를 추가한다")
+    @DisplayName("V16은 기존 역할 자료를 보존하고 필요한 제약이 있는 빈 WATCH 아웃박스를 추가한다")
     @Test
     void preservesRoleResourcesAndAddsConstrainedEmptyOutbox() {
         migrateTo("15");

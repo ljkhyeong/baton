@@ -34,7 +34,7 @@ class WatchHealthEventInboxMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V17은 V16 outbox를 보존하고 독립적인 WATCH health event inbox를 추가한다")
+    @DisplayName("V17은 V16 아웃박스를 보존하고 별도의 WATCH 상태 이벤트 인박스를 추가한다")
     @Test
     void preservesV16OutboxAndAddsConstrainedInbox() {
         migrateTo("16");

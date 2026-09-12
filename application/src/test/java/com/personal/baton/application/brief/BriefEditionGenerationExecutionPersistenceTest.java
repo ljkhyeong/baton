@@ -90,7 +90,7 @@ class BriefEditionGenerationExecutionPersistenceTest {
         );
     }
 
-    @DisplayName("같은 전달 경계 실행을 재사용하고 만료 lease만 회수한다")
+    @DisplayName("같은 전달 작업을 재사용하고 만료된 처리 임대만 회수한다")
     @Test
     void reusesExecutionAndReclaimsOnlyExpiredLease() {
         var boundary = executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID);
@@ -161,7 +161,7 @@ class BriefEditionGenerationExecutionPersistenceTest {
         assertThat(completed.sourceCursor()).isEqualTo(17);
     }
 
-    @DisplayName("전달 대기 outbox가 있으면 watermark 실행을 PENDING으로 기록한다")
+    @DisplayName("전달 대기 아웃박스가 있으면 워터마크 실행을 PENDING으로 기록한다")
     @Test
     void recordsPendingExecutionForIncompleteDelivery() {
         insertPendingOutbox();
@@ -207,7 +207,7 @@ class BriefEditionGenerationExecutionPersistenceTest {
     }
 
     @Test
-    @DisplayName("추가 전달은 성공한 생성 경계 이후 완료 기록만 보며 같은 에디션 재사용으로 기준을 갱신한다")
+    @DisplayName("추가 전달은 성공한 생성 경계 이후 완료 기록만 보며 같은 주간 요약을 재사용하면 기준을 갱신한다")
     void comparesDeliveredRecordsWithLatestSuccessfulConfirmation() {
         assertThat(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).isEmpty();
         var target = new GenerationTarget(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), ZoneId.of("Asia/Seoul"), 0);

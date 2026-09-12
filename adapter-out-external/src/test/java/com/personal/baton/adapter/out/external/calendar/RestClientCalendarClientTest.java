@@ -56,7 +56,7 @@ class RestClientCalendarClientTest {
     }
 
     @Test
-    @DisplayName("CAL client는 내부 Bearer와 같은 아웃박스 개정 번호로 전체 스냅샷을 전송한다")
+    @DisplayName("CAL 클라이언트는 내부 Bearer 토큰과 같은 아웃박스 개정 번호로 전체 스냅샷을 전송한다")
     void postsAuthenticatedSnapshot() {
         server.expect(requestTo(SNAPSHOT_URL))
                 .andExpect(method(HttpMethod.POST))
@@ -99,7 +99,7 @@ class RestClientCalendarClientTest {
     }
 
     @Test
-    @DisplayName("CAL 복구 client는 시즌 매니페스트와 전체 완료 응답을 요청 범위와 대조한다")
+    @DisplayName("CAL 복구 클라이언트는 시즌 매니페스트와 전체 완료 응답을 요청 범위와 대조한다")
     void verifiesRecoveryManifestAndCompletion() {
         UUID recoveryId = UUID.fromString("40000000-0000-0000-0000-000000000001");
         UUID seasonId = UUID.fromString("30000000-0000-0000-0000-000000000001");

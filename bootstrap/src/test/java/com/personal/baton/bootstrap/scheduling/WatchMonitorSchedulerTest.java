@@ -27,7 +27,7 @@ class WatchMonitorSchedulerTest {
             .withUserConfiguration(SchedulerTestConfig.class);
 
     @Test
-    @DisplayName("WATCH scheduler는 연동이 비활성일 때 조립되지 않는다")
+    @DisplayName("WATCH 연동이 비활성화되면 스케줄러를 등록하지 않는다")
     void doNotCreateSchedulerWhenDisabled() {
         contextRunner
                 .withPropertyValues("baton.watch.enabled=false")
@@ -35,7 +35,7 @@ class WatchMonitorSchedulerTest {
     }
 
     @Test
-    @DisplayName("WATCH scheduler는 연동이 활성일 때 전달과 정합성 port를 호출한다")
+    @DisplayName("WATCH 스케줄러는 연동이 활성일 때 전달과 상태 조정 포트를 호출한다")
     void invokeUseCasesWhenEnabled() {
         contextRunner
                 .withPropertyValues("baton.watch.enabled=true")
@@ -57,7 +57,7 @@ class WatchMonitorSchedulerTest {
     }
 
     @Test
-    @DisplayName("WATCH context는 scheduler와 시작 복구를 함께 조립한다")
+    @DisplayName("WATCH 애플리케이션은 스케줄러와 시작 복구 작업을 함께 구성한다")
     void initializeSchedulerAndStartupRecovery() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
 
@@ -71,7 +71,7 @@ class WatchMonitorSchedulerTest {
     }
 
     @Test
-    @DisplayName("WATCH namespace 검증이 실패하면 context 시작을 거부한다")
+    @DisplayName("WATCH 네임스페이스 검증이 실패하면 애플리케이션 시작을 거부한다")
     void rejectContextWhenNamespaceValidationFails() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
         doThrow(new IllegalStateException("namespace mismatch"))

@@ -50,7 +50,9 @@ public final class AuthResponses {
     public record AuthProvidersResponse(
             List<String> providers,
             boolean localRegistrationEnabled,
-            boolean passwordResetEnabled
+            boolean passwordResetEnabled,
+            @JsonInclude(JsonInclude.Include.ALWAYS)
+            String turnstileSiteKey
     ) {
 
         public AuthProvidersResponse {

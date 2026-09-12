@@ -123,7 +123,7 @@ test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 �
     archivedAt: null,
   })
 })
-test('@memory 결정 저장 응답 유실 뒤 reload해도 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
+test('@memory 결정 저장 응답이 유실된 뒤 새로고침해도 같은 요청으로 결과를 회수한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.commitNextContentCreationThenTimeout('decision')
   await openSharedWorkspace(page)
@@ -251,6 +251,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   let search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeInViewport()
   expect(await search.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('풀이 비교 문제 큐레이터')
@@ -275,9 +276,16 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(search.getByLabel('무엇을 다시 찾고 있나요?'))
     .toHaveValue('풀이 비교 문제 큐레이터')
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
+  const advancedFilters = search.locator('.record-search-advanced')
+  await expect(advancedFilters).not.toHaveAttribute('open')
+  await advancedFilters.locator('summary').focus()
+  await page.keyboard.press('Enter')
   await search.getByLabel('관련 역할').selectOption(SECOND_ROLE_ID)
+  await advancedFilters.locator('summary').click()
+  await expect(advancedFilters.locator('summary')).toContainText('1개 적용')
   await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '회고 질문 가이드' })).toBeVisible()
+  await advancedFilters.locator('summary').click()
 
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
   await search.getByLabel('기록 종류').selectOption('resource')
@@ -344,6 +352,7 @@ test('@records 보관한 역할 자료는 보관 기록으로만 탐색한다', 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
   const search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('보관한 문제 선정 기준')
+  await search.locator('.record-search-advanced > summary').click()
   await search.getByLabel('기록 종류').selectOption('resource')
   await search.getByLabel('상태').selectOption('active')
   await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
@@ -773,7 +782,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await expect(reopenedDialog.getByLabel('자료 설명')).toHaveValue('서버의 최신 기준입니다.')
 })
 
-test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다음 제출에 새 키를 쓴다', async ({ page }, testInfo) => {
+test('@handoff 재사용할 수 없는 생성 요청은 임시 기록을 지우고 다음 제출에 새 키를 쓴다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   api.rejectNextContentCreationAsReused('handoffItem')
   await openSharedWorkspace(page)
@@ -795,7 +804,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 pending을 지우고 다
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재전송을 막는다', async ({ page }, testInfo) => {
+test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전송을 막는다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
     { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
@@ -811,7 +820,7 @@ test('@handoff 콘텐츠 terminal 기록 cleanup이 실패하면 같은 키 재�
   await dialog.getByLabel('남길 내용').fill('terminal cleanup 재전송 차단')
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
 
-  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 정리하지 못해 요청을 다시 보내지 않았습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('임시 기록을 삭제하지 못해 요청을 보내지 않았습니다.')
   const firstAttempt = await recordedCall(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
@@ -937,7 +946,7 @@ test('@handoff Web Locks 요청이 실패하면 인수인계 생성 요청을 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 pending을 지우지 않는다', async ({ page }, testInfo) => {
+test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임시 기록을 지우지 않는다', async ({ page }, testInfo) => {
   const firstKey = 'content-race-key-00000000000000000001'
   const secondKey = 'content-race-key-00000000000000000002'
   await page.addInitScript(({ prefix, teamId, seasonId, roleId, first, second }) => {

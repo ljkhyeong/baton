@@ -14,6 +14,7 @@ import com.personal.baton.application.identity.error.EmailVerificationPayloadPro
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
@@ -82,6 +83,9 @@ class AuthSecurityTest {
     @MockitoBean
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
+    @MockitoBean
+    private HumanVerificationUseCase humanVerificationUseCase;
+
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
     private static final String EMAIL = "member@example.com";
@@ -134,7 +138,7 @@ class AuthSecurityTest {
         WebTestUtils.setCsrfTokenRepository(request, csrfTokenRepository);
     }
 
-    @DisplayName("CSRF bootstrap은 session 없이 cookie와 header용 opaque token을 반환한다")
+    @DisplayName("CSRF 초기화는 세션 없이 쿠키와 헤더용 불투명 토큰을 반환한다")
     @Test
     void exposesCsrfBootstrapContract() throws Exception {
         MvcResult result = mockMvc.perform(get(AuthController.CSRF_PATH))
@@ -154,7 +158,7 @@ class AuthSecurityTest {
                 });
     }
 
-    @DisplayName("cookie-backed CSRF bootstrap token은 다음 SPA mutation에서 그대로 검증된다")
+    @DisplayName("쿠키 기반 CSRF 초기화 토큰은 다음 SPA 변경 요청에서 그대로 검증된다")
     @Test
     void acceptsMutationWithCookieBackedCsrfToken() throws Exception {
         MvcResult bootstrap = mockMvc.perform(get(AuthController.CSRF_PATH))
@@ -232,19 +236,19 @@ class AuthSecurityTest {
         verifyNoInteractions(accountSecurityUseCase);
     }
 
-    @DisplayName("미구성 social provider 목록은 가입 capability와 credential 없는 빈 배열만 반환한다")
+    @DisplayName("설정하지 않은 소셜 공급자 목록은 가입 가능 여부와 인증 정보가 없는 빈 배열만 반환한다")
     @Test
     void exposesEmptyProviderListWhenSocialLoginIsUnavailable() throws Exception {
         mockMvc.perform(get(AuthController.PROVIDERS_PATH))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().json(
-                        "{\"providers\":[],\"localRegistrationEnabled\":true,\"passwordResetEnabled\":true}",
+                        "{\"providers\":[],\"localRegistrationEnabled\":true,\"passwordResetEnabled\":true,\"turnstileSiteKey\":null}",
                         true
                 ));
     }
 
-    @DisplayName("local 등록은 CSRF token이 없으면 application port 전에 거부한다")
+    @DisplayName("로컬 가입은 CSRF 토큰이 없으면 애플리케이션 포트 호출 전에 거부한다")
     @Test
     void rejectsRegistrationWithoutCsrf() throws Exception {
         mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
@@ -265,7 +269,7 @@ class AuthSecurityTest {
         verifyNoInteractions(registerLocalAccountUseCase);
     }
 
-    @DisplayName("local 등록은 유효한 CSRF token이 있어도 cross-origin이면 거부한다")
+    @DisplayName("로컬 가입은 유효한 CSRF 토큰이 있어도 교차 출처 요청이면 거부한다")
     @Test
     void rejectsCrossOriginRegistration() throws Exception {
         mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
@@ -291,6 +295,35 @@ class AuthSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
 
+        verifyNoInteractions(registerLocalAccountUseCase);
+    }
+
+    @DisplayName("자동 요청 방지 실패는 가입과 재설정의 메일 처리를 모두 차단한다")
+    @Test
+    void rejectsEmailRequestsBeforeDispatch() throws Exception {
+        doThrow(new com.personal.baton.application.identity.error.HumanVerificationRejectedException())
+                .when(humanVerificationUseCase).verify(any());
+        for (String path : java.util.List.of(AuthController.LOCAL_REGISTRATIONS_PATH,
+                AuthController.PASSWORD_RESET_REQUESTS_PATH)) {
+            mockMvc.perform(sameOrigin(post(path)).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"challenge@example.com\",\"displayName\":\"사용자\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("HUMAN_VERIFICATION_FAILED"));
+        }
+        verifyNoInteractions(registerLocalAccountUseCase, passwordResetUseCase);
+    }
+
+    @DisplayName("검증 공급자 장애 시 메일을 보내지 않고 재시도 가능한 오류를 반환한다")
+    @Test
+    void stopsEmailRequestsWhenVerificationIsUnavailable() throws Exception {
+        doThrow(new com.personal.baton.application.identity.error.HumanVerificationUnavailableException())
+                .when(humanVerificationUseCase).verify(any());
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"challenge-outage@example.com\",\"displayName\":\"사용자\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("HUMAN_VERIFICATION_UNAVAILABLE"));
         verifyNoInteractions(registerLocalAccountUseCase);
     }
 
@@ -380,7 +413,7 @@ class AuthSecurityTest {
                         .value("현재 이메일 인증을 시작할 수 없습니다"));
     }
 
-    @DisplayName("outbox 암호화 키가 없으면 평문 fallback 없이 일반화된 503을 반환한다")
+    @DisplayName("아웃박스 암호화 키가 없으면 평문으로 저장하지 않고 세부 원인을 숨긴 503을 반환한다")
     @Test
     void failsClosedWhenOutboxProtectionIsUnavailable() throws Exception {
         when(registerLocalAccountUseCase.registerLocalAccount(any()))
@@ -399,7 +432,7 @@ class AuthSecurityTest {
                         .value("현재 이메일 인증을 시작할 수 없습니다"));
     }
 
-    @DisplayName("알 수 없거나 만료된 이메일 검증 token은 하나의 일반화된 오류로 응답한다")
+    @DisplayName("알 수 없거나 만료된 이메일 검증 토큰은 같은 오류로 응답한다")
     @Test
     void generalizesInvalidVerificationToken() throws Exception {
         doThrow(new EmailVerificationException())
@@ -533,7 +566,7 @@ class AuthSecurityTest {
                         .value("이메일 또는 비밀번호가 올바르지 않습니다"));
     }
 
-    @DisplayName("credential이 없는 social registration은 OAuth 시작 경로를 노출하지 않는다")
+    @DisplayName("인증 정보가 없는 소셜 가입은 OAuth 시작 경로를 노출하지 않는다")
     @Test
     void omitsUnavailableSocialLogin() throws Exception {
         mockMvc.perform(get("/oauth2/authorization/google"))

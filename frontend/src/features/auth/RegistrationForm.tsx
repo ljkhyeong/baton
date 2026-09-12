@@ -2,12 +2,19 @@ import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { registerLocalAccount } from '@/features/auth/api'
+import TurnstileWidget from '@/features/auth/TurnstileWidget'
 
-export default function RegistrationForm() {
+export default function RegistrationForm({ turnstileSiteKey }: { turnstileSiteKey: string | null }) {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0)
   const registrationMutation = useMutation({
     mutationFn: registerLocalAccount,
+    onError: () => {
+      setTurnstileToken(null)
+      setTurnstileResetKey(value => value + 1)
+    },
   })
 
   if (registrationMutation.isSuccess) {
@@ -28,7 +35,12 @@ export default function RegistrationForm() {
       className="auth-form auth-form-stack"
       onSubmit={(event) => {
         event.preventDefault()
-        registrationMutation.mutate({ displayName, email })
+        if (registrationMutation.isPending || (turnstileSiteKey && !turnstileToken)) return
+        registrationMutation.mutate({
+          displayName,
+          email,
+          ...(turnstileSiteKey ? { turnstileToken } : {}),
+        })
       }}
     >
       <label>
@@ -56,6 +68,14 @@ export default function RegistrationForm() {
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
+      {turnstileSiteKey && (
+        <TurnstileWidget
+          action="local_registration"
+          onTokenChange={setTurnstileToken}
+          resetKey={turnstileResetKey}
+          siteKey={turnstileSiteKey}
+        />
+      )}
       {registrationMutation.isError && (
         <p className="form-error" role="alert">
           {registrationMutation.error instanceof Error
@@ -65,7 +85,7 @@ export default function RegistrationForm() {
       )}
       <button
         className="primary-button auth-submit"
-        disabled={registrationMutation.isPending}
+        disabled={registrationMutation.isPending || Boolean(turnstileSiteKey && !turnstileToken)}
         type="submit"
       >
         {registrationMutation.isPending ? '인증 메일 보내는 중' : '인증 메일 받기'}

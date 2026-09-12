@@ -325,7 +325,7 @@ test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 �
   }
 })
 
-test('membership 응답의 additive field를 무시한다', async ({ page }, testInfo) => {
+test('구성원 연결 응답의 추가 필드를 무시한다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, { additiveResponseFields: true })
   await openSharedWorkspace(page)
@@ -415,7 +415,7 @@ test('@smoke 기존 계정 정보가 있어도 세션 재조회 실패 중에는
   await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toBeEnabled()
 })
 
-test('다른 계정 범위의 current membership 응답은 연결 상태로 캐시하지 않는다', async ({ page }, testInfo) => {
+test('다른 계정 범위의 현재 구성원 연결 응답은 연결 상태로 저장하지 않는다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, {
     currentMembershipResponse: {
@@ -437,7 +437,7 @@ test('다른 계정 범위의 current membership 응답은 연결 상태로 캐�
   await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toHaveCount(0)
 })
 
-test('활동 종료된 선택값은 남은 활동 구성원으로 보정해 claim한다', async ({ page }, testInfo) => {
+test('활동이 끝난 선택값은 남은 활동 구성원으로 바꿔 연결한다', async ({ page }, testInfo) => {
   await installApi(page)
   const membershipApi = await installMembershipApi(page)
   await openSharedWorkspace(page)
@@ -468,7 +468,7 @@ test('활동 종료된 선택값은 남은 활동 구성원으로 보정해 clai
   })
 })
 
-test('종료 시즌에서도 연결 이력 진입을 열고 새 claim만 막는다', async ({ page }, testInfo) => {
+test('종료된 시즌에서도 연결 이력은 열고 새 연결만 막는다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   const endedAt = '2026-08-08T12:00:00Z'
   projection.season.endedAt = endedAt
@@ -491,7 +491,7 @@ test('종료 시즌에서도 연결 이력 진입을 열고 새 claim만 막는�
       && call.path === '/api/v1/account-memberships/current')).toBe(true)
 })
 
-test('claim 응답의 구성원 범위가 다르면 연결 cache를 갱신하지 않는다', async ({ page }, testInfo) => {
+test('연결 응답의 구성원 범위가 다르면 연결 정보를 갱신하지 않는다', async ({ page }, testInfo) => {
   await installApi(page)
   await installMembershipApi(page, {
     claimMembershipResponse: {

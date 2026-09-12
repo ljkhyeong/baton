@@ -86,7 +86,7 @@ export function RoutineModal({
     <ModalShell
       title={editing ? '반복 업무 수정' : '반복 업무 만들기'}
       description={editing
-        ? '업무 시점, 담당 역할, 기한 설명를 수정하세요.'
+        ? '업무 시점, 담당 역할과 기한을 수정하세요.'
         : '반복할 업무와 담당 역할, 마감을 정합니다.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}

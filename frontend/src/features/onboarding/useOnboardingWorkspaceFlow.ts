@@ -57,14 +57,14 @@ function errorMessage(error: unknown) {
   return '작업 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
 }
 
-const pendingStorageRequiredMessage = '입력을 브라우저에 저장할 수 없어 작업 공간을 만들지 않았습니다. 일반 창에서 열거나 브라우저 저장을 허용한 뒤 다시 시도하세요.'
-const pendingCreationLimitMessage = '완료 여부를 확인하지 못한 작업 공간이 5개 있습니다. 아래 목록에서 다시 확인하거나, 이미 확인한 항목을 삭제한 뒤 새로 만드세요.'
-const creationBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
+const pendingStorageRequiredMessage = '입력을 저장하지 못해 작업 공간을 만들지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const pendingCreationLimitMessage = '생성 결과를 확인하지 못한 작업 공간이 5개입니다. 아래 목록에서 결과를 확인하거나 필요 없는 항목을 삭제해 주세요.'
+const creationBusyMessage = '다른 탭에서 생성 결과를 확인하고 있습니다. 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 작업 공간을 만들거나 생성 결과를 확인할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
-const creationJournalCleanupRequiredMessage = '작업 공간을 만들 때 저장한 임시 기록을 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const workspaceCapabilityRemovalFailedMessage = '이 기기에 저장된 작업 공간 접근 권한을 제거하지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도해 주세요.'
-const workspaceCapabilityPartialRemovalMessage = '공유 링크는 지웠지만 최근 방문 목록을 지우지 못했습니다. 이 목록으로는 다시 접속할 수 없습니다. 브라우저 저장을 허용한 뒤 다시 삭제하세요.'
-const roundContextRemovalFailedMessage = '공유 링크와 최근 방문 목록은 지웠지만 ROUND 접속 정보가 남아 있습니다. 이 탭을 닫아 지워 주세요.'
+const creationJournalCleanupRequiredMessage = '생성 확인에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const workspaceCapabilityRemovalFailedMessage = '이 기기의 공유 링크를 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const workspaceCapabilityPartialRemovalMessage = '공유 링크는 삭제했지만 최근 방문 목록은 남아 있습니다. 사이트 데이터 저장을 허용한 뒤 다시 삭제해 주세요.'
+const roundContextRemovalFailedMessage = '공유 링크와 최근 방문 목록은 삭제했지만 ROUND 입장 정보가 남아 있습니다. 이 탭을 닫으면 삭제됩니다.'
 const workspaceCreationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
@@ -104,13 +104,13 @@ function confirmationMessage(
 ) {
   switch (reason) {
     case 'pendingMissing':
-      return '다른 탭에서 이 요청의 결과를 확인했거나 목록에서 지웠습니다. 작업 공간이 이미 만들어졌을 수 있으니 최근 목록이나 기존 공유 링크를 먼저 확인해 주세요.'
+      return '다른 탭에서 생성 결과를 확인했거나 임시 기록을 삭제했습니다. 최근 작업 공간이나 기존 공유 링크를 확인해 주세요.'
     case 'pendingChanged':
-      return '다른 탭에서 이 작업 공간의 임시 기록을 변경했습니다. ‘최근 작업 공간’이나 다른 탭에서 이미 만들어졌는지 확인하세요.'
+      return '다른 탭에서 임시 기록을 변경했습니다. 해당 탭이나 ‘최근 작업 공간’에서 생성 결과를 확인해 주세요.'
     case 'concurrentAttempt':
-      return '다른 탭에서 같은 작업 공간을 만들고 있었습니다. 이미 만들어졌을 수 있으니 ‘최근 작업 공간’이나 다른 탭에서 먼저 확인하세요.'
+      return '다른 탭에서 같은 작업 공간을 만들고 있습니다. 해당 탭이나 ‘최근 작업 공간’에서 생성 결과를 확인해 주세요.'
     case 'replayExpired':
-      return '공유 링크가 바뀌어 저장된 링크로는 작업 공간을 열 수 없습니다. 운영자에게 최신 링크를 받아 기존 작업 공간을 먼저 확인하세요.'
+      return '저장된 공유 링크가 만료됐습니다. 운영자에게 최신 링크를 받아 기존 작업 공간을 확인해 주세요.'
     case 'cleanupRequired':
       return creationJournalCleanupRequiredMessage
   }
@@ -191,13 +191,13 @@ export function useOnboardingWorkspaceFlow() {
       : activeNewRequestConfirmationReason
   const creationBusy = creationAttemptPending || createMutation.isPending
   const creationSubmitLabel = creationBusy
-    ? '작업 공간 확인하는 중…'
+    ? '생성 결과 확인 중…'
     : creationConfirmationReason === 'cleanupRequired'
-      ? '임시 요청 기록 삭제 필요'
+      ? '임시 기록 삭제 필요'
       : creationConfirmationReason
         ? '기존 작업 공간 확인 필요'
         : selectedPendingMatchesDraft
-          ? '작업 공간 다시 확인'
+          ? '생성 결과 다시 확인'
           : '작업 공간 만들기'
 
   useEffect(() => {
@@ -382,14 +382,14 @@ export function useOnboardingWorkspaceFlow() {
             request: pendingToRecover!.request,
             reason: 'pendingMissing',
           })
-          setValidationMessage('다른 탭에서 이 요청을 확인했거나 목록에서 지웠습니다. 새 작업 공간을 만들기 전에 최근 목록이나 기존 공유 링크를 확인해 주세요.')
+          setValidationMessage('다른 탭에서 생성 결과를 확인했거나 임시 기록을 삭제했습니다. 최근 작업 공간이나 기존 공유 링크를 확인해 주세요.')
         } else if (lockResult.value.reason === 'changed') {
           setSelectedPendingCreation(null)
           setNewRequestConfirmation({
             request: pendingToRecover!.request,
             reason: 'pendingChanged',
           })
-          setValidationMessage('다른 탭에서 임시 기록이 변경됐습니다. 새 작업 공간을 만들기 전에 다른 탭의 결과를 확인해 주세요.')
+          setValidationMessage('다른 탭에서 임시 기록을 변경했습니다. 해당 탭에서 생성 결과를 확인해 주세요.')
         } else {
           setValidationMessage(pendingStorageRequiredMessage)
         }
@@ -452,7 +452,7 @@ export function useOnboardingWorkspaceFlow() {
       setValidationMessage('')
     } else {
       setNewRequestConfirmation(null)
-      setValidationMessage('브라우저의 임시 요청 기록을 삭제했습니다. 입력을 확인한 뒤 다시 시도해 주세요.')
+      setValidationMessage('임시 기록을 삭제했습니다. 입력을 확인한 뒤 다시 시도해 주세요.')
     }
     requestAnimationFrame(() => teamNameInputRef.current?.focus())
   }

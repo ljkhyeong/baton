@@ -203,6 +203,7 @@ read_secret_or_placeholder() {
   printf '%s' "$(< "$target")"
 }
 
+turnstile_secret_file="$(env_value BATON_TURNSTILE_SECRET_KEY_FILE)"
 google_secret_file="$(env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
 naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
 cal_bearer_token_file="$(env_value BATON_CAL_BEARER_TOKEN_FILE)"
@@ -233,6 +234,9 @@ if [[ "$round_runtime_enabled" == "true" \
   exit 1
 fi
 
+turnstile_secret_key="$(
+  read_secret_or_placeholder "$turnstile_secret_file" disabled-turnstile-secret-key
+)"
 google_client_secret="$(
   read_secret_or_placeholder "$google_secret_file" disabled-google-oauth-client-secret
 )"
@@ -425,6 +429,7 @@ env \
   -u BUILDKIT_HOST \
   -u DOCKER_BUILDKIT \
   COMPOSE_MENU=false \
+  BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
   BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
   BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
   BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \

@@ -21,7 +21,7 @@ class EmailVerificationOutboxPayloadProtectorTest {
             "secure-email-verification-token-000000000001"
     );
 
-    @DisplayName("AES-256-GCM protector는 이메일과 토큰을 노출하지 않는 payload로 왕복한다")
+    @DisplayName("AES-256-GCM 보호기는 이메일과 토큰을 노출하지 않는 페이로드를 암복호화한다")
     @Test
     void protectsAndUnprotectsPayload() {
         var protector = new AesGcmEmailVerificationOutboxPayloadProtector(TEST_KEY);
@@ -72,7 +72,7 @@ class EmailVerificationOutboxPayloadProtectorTest {
                 .isInstanceOf(EmailVerificationPayloadProtectionException.class);
     }
 
-    @DisplayName("Base64 키는 정확히 32바이트가 아니면 protector 구성을 거부한다")
+    @DisplayName("Base64 키가 정확히 32바이트가 아니면 보호기 구성을 거부한다")
     @Test
     void requiresAes256Key() {
         assertThatThrownBy(() -> new AesGcmEmailVerificationOutboxPayloadProtector("not-base64"))
@@ -82,7 +82,7 @@ class EmailVerificationOutboxPayloadProtectorTest {
                 .hasMessageContaining("32바이트");
     }
 
-    @DisplayName("키가 설정되지 않은 protector는 평문 저장으로 fallback하지 않는다")
+    @DisplayName("키가 없는 보호기는 평문 저장으로 대체하지 않는다")
     @Test
     void missingKeyFailsClosed() {
         var protector = new DisabledEmailVerificationOutboxPayloadProtector();
@@ -94,7 +94,7 @@ class EmailVerificationOutboxPayloadProtectorTest {
                 .isEqualTo(true);
     }
 
-    @DisplayName("identity 메일 설정 문자열은 outbox 암호화 키를 노출하지 않는다")
+    @DisplayName("신원 메일 설정 문자열은 아웃박스 암호화 키를 노출하지 않는다")
     @Test
     void redactsEncryptionKeyFromPropertiesString() {
         var properties = new IdentityEmailVerificationProperties(

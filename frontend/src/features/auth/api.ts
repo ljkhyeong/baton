@@ -83,10 +83,16 @@ export async function deleteAuthSession(): Promise<void> {
   })
 }
 
-export async function requestPasswordReset(email: string): Promise<void> {
+export async function requestPasswordReset(
+  email: string,
+  turnstileToken: string | null,
+): Promise<void> {
   await apiRequest(`${AUTH_ROOT}/local/password-reset-requests`, {
     method: 'POST',
-    body: { email },
+    body: {
+      email,
+      ...(turnstileToken ? { turnstileToken } : {}),
+    },
     headers: await mutationHeaders(),
     decode: decodePasswordResetRequest,
   })

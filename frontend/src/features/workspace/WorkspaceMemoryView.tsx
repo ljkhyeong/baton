@@ -46,14 +46,13 @@ export function MemoryView({
       {decisions.length ? (
         <section className="memory-ledger">
           <div className="memory-rule"><span>최근 결정</span><span>{decisions.length}개의 기록</span></div>
-          {decisions.map((decision, index) => (
+          {decisions.map((decision) => (
             <article
               className="decision-entry"
               data-decision-id={decision.id}
               key={decision.id}
               tabIndex={-1}
             >
-              <div className="decision-number">{String(decisions.length - index).padStart(2, '0')}</div>
               <div className="decision-body">
                 <div className="decision-heading">
                   <div>

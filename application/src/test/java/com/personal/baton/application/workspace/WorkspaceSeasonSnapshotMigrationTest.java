@@ -36,7 +36,7 @@ class WorkspaceSeasonSnapshotMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("V11은 기존 다중 시즌의 역할 참조와 바통·자료·멱등 결과를 시즌 snapshot으로 이관한다")
+    @DisplayName("V11은 기존 다중 시즌의 역할 참조와 바통·자료·멱등 결과를 시즌 스냅샷으로 이관한다")
     @Test
     void migratesLegacyTeamContentIntoSeasonSnapshots() {
         migrateTo("10");

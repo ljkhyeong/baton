@@ -43,7 +43,7 @@ export function requireRoundEdgeHttpsOrigin(
   try {
     url = new URL(value)
   } catch {
-    throw new Error(`${variableName}는 BATON ROUND 테스트용 HTTPS origin이어야 합니다.`)
+    throw new Error(`${variableName}는 BATON ROUND 테스트용 HTTPS 출처여야 합니다.`)
   }
 
   if (
@@ -55,7 +55,7 @@ export function requireRoundEdgeHttpsOrigin(
     || url.search
     || url.hash
   ) {
-    throw new Error(`${variableName}는 BATON ROUND 테스트용 HTTPS origin이어야 합니다.`)
+    throw new Error(`${variableName}는 BATON ROUND 테스트용 HTTPS 출처여야 합니다.`)
   }
 
   return url.origin

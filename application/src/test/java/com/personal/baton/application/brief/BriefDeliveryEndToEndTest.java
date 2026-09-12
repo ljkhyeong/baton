@@ -75,7 +75,7 @@ class BriefDeliveryEndToEndTest {
     @TempDir
     private Path tempDirectory;
 
-    @DisplayName("BATON 원본 신호가 초기 정합화와 재전달을 거쳐 BRIEF로 수렴한다")
+    @DisplayName("BATON 기존 신호와 재전달 결과가 BRIEF에 반영된다")
     @Test
     void deliversAuthoritativeSignalAcrossActualServiceRuntimes() throws Exception {
         Path batonJar = requiredJar("baton.boot.jar");
@@ -170,7 +170,7 @@ class BriefDeliveryEndToEndTest {
             assertThat(persistedWorkspace.path("roles").get(0).path("currentMemberId").isNull())
                     .isTrue();
 
-            await("초기 정합화로 ROLE_UNASSIGNED 생성", () ->
+            await("기존 상태 반영으로 ROLE_UNASSIGNED 생성", () ->
                     outboxCount(jdbcTemplate) == 1
             );
             Map<String, Object> initialOutbox = jdbcTemplate.queryForMap(

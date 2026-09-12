@@ -25,7 +25,7 @@ class AccountSessionSecurityContextRepositoryTest {
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
 
-    @DisplayName("BATON 계정 principal이 아닌 OAuth 성공 인증은 저장하지 않고 fail-closed 한다")
+    @DisplayName("BATON 계정이 아닌 OAuth 인증 결과는 저장하지 않고 차단한다")
     @Test
     void rejectsRawProviderAuthenticationBeforeDelegatingSave() {
         OidcUser rawProviderUser = mock(OidcUser.class);

@@ -418,7 +418,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
 
     private void requireMarked(boolean marked) {
         if (!marked) {
-            throw new IllegalStateException("BRIEF 생성 실행 lease가 만료됐습니다");
+            throw new IllegalStateException("BRIEF 주간 요약 생성 작업이 만료됐습니다");
         }
     }
 }

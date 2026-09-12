@@ -265,7 +265,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     const retry = contentCreationCleanupCommand.retryCleanup()
     if (!retry) return
     void retry.then((completed) => {
-      if (completed) showToast('브라우저의 임시 요청 기록을 삭제했습니다.')
+      if (completed) showToast('임시 기록을 삭제했습니다.')
     })
   }
   const roleHandoffFlow = useWorkspaceRoleHandoffFlow({
@@ -281,6 +281,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   })
   const {
     copyShareLink,
+    shareWorkspaceLink,
     pendingRotationIdempotencyKey,
     recoverPendingAccessKeyRotation,
     retryRotationJournalCleanup,
@@ -558,6 +559,26 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }
 
+  const openResourceReview = (roleId: string, resourceId: string) => {
+    const resource = resources.find((entry) => entry.id === resourceId
+      && entry.roleId === roleId && !entry.archivedAt)
+    if (!resource) {
+      showToast('자료 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error')
+      return
+    }
+    setView('roles')
+    selectRole(roleId)
+    window.requestAnimationFrame(() => {
+      const row = [...document.querySelectorAll<HTMLElement>('[data-resource-id]')]
+        .find((element) => element.dataset.resourceId === resourceId)
+      const details = row?.querySelector<HTMLDetailsElement>('.resource-verification')
+      if (details) details.open = true
+      const target = details?.querySelector<HTMLElement>('summary') ?? null
+      target?.scrollIntoView({ block: 'center' })
+      focusWorkspaceElement(target)
+    })
+  }
+
   const openRecordSearchResult = (result: RecordSearchResult) => {
     if (result.kind === 'decision') {
       openView('memory')
@@ -769,7 +790,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     closeModal,
     onRecordSaved: (kind, id) => {
       if (!sessionQuery.isSuccess) return
-      void clearRecordDraft(scope, kind, id).catch(() => showToast('기록은 저장했지만 탭의 초안을 지우지 못했습니다. 다시 작성할 때 이전 초안을 삭제해 주세요.', 'error'))
+      void clearRecordDraft(scope, kind, id).catch(() => showToast('기록은 저장했지만 작성 중인 초안은 삭제하지 못했습니다. 다음 작성 전에 이전 초안을 삭제해 주세요.', 'error'))
     },
     openMemberManagement: () => openModal('members'),
     selectRound,
@@ -823,11 +844,17 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={copyShareLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
-        <div className="page-stage" key={view}>
+          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+        <div className="workspace-toolbar">
+          <div className="workspace-breadcrumb" aria-label="현재 작업 공간">
+            <span>{workspace.team.name}</span><span aria-hidden="true">/</span><span>{workspace.season.name}</span>
+          </div>
+          <button type="button" className="workspace-search-button" onClick={() => openView('records')}>
+            <Icon name="search" size={16} />기록 검색
+          </button>
           <WorkspaceSyncStatus
             updatedAt={workspaceQuery.dataUpdatedAt}
             syncing={workspaceQuery.isFetching}
@@ -841,6 +868,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               void workspaceQuery.refetch()
             }}
           />
+        </div>
+        <div className="page-stage" key={view}>
           {conflictDraftFlow.draft && (
             <WorkspaceConflictDraft
               key={conflictDraftFlow.draft.text}
@@ -871,7 +900,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             <TodayView
               workspace={activeWorkspace}
               personalWork={<><DueResourceReviewsPanel scope={scope} timeZone={workspace.season.timeZone} ended={Boolean(workspace.season.endedAt)}
-                onOpenRole={roleId => { setView('roles'); selectRole(roleId) }} /><PersonalWorkPanel
+                onOpenResource={openResourceReview} /><PersonalWorkPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
@@ -1245,7 +1274,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           onClose={closeModal}
         />
       )}
-      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} onClose={closeModal} />}
+      {modal === 'shareLink' && <ShareLinkFallback shareUrl={shareUrl} accountAccessEnabled={accountAccessEnabled} onClose={closeModal} />}
       {modal === 'accessKey' && (
         <AccessKeyModal
           pending={rotationPending}

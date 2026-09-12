@@ -22,7 +22,7 @@ class WatchMonitorStartupRecoveryTest {
     private static final String RECEIVER_TOKEN =
             "receiver-token-with-at-least-32-characters";
 
-    @DisplayName("WATCH 양방향 연동이 모두 비활성이면 outbox를 검사하지 않는다")
+    @DisplayName("WATCH 양방향 연동이 모두 비활성이면 아웃박스를 검사하지 않는다")
     @Test
     void skipRecoveryWhenBothDirectionsAreDisabled() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
@@ -33,7 +33,7 @@ class WatchMonitorStartupRecoveryTest {
         verifyNoInteractions(recover);
     }
 
-    @DisplayName("WATCH 이벤트 수신만 활성화해도 기존 outbox namespace가 다르면 시작을 거부한다")
+    @DisplayName("WATCH 이벤트 수신만 활성화해도 기존 아웃박스 네임스페이스가 다르면 시작을 거부한다")
     @Test
     void rejectMismatchedNamespaceWhenOnlyReceiverIsEnabled() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);
@@ -50,7 +50,7 @@ class WatchMonitorStartupRecoveryTest {
         verify(recover, never()).requeueOperationalFailures();
     }
 
-    @DisplayName("WATCH outbound 연동은 namespace를 검사한 뒤 운영 설정 실패를 재처리한다")
+    @DisplayName("WATCH 발신 연동은 네임스페이스를 검사한 뒤 운영 설정 실패를 재처리한다")
     @Test
     void validateAndRequeueWhenOutboundIsEnabled() {
         RecoverWatchMonitorOutboxUseCase recover = mock(RecoverWatchMonitorOutboxUseCase.class);

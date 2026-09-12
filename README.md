@@ -18,12 +18,12 @@ BATON은 팀 업무와 인수인계를 관리하는 도구다. 담당자가 바�
 
 ### 그룹 스터디 파일럿
 
-팀 이름, 시즌 기간과 구성원을 입력해 작업 공간을 만든다. 빈 구성이나 스터디·팀 운영 템플릿을 선택할 수 있다. 템플릿에는 역할 3개와 반복 업무 3개가 포함되며 담당자와 일정은 직접 정한다.
+팀 이름, 시즌 기간과 구성원을 입력해 작업 공간을 만든다. 빈 구성이나 스터디·팀 운영·TF 템플릿을 선택할 수 있다. 템플릿에는 역할 3개와 반복 업무 3개가 포함되며 담당자와 일정은 직접 정한다.
 
 | 화면 | 할 수 있는 일 |
 | --- | --- |
-| 내 팀 | 참여한 팀으로 이동하고, 여러 팀의 미완료 담당 업무와 수락할 인수인계를 모아 본다. |
-| 오늘 | 이번 회차 업무를 완료 처리하고, ‘확인할 항목’에서 담당자 공백·업무 지연을 확인한다. 내 업무·자료 재확인·주간 업무 점검은 펼쳐서 본다. |
+| 내 팀 | 참여한 팀으로 이동하고, 여러 팀의 내 업무·수락할 인수인계·최근 추가된 기록을 모아 본다. |
+| 오늘 | 이번 회차 업무를 완료 처리하고, ‘조치할 항목’에서 담당자 공백·업무 지연을 확인한다. 내 업무·자료 재확인·주간 업무 점검은 펼쳐서 본다. |
 | 역할 | 역할별 담당 업무·현재 담당자·다음 담당자·담당 기간을 관리한다. 구성원 관리, 자료 추가와 이전 시즌 기록 조회도 제공한다. |
 | 일정 | 반복 업무와 마감을 정하고 회차를 만든다. 주간·격주 자동 생성, 회차 날짜 변경·건너뛰기·보관·복원을 지원한다. |
 | 기록 | 결정 내용·이유·대안·관련 역할을 남긴다. Markdown 편집·미리보기, 수정 이력과 보관함을 제공한다. |
@@ -31,11 +31,11 @@ BATON은 팀 업무와 인수인계를 관리하는 도구다. 담당자가 바�
 | 검색 | 현재 시즌 또는 모든 시즌의 결정·체크리스트 항목·자료를 검색한다. 종류·역할·보관 여부·작성일로 좁힐 수 있다. |
 | 시즌 | 이전 시즌을 조회하고 현재 시즌을 종료·재개한다. 다음 시즌에는 선택한 역할과 반복 업무를 복사한다. |
 
-역할 상세에서 자료의 연결 상태를 조회하고 다시 점검할 수 있다. 자동 점검과 별도로 ‘사용 가능·수정 필요’ 확인 결과와 재확인 주기를 기록한다. 내 알림은 마감 임박·업무 지연·수락할 인수인계를 표시하며, 읽음과 알림 설정을 계정별로 저장한다. 결정·자료·체크리스트 본문 초안은 같은 브라우저 탭에서 복구할 수 있다.
+역할 상세에서 자료 링크 상태를 조회하고 다시 점검할 수 있다. 자동 점검과 별도로 ‘사용 가능·수정 필요’ 결과와 재확인 주기를 기록한다. 내 알림에는 마감 임박·업무 지연·수락할 인수인계를 표시한다. 읽음 상태와 알림 설정은 계정별로 저장한다. 결정·자료·체크리스트 초안은 같은 브라우저 탭에서 복구할 수 있다.
 
 ‘내 알림’은 펼쳐둔 동안 갱신하며 ‘안 읽은 알림만’으로 좁혀 볼 수 있다.
 
-업무 데이터는 MySQL에 저장한다. 보관한 기록과 종료 시즌도 조회할 수 있으며, 응답 유실은 저장한 같은 요청으로 다시 확인한다. 공유 키 팀은 공유 링크로, 계정 권한 팀은 로그인과 팀별 권한으로 접근한다. 상세 동작은 [제품 명세](docs/PRD/0001_product-baseline/spec.md), 요청·오류·복구 조건은 [API 계약](docs/PRD/0002_api-contract/spec.md)을 따른다.
+업무 데이터는 MySQL에 저장하며 보관한 기록과 종료 시즌도 조회할 수 있다. 응답을 받지 못하면 같은 요청을 다시 보내 저장 결과를 확인한다. 공유 키 팀은 공유 링크로, 계정 권한 팀은 로그인과 팀별 권한으로 접근한다. 상세 동작은 [제품 명세](docs/PRD/0001_product-baseline/spec.md), 요청·오류·복구 조건은 [API 계약](docs/PRD/0002_api-contract/spec.md)을 따른다.
 
 인수인계 문서와 주간 요약은 화면의 인쇄 버튼으로 출력한다. 이 버튼은 주소의 접근 키를 잠시 숨기고 인쇄 후 복원한다. 접근 키가 주소에 남아 있을 때는 브라우저 메뉴나 단축키 대신 화면의 인쇄 버튼을 사용한다.
 
@@ -59,7 +59,7 @@ BATON은 팀·시즌·역할·업무 기록과 최종 접근 권한을 관리한
 | --- | --- | --- |
 | CAL | 회차·마감 캘린더와 개인 구독 | 일정·시즌 이름 전달, 재시도와 복구 절차 구현. 개인 구독의 공식 계약 채택과 실제 캘린더 앱 검증은 남아 있다. [계약](docs/PRD/0006_calendar-integration-contract/spec.md) |
 | WATCH | 자료 URL 점검과 상태 변경 전달 | 송신·수신 기록과 자료 연결 상태 조회·재점검 구현. 공개 HTTPS 전달·조회 검증과 운영 활성화는 남아 있다. [계약](docs/PRD/0004_watch-integration-contract/spec.md) |
-| BRIEF | 업무 점검 항목과 주간 요약 | 신호 전달·재시도·요약 조회·생성 구현. 로컬 서비스 간 검증을 마쳤으며 공개 HTTPS 검증과 운영 활성화는 남아 있다. [전달 계약](docs/PRD/0007_brief-continuity-signal-producer/spec.md) |
+| BRIEF | 업무 점검 항목과 주간 요약 | 점검 이벤트 전달·재시도·요약 조회·생성 구현. 로컬 서비스 간 검증을 마쳤으며 공개 HTTPS 검증과 운영 활성화는 남아 있다. [전달 계약](docs/PRD/0007_brief-continuity-signal-producer/spec.md) |
 | ROUND | 화상회의·시그널링·TURN | BATON의 방 매핑·참여권 발급과 로컬 서비스 간 검증 완료. 실제 릴리스·외부 coturn의 공개 HTTPS 검증은 남아 있다. [운영 구성](docs/ADR/0018_round-production-runtime/adr.md) |
 | GO | 공유 링크 코드·만료·폐기·이동 대상 관리 | 최종 팀·방 접근 권한은 BATON·ROUND에서 확인한다. |
 | RELAY | 이벤트 수신·중복 제거·외부 알림 전달 | 수신·구독·전달 작업 생성까지 구현. 실제 채널 공급자 호출과 재시도 작업자는 미구현이다. |
@@ -67,6 +67,10 @@ BATON은 팀·시즌·역할·업무 기록과 최종 접근 권한을 관리한
 자료 연결 상태의 조회 주기·재점검·독립 복원 기준은 [WATCH 현재 상태 조회](docs/ADR/0021_watch-current-state-query/adr.md)를 따른다.
 
 대한민국 공휴일은 한국천문연구원 무료 API로 조회한다. 월별 공휴일과 모임일의 공휴일 여부를 표시하며 일정을 자동 변경하지 않는다. [서비스 키 설정](#무료-공휴일-연동) 전에는 비활성 상태다.
+
+작업 공간의 `공유` 버튼은 기기의 공유 창에서 메신저·메일 앱을 선택하도록 연결한다. 별도 서비스 키나 요금이 없으며, 지원하지 않는 브라우저에서는 링크를 복사한다. [지원 조건](docs/runbooks/free-integrations.md#기기-앱-공유-web-share-api)
+
+추가 비용 없이 연결할 이메일·외부 장애 감시·백업 저장소와 `b4ton.com`의 서비스별 주소는 [무료 외부 연동](docs/runbooks/free-integrations.md)에 정리했다. 기존 SMTP·CAL·rclone을 재사용하며, 백업 완료 신호를 Better Stack 하트비트 API에 보내는 기능은 비밀 URL 파일을 설정하면 사용할 수 있다.
 
 다음 운영 작업은 [HANDOFF](HANDOFF.md), 장기 개발 순서는 [개발 우선순위](docs/PRD/0003_product-roadmap/spec.md)를 기준으로 한다.
 
@@ -181,7 +185,7 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 1. `http://127.0.0.1:3000`에서 팀 이름, 시즌 기간과 구성원을 입력한다. 같은 이름은 별칭으로 구분하고, 서버에 생성 코드가 설정돼 있으면 함께 입력한다.
 2. ‘역할’에서 담당 업무·담당자·담당 기간을 정하고 필요한 자료를 추가한다.
 3. ‘일정’에서 반복 업무와 마감을 정한다. 회차를 직접 만들거나 시간대와 주간·격주 자동 생성을 설정한다.
-4. ‘오늘’에서 이번 회차 업무를 완료 처리하고 ‘확인할 항목’의 담당자 공백·업무 지연을 확인한다.
+4. ‘오늘’에서 이번 회차 업무를 완료 처리하고 ‘조치할 항목’의 담당자 공백·업무 지연을 확인한다.
 5. 사이드바 또는 모바일 상단의 ‘공유’로 팀원에게 링크를 전달한다. 공유 키는 읽기·쓰기 권한이므로 공개 채널에 게시하지 않는다.
 6. 담당자가 바뀌면 ‘인수인계’에서 다음 담당 기간을 정하고 전달·수락한다.
 7. 시즌이 끝나면 진행 중인 인수인계를 수락하거나 취소한 뒤 다음 시즌을 시작한다. 이어 갈 역할·반복 업무를 고르고 새 담당자·일정을 정한다. 이전 시즌은 계속 조회할 수 있다.
@@ -241,6 +245,8 @@ openssl rand -hex 32
 - ROUND 런타임을 켜면 고정 다이제스트의 이미지를 가져온다. 두 이미지의 릴리스 리비전·태그 객체가 같고 웹 이미지가 BATON 모드인지 확인한다.
 - 실제 `up`, `create`, `pull`에서는 `production-compose.sh`가 배포 잠금을 잡고 환경 파일의 `0600` 스냅샷을 만든다. 설정과 ROUND 이미지 호환성을 다시 검사하고 Compose도 이 스냅샷만 사용한다. 실행 중 바뀐 원본은 읽지 않으며 종료 시 스냅샷을 제거한다.
 
+[Trivy 이미지 검사](docs/runbooks/free-integrations.md#배포-이미지-취약점-검사-trivy)는 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 JSON 보고서로 남긴다. `./ops/scan-images.sh IMAGE [IMAGE ...]`로 실행하며 GitHub Actions 작업은 추가하지 않는다.
+
 고정 다이제스트는 운영자가 선택한 이미지를 식별한다. 게시자 서명이나 빌드 출처를 증명하지는 않는다. 실제 DNS 연결, 외부 80/443 접근, 공인 인증서 발급과 호스트 디스크 여유는 운영자가 별도로 확인한다.
 
 `production-compose.sh`는 매번 환경 설정을 검사하고 충돌할 수 있는 셸의 배포·Compose 변수를 제거한다. Docker는 Linux 로컬 `unix:///var/run/docker.sock`, 프로젝트와 DB 볼륨은 `baton-production`, Compose 파일은 저장소의 프로덕션 설정으로 고정한다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
@@ -262,7 +268,7 @@ openssl rand -hex 32
 
 ### 외부 연동 비밀과 ROUND 운영 설정
 
-`.env.production`에는 공개 설정과 비밀 파일 경로를 둔다. 공개 설정은 Google·Naver 클라이언트 ID, SMTP 호스트·사용자 이름, BRIEF HTTPS origin, JWK `kid` 등이다. 비밀 원문을 이 파일에 복사하거나 래퍼 없이 `docker compose`를 직접 실행하지 않는다.
+`.env.production`에는 공개 설정과 비밀 파일 경로를 둔다. 공개 설정은 Google·Naver 클라이언트 ID, SMTP 호스트·사용자 이름, BRIEF HTTPS 출처, JWK `kid` 등이다. 비밀 원문을 이 파일에 복사하거나 래퍼 없이 `docker compose`를 직접 실행하지 않는다.
 
 `ops/validate-production-auth-secrets.sh`는 다음을 검사한다.
 
@@ -296,7 +302,7 @@ chmod 0600 \
   /srv/baton/secrets/round-current-public.pem
 ```
 
-Google 리디렉션 URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver 콜백은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 콘솔에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 시작 시 SMTP 연결을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. 서버의 인증 기능 응답과 화면은 이 게이트를 그대로 반영하므로, 게이트가 닫힌 동안 기존 이메일 로그인은 유지하면서 새 계정 만들기만 숨긴다. SMTP는 587/TCP, 인증, STARTTLS 필수, 서버 신원 검증과 2초 연결·읽기·쓰기 시간 초과로 고정된다. 실제 수신함에서 프래그먼트 토큰 링크와 비밀번호 설정까지 확인한다.
+Google 리디렉션 URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver 콜백은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 콘솔에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 시작 시 SMTP 연결을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. 공개 가입·재설정 요청에 Turnstile을 사용하려면 [무료 외부 연동](docs/runbooks/free-integrations.md#가입재설정-봇-방지-cloudflare-turnstile)의 사이트 키·비밀 키·허용 호스트와 CSP를 함께 준비한다. 서버의 인증 기능 응답과 화면은 이 게이트를 그대로 반영하므로, 게이트가 닫힌 동안 기존 이메일 로그인은 유지하면서 새 계정 만들기만 숨긴다. SMTP는 587/TCP, 인증, STARTTLS 필수, 서버 신원 검증과 2초 연결·읽기·쓰기 시간 초과로 고정된다. 실제 수신함에서 프래그먼트 토큰 링크와 비밀번호 설정까지 확인한다.
 
 비밀번호 재설정 메일 요청은 가입 게이트와 별개인 `BATON_AUTH_PASSWORD_RESET_ENABLED=false`가
 기본값이다. V30 마이그레이션과 실제 SMTP·공개 HTTPS 검증을 마친 뒤 별도로 켠다. 요청을 닫아도
@@ -309,7 +315,7 @@ ROUND 런타임은 참여권 서명자와 별도 게이트로 배포한다. 먼�
 
 비공개 배포에서 `./ops/production-compose.sh ps`, 내부 상태와 `/room/<room-id>` 정적 응답을 확인한 뒤 서명 키를 구성하고 참여권 게이트를 연다. Caddy는 갱신을 BATON에 남기고 공개 시그널링·TURN만 ROUND 내부 경로로 재작성하며, 원본 `Cookie` 헤더에 정확한 철자의 `__Secure-round_access`가 하나일 때만 그 쿠키를 ROUND 업스트림에 전달한다. 중복이나 대소문자 변형은 업스트림 전에 `401`·`no-store`로 거부한다. 방 범위의 세 경로는 커밋 고정 Caddy 요청률 제한 모듈로 클라이언트 IP당 1분 120회로 제한된다. 공개 `/actuator/health`는 BATON 애플리케이션·DB만 나타내므로 ROUND 컨테이너 상태와 실제 coturn 할당은 별도 확인한다.
 
-비활성화는 참여권과 런타임 게이트를 함께 닫고 `./ops/production-compose.sh up -d --build`를 다시 실행하는 즉시 차단 절차다. 참여권 게이트를 닫으면 갱신뿐 아니라 공개 JWK도 닫히므로 기존 참여권의 300초 만료를 기다리는 점진적 종료로 해석하지 않는다. 래퍼는 호출자가 일부 서비스만 지정해도 `mysql`, `app`, `web`과 활성 ROUND 서비스를 모두 수렴시키고, 고정 오버레이를 제외한 전환에서는 `--remove-orphans`로 기존 ROUND 컨테이너를 제거한다. `stop`, `down`, `logs`, `ps`는 게이트가 닫힌 뒤에도 이전 오버레이 서비스를 관리할 수 있다. coturn의 공인 IP·3478/5349·중계 포트·TLS 인증서와 실제 할당·미디어 중계는 이 Compose 밖의 별도 ROUND 운영 단위와 외부 탐침이 소유한다.
+비활성화는 참여권과 런타임 게이트를 함께 닫고 `./ops/production-compose.sh up -d --build`를 다시 실행하는 즉시 차단 절차다. 참여권 게이트를 닫으면 갱신뿐 아니라 공개 JWK도 닫히므로 기존 참여권의 300초 만료를 기다리는 점진적 종료로 해석하지 않는다. 래퍼는 호출자가 일부 서비스만 지정해도 `mysql`, `app`, `web`과 활성 ROUND 서비스를 모두 해당 구성으로 갱신하고, 고정 오버레이를 제외한 전환에서는 `--remove-orphans`로 기존 ROUND 컨테이너를 제거한다. `stop`, `down`, `logs`, `ps`는 게이트가 닫힌 뒤에도 이전 오버레이 서비스를 관리할 수 있다. coturn의 공인 IP·3478/5349·중계 포트·TLS 인증서와 실제 할당·미디어 중계는 이 Compose 밖의 별도 ROUND 운영 단위와 외부 탐침이 소유한다.
 
 ROUND 키 회전은 두 번의 명시적 배포로 수행한다. 먼저 이전 키로 계속 서명하면서 새 공개 키를 이전 슬롯에 넣어 JWK에 선게시하고 60초 캐시 갱신보다 길게 기다린다. 그다음 새 비공개·공개 키를 현재 키로, 이전 공개 키를 이전 키로 바꿔 발급을 전환한다. 마지막 이전 참여권 발급 뒤 300초 수명, 60초 시간 편차와 60초 JWK 캐시를 합친 최소 420초가 지난 후에만 이전 키를 제거한다. 각 단계에서 공개 JWK가 예상 두 `kid`만 포함하고 비공개 RSA 필드가 없는지, 갱신으로 받은 쿠키가 TURN·WebSocket 입장까지 같은 `sub`로 동작하는지 확인한다.
 
@@ -377,7 +383,12 @@ systemctl --user start baton-backup.timer
 
 백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 보조 파일로 생성된다. `backup.sh`는 gzip과 BATON 핵심 스키마 표식을 확인하고 보조 파일을 먼저 원자적으로 게시한 뒤 덤프 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. `restore.sh`는 보조 파일 검증을 자체적으로 강제하고 예약 백업 잠금과 프로덕션 Compose 생명주기 잠금을 모두 잡는다. 또한 애플리케이션·웹과 잔존 ROUND 웹·시그널링 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다.
 
-계정 권한 팀이 없는 백업에 대해 다음 자동 복구를 적용한다. 복원한 스냅샷의 접근 키 상태는 현재 시점의 폐기 이력을 증명할 수 없으므로 `restore.sh`는 공개 전에 모든 팀의 접근 키 해시를 발급한 적 없는 무작위 값으로 교체한다. 현재 스키마에서는 마지막 키 변경 멱등 표식을 비우고 팀 버전도 함께 올리되, 이미 사용한 키 변경·워크스페이스 생성·콘텐츠 생성 멱등 이력은 과거 요청을 새 요청으로 되살리지 않도록 보존한다. 모든 팀이 무효화됐고 팀마다 복구에 사용할 최신 대표 시즌이 하나씩 있는지 확인한 뒤에만 성공하며, 대상은 권한이 제한된 `last-restore-recovery-targets.tsv`에 기록한다. 따라서 복원 뒤에는 기존 공유 링크가 전부 `403`이 되고, 운영자가 각 팀을 서로 다른 새 멱등 키로 복구해 받은 접근 키로 새 링크를 다시 배포해야 한다. 응답이 유실되면 해당 팀에는 같은 멱등 키로 재시도한다. 스냅샷의 출처나 운영 비밀 노출 여부가 의심되면 `.env.production`의 생성 키와 복구 키도 새 값으로 교체한다.
+계정 권한 모델 도입 전 백업은 현재 접근 키 폐기 상태를 증명할 수 없다. 따라서 기존 공유 링크를 모두 무효화하고 다음 순서로 복구한다.
+
+1. 모든 팀의 접근 키 해시를 발급 이력이 없는 무작위 값으로 바꾸고 팀 버전을 올린다. 마지막 키 변경 표식은 지우되, 과거 멱등 이력은 보존한다.
+2. 모든 팀의 키가 무효화됐고 팀마다 복구할 최신 시즌이 있는지 확인한다. 대상은 권한을 제한한 `last-restore-recovery-targets.tsv`에 기록한다.
+3. 운영자가 팀마다 다른 멱등 키로 새 접근 키를 발급하고 공유 링크를 다시 배포한다. 응답이 유실되면 같은 팀과 멱등 키로 다시 요청한다.
+4. 백업 출처나 비밀값 노출이 의심되면 생성 키와 복구 키도 교체한다.
 
 기존 DB를 교체하고 모든 공유 링크를 폐기하는 작업이므로 복구 직전에도 백업하고, 실제 데이터를 넣기 전 별도 환경에서 복구·팀별 키 재발급·옛 링크 거부까지 리허설한다.
 
@@ -410,7 +421,9 @@ BATON_BACKUP_STATE_DIR=/absolute/path/to/baton-backup-state ./ops/check-backup-f
 
 타이머는 매일 `03:15 Asia/Seoul`부터 최대 15분 안에 실행하고, 호스트가 꺼져 놓친 실행은 다음 기동 뒤 보충한다. 실패한 서비스는 15분 간격으로 다시 시작하되 시작률을 1시간에 네 번으로 제한한다. 주기는 커널 `flock`으로 겹침을 막아 프로세스 종료 뒤 오래된 잠금이 남지 않는다.
 
-각 주기는 이전에 업로드하지 못한 로컬 백업을 먼저 재시도하되 이 단계만으로 최신성이나 로컬 보존 상태를 바꾸지 않고, 이어서 새 덤프를 만든다. 모든 덤프와 필수 SHA-256 보조 파일을 `--immutable`로 암호화 원격 저장소에 게시한 뒤, 같은 원격 저장소를 통해 본문과 보조 파일을 다시 읽어 해시를 비교한다. 완전히 검증한 파일에는 로컬 완료 표식을 남겨 이후 주기에는 다시 전송하지 않는다. 새 스냅샷까지 외부 검증된 뒤 상태 파일에 체크섬이 이름과 결합한 UTC 스냅샷 시각·이름·해시와 검증 시각을 기록한다. 14일이 지난 로컬 파일은 삭제 직전에 원격 본문과 보조 파일을 다시 검증하고, 최신 세 개는 항상 남긴다. BATON 스크립트는 원격 백업을 삭제하지 않으므로 원격 버전 관리·객체 잠금·생명주기는 공급자에서 별도로 설정한다.
+각 주기는 이전에 업로드하지 못한 로컬 백업을 먼저 재시도하되 이 단계만으로 최신성이나 로컬 보존 상태를 바꾸지 않고, 이어서 새 덤프를 만든다. 모든 덤프와 필수 SHA-256 보조 파일을 `--immutable`로 암호화 원격 저장소에 게시한 뒤, `rclone check --download`로 해당 두 파일의 실제 내용을 비교한다. 완전히 검증한 파일에는 로컬 완료 표식을 남겨 이후 주기에는 다시 전송하지 않는다. 새 스냅샷까지 외부 검증된 뒤 상태 파일에 체크섬이 이름과 결합한 UTC 스냅샷 시각·이름·해시와 검증 시각을 기록한다. 14일이 지난 로컬 파일은 삭제 직전에 원격 본문과 보조 파일을 다시 검증하고, 최신 세 개는 항상 남긴다. BATON 스크립트는 원격 백업을 삭제하지 않으므로 원격 버전 관리·객체 잠금·생명주기는 공급자에서 별도로 설정한다.
+
+선택 설정 `BATON_BACKUP_HEARTBEAT_URL_FILE`은 [외부 백업 감시](docs/runbooks/free-integrations.md#백업-하트비트)에 사용한다. 새 백업의 원격 검증이 끝난 뒤에만 완료 신호를 보내므로 홈서버 정전과 작업 중단도 외부에서 감지한다. 감시 API 장애로 이미 성공한 백업을 다시 만들지는 않는다.
 
 외부 백업을 복구할 때는 덤프와 같은 이름의 `.sha256`을 함께 암호화 원격 저장소에서 내려받고 먼저 검증한다.
 
@@ -462,6 +475,10 @@ journalctl --user \
 서비스 점검은 5분마다 공개 `https://.../actuator/health`를 리디렉션 없이 기본 CA 검증과 TLS 1.2 이상으로 호출한다. HTTP 200의 종합 `UP` 응답이어야 성공하므로 DNS, 공인 TLS, Caddy, Spring과 DB 상태 경계를 함께 지난다. 백업 점검은 1시간마다 마지막 암호화 원격 저장소 재읽기 검증 상태를 읽고 파일명 UTC 시각·에포크·검증 시각의 일치와 36시간 이내 최신성을 확인한다. 둘 다 자동 복구나 Compose 재시작은 하지 않고 실패 종료와 로그를 남긴다.
 
 CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애플리케이션 컨테이너의 Prometheus 지표로 확인한다. 다음 명령은 검증된 프로덕션 Compose 경계 안에서 `127.0.0.1:8080`의 `GET /actuator/prometheus`만 호출하며, 호스트에는 애플리케이션 포트를 게시하지 않고 Caddy도 이 경로를 프록시하지 않는다.
+
+상시 경보는 [Prometheus·Alertmanager 연동 설정](docs/runbooks/free-integrations.md#내부-연동-장애-알림-prometheus--alertmanager)을 사용할 수 있다. 기존 지표의 수집·갱신 장애와 전달 실패·처리 지연을 판단하고 무료 SMTP로 운영자에게 알린다. 설정·장애 시나리오 검증을 마쳤으며 실제 수집과 메일 수신 확인은 남아 있다.
+
+[공개 인증서 만료 알림](docs/runbooks/free-integrations.md#공개-인증서-만료-알림-blackbox-exporter)은 Blackbox Exporter를 연결해 만료 14일 전부터 같은 SMTP로 알린다. Cloudflare 프록시 사용 시 홈서버 원본 인증서는 별도 확인해야 한다.
 
 ```bash
 ./ops/show-integration-metrics.sh
@@ -541,13 +558,13 @@ BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.2 \
 - `useCaseTest`: Spring, DB, Flyway와 트랜잭션을 포함하는 통합 흐름 테스트
 - `restDocsTest`: 외부 HTTP 계약 테스트
 - `build`: 전체 컴파일·테스트와 REST Docs 검증
-- `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·PostgreSQL 18.6을 연결해 이벤트 초기 정합화·장애 재시도·동일 재전달·해소 투영을 검증하고, 별도 서비스 Caddy·PKCS12 truststore·`Internal=true` 네트워크에서 사용자 세션 기반 에디션 생성·조회·응답 유실 재시도와 서비스 token 교체를 검증하는 선택 실행 테스트
+- `briefCrossServiceTest`: 실제 BATON·BRIEF 실행 JAR과 두 DB를 연결해 이벤트 전달·재시도·해소 반영과 사용자 세션 기반 주간 요약 생성·조회·응답 유실 복구·서비스 토큰 교체를 확인하는 선택 실행 테스트
 - `round-consumer-contract.sh`: BATON의 실제 RS256 서명자·JWK를 현재 ROUND 시그널링 `bootJar`에 연결해 올바른 방의 TURN·WebSocket 수락, 다른 방·발급자·수신자·`kid`·만료 참여권 거부, 키 선게시·새 `kid` 즉시 재조회·이전 키 중첩과 반복되는 알 수 없는 `kid`의 JWK 갱신 제한을 검증하는 선택 실행 교차 서비스 테스트
-- `calendar-consumer-contract.sh`: CAL 불변 사전 릴리스 `1.1.0-rc.2`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
+- `calendar-consumer-contract.sh`: CAL 고정 사전 릴리스 `1.1.0-rc.2`의 실제 PostgreSQL 런타임과 BATON 운영 클라이언트를 연결해 일정 생성·변경·취소·시즌 이름, 중복·역순 전달과 복구 완료를 검증하는 선택 실행 교차 서비스 테스트
 
 교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다.
 
-BRIEF 테스트는 미리 빌드한 BRIEF 실행 JAR의 절대 경로를 `briefBootJar` 속성 또는 `BRIEF_BOOT_JAR` 환경 변수로 받아 BATON 실행 JAR은 현재 저장소에서 빌드한다. 이벤트 응답 유실은 BRIEF 수신 뒤 BATON 전달 행을, 에디션 생성 응답 유실은 BRIEF 저장 뒤 BATON 실행 성공 상태를 각각 재시도 상태로 되돌려 재현한다. 실제 TCP 응답 절단은 아니며 로컬 CA 결과를 공인 HTTPS 완료로 해석하지 않는다.
+BRIEF 테스트는 미리 빌드한 BRIEF 실행 JAR의 절대 경로를 `briefBootJar` 속성 또는 `BRIEF_BOOT_JAR` 환경 변수로 받고, BATON 실행 JAR은 현재 저장소에서 빌드한다. 이벤트 응답 유실은 BRIEF 수신 뒤 BATON 전달 행을, 주간 요약 생성 응답 유실은 BRIEF 저장 뒤 BATON 실행 상태를 각각 재시도 상태로 되돌려 재현한다. 실제 TCP 응답 절단은 아니며 로컬 CA 결과를 공인 HTTPS 완료로 해석하지 않는다.
 
 `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git 리비전·변경 상태가 남는다.
 
@@ -555,7 +572,7 @@ ROUND 교차 서비스 경계는 실제 BATON 서명자와 ROUND의 Nimbus JWK �
 
 CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.2`인 `contracts-v1.1.0-rc.2` 태그 checkout을
 사용한다. `BATON_CAL_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `baton-cal`을
-시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 불변 태그의 별도 절대 경로를
+시도하지만, 해당 저장소가 다른 계약 버전이면 실행 전에 실패하므로 고정 태그의 별도 절대 경로를
 지정한다. 버전 확인 뒤 실제 CAL 컨테이너를 띄워 일정과 시즌 이름 생산자 계약을 함께 검증한다.
 요청 스키마는 게시된 계약 자산에서 `contracts/baton-cal`로 고정하며 런타임 검증에는 사용하지 않는다.
 `calendarMetadataOutboxContractTest`는 실제 시즌 생성·이름 수정 → MySQL 아웃박스 → 운영 전달
@@ -564,7 +581,7 @@ CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.2`인 `contracts-v1.1.0-rc
 재전달도 확인한다. 이어 새 복구 모드에서 BATON이 계산한 시즌별·전체 다이제스트와 완료 요청
 재시도를 실제 CAL 저장 상태에 대조한다. 실제 캘린더 앱 검증은 포함하지 않는다.
 
-`useCaseTest`는 MySQL 8 Testcontainers에서 멱등한 온보딩과 기존 팀 구성원·시즌·역할·역할 자료·반복 업무·회차·결정·인수인계 항목·역할 인수인계 생성, 구성원 이름·활동 상태와 시즌·반복 업무 정의·회차·결정·인수인계 정정·보관·복원, 역할 인수인계 전달·수락·취소, 다음 시즌 역할·활성 반복 업무 복사, 활성 정의만 사용하는 수동·자동 회차와 실제 마감 스냅샷·독립 완료 상태, 활성 정의가 없는 자동 발생의 커서 전진과 빈 회차 미생성, 접근 키 회전·운영자 복구, 저장·재조회와 동시 충돌 규칙을 검증한다. 실제 행 잠금이 설정한 제한을 넘으면 애그리거트별 충돌로 실패하고 트랜잭션이 롤백되어 나중에 변경이 반영되지 않는지도 확인한다.
+`useCaseTest`는 MySQL 8 Testcontainers에서 워크스페이스 생성, 콘텐츠 변경·보관·복원, 역할 인수인계, 다음 시즌 전환, 수동·자동 회차, 접근 키 변경·복구와 동시 수정 충돌을 검증한다. 행 잠금 시간 초과가 대상별 충돌로 처리되고 트랜잭션 전체가 롤백되는지도 확인한다.
 
 Flyway 변경은 대상 이전 버전의 대표 데이터를 최신 스키마로 올린 뒤 기존 데이터·참조 보존과 새 제약·인덱스 같은 실제 사후조건을 전용 마이그레이션 테스트가 검증한다. 개별 버전별 기대값은 [제품 명세](docs/PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](docs/PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](docs/PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에서 관리하며 이 명령 색인에는 반복해 열거하지 않는다.
 
@@ -615,7 +632,7 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 - `e2e:focus`: Chromium·워커 2개로 실행하고 첫 실패에서 중단한다. 확인할 파일이나 `--grep`을 함께 지정한다.
 - `e2e:failed`: 직전 Playwright 실행에서 실패한 테스트만 다시 실행한다. 중간에 다른 실행을 하면 실패 목록이 바뀌므로 그때는 파일·제목을 직접 지정한다.
 - `e2e`: 독립 API 픽스처를 사용하는 전체 Playwright 회귀 테스트. 전체 흐름은 Chromium, 모바일 흐름은 390px Chromium, 핵심 스모크·반응형 흐름과 `@webkit`으로 고른 브라우저 API 대표 사례는 Safari 호환 WebKit에서도 실행한다.
-- `e2e:fullstack`: 임시 MySQL에서 실제 Spring Boot와 Vite를 띄우고 빈 DB 온보딩, 기존 팀 구성원 추가, 역할 자료, 반복 업무·회차, 두 브라우저 동기화와 새로고침 후 영속성을 확인한다. 테스트 전용 로컬 계정과 폐기 가능한 RSA 키로 실제 로그인 세션, AccountMembership 연결, 서버에서 관리하는 방 매핑, 참여권 쿠키의 속성·RS256 서명·클레임·300초 수명과 공개 JWK를 함께 검증한다. 세션 ID 회전은 실제 Spring Security 필터 체인을 사용하는 `AuthSecurityTest`가 검증한다.
+- `e2e:fullstack`: 임시 MySQL과 실제 Spring Boot·Vite를 실행해 온보딩, 핵심 콘텐츠, 두 브라우저 동기화와 새로고침 뒤 저장 상태를 확인한다. 테스트 계정과 임시 RSA 키로 로그인 세션, 구성원 연결, 방 매핑, 참여권 쿠키와 공개 JWK도 검증한다. 세션 ID 회전은 `AuthSecurityTest`가 담당한다.
 - `e2e:round-edge`: 명시한 ROUND 저장소의 기존 `baton-web-runtime`·`signaling-runtime` 이미지를 테스트 전용 Caddy, 로컬 사설 CA와 임시 MySQL에 연결한다. 실제 HTTPS 브라우저 세션에서 구성원 연결·방 매핑·참여권 재발급을 거쳐 공개 TURN 자격 증명 엔드포인트와 WSS 방 입장, 내부 TURN 경로 비노출을 확인한다. 프록시는 ROUND 업스트림에 참여 쿠키만 전달하고 BATON 세션·`Authorization`·워크스페이스 자격 증명은 제거하도록 구성한다.
 
 Chromium과 WebKit이 설치되어 있지 않으면 먼저 `npm run e2e:install`을 실행한다. `@webkit`은 `Headers`, 요청 취소, Web Storage와 네이티브 dialog처럼 엔진 차이를 직접 확인할 대표 사례에만 사용한다. WebKit 검증은 최신 Safari 엔진과의 핵심 호환성을 확인하지만 실제 macOS·iOS 기기, Safari 확장 기능과 운영 네트워크를 대신하지 않는다. `e2e:fullstack`은 Docker, Java 21과 OpenSSL도 필요하며, 고유 Compose 프로젝트와 임시 MySQL 볼륨·RSA 키를 만들었다가 종료 시 함께 제거한다. 합성 로컬 자격 증명은 실행기가 추가한 테스트 전용 Flyway 위치에만 있고 운영 마이그레이션과 기존 로컬·프로덕션 DB에는 들어가지 않는다. 이 명령은 실제 브라우저와 Vite 개발 프록시까지 검증하지만 Caddy, TLS, 프로덕션 이미지와 ROUND TURN·WebSocket 런타임을 대신하지 않는다. 프런트엔드 단위 테스트와 린트 명령은 아직 구성하지 않았다.
@@ -644,6 +661,7 @@ bash ops/check-shell-scripts.sh
 bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/integration-delivery-check-test.sh
+bash ops/tests/integration-alerts-test.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer ops/systemd/baton-integration-delivery.service ops/systemd/baton-integration-delivery.timer
 ./ops/production-compose.sh config --quiet
@@ -680,6 +698,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 백업 생성·검증·암호화 원격 실패·보존 수명주기, 배포 사전점검·상태 감지, systemd 유닛, 프로덕션 Compose 조립과 `app`·`web` 이미지 빌드·런타임 스모크
 
 네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 규칙 집합 또는 분기 보호에서 이 검사를 필수로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. 프로덕션 이미지의 DB 설정 누락 시 폐쇄형 실패, 로컬 CA TLS 종단, 빈 DB 마이그레이션과 현재 스키마의 복원 키 무효화 SQL은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 전체 복원과 팀별 새 링크 배포는 배포 후 별도로 확인한다.
+
+[Dependabot](.github/dependabot.yml)은 Java·npm·GitHub Actions·Dockerfile과 Compose의 MySQL·Caddy 업데이트를 주 1회 점검한다. Compose 제안은 PR 하나로 묶어 기존 품질 게이트에서 검증한다. 대상·버전 범위·무료 사용 조건은 [운영 이미지 업데이트](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)를 따른다.
 
 ## 로컬 설정
 
@@ -718,12 +738,12 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   기본 연결 시간 제한은 `PT2S`, 읽기 시간 제한은 `PT5S`, 전달 간격은 `PT10S`이며 두 시간 제한의
   합은 45초를 넘을 수 없다. `401`·`403`은 아웃박스를 실패로 확정하지 않고 자격 증명 교체 뒤 같은
   행을 재시도한다. 로컬 교차 서비스 검증은 `./ops/tests/calendar-consumer-contract.sh`로
-  CAL 불변 사전 릴리스 `1.1.0-rc.2` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
+  CAL 고정 사전 릴리스 `1.1.0-rc.2` 컨테이너와 실제 BATON 클라이언트를 연결한다. Actuator Prometheus의
   `baton_integration_delivery_items{integration="calendar",status="..."}`는 `pending`,
   `processing`, `failed` 상태별 현재 행 수를 MySQL에서 읽고,
   `baton_integration_delivery_actionable_failed_items{integration="calendar"}`는 조치 대상 영구
   실패 수를 나타낸다. 보정 뒤에는 조치 대상 실패가 `0`인지 확인하고 전달을 켠 뒤에는
-  `pending=0`, `processing=0`, `failed=0`으로 수렴했는지 확인한다.
+  `pending=0`, `processing=0`, `failed=0`인지 확인한다.
 - 개인 캘린더 구독: 오늘 화면의 **내 캘린더에 추가**에서 활성 구성원이 자기 시즌의 구독 주소를
   발급·복사·재발급·해제한다. 주소는 열린 화면에서만 보이며 서버와 브라우저 저장소에는 보관하지 않는다.
   Google·Apple·Outlook 중 사용할 앱을 선택하면 URL 구독 등록 절차를 안내한다. 갱신 주기는 앱마다 다르다.
@@ -747,8 +767,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   사전점검은 이 두 단계의 필수 설정 조합과 복구 ID의 표준 UUID 형식을 확인한다.
 - WATCH 모니터 동기화: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, 경로가 없는 HTTPS 출처인 `BATON_WATCH_BASE_URL`, 32~200자의 URL 안전 ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP 기본 URL은 Bearer 토큰 보호를 위해 기동 단계에서 거부한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 디스패처는 전용 스케줄러에서 한 번에 한 건을 1분 임대로 처리하며 10초 간격, 최초 상태 동기화는 10초 뒤, 이후에는 6시간 간격이다. 소스 이름공간은 기존 아웃박스와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - WATCH 상태 이벤트 수신: 기본 비활성화. 활성화하려면 `BATON_WATCH_EVENT_RECEIVER_ENABLED=true`, 위와 같은 환경의 `BATON_WATCH_SOURCE_NAMESPACE`와 32~200자의 URL 안전 ASCII `BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN`을 설정한다. 수신 토큰은 외부 전송 WATCH 토큰과 그 밖의 운영 비밀값과 달라야 한다. 저장소 구현과 로컬 런타임 스모크는 실제 공개 HTTPS 콜백, 응답 유실 뒤 동일 재전송과 운영 활성화를 대신하지 않는다.
-- BRIEF 이벤트 전달: 기본 비활성화. 로컬 BRIEF로 전달할 때는 `BATON_BRIEF_DELIVERY_ENABLED=true`와 경로가 없는 loopback HTTP origin인 `BATON_BRIEF_BASE_URL`을 설정한다. loopback 밖에서는 경로가 없는 HTTPS origin만 허용한다. 직접 실행에서는 32~200자의 URL-safe ASCII `BATON_BRIEF_BEARER_TOKEN`을 사용한다. 프로덕션에서는 `.env.production`에 원문 대신 `BATON_BRIEF_BEARER_TOKEN_FILE`의 소유자 전용 절대 경로를 두며 배포 래퍼가 Spring config tree의 `baton.brief.bearer-token`으로 마운트한다. 시간 경계 재조정은 양의 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 명시한 경우에만 켜진다. token을 바꿀 때는 BRIEF가 새 값과 직전 값을 먼저 함께 허용하게 한 뒤 BATON 비밀 파일을 새 값으로 교체하고, 전달 성공 확인 뒤 BRIEF에서 직전 값을 제거한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 전용 스케줄러가 기본 10초 간격으로 한 번에 한 건을 1분 lease로 처리하며, 같은 신호의 후속 리비전은 앞선 리비전이 완료되거나 영구 실패로 종료된 뒤에만 claim한다. `200`·`202`는 완료, `429`·`5xx`·네트워크 실패는 재시도, `401`을 포함한 그 밖의 HTTP 상태는 영구 실패로 기록한다. 별도 최대 시도 횟수와 backoff는 아직 채택하지 않았다. 기존 프로덕션 Compose는 이 설정 주입 경계만 제공하며 BRIEF 서비스 자체를 같은 토폴로지에 배포하지 않는다. 실제 공개 HTTPS 스테이징 전달은 아직 검증하지 않았다.
-- BRIEF 에디션 조회·생성: 기본 비활성화. BATON 사용자 API는 계정 세션·활동 중인 팀 멤버십·워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계하고, 시즌 시간대의 현재 월요일과 완료된 이벤트 전달 watermark를 V27 실행 기록에 고정해 생성한다. 프로덕션에서는 `BATON_BRIEF_SERVICE_API_ENABLED=true`, 단일 DNS label인 `BATON_BRIEF_SERVICE_HOST`, `Internal=true`인 `BATON_BRIEF_PRIVATE_NETWORK`, 별도 Bearer 파일과 BRIEF 서비스 인증서를 담은 PKCS12 truststore 파일을 설정한다. `compose.brief-service.production.yml`은 활성화할 때만 프로덕션 래퍼가 합성하며 서비스 Bearer를 config tree, truststore를 고정 키 경로로 마운트한다. 이벤트 token을 재사용하거나 인증서 검증을 끄지 않는다. 로컬 선택 실행 테스트에서 실제 두 JAR과 서비스 Caddy의 HTTPS 조회·생성·token 교체를 확인했으며, 공인 DNS·ACME와 서로 다른 스테이징 호스트 검증은 남아 있다.
+- BRIEF 이벤트 전달은 기본으로 꺼져 있다. 로컬은 `BATON_BRIEF_DELIVERY_ENABLED=true`와 경로 없는 루프백 HTTP 주소를, 그 밖의 환경은 경로 없는 HTTPS 주소를 `BATON_BRIEF_BASE_URL`에 설정한다. 직접 실행은 `BATON_BRIEF_BEARER_TOKEN`, 프로덕션은 소유자 전용 `BATON_BRIEF_BEARER_TOKEN_FILE`을 사용한다. 토큰은 BRIEF가 새 값과 직전 값을 함께 허용한 뒤 BATON을 새 값으로 전환하고, 전달 성공을 확인한 다음 직전 값을 제거한다. 작업자는 기본 10초 간격으로 한 건씩 처리한다. `200`·`202`는 완료, `429`·`5xx`·네트워크 오류는 재시도, 그 밖의 상태는 영구 실패로 기록한다. 시간 경계 재계산은 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 설정할 때만 실행한다. 공개 HTTPS 스테이징 전달은 아직 검증하지 않았다.
+- BRIEF 주간 요약 조회·생성은 기본으로 꺼져 있다. BATON은 계정 세션, 활동 중인 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF에 저장된 최신 요약을 전달한다. 프로덕션에서는 `BATON_BRIEF_SERVICE_API_ENABLED=true`, `BATON_BRIEF_SERVICE_HOST`, `BATON_BRIEF_PRIVATE_NETWORK`, 전용 Bearer 토큰 파일과 PKCS12 truststore 파일을 설정한다. 이벤트 전송 토큰을 재사용하거나 인증서 검증을 끄지 않는다. 로컬에서는 실제 두 JAR과 Caddy로 HTTPS 조회·생성·토큰 교체를 확인했다. 공인 DNS·ACME와 분리된 스테이징 호스트 검증은 남아 있다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다. 외부 호스트나 관리형 DB로 옮기기 전에는 CA 배포·회전과 인증서 SAN 검증을 준비하고 JDBC·상태 검사를 `VERIFY_IDENTITY`로 전환해야 한다.
 
@@ -762,8 +782,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - BATON–WATCH 역할 자료 감시 계약: [PRD-0004](docs/PRD/0004_watch-integration-contract/spec.md)
 - 계정 인증과 ROUND 참여권 계약: [PRD-0005](docs/PRD/0005_account-and-round-authentication/spec.md)
 - BATON–CAL 일정 스냅샷 생산 계약: [PRD-0006](docs/PRD/0006_calendar-integration-contract/spec.md)
-- BATON–BRIEF 연속성 신호 생산 계약: [PRD-0007](docs/PRD/0007_brief-continuity-signal-producer/spec.md)
-- BATON 경유 BRIEF 에디션 조회·생성 계약: [PRD-0008](docs/PRD/0008_brief-edition-query-and-generation/spec.md)
+- BATON–BRIEF 업무 점검 이벤트 발행 계약: [PRD-0007](docs/PRD/0007_brief-continuity-signal-producer/spec.md)
+- BATON 경유 BRIEF 주간 요약 조회·생성 계약: [PRD-0008](docs/PRD/0008_brief-edition-query-and-generation/spec.md)
 - BRIEF 주간 업무 점검 조회: [PRD-0009](docs/PRD/0009_brief-current-attention/spec.md)
 - BRIEF 이벤트 v2 고정 계약 팩: [contracts/brief](contracts/brief/README.md)
 - 백엔드 구조: [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md)
@@ -800,12 +820,12 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 
 구성원 관리의 `팀 초대·권한 관리`에서 운영자 복구 키로 첫 관리자를 지정하면 해당 팀을 계정 권한으로
 전환한다. 기존 공유 링크와 직접 구성원 연결은 종료하며 다른 기존 연결은 자동 승인하지 않는다.
-관리자는 7일짜리 초대 링크를 만들거나 취소하고 관리자·구성원·열람자 권한을 부여·회수할 수 있다.
+관리자는 7일짜리 초대 링크를 만들거나 유효한 초대를 취소하고 관리자·구성원·열람자 권한을 부여·회수할 수 있다. 초대 목록은 유효·수락·취소·만료 상태를 구분한다.
 열람자는 읽기, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리까지 할 수 있다.
 마지막 활성 관리자는 제거할 수 없으며 최근 50건의 권한 변경 이력을 남긴다.
 
 초대받은 사용자는 `/join`에서 로그인한 뒤 팀·구성원·권한을 확인하고 수락한다. 이후에는 공유 키 없이
-팀 주소로 들어간다. 기존 팀은 자동 전환하지 않는다. 상세 계약은 [PRD-0009](docs/PRD/0009_team-account-access/spec.md),
+팀 주소로 들어간다. 같은 탭에서 수락하지 않은 초대는 `/my-teams`에서 다시 확인하거나 저장 정보만 지울 수 있다. 기존 팀은 자동 전환하지 않는다. 상세 계약은 [PRD-0009](docs/PRD/0009_team-account-access/spec.md),
 구조 결정은 [ADR-0021](docs/ADR/0021_team-account-access/adr.md)을 따른다.
 
 계정 권한 팀이 들어 있는 백업은 `restore.sh`가 DB를 불러온 뒤 완료 처리를 중단한다. 계정 권한과 초대를

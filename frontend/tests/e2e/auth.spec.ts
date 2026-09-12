@@ -37,6 +37,7 @@ type AuthApiOptions = {
   authenticated?: boolean
   csrfHeaderName?: string
   localRegistrationEnabled?: boolean
+  passwordResetEnabled?: boolean
   providerFailuresBeforeSuccess?: number
   providersDeferred?: boolean
   providers?: AuthProvider[]
@@ -52,6 +53,7 @@ type AuthApiOptions = {
   mutationAuthenticationRequired?: 'password-change' | 'session-revocation'
   passwordChangeFailure?: boolean
   sessionFailuresBeforeSuccess?: number
+  turnstileSiteKey?: string
 }
 
 async function installAuthApi(target: Page | BrowserContext, options: AuthApiOptions = {}) {
@@ -108,7 +110,8 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
       return json(200, {
         providers,
         localRegistrationEnabled: options.localRegistrationEnabled ?? true,
-        passwordResetEnabled: false,
+        passwordResetEnabled: options.passwordResetEnabled ?? false,
+        turnstileSiteKey: options.turnstileSiteKey ?? null,
         ...responseExtension,
       })
     }
@@ -166,6 +169,9 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
           verificationRequired: options.registrationVerificationRequired ?? true,
           ...responseExtension,
         })
+      }
+      if (path === '/api/v1/auth/local/password-reset-requests') {
+        return json(202, { accepted: true })
       }
       if (path === '/api/v1/auth/local/email-verifications') {
         verificationAttempts += 1
@@ -253,6 +259,40 @@ function requiredCall(calls: AuthCall[], method: string, path: string) {
 
 async function waitForCall(calls: AuthCall[], method: string, path: string) {
   await expect.poll(() => callsFor(calls, method, path).length).toBeGreaterThan(0)
+}
+
+async function installTurnstileStub(page: Page, automatic = true) {
+  await page.addInitScript((automatic) => {
+    type WidgetOptions = {
+      callback: (token: string) => void
+      'expired-callback': () => void
+      'error-callback': () => void
+      action: string
+    }
+    let sequence = 0
+    const widgets = new Map<string, () => void>()
+    const stub = {
+      remove: (id: string) => { widgets.get(id)?.(); widgets.delete(id) },
+      render: (container: HTMLElement, options: WidgetOptions) => {
+        const id = String(++sequence)
+        const host = container.parentElement!
+        host.dataset.action = options.action
+        container.style.cssText = 'width:100%;min-width:300px;height:65px;border:1px solid #ddd'
+        container.textContent = '자동 요청 방지 확인 (테스트 위젯)'
+        const receive = (event: Event) => {
+          const detail = (event as CustomEvent<string>).detail
+          if (detail === 'expire') options['expired-callback']()
+          else if (detail === 'error') options['error-callback']()
+          else options.callback(detail)
+        }
+        host.addEventListener('test-challenge', receive)
+        widgets.set(id, () => host.removeEventListener('test-challenge', receive))
+        if (automatic) queueMicrotask(() => options.callback('verified-turnstile-token'))
+        return id
+      },
+    }
+    Object.defineProperty(window, 'turnstile', { configurable: true, value: stub })
+  }, automatic)
 }
 
 async function fillVerificationPassword(page: Page, password = PASSWORD) {
@@ -467,7 +507,7 @@ test('설정된 로그인 공급자만 노출하고 local 로그인을 항상 �
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
 })
 
-test('인증 응답의 additive field를 무시한다', async ({ page }) => {
+test('인증 응답의 추가 필드를 무시한다', async ({ page }) => {
   const api = await installAuthApi(page, {
     additiveResponseFields: true,
     providers: ['google', 'google'],
@@ -652,7 +692,118 @@ test('이메일 가입은 비밀번호 없이 JSON 등록 요청을 보낸다', 
   expect(body).not.toHaveProperty('password')
 })
 
-test('이메일 fragment를 먼저 제거하고 token과 새 비밀번호를 한 번만 검증한다', async ({ page }) => {
+test('자동 요청 방지가 활성화되면 위젯 token을 가입 요청에 포함한다', async ({ page }) => {
+  await installTurnstileStub(page)
+  const api = await installAuthApi(page, { turnstileSiteKey: 'turnstile-site-key' })
+  await page.goto('/register')
+
+  await page.getByRole('textbox', { name: /^이름/ }).fill('박민서')
+  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
+  await expect(page.getByRole('button', { name: '인증 메일 받기' })).toBeEnabled()
+  await page.getByRole('button', { name: '인증 메일 받기' }).click()
+
+  await waitForCall(api.calls, 'POST', '/api/v1/auth/local/registrations')
+  const registration = requiredCall(
+    api.calls,
+    'POST',
+    '/api/v1/auth/local/registrations',
+  )
+  expect(JSON.parse(registration.body ?? '{}')).toEqual({
+    displayName: '박민서',
+    email: EMAIL,
+    turnstileToken: 'verified-turnstile-token',
+  })
+})
+
+test('비밀번호 재설정도 별도 동작의 위젯 token을 전송한다', async ({ page }) => {
+  await installTurnstileStub(page)
+  const api = await installAuthApi(page, {
+    passwordResetEnabled: true,
+    turnstileSiteKey: 'turnstile-site-key',
+  })
+  await page.goto('/forgot-password')
+
+  await page.getByRole('textbox', { name: '가입한 이메일' }).fill(EMAIL)
+  await expect(page.getByRole('button', { name: '재설정 메일 받기' })).toBeEnabled()
+  await page.getByRole('button', { name: '재설정 메일 받기' }).click()
+
+  await expect(page.getByRole('heading', { name: '재설정 요청을 접수했습니다.' }))
+    .toBeVisible()
+  const request = requiredCall(
+    api.calls,
+    'POST',
+    '/api/v1/auth/local/password-reset-requests',
+  )
+  expect(JSON.parse(request.body ?? '{}')).toEqual({
+    email: EMAIL,
+    turnstileToken: 'verified-turnstile-token',
+  })
+})
+
+for (const flow of [
+  { path: '/register', endpoint: '/api/v1/auth/local/registrations', submit: '인증 메일 받기', action: 'local_registration' },
+  { path: '/forgot-password', endpoint: '/api/v1/auth/local/password-reset-requests', submit: '재설정 메일 받기', action: 'password_reset_request' },
+]) {
+  test(`Turnstile 만료·요청 실패 뒤 새 토큰으로 재시도한다 ${flow.path} @responsive`, async ({ page }, testInfo) => {
+    await installTurnstileStub(page, false)
+    const api = await installAuthApi(page, { passwordResetEnabled: true, turnstileSiteKey: 'site-key' })
+    let attempts = 0
+    await page.route(`**${flow.endpoint}`, async (route) => {
+      if (++attempts === 1) return route.fulfill({ status: 503, json: {
+        code: 'HUMAN_VERIFICATION_UNAVAILABLE', message: '잠시 후 다시 시도해 주세요',
+      } })
+      return route.fallback()
+    })
+    await page.goto(flow.path)
+    if (flow.path === '/register') await page.getByRole('textbox', { name: /^이름/ }).fill('박민서')
+    await page.locator('input[name="email"]').fill(EMAIL)
+    const widget = page.locator('.auth-turnstile')
+    const challenge = (detail: string) => widget.evaluate((element, value) => {
+      element.dispatchEvent(new CustomEvent('test-challenge', { detail: value }))
+    }, detail)
+    const submit = page.getByRole('button', { name: flow.submit })
+    await expect(widget).toHaveAttribute('data-action', flow.action)
+    await expect(submit).toBeDisabled()
+    await challenge('first-token')
+    await expect(submit).toBeEnabled()
+    await challenge('expire')
+    await expect(submit).toBeDisabled()
+    await challenge('second-token')
+    await submit.click()
+    await expect(page.getByRole('alert')).toContainText('잠시 후')
+    await expect(submit).toBeDisabled()
+    await challenge('error')
+    await page.getByRole('button', { name: '다시 확인', exact: true }).click()
+    await expect(submit).toBeDisabled()
+    await challenge('fresh-token')
+    await expect(submit).toBeEnabled()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath(`turnstile-${flow.action}.png`), fullPage: true })
+    await submit.click()
+    await waitForCall(api.calls, 'POST', flow.endpoint)
+    expect(JSON.parse(requiredCall(api.calls, 'POST', flow.endpoint).body ?? '{}').turnstileToken).toBe('fresh-token')
+    expect(attempts).toBe(2)
+  })
+}
+
+test('Turnstile 스크립트 로딩 실패를 안내하고 다시 불러온다', async ({ page }) => {
+  await installAuthApi(page, { turnstileSiteKey: 'site-key' })
+  let loads = 0
+  await page.route('https://challenges.cloudflare.com/turnstile/v0/api.js?*', route => {
+    if (++loads === 1) return route.abort()
+    return route.fulfill({ contentType: 'application/javascript', body:
+      "window.turnstile={render:(el,o)=>{queueMicrotask(()=>o.callback('fresh-token'));return 'widget'},remove:()=>{}}" })
+  })
+  await page.goto('/register')
+  const submit = page.getByRole('button', { name: '인증 메일 받기' })
+  await expect(page.getByRole('alert')).toContainText('자동 요청 방지 확인을 완료하지 못했습니다.')
+  await expect(submit).toBeDisabled()
+  await page.getByRole('button', { name: '다시 확인', exact: true }).click()
+  await expect(submit).toBeEnabled()
+  expect(loads).toBe(2)
+})
+
+test('이메일 주소 조각을 먼저 제거하고 토큰과 새 비밀번호를 한 번만 검증한다', async ({ page }) => {
   const api = await installAuthApi(page)
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
 
@@ -676,7 +827,7 @@ test('이메일 fragment를 먼저 제거하고 token과 새 비밀번호를 한
   })
 })
 
-test('일시적 이메일 검증 실패는 제거한 token과 비밀번호로 재시도한다', async ({ page }) => {
+test('일시적인 이메일 검증 실패는 제거한 토큰과 비밀번호로 재시도한다', async ({ page }) => {
   const api = await installAuthApi(page, { verificationFailure: 'transientOnce' })
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
   await fillVerificationPassword(page)
@@ -702,7 +853,7 @@ test('일시적 이메일 검증 실패는 제거한 token과 비밀번호로 �
   ])
 })
 
-test('유효하지 않은 이메일 token은 비밀번호 form을 닫고 새 메일을 안내한다', async ({ page }) => {
+test('유효하지 않은 이메일 토큰은 비밀번호 입력 화면을 닫고 새 메일을 안내한다', async ({ page }) => {
   const api = await installAuthApi(page, { verificationFailure: 'invalid' })
   await page.goto(`/verify-email#token=${encodeURIComponent(VERIFICATION_TOKEN)}`)
   await fillVerificationPassword(page)
@@ -995,7 +1146,7 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   await page.getByRole('button', { name: '로그아웃' }).click()
 
   await expect(page.getByRole('alert')).toContainText(
-    '이 기기의 작업 공간 접근 정보를 모두 지우지 못했습니다.',
+    '팀 접속 정보를 모두 삭제하지 못했습니다.',
   )
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
     .toBe('device-cleanup-capability')
@@ -1065,7 +1216,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
 })
 
-test('로그인은 검증된 내부 workspace 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
+test('로그인은 검증된 내부 작업 공간 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
@@ -1138,7 +1289,7 @@ test('외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로를 이어 간다', async ({ page }) => {
+test('소셜 로그인 콜백 세션은 같은 탭의 검증된 작업 공간 복귀 경로를 이어 간다', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
   await page.addInitScript(({ key, returnTo }) => {
     window.sessionStorage.setItem(key, returnTo)
@@ -1154,7 +1305,7 @@ test('소셜 callback session은 같은 탭의 검증된 workspace 복귀 경로
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
+test('소셜 로그인 콜백 세션도 기억한 ROUND 경로를 새 문서로 연다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await page.addInitScript(({ key, returnTo }) => {
     if (window.name === 'baton-round-return-seeded') return
@@ -1173,7 +1324,7 @@ test('소셜 callback session도 기억한 ROUND 경로를 새 문서로 연다'
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('@responsive 모바일 로그인은 가로 넘침 없이 키보드 focus와 터치 크기를 유지한다', async ({ page }, testInfo) => {
+test('@responsive 모바일 로그인은 가로 넘침 없이 키보드 초점과 터치 영역 크기를 유지한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 viewport 전용 접근성 경계입니다.')
   await installAuthApi(page, { providers: ['google', 'naver'] })
   await page.goto('/login')
@@ -1231,7 +1382,7 @@ test('@smoke @responsive 계정 비활성화는 기록 보존을 확인하고 �
   })
   await page.goto('/account')
   const section = page.getByRole('region', { name: '계정 비활성화', exact: true })
-  await expect(section).toContainText('팀의 결정·자료·작성자 기록과 로그인 정보는 보존합니다.')
+  await expect(section).toContainText('팀의 결정·자료·작성자 기록과 로그인 정보는 보존됩니다.')
   await expect(section.getByRole('button', { name: '이 계정 비활성화' })).toBeDisabled()
   expect(submitted).toBe(0)
   await section.getByRole('checkbox', { name: '기록 보존과 로그인 중지를 확인했습니다.' }).check()

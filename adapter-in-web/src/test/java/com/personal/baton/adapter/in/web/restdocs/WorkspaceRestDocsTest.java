@@ -194,7 +194,7 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation CREATE_NEXT_SEASON = new OperationDocumentation(
             "다음 시즌 시작",
-            "현재 시즌을 종료하고 선택한 역할과 반복 업무 정의만 새 시즌 snapshot으로 이어 간다."
+            "현재 시즌을 종료하고 선택한 역할과 반복 업무 정의만 새 시즌으로 이어 간다."
     );
     private static final OperationDocumentation CREATE_MEMBER = new OperationDocumentation(
             "구성원 추가",
@@ -219,11 +219,11 @@ class WorkspaceRestDocsTest {
     );
     private static final OperationDocumentation CREATE_ROLE = new OperationDocumentation(
             "역할 생성",
-            "현재 시즌에 역할, 담당자, 책임과 위험 신호를 등록한다."
+            "현재 시즌에 역할, 담당자, 담당 업무와 주의사항을 등록한다."
     );
     private static final OperationDocumentation UPDATE_ROLE = new OperationDocumentation(
             "역할 수정",
-            "현재 시즌의 역할 이름, 담당자, 책임과 위험 신호를 수정한다."
+            "현재 시즌의 역할 이름, 담당자, 담당 업무와 주의사항을 수정한다."
     );
     private static final OperationDocumentation PREPARE_ROLE_HANDOFF = new OperationDocumentation(
             "역할 인수인계 준비",
@@ -407,7 +407,7 @@ class WorkspaceRestDocsTest {
                         )));
     }
 
-    @DisplayName("워크스페이스 조회 API는 Today 화면에 필요한 전체 projection을 반환한다")
+    @DisplayName("작업 공간 조회 API는 오늘 화면에 필요한 전체 데이터를 반환한다")
     @Test
     void documentsGetWorkspace() throws Exception {
         when(lifecycleUseCase.getWorkspace(TEAM_ID, SEASON_ID, ACCESS_KEY)).thenReturn(workspaceResult());
@@ -1475,7 +1475,7 @@ class WorkspaceRestDocsTest {
                                 .description("복구 시 한 번만 제공하는 새 워크스페이스 접근 키"))));
     }
 
-    @DisplayName("역할 생성 API는 팀 역할과 책임 목록을 저장해 반환한다")
+    @DisplayName("역할 생성 API는 팀 역할과 담당 업무 목록을 저장해 반환한다")
     @Test
     void documentsCreateRole() throws Exception {
         when(peopleUseCase.createRole(
@@ -1525,14 +1525,14 @@ class WorkspaceRestDocsTest {
                                 optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
                                         "assignmentEndDate", "배정 종료일"),
                                 requestStringArrayField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "responsibilities", "responsibilities[]", "역할 책임 목록"),
+                                        "responsibilities", "responsibilities[]", "담당 업무 목록"),
                                 optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "risk", "인수인계 위험 신호")
+                                        "risk", "역할 주의사항")
                         ),
                         responseFields(roleResponseFields())));
     }
 
-    @DisplayName("역할 수정 API는 역할의 담당자와 책임을 바꿔 반환한다")
+    @DisplayName("역할 수정 API는 역할의 담당자와 담당 업무를 바꿔 반환한다")
     @Test
     void documentsUpdateRole() throws Exception {
         when(peopleUseCase.updateRole(
@@ -1577,9 +1577,9 @@ class WorkspaceRestDocsTest {
                                 optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
                                         "assignmentEndDate", "배정 종료일"),
                                 requestStringArrayField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "responsibilities", "responsibilities[]", "역할 책임 목록"),
+                                        "responsibilities", "responsibilities[]", "담당 업무 목록"),
                                 optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "risk", "인수인계 위험 신호")
+                                        "risk", "역할 주의사항")
                         ),
                         responseFields(roleResponseFields())));
     }
@@ -3290,7 +3290,7 @@ class WorkspaceRestDocsTest {
                         responseFields(roleResourceResponseFields())));
     }
 
-    @DisplayName("허용하지 않는 역할 자료 URL은 안정적인 400 오류 계약을 반환한다")
+    @DisplayName("허용하지 않는 역할 자료 URL은 일관된 400 오류 계약을 반환한다")
     @Test
     void documentsCreateRoleResourceInvalidInput() throws Exception {
         when(recordsUseCase.createRoleResource(
@@ -4073,7 +4073,7 @@ class WorkspaceRestDocsTest {
                         responseFields(errorResponseFields())));
     }
 
-    @DisplayName("UUID 경로 변수 형식이 잘못되면 안정적인 400 오류 계약을 반환한다")
+    @DisplayName("UUID 경로 변수 형식이 잘못되면 일관된 400 오류 계약을 반환한다")
     @Test
     void handlesInvalidPathVariableFormat() throws Exception {
         mockMvc.perform(get("/api/v1/teams/not-a-uuid/seasons/{seasonId}/workspace", SEASON_ID)
@@ -4748,7 +4748,7 @@ class WorkspaceRestDocsTest {
     private Snippet responseHeadersWithRequestId(HeaderDescriptor... descriptors) {
         List<HeaderDescriptor> completeDescriptors = new ArrayList<>();
         completeDescriptors.add(headerWithName(RequestIdFilter.HEADER_NAME)
-                .description("서버가 생성한 불투명 요청 진단 식별자"));
+                .description("서버가 생성한 요청 추적 ID"));
         completeDescriptors.addAll(Arrays.asList(descriptors));
         return responseHeaders(completeDescriptors.toArray(HeaderDescriptor[]::new));
     }
@@ -4849,10 +4849,10 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roles[].nextMemberId").optional().description("다음 담당자 UUID"),
                 fieldWithPath("roles[].assignmentStartDate").optional().description("배정 시작일"),
                 fieldWithPath("roles[].assignmentEndDate").optional().description("배정 종료일"),
-                stringArrayField("roles[].responsibilities[]", "역할 책임 목록"),
+                stringArrayField("roles[].responsibilities[]", "담당 업무 목록"),
                 fieldWithPath("roles[].previousRoleId").type(JsonFieldType.STRING).optional()
                         .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
-                fieldWithPath("roles[].risk").optional().description("위험 신호"),
+                fieldWithPath("roles[].risk").optional().description("주의사항"),
                 fieldWithPath("routines").type(JsonFieldType.ARRAY).description("반복 업무 목록"),
                 fieldWithPath("routines[].id").description("반복 업무 UUID"),
                 fieldWithPath("routines[].title").description("반복 업무 제목"),
@@ -5014,7 +5014,7 @@ class WorkspaceRestDocsTest {
                         .description("준비도 경고를 명시적으로 확인했는지 여부"),
                 fieldWithPath("continuitySignals")
                         .type(JsonFieldType.ARRAY)
-                        .description("설명 가능한 규칙으로 계산한 조직 연속성 위험 신호"),
+                        .description("담당자 공백과 업무 지연 등 조치가 필요한 항목"),
                 enumField(
                         ContinuitySignalType.class,
                         "continuitySignals[].type",
@@ -5026,15 +5026,15 @@ class WorkspaceRestDocsTest {
                         "CRITICAL 또는 WARNING 우선순위"
                 ),
                 fieldWithPath("continuitySignals[].roleId")
-                        .description("신호가 가리키는 역할 UUID"),
+                        .description("항목이 가리키는 역할 UUID"),
                 fieldWithPath("continuitySignals[].routineId")
                         .type(JsonFieldType.STRING)
                         .optional()
-                        .description("반복 지연 신호가 가리키는 반복 업무 UUID"),
+                        .description("반복 업무 지연 항목이 가리키는 반복 업무 UUID"),
                 fieldWithPath("continuitySignals[].title")
-                        .description("신호의 짧은 제목"),
+                        .description("항목 제목"),
                 fieldWithPath("continuitySignals[].reason")
-                        .description("현재 기록에서 이 신호가 발생한 이유"),
+                        .description("현재 기록을 기준으로 항목을 표시한 이유"),
                 fieldWithPath("continuitySignals[].recommendedAction")
                         .description("사용자가 바로 취할 수 있는 다음 행동"),
                 fieldWithPath("continuitySignals[].relevantDate")
@@ -5176,10 +5176,10 @@ class WorkspaceRestDocsTest {
                         .description("배정 시작일"),
                 fieldWithPath("assignmentEndDate").type(JsonFieldType.STRING).optional()
                         .description("배정 종료일"),
-                stringArrayField("responsibilities[]", "역할 책임 목록"),
+                stringArrayField("responsibilities[]", "담당 업무 목록"),
                 fieldWithPath("previousRoleId").type(JsonFieldType.STRING).optional()
                         .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
-                fieldWithPath("risk").type(JsonFieldType.STRING).optional().description("위험 신호")
+                fieldWithPath("risk").type(JsonFieldType.STRING).optional().description("주의사항")
         };
     }
 
@@ -5197,10 +5197,10 @@ class WorkspaceRestDocsTest {
                         .description("배정 시작일"),
                 fieldWithPath("role.assignmentEndDate").type(JsonFieldType.STRING).optional()
                         .description("배정 종료일"),
-                stringArrayField("role.responsibilities[]", "역할 책임 목록"),
+                stringArrayField("role.responsibilities[]", "담당 업무 목록"),
                 fieldWithPath("role.previousRoleId").type(JsonFieldType.STRING).optional()
                         .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
-                fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("위험 신호"),
+                fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("주의사항"),
                 fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 인수인계"),
                 fieldWithPath("handoff.id").description("역할 인수인계 UUID"),
                 fieldWithPath("handoff.roleId").description("대상 역할 UUID"),

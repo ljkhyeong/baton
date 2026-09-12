@@ -254,7 +254,7 @@ class BriefApplicationServiceTest {
         verifyNoInteractions(client, signalStore, executionPort);
     }
 
-    @DisplayName("시즌 시간대의 이번 주 월요일과 완료된 전달 watermark로 에디션을 생성한다")
+    @DisplayName("시즌 시간대의 이번 주 월요일과 전달 완료 기준으로 주간 요약을 생성한다")
     @Test
     void generatesEditionForAuthoritativeWeekAndZone() {
         Season season = mock(Season.class);
@@ -392,7 +392,7 @@ class BriefApplicationServiceTest {
         );
     }
 
-    @DisplayName("BRIEF 최신 응답의 작업공간과 시즌이 권한 범위와 다르면 노출하지 않는다")
+    @DisplayName("BRIEF 최신 응답의 작업 공간과 시즌이 권한 범위와 다르면 노출하지 않는다")
     @Test
     void rejectsLatestEditionOutsideAuthorizedScope() {
         when(client.findLatestEdition(TEAM_ID, SEASON_ID)).thenReturn(Result.completed(

@@ -16,7 +16,7 @@ public record BriefServiceApiProperties(
 ) {
 
     URI requiredBaseUri() {
-        return ExternalHttpOrigin.requireHttps("BRIEF service API base URL", baseUrl);
+        return ExternalHttpOrigin.requireHttps("BRIEF service API 기본 URL", baseUrl);
     }
 
     String requiredBearerToken() {
@@ -26,7 +26,7 @@ public record BriefServiceApiProperties(
     Duration requiredConnectTimeout() {
         return OutboundHttpSettings.requirePositiveTimeout(
                 "BRIEF service API",
-                "connect timeout",
+                "연결 시간 제한",
                 connectTimeout
         );
     }
@@ -34,7 +34,7 @@ public record BriefServiceApiProperties(
     Duration requiredReadTimeout() {
         return OutboundHttpSettings.requirePositiveTimeout(
                 "BRIEF service API",
-                "read timeout",
+                "읽기 시간 제한",
                 readTimeout
         );
     }

@@ -34,7 +34,7 @@ public class WatchEventReceiverConfig {
         requireDistinctToken(
                 receiverToken,
                 watchProperties.bearerToken(),
-                "WATCH 이벤트 수신 token과 outbound WATCH token은 달라야 합니다"
+                "WATCH 이벤트 수신 토큰과 발신 WATCH 토큰은 달라야 합니다"
         );
         requireDistinctWorkspaceTokens(receiverToken, workspaceProperties);
         return WatchEventReceiverAuthentication.enabled(receiverToken);
@@ -43,7 +43,7 @@ public class WatchEventReceiverConfig {
     static void requireSourceNamespace(String sourceNamespace) {
         if (sourceNamespace == null || sourceNamespace.isBlank()) {
             throw new IllegalStateException(
-                    "WATCH 이벤트 수신을 켤 때 source namespace는 필수입니다"
+                    "WATCH 이벤트 수신을 켤 때 원본 네임스페이스는 필수입니다"
             );
         }
         new WatchMonitorSource(sourceNamespace);
@@ -56,12 +56,12 @@ public class WatchEventReceiverConfig {
         requireDistinctToken(
                 receiverToken,
                 workspaceProperties.creationKey(),
-                "WATCH 이벤트 수신 token과 워크스페이스 운영 키는 달라야 합니다"
+                "WATCH 이벤트 수신 토큰과 워크스페이스 운영 키는 달라야 합니다"
         );
         requireDistinctToken(
                 receiverToken,
                 workspaceProperties.recoveryKey(),
-                "WATCH 이벤트 수신 token과 워크스페이스 운영 키는 달라야 합니다"
+                "WATCH 이벤트 수신 토큰과 워크스페이스 운영 키는 달라야 합니다"
         );
     }
 

@@ -73,6 +73,9 @@ services:
       BATON_AUTH_OAUTH2_NAVER_CLIENT_ID: ${BATON_AUTH_OAUTH2_NAVER_CLIENT_ID:-}
       BATON_AUTH_LOCAL_REGISTRATION_ENABLED: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:-false}
       BATON_AUTH_PASSWORD_RESET_ENABLED: ${BATON_AUTH_PASSWORD_RESET_ENABLED:-false}
+      BATON_TURNSTILE_ENABLED: ${BATON_TURNSTILE_ENABLED:-false}
+      BATON_TURNSTILE_SITE_KEY: ${BATON_TURNSTILE_SITE_KEY:-}
+      BATON_TURNSTILE_EXPECTED_HOSTNAME: ${BATON_TURNSTILE_EXPECTED_HOSTNAME:-}
       BATON_EMAIL_VERIFICATION_DELIVERY: ${BATON_EMAIL_VERIFICATION_DELIVERY:-disabled}
       BATON_PUBLIC_BASE_URL: https://${BATON_HOST:?BATON_HOST is required}
       BATON_EMAIL_FROM_ADDRESS: ${BATON_EMAIL_FROM_ADDRESS:-}
@@ -101,6 +104,11 @@ services:
       BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_PATH: ${BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH:-}
       TZ: UTC
     secrets:
+      - source: baton_turnstile_secret_key
+        target: /run/baton-config/baton.auth.turnstile.secret-key
+        uid: "10001"
+        gid: "10001"
+        mode: 0400
       - source: baton_holidays_service_key
         target: /run/baton-config/baton.holidays.service-key
         uid: "10001"
@@ -207,6 +215,8 @@ volumes:
   baton_caddy_config:
 
 secrets:
+  baton_turnstile_secret_key:
+    environment: BATON_SECRET_TURNSTILE_SECRET_KEY
   baton_holidays_service_key:
     environment: BATON_SECRET_HOLIDAYS_SERVICE_KEY
   baton_google_oauth_client_secret:

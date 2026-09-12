@@ -84,7 +84,7 @@ class BriefEditionHttpsEndToEndTest {
     @TempDir
     private Path tempDirectory;
 
-    @DisplayName("실제 비공개 HTTPS 경계에서 생성 재시도와 서비스 token 교체가 수렴한다")
+    @DisplayName("비공개 HTTPS 환경에서 생성 재시도와 서비스 토큰 교체가 완료된다")
     @Test
     void connectsActualEditionFlowThroughPrivateHttpsBoundary() throws Exception {
         Path batonJar = requiredJar("baton.boot.jar");

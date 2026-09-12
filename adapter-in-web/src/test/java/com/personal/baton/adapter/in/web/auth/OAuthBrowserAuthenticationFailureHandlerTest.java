@@ -15,7 +15,7 @@ class OAuthBrowserAuthenticationFailureHandlerTest {
     private final OAuthBrowserAuthenticationFailureHandler handler =
             new OAuthBrowserAuthenticationFailureHandler();
 
-    @DisplayName("identity 인프라 OAuth 실패는 고정 temporarily_unavailable로 이동한다")
+    @DisplayName("신원 인프라 OAuth 실패는 고정 temporarily_unavailable로 이동한다")
     @Test
     void redirectsInfrastructureFailureToTemporaryError() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest(

@@ -10,12 +10,12 @@ import org.springframework.validation.annotation.Validated;
 public record WorkspaceSecretProperties(
         @Pattern(
                 regexp = "(?:|[A-Za-z0-9._~-]{32,200})",
-                message = "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                message = "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
         )
         @DefaultValue("") String creationKey,
         @Pattern(
                 regexp = "(?:|[A-Za-z0-9._~-]{32,200})",
-                message = "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                message = "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
         )
         @DefaultValue("") String recoveryKey
 ) {

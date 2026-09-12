@@ -42,7 +42,7 @@ class BriefContinuityOutboxDeliveryMigrationTest {
             .withUsername("baton")
             .withPassword("password");
 
-    @DisplayName("BRIEF 전달 상태 이관 뒤 작업공간·시즌 전달 경계 인덱스를 추가한다")
+    @DisplayName("BRIEF 전달 상태 이관 뒤 작업 공간·시즌 전달 경계 인덱스를 추가한다")
     @Test
     void preservesExistingEventAndAddsDeliveryLifecycle() {
         migrateTo("24");

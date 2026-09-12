@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.AccountView;
@@ -87,6 +88,9 @@ class ConfiguredSocialLoginSecurityTest {
     @MockitoBean
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
 
+    @MockitoBean
+    private HumanVerificationUseCase humanVerificationUseCase;
+
     @BeforeEach
     void acceptCurrentAccountSessions() {
         when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
@@ -136,7 +140,7 @@ class ConfiguredSocialLoginSecurityTest {
                 ));
     }
 
-    @DisplayName("provider 목록에는 repository에 구성된 Google만 고정 allowlist로 노출한다")
+    @DisplayName("공급자 목록에는 저장소에 설정된 Google만 고정 허용 목록으로 노출한다")
     @Test
     void exposesOnlyConfiguredProvider() throws Exception {
         mockMvc.perform(get(AuthController.PROVIDERS_PATH))
@@ -145,7 +149,8 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .content().json(
                                 "{\"providers\":[\"google\"],"
-                                        + "\"localRegistrationEnabled\":false,\"passwordResetEnabled\":false}",
+                                        + "\"localRegistrationEnabled\":false,\"passwordResetEnabled\":false,"
+                                        + "\"turnstileSiteKey\":null}",
                                 true
                         ));
     }
@@ -160,7 +165,7 @@ class ConfiguredSocialLoginSecurityTest {
                 .andExpect(header().doesNotExist("Location"));
     }
 
-    @DisplayName("OAuth callback 실패는 provider 설명 없이 고정 login_failed로 이동한다")
+    @DisplayName("OAuth 콜백 실패는 공급자 정보 없이 고정 login_failed 경로로 이동한다")
     @Test
     void redirectsCallbackFailureToFixedBrowserError() throws Exception {
         MockHttpSession session = new MockHttpSession();
@@ -187,7 +192,7 @@ class ConfiguredSocialLoginSecurityTest {
         assertThat(session.getAttribute("preserved")).isEqualTo("session value");
     }
 
-    @DisplayName("실제 OIDC callback filter는 provider token을 저장하지 않고 canonical account session만 남긴다")
+    @DisplayName("실제 OIDC 콜백 필터는 공급자 토큰을 저장하지 않고 표준 계정 세션만 남긴다")
     @Test
     void persistsOnlyCanonicalAccountAuthenticationAfterOidcCallback() throws Exception {
         RecordingMockHttpSession session = new RecordingMockHttpSession();

@@ -88,19 +88,19 @@ export function TodayView({
         description="끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요."
         action={<PrimaryButton onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>{roles.length ? '업무 추가' : '역할 추가'}</PrimaryButton>}
       />
-      <RoundControl
-        compact
-        rounds={rounds}
-        selectedRound={selectedRound}
-        archivedRoundCount={archivedRoundCount}
-        hasRoutines={Boolean(routines.length)}
-        onSelect={onSelectRound}
-        onCreate={onAddRound}
-        changesDisabled={changesDisabled}
-      />
       <section className="relay-board" aria-labelledby="relay-title">
-        <div className="section-heading">
-          <h2 id="relay-title">이번 회차 업무</h2>
+        <div className="today-list-toolbar">
+          <RoundControl
+            compact
+            rounds={rounds}
+            selectedRound={selectedRound}
+            archivedRoundCount={archivedRoundCount}
+            hasRoutines={Boolean(routines.length)}
+            onSelect={onSelectRound}
+            onCreate={onAddRound}
+            changesDisabled={changesDisabled}
+          />
+          <h2 id="relay-title" className="visually-hidden">이번 회차 업무</h2>
           <div className="round-meta">
             <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0} 완료</strong>
           </div>
@@ -115,6 +115,7 @@ export function TodayView({
               value={completedCount}
               max={Math.max(1, selectedRound.routineExecutions.length)}
             />
+            <div className="today-list-columns" aria-hidden="true"><span>업무</span><span>상태 · 마감</span><span>담당자</span></div>
             <div className="today-task-list" role="list">
               {orderedRoutines.map(({ id, routine, execution }) => {
                 const ownerRoleId = execution?.ownerRoleId ?? routine?.ownerRoleId
@@ -155,7 +156,7 @@ export function TodayView({
         <div className="today-lower">
           <section className="plain-section" aria-labelledby="continuity-radar-title">
             <div className="section-heading compact">
-              <h2 id="continuity-radar-title">확인할 항목</h2>
+              <h2 id="continuity-radar-title">조치할 항목</h2>
               <span className="continuity-count">
                 {workspace.continuitySignals.length}개
               </span>

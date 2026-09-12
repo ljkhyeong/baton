@@ -1,0 +1,15 @@
+{
+  "pronounceable_name": "BATON",
+  "url": "https://b4ton.com/actuator/health",
+  "monitor_type": "keyword",
+  "required_keyword": "\"status\":\"UP\"",
+  "check_frequency": 180,
+  "request_timeout": 15,
+  "follow_redirects": false,
+  "verify_ssl": true,
+  "email": true,
+  "sms": false,
+  "call": false,
+  "push": false,
+  "paused": true
+}

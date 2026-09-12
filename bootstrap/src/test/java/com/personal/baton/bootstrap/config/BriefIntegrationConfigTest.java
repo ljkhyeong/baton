@@ -28,7 +28,7 @@ class BriefIntegrationConfigTest {
             .withBean(BriefRestClientFactory.class, () -> clientFactory)
             .withUserConfiguration(BriefIntegrationConfig.class);
 
-    @DisplayName("BRIEF 전달은 기본 비활성이고 명시적으로 활성화할 때만 client와 use case를 만든다")
+    @DisplayName("BRIEF 전달은 기본 비활성이고 명시적으로 활성화할 때만 클라이언트와 유스케이스를 만든다")
     @Test
     void enablesDeliveryOnlyWhenConfigured() {
         when(clientFactory.createContinuityClient(
@@ -53,7 +53,7 @@ class BriefIntegrationConfigTest {
                 .hasSingleBean(DispatchBriefContinuityOutboxUseCase.class));
     }
 
-    @DisplayName("BRIEF 전달은 loopback이 아닌 평문 HTTP origin을 거부한다")
+    @DisplayName("BRIEF 전달은 루프백이 아닌 HTTP 출처를 거부한다")
     @Test
     void rejectsExternalPlainHttpOrigin() {
         contextRunner.withPropertyValues(

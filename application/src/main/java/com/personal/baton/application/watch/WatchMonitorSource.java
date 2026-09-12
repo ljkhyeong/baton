@@ -14,10 +14,10 @@ public record WatchMonitorSource(
     private static final Pattern NAMESPACE_PATTERN = Pattern.compile("[A-Za-z0-9._-]{1,63}");
 
     public WatchMonitorSource {
-        Objects.requireNonNull(namespace, "WATCH source namespace는 필수입니다");
+        Objects.requireNonNull(namespace, "WATCH 원본 네임스페이스는 필수입니다");
         if (!NAMESPACE_PATTERN.matcher(namespace).matches()) {
             throw new IllegalArgumentException(
-                    "WATCH source namespace는 1~63자의 영문자, 숫자, 점, 밑줄, 하이픈이어야 합니다"
+                    "WATCH 원본 네임스페이스는 1~63자의 영문자, 숫자, 점, 밑줄, 하이픈이어야 합니다"
             );
         }
     }

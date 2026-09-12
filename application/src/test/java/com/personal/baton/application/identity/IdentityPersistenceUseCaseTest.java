@@ -153,7 +153,7 @@ class IdentityPersistenceUseCaseTest {
         reset(emailVerificationDeliveryPort);
     }
 
-    @DisplayName("자체 이메일 가입부터 일회성 검증과 로그인 자격 조회까지 실제 MySQL transaction으로 이어진다")
+    @DisplayName("자체 이메일 가입부터 일회성 검증과 로그인 자격 조회까지 실제 MySQL 트랜잭션으로 이어진다")
     @Test
     void persistsAndVerifiesLocalCredentialLifecycle() {
         var registration = registerLocalAccountUseCase.registerLocalAccount(
@@ -314,7 +314,7 @@ class IdentityPersistenceUseCaseTest {
         )).isOne();
     }
 
-    @DisplayName("이메일 인증 outbox lease는 다른 dispatcher의 동시 claim을 막고 만료 뒤 복구한다")
+    @DisplayName("이메일 인증 아웃박스 임대는 여러 디스패처의 동시 처리를 막고 만료 뒤 복구한다")
     @Test
     void leasesEmailVerificationOutboxAcrossDispatchers() {
         registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
@@ -350,7 +350,7 @@ class IdentityPersistenceUseCaseTest {
                 .isNotEqualTo(firstClaim.getFirst().leaseToken());
     }
 
-    @DisplayName("서버 Clock 시각까지 만료된 outbox만 폐기하고 직후 payload는 보존한다")
+    @DisplayName("서버 시각까지 만료된 아웃박스만 폐기하고 직후 페이로드는 보존한다")
     @Test
     void expiresOnlyPayloadsAtOrBeforeServerClock() {
         registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
@@ -437,7 +437,7 @@ class IdentityPersistenceUseCaseTest {
         assertThat(validDelivery.get("challenge_token_hash")).isNotNull();
     }
 
-    @DisplayName("MySQL에 저장된 AES-GCM ciphertext가 변조되면 SMTP 없이 fail-closed 한다")
+    @DisplayName("MySQL에 저장된 AES-GCM ciphertext가 변조되면 SMTP 없이 차단한다")
     @Test
     void rejectsTamperedPersistedPayload() {
         registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
@@ -502,7 +502,7 @@ class IdentityPersistenceUseCaseTest {
         )).isEqualTo(2);
     }
 
-    @DisplayName("같은 provider subject의 동시 최초 OAuth callback은 한 Account로 수렴한다")
+    @DisplayName("같은 공급자 사용자의 첫 OAuth 콜백이 겹쳐도 계정 하나만 생성한다")
     @Test
     void convergesConcurrentFirstExternalLogin() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);

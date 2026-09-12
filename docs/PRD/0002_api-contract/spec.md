@@ -136,7 +136,7 @@ POST /api/v1/workspaces
 
 `teamName`과 `seasonName`은 공백만으로 구성될 수 없고 각각 100자 이하다. `startDate`와 `endDate`는 시간대 없는 ISO 8601 달력 날짜이며 시작일은 종료일보다 늦을 수 없다. `memberNames`는 1명 이상 100명 이하이고 각 이름은 공백만으로 구성될 수 없으며 100자 이하다. 앞뒤 공백을 제거한 구성원 이름은 중복될 수 없으며, 이름이 같은 사람은 역할 선택에서 구분할 수 있는 별칭을 붙인다.
 
-선택 필드 `template`은 `STUDY_V1` 또는 `TEAM_V1`이며 생략·`null`이면 기존 빈 구성으로 생성한다. 다른 값은 `400 INVALID_INPUT`이다. 각 템플릿은 역할 3개와 반복 업무 3개를 팀·시즌·구성원과 같은 트랜잭션으로 저장하고 담당자·담당 기간·실제 마감·반복 일정·회차는 만들지 않는다. 역할 공백의 연속성 신호도 같은 트랜잭션에 반영한다. 배포된 템플릿 식별자의 구성은 유지하고 변경은 새 버전으로 추가한다.
+선택 필드 `template`은 `STUDY_V1`, `TEAM_V1`, `TASK_FORCE_V1` 중 하나이며 생략·`null`이면 기존 빈 구성으로 생성한다. 다른 값은 `400 INVALID_INPUT`이다. 각 템플릿은 역할 3개와 반복 업무 3개를 팀·시즌·구성원과 같은 트랜잭션으로 저장하고 담당자·담당 기간·실제 마감·반복 일정·회차는 만들지 않는다. 역할 공백의 연속성 신호도 같은 트랜잭션에 반영한다. 배포된 템플릿 식별자의 구성은 유지하고 변경은 새 버전으로 추가한다.
 
 선택한 템플릿은 멱등 요청 비교에 포함한다. 같은 키로 템플릿만 바꾸거나 빈 구성과 템플릿을 서로 바꾸면 `409 IDEMPOTENCY_KEY_REUSED`다. 생략과 `null`은 같은 빈 구성이고 기존 빈 구성의 요청 지문을 유지하므로 배포 전 미확인 생성 요청도 복구할 수 있다. 동일 재전송은 역할·반복 업무를 다시 만들지 않는다.
 
@@ -192,14 +192,14 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `season` | 요청한 시즌의 `id`, `name`, `startDate`, `endDate`, `null` 허용 `endedAt`, `null` 허용 `previousSeasonId`, IANA `timeZone`, `null` 허용 `roundSchedule` |
 | `seasons` | 같은 팀의 서버에서 관리하는 시즌 목록. 각 항목은 `season`과 같은 필드를 가짐 |
 | `members` | 팀 구성원의 `id`, `name`, `initials`, `tone`, `null` 허용 `deactivatedAt` 목록 |
-| `roles` | 현재 시즌의 역할 스냅샷, 담당자·기간, 책임과 위험 신호 목록 |
+| `roles` | 현재 시즌의 역할 스냅샷, 담당자·기간, 담당 업무와 주의사항 목록 |
 | `routines` | 현재 시즌의 반복 업무 정의, `null` 허용 실제 마감 규칙과 `null` 허용 `archivedAt` 목록. 완료 상태는 포함하지 않음 |
 | `rounds` | 생성 출처·시간 상태·`null` 허용 `archivedAt`을 가진 시즌 회차와 회차 생성 시 복사된 실제 마감·반복 업무 실행 목록 |
 | `decisions` | 결정, 서버 생성 시각, 작성자 식별자·이름, 관련 역할과 `null` 허용 `archivedAt` 목록 |
 | `handoffItems` | 역할별 인수인계 항목, 완료 여부, `null` 허용 `createdAt`과 `null` 허용 `archivedAt` 목록 |
 | `resources` | 역할별 자료의 제목, 외부 링크, `null` 허용 설명과 `null` 허용 `createdAt` 목록 |
 | `roleHandoffs` | 역할별 인수인계 준비·전달·수락·취소 이력과 전달 시점 준비도 스냅샷 목록 |
-| `continuitySignals` | 현재 기록에서 계산한 조직 연속성 위험의 유형·우선순위·이유와 다음 행동 목록 |
+| `continuitySignals` | 현재 기록에서 계산한 담당자 공백·업무 지연의 유형·우선순위·이유와 다음 행동 목록 |
 
 역할 응답 필드:
 
@@ -251,7 +251,7 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 
 - 현재 담당자가 없거나 활동을 종료한 역할은 신호를 만든다. 시즌 시작 전이면 `WARNING`, 시작일 이후면 `CRITICAL`이다.
 - 현재 담당자가 활동 중이고 다음 담당자가 없거나 활동을 종료했거나 현재 담당자와 같으며 담당 종료일이 시즌 현지 오늘부터 14일 이내이거나 이미 지났으면 후임 공백 신호를 만든다. 종료일까지 시간이 남았으면 `WARNING`, 오늘이거나 지났으면 `CRITICAL`이다.
-- 역할에 위험 신호가 있으면서 책임 목록이 없거나, 활성 인수인계 항목이 없거나 미완료이거나, 역할 자료가 없으면 사용자에게 기록한 위험과 부족한 준비 요소를 한 신호의 이유에 함께 설명한다.
+- 역할에 주의사항이 있으면서 담당 업무 목록이 없거나, 활성 인수인계 항목이 없거나 미완료이거나, 역할 자료가 없으면 기록한 주의사항과 부족한 준비 요소를 한 항목의 이유에 함께 설명한다.
 - 같은 반복 업무의 미완료 실행이 서로 다른 활성 회차에서 실제 마감 뒤로 2회 이상 지연되면 반복 지연 신호를 만든다. 2회는 `WARNING`, 3회 이상은 `CRITICAL`이다.
 - 현재·다음 담당자가 활동 중이고 담당 종료일이 14일 이내이거나 이미 지났지만 열린 역할 인수인계가 없으면 인수인계 미시작 신호를 만든다.
 - 열린 역할 인수인계는 새 담당 시작일이 시즌 현지 오늘부터 7일 이내이거나 이미 지났으면 항목 준비도와 무관하게 남은 전달 또는 수락 행동을 알린다. `PREPARING`은 현재 활성 항목을, `TRANSFERRED`는 전달 시점 스냅샷을 이유에 사용한다. 시작일까지 시간이 남았으면 `WARNING`, 오늘이거나 지났으면 `CRITICAL`이다.
@@ -367,11 +367,11 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 새 시즌 시작일은 원본 시즌 종료일보다 늦어야 한다. 두 선택 목록은 각각 최대 100개이고 중복이나 다른 시즌 식별자를 허용하지 않는다. 활성 반복 업무만 선택할 수 있고 선택한 반복 업무의 담당 역할도 `copyRoleIds`에 포함해야 한다. 보관 반복 업무 식별자는 `404 ROUTINE_NOT_FOUND`로 거절하고 전체 전환을 롤백한다.
 
-서버는 한 트랜잭션에서 원본 시즌을 종료하고 후속 시즌과 선택한 정의를 만든다. 역할은 이름·목적·책임·위험 신호를 새 UUID로 복사하되 현재·다음 담당자와 담당 기간을 비운다. 반복 업무도 실제 마감 규칙과 함께 새 UUID로 복사하고 새 역할 UUID를 참조한다. 새 시즌은 원본 시즌의 `timeZone`을 이어 받지만 `roundSchedule`, 발생 커서, 회차·실행, 결정, 인수인계 항목, 역할 인수인계 이력과 역할 자료는 복사하지 않고 원본 시즌에 남긴다. 같은 원본 시즌에는 후속 시즌을 하나만 만들 수 있고 한 팀에는 종료되지 않은 시즌을 하나만 둔다. 열린 역할 인수인계가 있으면 원본 시즌을 종료하거나 후속 시즌을 만들지 않고 `409 ROLE_HANDOFF_STATE_CONFLICT`를 반환한다.
+서버는 한 트랜잭션에서 원본 시즌을 종료하고 후속 시즌과 선택한 정의를 만든다. 역할은 이름·목적·담당 업무·주의사항을 새 UUID로 복사하되 현재·다음 담당자와 담당 기간을 비운다. 반복 업무도 실제 마감 규칙과 함께 새 UUID로 복사하고 새 역할 UUID를 참조한다. 새 시즌은 원본 시즌의 `timeZone`을 이어 받지만 `roundSchedule`, 발생 커서, 회차·실행, 결정, 인수인계 항목, 역할 인수인계 이력과 역할 자료는 복사하지 않고 원본 시즌에 남긴다. 같은 원본 시즌에는 후속 시즌을 하나만 만들 수 있고 한 팀에는 종료되지 않은 시즌을 하나만 둔다. 열린 역할 인수인계가 있으면 원본 시즌을 종료하거나 후속 시즌을 만들지 않고 `409 ROLE_HANDOFF_STATE_CONFLICT`를 반환한다.
 
 성공 상태는 `201 Created`이고 `Location`은 새 시즌 워크스페이스 경로다. 응답은 종료된 `sourceSeason`, 생성한 `season`, `sourceRoleId`와 새 `roleId`의 `copiedRoles`, `sourceRoutineId`와 새 `routineId`의 `copiedRoutines`를 반환한다. 같은 멱등 키와 정규화 요청을 동일 재처리하면 같은 시즌과 식별자 대응을 반환하며, 역할·반복 업무 선택 순서는 요청 지문에서 의미 없는 집합으로 정렬한다.
 
-종료 시즌은 워크스페이스 조회, 시즌 전환, 접근 키 회전·복구와 다음 시즌 시작을 허용한다. 구성원·역할·자료·반복 업무·회차·실행·결정·인수인계 항목·역할 인수인계의 생성·수정·완료·보관·복원은 `409 SEASON_ENDED`로 거절한다. 프런트엔드도 같은 경계를 읽기 전용으로 표시하지만 서버 검증이 권위다.
+종료 시즌은 워크스페이스 조회, 시즌 전환, 접근 키 회전·복구와 다음 시즌 시작을 허용한다. 구성원·역할·자료·반복 업무·회차·실행·결정·인수인계 항목·역할 인수인계의 생성·수정·완료·보관·복원은 `409 SEASON_ENDED`로 거절한다. 프런트엔드도 같은 경계를 읽기 전용으로 표시하지만 서버 검증이 최종 기준이다.
 
 ### 접근 키 회전
 
@@ -420,13 +420,19 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 구성원, 역할, 반복 업무, 회차, 결정, 인수인계 항목, 역할 자료와 역할 인수인계 준비를 만드는 여덟 `POST` 요청에는 워크스페이스 생성과 같은 형식의 `Idempotency-Key`가 필수다. 서버는 동일 재처리 요청에서도 현재 `X-Baton-Access-Key`를 먼저 검증하며, 팀·시즌·작업 종류별로 멱등 결과를 분리한다. 따라서 같은 원문 키를 다른 작업 종류나 다른 작업 공간에서 독립적으로 사용할 수 있지만, 클라이언트는 각 사용자 의도마다 새 키를 사용한다.
 
-같은 키와 의미가 같은 정규화 요청을 다시 보내면 새 리소스를 만들지 않고 최초에 생성된 리소스의 같은 `id`와 현재 표현을 `201 Created`로 반환한다. 그 사이 구성원의 이름·활동 상태, 반복 업무·회차의 보관 상태, 회차의 이름·모임 날짜·반복 업무 실행 상태, 인수인계 항목의 완료 상태, 결정·인수인계 항목의 내용이나 보관 상태 또는 역할 인수인계의 전환 상태가 바뀌었다면 동일 재처리 응답에는 현재 상태가 보인다. 보관된 반복 업무·회차·결정·인수인계 항목도 `archivedAt`이 있는 현재 표현으로 반환되므로 동일 재처리 성공을 활성 기록의 재생성으로 해석하지 않는다. 역할 인수인계 준비 동일 재처리도 같은 `role`과 `handoff`의 현재 표현을 반환하며 완료·취소한 이력을 새로 열지 않는다. 회차 생성 뒤 반복 업무 정의를 추가·수정·보관해도 동일 재처리는 최초 회차의 실행 식별자, 구성과 스냅샷을 바꾸지 않는다. 동일 재처리 일치 여부는 현재 표현이 아니라 최초 생성 요청의 지문으로 판단하므로, 정정된 이름·날짜를 원래 생성 키와 함께 보내면 `409 IDEMPOTENCY_KEY_REUSED`다. 같은 범위·작업의 키를 그 밖의 의미가 다른 요청에 재사용해도 같은 오류를 반환하고, 동일 키 예약이 동시에 충돌하면 `409 IDEMPOTENCY_KEY_CONFLICT`다. 동시 충돌을 받은 클라이언트는 새 키를 만들지 않고 잠시 뒤 같은 키와 같은 요청으로 재시도한다.
+동일 재처리는 다음 규칙을 따른다.
+
+- 같은 키와 같은 요청이면 새 리소스를 만들지 않고 기존 ID와 현재 상태를 `201 Created`로 반환한다.
+- 생성 뒤 이름·상태·내용·보관 여부가 바뀌었다면 현재 값을 반환한다. 보관된 기록을 다시 활성화하거나 새로 만들지 않는다.
+- 역할 인수인계는 완료·취소된 이력을 다시 열지 않는다. 회차는 생성 당시 실행 ID와 업무 스냅샷을 유지한다.
+- 일치 여부는 최초 요청의 지문으로 판단한다. 같은 키에 다른 요청을 보내면 `409 IDEMPOTENCY_KEY_REUSED`, 같은 요청을 동시에 처리하면 `409 IDEMPOTENCY_KEY_CONFLICT`를 반환한다.
+- 동시 처리 중이면 새 키를 만들지 말고 잠시 뒤 같은 키와 요청으로 다시 시도한다.
 
 현재 자동 일정에 따른 반복 업무 마감 필수 여부와 현재 시즌 기간에 따른 회차 날짜 검증은 신규 생성에만 적용한다. 생성 뒤 자동 일정이나 시즌 기간이 바뀌어도 같은 멱등 키와 최초 요청의 재시도를 이 조건으로 거부하지 않는다. 현재 접근 키와 시즌 종료 여부, 최초 요청 지문과의 일치 여부는 재시도에서도 확인한다.
 
 요청 지문은 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
-브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 Web Lock 임계 구역에서 내구 저장해야 한다. `setItem`이 예외를 던지거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 동일 재처리를 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
+브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 Web Lock으로 보호한 브라우저 영구 저장소에 저장해야 한다. `setItem`이 예외를 던지거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 동일 재처리를 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
 
 ### 구성원
 
@@ -508,7 +514,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 요청은 생성과 같은 전체 필드를 사용하며 성공 상태는 `200 OK`다. 대상 역할은 해당 팀·시즌 소속이어야 하고 시즌 안의 이름 중복, 구성원 소속·활동 상태와 담당 기간 규칙을 다시 검증한다. 기존 현재·다음 위치에 있던 활동 종료 구성원 ID를 같은 위치에 유지하는 것은 허용하지만 활동 종료 구성원을 새 위치에 배정할 수는 없다. 자기 자신의 현재 이름은 중복으로 보지 않는다. 응답은 수정된 역할이다. 같은 역할을 먼저 읽은 다른 수정과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다.
 
-열린 역할 인수인계가 `PREPARING`이면 현재·다음 담당자와 담당 기간은 인수인계 준비 시점 값으로 고정하지만 역할의 이름·목적·책임·위험 신호는 수정할 수 있다. `TRANSFERRED`이면 수락 또는 취소 전까지 역할 전체를 수정할 수 없다. 위반은 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
+열린 역할 인수인계가 `PREPARING`이면 현재·다음 담당자와 담당 기간은 인수인계 준비 시점 값으로 고정하지만 역할의 이름·목적·담당 업무·주의사항는 수정할 수 있다. `TRANSFERRED`이면 수락 또는 취소 전까지 역할 전체를 수정할 수 없다. 위반은 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
 
 ### 역할 인수인계 전달
 
@@ -719,7 +725,12 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 `name`은 앞뒤 공백을 정규화한 뒤 같은 시즌에서 유일해야 하고 최대 100자다. `meetingDate`는 ISO 8601 날짜이며 시즌 시작일과 종료일을 포함한 기간 안에 있어야 한다. 성공 상태는 `201 Created`다.
 
-서버는 회차 생성 트랜잭션에서 현재 시즌의 활성 반복 업무 정의를 각각 독립된 실행으로 복사하고 처음 상태를 `WAITING`으로 둔다. 실제 마감 규칙이 있는 실행은 모임 날짜와 시즌 시간대로 UTC `deadlineAt`을 계산해 함께 스냅샷한다. 응답은 회차 `id`, `name`, `meetingDate`, `null` 허용 `archivedAt`, `origin`, `null` 허용 `scheduledOccurrenceDate`, `null` 허용 `scheduledAt`, `timingStatus`와 `routineExecutions`를 반환한다. 이 API로 만든 회차는 `origin: MANUAL`이고 두 일정 메타데이터는 `null`이며 새 회차의 `archivedAt`은 `null`이다. 각 실행은 `id`, `roundId`, 원본 `routineId`, 스냅샷 필드, `status`, `null` 허용 `deadlineAt`과 `timingStatus`를 가진다. 회차 생성 뒤 반복 업무를 추가·수정·보관해도 기존 회차에는 반영되지 않고 다음에 만드는 회차부터 반영된다. 같은 멱등 요청을 동일 재처리하면 실행을 다시 만들지 않고 최초 회차 식별자와 현재 이름·날짜·보관·실행 상태를 반환한다.
+회차 생성은 다음 규칙을 따른다.
+
+- 현재 시즌의 활성 반복 업무를 실행 항목으로 복사하고 상태를 `WAITING`으로 둔다. 마감 규칙이 있으면 `deadlineAt`도 계산해 저장한다.
+- 응답은 회차 정보, 일정 메타데이터, 상태와 실행 목록을 반환한다. 수동 회차는 `origin: MANUAL`이며 자동 일정 메타데이터와 `archivedAt`은 `null`이다.
+- 각 실행은 원본 `routineId`, 생성 당시 업무 정보, 완료 상태와 마감 정보를 보존한다. 이후 반복 업무를 바꿔도 기존 회차에는 반영하지 않는다.
+- 같은 멱등 요청은 실행을 다시 만들지 않고 기존 회차 ID와 현재 상태를 반환한다.
 
 활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 스케줄러가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다. 처리할 발생일에 활성 반복 업무가 없으면 `roundSchedule.nextOccurrenceDate`만 다음 주기로 전진하고 실행이 없는 자동 회차는 만들지 않는다. 나중에 정의를 복원해도 이미 건너뛴 발생일을 소급 생성하지 않는다.
 
@@ -976,8 +987,8 @@ GET /actuator/health
 | `403` | `BRIEF_ACCESS_DENIED` | `Account`가 요청 팀의 활동 중인 멤버십을 갖지 않음 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
 | `404` | `RESOURCE_NOT_FOUND` | Spring MVC가 처리할 요청 경로를 찾지 못함 |
-| `404` | `ROUND_ROOM_NOT_FOUND` | 서버 권위 활성 방 매핑을 찾지 못했거나 요청 힌트가 일치하지 않음 |
-| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 최신·선택 생성본이 없거나 단건·비교 대상이 요청 범위 밖임 |
+| `404` | `ROUND_ROOM_NOT_FOUND` | 서버에 저장된 활성 방 매핑을 찾지 못했거나 요청 힌트가 일치하지 않음 |
+| `404` | `BRIEF_EDITION_NOT_FOUND` | 권한 범위의 최신·선택 주간 요약이 없거나 단건·비교 대상이 요청 범위 밖임 |
 | `405` | `METHOD_NOT_ALLOWED` | 경로는 있지만 요청한 HTTP 메서드를 지원하지 않음 |
 | `409` | `MEMBER_NAME_CONFLICT` | 같은 팀에 동일한 구성원 이름이 존재함 |
 | `409` | `SEASON_NAME_CONFLICT` | 같은 팀에 동일한 시즌 이름이 존재함 |
@@ -997,8 +1008,8 @@ GET /actuator/health
 | `409` | `LOCAL_PASSWORD_UNAVAILABLE` | 로그인 계정에 자체 이메일 비밀번호 자격 증명이 없음 |
 | `409` | `ACCOUNT_MEMBERSHIP_CONFLICT` | 확인한 계정과 로그인 계정이 다르거나 `Account` 또는 `Member`가 다른 멤버십 연결과 충돌함 |
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
-| `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 연속성 outbox 전달이 끝나지 않아 생성할 수 없음 |
-| `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 watermark의 생성 실행 lease가 아직 유효함 |
+| `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 업무 점검 아웃박스 전달이 끝나지 않아 생성할 수 없음 |
+| `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 기준의 생성 작업이 아직 진행 중임 |
 | `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 요청률 제한을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 미디어 타입을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 게이트, 아웃박스 페이로드 보호 또는 메일 전달 인프라를 사용할 수 없음 |
@@ -1008,9 +1019,17 @@ GET /actuator/health
 | `503` | `BRIEF_UNAVAILABLE` | BRIEF 네트워크·요청률 제한·서버 장애로 호출을 완료하지 못함 |
 | `500` | `INTERNAL_ERROR` | 예상하지 못한 서버 오류이며 내부 상세는 응답에 노출하지 않음 |
 
-실제 MySQL 행 잠금 대기가 제한을 넘으면 새 워크스페이스·콘텐츠 생성의 멱등 예약은 기존 `409 IDEMPOTENCY_KEY_CONFLICT`, 기존 팀 접근 키 애그리거트는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`, 공유 콘텐츠 애그리거트는 `409 WORKSPACE_CONTENT_CONFLICT`로 수렴한다. 위 계정 신원 인증 경계에서 명시적으로 `503`으로 분류한 경우를 제외한 일반 쿼리 시간 초과, 트랜잭션 시간 초과와 DB 커넥션 획득 실패는 사용자의 동시 수정으로 추측하지 않고 `500 INTERNAL_ERROR`로 처리한다.
+MySQL 행 잠금 시간이 제한을 넘으면 대상에 따라 다음 오류로 처리한다.
 
-예상하지 못한 예외와 Spring MVC가 식별한 요청 오류도 같은 `ErrorResponse` 형태로 정규화한다. 단, 클라이언트가 서버가 제공하는 모든 미디어 타입을 거부해 발생하는 `406 Not Acceptable`은 오류 JSON도 협상할 수 없으므로 본문 없이 응답한다. 이 응답도 `X-Request-ID`는 유지한다. 내부 예외 상세와 스택 추적은 응답에 노출하지 않고 서버 로그에만 남기며, 처리한 예외를 현재 HTTP 관측의 오류로 기록한다. Spring에서 처리하거나 필터 체인을 벗어난 5xx는 MDC와 응답 헤더가 같은 요청 ID를 사용하며 Caddy 액세스 로그도 최종 응답 헤더를 기록한다. Caddy가 직접 만든 413·502·503은 응답 헤더와 액세스 로그의 내장 `uuid`가 같은 엣지 요청 ID를 사용한다. 해당 로그에서는 제품 운영 키, 멱등 키와 외부 요청 ID 헤더를 제거한다. 브라우저 클라이언트는 운영자가 해당 경계의 로그를 찾을 수 있도록 5xx 안내에 이 값을 함께 표시한다.
+- 워크스페이스·콘텐츠 생성 예약: `409 IDEMPOTENCY_KEY_CONFLICT`
+- 팀 접근 키: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
+- 공유 콘텐츠: `409 WORKSPACE_CONTENT_CONFLICT`
+
+계정 인증에서 별도로 `503`으로 분류한 경우가 아니라면 쿼리·트랜잭션 시간 초과와 DB 연결 실패는 `500 INTERNAL_ERROR`로 처리한다. 이를 사용자의 동시 수정으로 추측하지 않는다.
+
+예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `406 Not Acceptable`은 오류 JSON을 협상할 수 없으므로 본문 없이 `X-Request-ID`만 반환한다.
+
+내부 예외와 스택 추적은 서버 로그에만 남긴다. Spring과 필터 체인의 5xx는 MDC와 응답 헤더에 같은 요청 ID를 사용한다. Caddy가 만든 413·502·503도 응답과 접근 로그에 같은 엣지 요청 ID를 남긴다. 로그에서는 운영 키, 멱등 키와 외부 요청 ID를 제거한다. 브라우저는 운영자가 로그를 찾을 수 있도록 5xx 안내에 요청 ID를 표시한다.
 
 새 제품 API를 추가할 때는 다음을 함께 결정한다.
 
@@ -1049,11 +1068,11 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/auth/csrf` | 없음 | `200 {csrfHeaderName, csrfToken}`. 토큰을 준비하기 위해 세션을 만들 수 있음 |
 | `GET` | `/api/v1/auth/session` | 없음 | 미인증 `200 {authenticated:false}` 또는 인증 `200 {authenticated:true,accountId,csrfHeaderName,csrfToken}` |
-| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false,passwordResetEnabled:true|false}`. 구성한 공급자, 새 가입과 재설정 메일 요청 가능 여부를 각각 반환 |
+| `GET` | `/api/v1/auth/providers` | 없음 | `200 {providers:["google","naver"],localRegistrationEnabled:true|false,passwordResetEnabled:true|false,turnstileSiteKey:string|null}`. 구성한 공급자, 새 가입·재설정 메일 요청 가능 여부와 자동 요청 방지 사이트 키를 반환 |
 | `GET` | `/api/v1/auth/account` | 없음 | `200 {accountId,displayName,identities:[{provider,email?,emailVerified}]}`. 로그인 계정과 연결된 로그인 방법 조회 |
-| `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/registrations` | JSON `{email,displayName,turnstileToken?}` | `202 {verificationRequired:true}`. 계정 존재 여부를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/email-verifications` | JSON `{token,password}` | `204`. 토큰 소비·이메일 검증·최초 자격 증명 생성을 한 트랜잭션으로 완료 |
-| `POST` | `/api/v1/auth/local/password-reset-requests` | JSON `{email}` | `202 {accepted:true}`. 계정 존재·검증 여부와 실제 메일 발송 완료를 구분하지 않음 |
+| `POST` | `/api/v1/auth/local/password-reset-requests` | JSON `{email,turnstileToken?}` | `202 {accepted:true}`. 계정 존재·검증 여부와 실제 메일 발송 완료를 구분하지 않음 |
 | `POST` | `/api/v1/auth/local/password-resets` | JSON `{token,password}` | `204`. 토큰 소비·비밀번호 변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료. 자동 로그인 없음 |
 | `POST` | `/api/v1/auth/local/password-changes` | JSON `{currentPassword,newPassword}` | `204`. 현재 비밀번호 확인·변경·기존 세션 버전 무효화를 한 트랜잭션으로 완료하고 현재 세션도 종료 |
 | `POST` | `/api/v1/auth/local/session` | 폼 `{email,password}` | `204`. 인증 성공 시 세션 ID 교체 |
@@ -1065,6 +1084,11 @@ Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. �
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
 `Retry-After`를 반환한다.
+
+Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최대 2,048자의 일회용
+`turnstileToken`이 필요하다. 서버는 Siteverify 응답의 성공 여부, `hostname`과 요청별 `action`을
+확인한다. 실패는 `400 HUMAN_VERIFICATION_FAILED`, 공급자 연결·설정 장애는
+`503 HUMAN_VERIFICATION_UNAVAILABLE`로 반환하며 원시 공급자 오류는 노출하지 않는다.
 
 재설정 이메일도 최대 320자, 토큰은 32~512자, 새 비밀번호는 12~128자다. 인증된 자체 이메일
 계정만 메일을 발급하며 Google·Naver 신원이나 미인증 계정에는 발급하지 않는다. 링크는 발급 후
@@ -1098,7 +1122,7 @@ Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. �
 OAuth 시작 경로는 `/oauth2/authorization/google`, `/oauth2/authorization/naver`, 콜백은
 `/login/oauth2/code/google`, `/login/oauth2/code/naver`다. 구성되지 않은 공급자는 노출하지 않고,
 성공 뒤 `/login`으로 리디렉션한다. 콜백 실패는 `ErrorResponse` JSON을 반환하지 않고 다음
-고정 응답으로 수렴한다.
+아래 고정 응답을 반환한다.
 
 | 실패 분류 | 응답 |
 | --- | --- |
@@ -1143,11 +1167,11 @@ CSRF 없이 조회한다.
 읽기 전용 경계에서 거부하고 ROUND 참여 가능성은 별도 활동 중인 `Member` 규칙으로 판단한다. 방 매핑은
 해당 팀·시즌의 역할 자료만 연결하며 활성 자료와 방 ID를 각각 하나로 제한한다. 현재
 매핑 목록 조회는 팀 접근 키와 활동 중인 멤버십을 한 번 확인한 뒤 해당 팀·시즌의
-서버 영속 매핑을 한 번에 조회해 권위로 반환한다. 브라우저 `sessionStorage`는 ROUND 입장 힌트일
+서버에 저장된 매핑을 한 번에 조회해 기준 정보로 반환한다. 브라우저 `sessionStorage`는 ROUND 입장 힌트일
 뿐 조회 결과를 대체하지 않는다.
 종료한 방 ID의 삭제 표식은 영구 보존하고 재사용하지 않는다.
 
-### BRIEF 조회와 생성본 생성 API
+### BRIEF 주간 요약 조회·생성 API
 
 다음 API는 활동 중인 `Account` 세션과 같은 팀의 활동 중 멤버십을 요구한다. 계정 권한을
 사용하는 팀은 기존 팀 읽기·변경 권한을 검사하며 공유 키가 필요하지 않다. 공유 키 방식의 팀은
@@ -1155,7 +1179,7 @@ CSRF 없이 조회한다.
 
 | 메서드 | 경로 | 요청 | 성공 응답 |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF 불변 생성본 전체 표현 또는 일치하는 `304` |
+| `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/latest` | 헤더 `X-Baton-Access-Key`, 선택적 `If-None-Match`, 본문 없음 | `200` BRIEF에 저장된 주간 요약 또는 일치하는 `304` |
 | `POST` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions` | 헤더 `X-Baton-Access-Key`, 본문 없음 | 새 생성 `201`, 같은 불변 상태 재사용 `200`과 생성 실행 요약 |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/resolutions` | 같은 헤더, 함께 쓰는 선택적 `afterEventType`·`afterSourceReference`, `limit` 1~100(기본 20) | `200 {weekStart, zoneId, windowStart, windowEnd, evaluatedAt, resolvedCount, items, nextCursor}` |
 | `GET` | `/api/v1/teams/{teamId}/seasons/{seasonId}/brief/attention-items/summary` | 헤더 `X-Baton-Access-Key`, 본문 없음 | `200 {highCount, mediumCount, revisionGapCount}` |
@@ -1168,20 +1192,20 @@ CSRF 없이 조회한다.
 | 메서드 | 하위 경로 | 입력 | 성공 응답 |
 | --- | --- | --- | --- |
 | `GET` | `/editions` | 선택적 양수 `beforeGeneration`, `limit` 1~100(기본 20) | `editions`, nullable `nextBeforeGeneration` |
-| `GET` | `/editions/{editionId}` | UUID 식별자 | 기존 불변 본문·ETag, 조건 일치 시 `304` |
-| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 주간 요약과 같은 시간대의 지난주 마지막 불변 본문·ETag |
+| `GET` | `/editions/{editionId}` | UUID 식별자 | 저장된 본문·ETag, 조건 일치 시 `304` |
+| `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 주간 요약과 같은 시간대의 지난주 마지막 저장 본문·ETag |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
 | `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
-| `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 정체성·nullable `target` 목록 |
+| `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 `eventType`·`sourceReference`와 nullable `target` 목록 |
 | `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
 
-단건·비교·추가 전달 확인에서 요청 범위 밖인 생성본은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 target은 현재
-`title`, `roleId`, nullable `routineId`, `archived`를 포함하며 불변 생성본 ETag에 포함하지 않는다.
+단건·비교·추가 전달 확인에서 요청 범위 밖인 주간 요약은 `404 BRIEF_EDITION_NOT_FOUND`다. 업무 대상은 현재
+`title`, `roleId`, nullable `routineId`, `archived`를 포함하며 저장된 주간 요약의 ETag에 포함하지 않는다.
 준비 상태는 `READY`, `DELIVERY_PENDING`, `DELIVERY_FAILED`, `GENERATING`,
 `GENERATION_FAILED`, `SEASON_ENDED`, `DISABLED`이며 실제 생성에서는 기존 판정을 반복한다.
 추가 전달 상태는 `ADDITIONAL_DELIVERIES`, `NO_ADDITIONAL_DELIVERIES`, `UNKNOWN`이다.
-같은 생성본의 성공 생성·재사용 기록 중 최대 deliveryWatermark 뒤에 같은 팀·시즌의
-DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면 UNKNOWN이며 원본 전체
+같은 주간 요약의 생성·재사용 성공 기록 중 최대 `deliveryWatermark` 뒤에 같은 팀·시즌의
+`DELIVERED` 아웃박스가 있는지만 확인한다. 생성 성공 근거가 없으면 `UNKNOWN`이며 원본 전체
 반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
@@ -1189,7 +1213,7 @@ DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면
 조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
 권한, 실행 상태와 BRIEF 서비스 결과 분류는 PRD-0008을 따른다.
 
-현재 관심 항목 조회는 [PRD-0009](../0009_brief-current-attention/spec.md)를 따른다. 기본 상태는
+현재 점검 항목 조회는 [PRD-0009](../0009_brief-current-attention/spec.md)를 따른다. 기본 상태는
 `ACTIVE`, 기본 `limit`은 `20`이며 `1..100`을 허용한다. `severity`는 `HIGH`·`MEDIUM`,
 `revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
 첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
@@ -1205,7 +1229,7 @@ DELIVERED outbox가 있는지만 확인한다. 생성 성공 근거가 없으면
 ### ROUND 참여권과 JWK
 
 `POST /round/rooms/{roomId}/participation-grant/refresh`는 `Account` 세션, CSRF와 정확히 일치하는
-동일 출처를 요구한다. 요청 본문은 생략하거나 서버 권위 매핑을 재확인할
+동일 출처를 요구한다. 요청 본문은 생략하거나 서버 저장 매핑을 재확인할
 `{teamId,seasonId,resourceId}` 세 필드만 보낼 수 있다. 본문을 생략하면 `Content-Type`도 보내지
 않는다. 세 식별자는 소문자 UUID 문자열이어야 하며 누락·잘못된 형식·추가 필드는
 `400 INVALID_INPUT`으로 거부하고 기존 참여권 쿠키를 유지한다.
@@ -1265,7 +1289,11 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-두 생성 파일은 프런트 단독·Docker 빌드에서도 Java 도구 체인을 요구하지 않도록 저장소에 추적한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다. 정규화 계층은 생성기가 누락하는 요청 본문 필수성, Jakarta Validation, UUID·날짜 형식, 인증 세션의 정확한 두 응답 변형과 필수이면서 `null`을 허용하는 응답을 보정하며 OpenAPI 서버를 동일 출처 `/`로 유지한다. API 경로, 요청·응답 DTO, 헤더, 오류 상태나 열거형을 바꾸면 구현·REST Docs 디스크립터·이 문서와 두 생성 파일을 같은 변경에 포함한다. `checkApiContract`는 REST Docs에서 재생성한 OpenAPI와 추적 파일의 바이트 차이와 OpenAPI에서 재생성한 TypeScript 타입의 드리프트를 거부한다. 오퍼레이션별 경로·메서드·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 디스크립터가 검증하며 별도 수기 목록이나 의미 검증기로 복제하지 않는다. Spring Security가 직접 처리하는 자체 세션·로그아웃도 실제 필터 체인 기반 REST Docs로 생성 계약에 포함하고, OAuth 시작·콜백 경로만 실제 필터 체인 보안 통합 테스트로 고정한다. 프런트 API 함수는 생성된 `paths`로 URI 템플릿과 HTTP 메서드 조합까지 검증한다.
+두 생성 파일은 프런트 단독·Docker 빌드에서 Java 도구 체인이 없어도 사용할 수 있도록 저장소에 포함한다. 직접 수정하지 않고 `generateApiContract`로 갱신한다.
+
+`generateApiContract`는 요청 본문 필수 여부, Jakarta Validation, UUID·날짜 형식, 인증 세션 응답과 `null` 허용 필드를 보정하고 OpenAPI 서버를 동일 출처 `/`로 유지한다. API 경로·DTO·헤더·상태 코드·열거형을 바꾸면 구현, REST Docs 디스크립터, 이 문서와 생성 파일을 함께 갱신한다.
+
+`checkApiContract`는 REST Docs에서 다시 만든 OpenAPI와 추적 파일, OpenAPI에서 다시 만든 TypeScript 타입의 차이를 검사한다. MockMvc REST Docs는 오퍼레이션과 공통 헤더를 검증한다. 자체 세션·로그아웃도 실제 Spring Security 필터 체인으로 문서화하며, OAuth 시작·콜백 경로는 보안 통합 테스트에서 확인한다. 프런트 API 함수는 생성된 `paths`로 경로와 HTTP 메서드를 검사한다.
 
 ## 11. 관련 문서
 
@@ -1286,7 +1314,7 @@ cd frontend && npm ci && cd ..
 - [역할 인수인계 전달 생명주기](../../ADR/0013_role_handoff_lifecycle/adr.md)
 - [WATCH 트랜잭셔널 아웃박스와 현재 상태 재동기화](../../ADR/0015_watch-transactional-outbox/adr.md)
 - [WATCH 상태 변경 이벤트 트랜잭셔널 인박스](../../ADR/0016_watch-health-event-transactional-inbox/adr.md)
-- [BATON 경유 BRIEF 생성본 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
+- [BATON 경유 BRIEF 주간 요약 조회와 생성](../0008_brief-edition-query-and-generation/spec.md)
 - [BATON 경유 BRIEF 점검 항목 조회](../0009_brief-current-attention/spec.md)
 - [BRIEF 조회·생성 애플리케이션 경계](../../ADR/0020_brief-query-generation-boundary/adr.md)
 

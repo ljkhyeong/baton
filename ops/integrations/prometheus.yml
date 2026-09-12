@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+
+rule_files:
+  - baton-alerts.yml
+  - baton-https-alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        # 실제 내부 Alertmanager 주소로 지정한다. 공개 도메인은 사용하지 않는다.
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: baton
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 수집기는 BATON 앱과 네트워크 공간을 공유해야 한다.
+      - targets: ['127.0.0.1:8080']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: baton_integration_.*
+        action: keep
+
+  - job_name: baton-https
+    scrape_interval: 1m
+    metrics_path: /probe
+    params:
+      module: [baton_https]
+    static_configs:
+      - targets: ['https://b4ton.com/actuator/health']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        # 실제 내부 Blackbox Exporter 주소로 지정한다.
+        replacement: blackbox-exporter:9115

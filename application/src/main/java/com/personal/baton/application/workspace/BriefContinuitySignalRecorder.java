@@ -146,7 +146,7 @@ public class BriefContinuitySignalRecorder {
                         BriefContinuitySignalRecorder::identity,
                         Function.identity(),
                         (first, duplicate) -> {
-                            throw new IllegalStateException("같은 정체성의 연속성 신호가 중복됐습니다");
+                            throw new IllegalStateException("같은 식별 기준의 업무 점검 신호가 중복됐습니다");
                         },
                         () -> new TreeMap<>(SignalIdentity.ORDER)
                 ));

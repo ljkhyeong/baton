@@ -263,20 +263,24 @@ case "$command_name" in
     fi
     cp -p -- "$source_path" "$remote_path"
     ;;
-  cat)
-    cat_count_file="${FAKE_RCLONE_CAT_COUNT_FILE:-$FAKE_RCLONE_COUNT_FILE.cat}"
-    cat_count=0
-    if [[ -f "$cat_count_file" ]]; then
-      IFS= read -r cat_count < "$cat_count_file"
+  check)
+    source_dir="$2"
+    remote_relative="${3#*:}"
+    shift 3
+    [[ "$*" == '--download --one-way --files-from-raw - --retries 5 --retries-sleep 30s' ]] || exit 46
+    check_count_file="${FAKE_RCLONE_CHECK_COUNT_FILE:-$FAKE_RCLONE_COUNT_FILE.check}"
+    check_count=0
+    if [[ -f "$check_count_file" ]]; then
+      IFS= read -r check_count < "$check_count_file"
     fi
-    cat_count=$((cat_count + 1))
-    printf '%s\n' "$cat_count" > "$cat_count_file"
-    if [[ "${FAKE_RCLONE_CORRUPT_CAT_AT:-0}" == "$cat_count" ]]; then
-      printf '%s\n' 'corrupted remote readback'
-      exit 0
-    fi
-    remote_relative="${2#*:}"
-    cat -- "$FAKE_REMOTE_ROOT/$remote_relative"
+    while IFS= read -r name; do
+      check_count=$((check_count + 1))
+      printf '%s\n' "$check_count" > "$check_count_file"
+      if [[ "${FAKE_RCLONE_CORRUPT_CHECK_AT:-0}" == "$check_count" ]]; then
+        exit 47
+      fi
+      cmp -s -- "$source_dir/$name" "$FAKE_REMOTE_ROOT/$remote_relative/$name" || exit 48
+    done
     ;;
   *)
     printf 'Unexpected fake rclone command: %s\n' "$command_name" >&2
@@ -286,6 +290,15 @@ esac
 SCRIPT
 
 chmod +x "$fake_bin/flock" "$fake_bin/docker" "$fake_bin/mv" "$fake_bin/rclone"
+
+cat > "$fake_bin/curl" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > "$FAKE_HEARTBEAT_ROOT/args"
+cat > "$FAKE_HEARTBEAT_ROOT/request"
+exit "${FAKE_HEARTBEAT_EXIT:-0}"
+SCRIPT
+chmod +x "$fake_bin/curl"
 
 run_cycle() {
   local scenario_root="$1"
@@ -297,7 +310,7 @@ run_cycle() {
   BATON_RCLONE_REMOTE=fake:daily \
   FAKE_REMOTE_ROOT="$scenario_root/remote" \
   FAKE_RCLONE_COUNT_FILE="$scenario_root/rclone-count" \
-  FAKE_RCLONE_CAT_COUNT_FILE="$scenario_root/rclone-cat-count" \
+  FAKE_RCLONE_CHECK_COUNT_FILE="$scenario_root/rclone-check-count" \
   FAKE_MV_COUNT_FILE="$scenario_root/mv-count" \
   "$fixture_backup_cycle_script"
 }
@@ -580,7 +593,7 @@ BATON_BACKUP_LOCAL_RETENTION_DAYS=14 \
 BATON_RCLONE_REMOTE=fake:daily \
 FAKE_REMOTE_ROOT="$stale_sync_root/remote" \
 FAKE_RCLONE_COUNT_FILE="$stale_sync_root/rclone-count" \
-FAKE_RCLONE_CAT_COUNT_FILE="$stale_sync_root/rclone-cat-count" \
+FAKE_RCLONE_CHECK_COUNT_FILE="$stale_sync_root/rclone-check-count" \
 "$repo_root/ops/sync-backups.sh" >/dev/null
 if PATH="$fake_bin:$PATH" \
   BATON_BACKUP_STATE_DIR="$stale_sync_root/state" \
@@ -597,7 +610,7 @@ for day in 01 02 03 04; do
   write_valid_backup "$prune_audit_backup"
   touch -t "202001${day}0000" "$prune_audit_backup"
 done
-if FAKE_RCLONE_CORRUPT_CAT_AT=11 run_cycle "$prune_audit_root" >/dev/null 2>&1; then
+if FAKE_RCLONE_CORRUPT_CHECK_AT=11 run_cycle "$prune_audit_root" >/dev/null 2>&1; then
   fail 'remote prune audit mismatch unexpectedly succeeded'
 fi
 prune_audit_backup_count="$(find "$prune_audit_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
@@ -640,7 +653,7 @@ assert_no_file "$new_upload_failure_root/state/last-success"
 readback_mismatch_root="$test_root/readback-mismatch"
 mkdir -p -- "$readback_mismatch_root/backups" "$readback_mismatch_root/remote"
 write_valid_production_env "$readback_mismatch_root/production.env"
-if FAKE_RCLONE_CORRUPT_CAT_AT=1 run_cycle "$readback_mismatch_root" >/dev/null 2>&1; then
+if FAKE_RCLONE_CORRUPT_CHECK_AT=1 run_cycle "$readback_mismatch_root" >/dev/null 2>&1; then
   fail 'remote backup readback mismatch unexpectedly succeeded'
 fi
 readback_backup="$(find "$readback_mismatch_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' -print)"
@@ -651,7 +664,7 @@ assert_no_file "$readback_mismatch_root/state/last-success"
 sidecar_readback_root="$test_root/sidecar-readback-mismatch"
 mkdir -p -- "$sidecar_readback_root/backups" "$sidecar_readback_root/remote"
 write_valid_production_env "$sidecar_readback_root/production.env"
-if FAKE_RCLONE_CORRUPT_CAT_AT=2 run_cycle "$sidecar_readback_root" >/dev/null 2>&1; then
+if FAKE_RCLONE_CORRUPT_CHECK_AT=2 run_cycle "$sidecar_readback_root" >/dev/null 2>&1; then
   fail 'remote checksum readback mismatch unexpectedly succeeded'
 fi
 sidecar_readback_backup="$(find "$sidecar_readback_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' -print)"
@@ -728,5 +741,39 @@ set -e
 assert_count 75 "$lock_status" 'backup lock contention exit status'
 lock_backup_count="$(find "$lock_root/backups" -maxdepth 1 -type f | wc -l | tr -d ' ')"
 assert_count 0 "$lock_backup_count" 'backup lock contention local files'
+
+heartbeat_root="$test_root/heartbeat"
+mkdir -p -- "$heartbeat_root/backups" "$heartbeat_root/remote"
+write_valid_production_env "$heartbeat_root/production.env"
+printf '%s' 'https://uptime.betterstack.com/api/v1/heartbeat/test-secret-token' > "$heartbeat_root/url"
+chmod 600 "$heartbeat_root/url"
+BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
+FAKE_HEARTBEAT_ROOT="$heartbeat_root" \
+run_cycle "$heartbeat_root" > "$heartbeat_root/output" 2>&1
+assert_file "$heartbeat_root/state/last-success"
+assert_file "$heartbeat_root/request"
+if grep -q 'test-secret-token' "$heartbeat_root/args" "$heartbeat_root/output"; then
+  fail 'heartbeat token leaked to process arguments or logs'
+fi
+rm "$heartbeat_root/request"
+# 통보 실패는 완료한 백업을 실패 처리하거나 다시 업로드하지 않는다.
+BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
+FAKE_HEARTBEAT_ROOT="$heartbeat_root" FAKE_HEARTBEAT_EXIT=28 \
+run_cycle "$heartbeat_root" > "$heartbeat_root/output" 2>&1
+assert_file "$heartbeat_root/request"
+assert_file "$heartbeat_root/state/last-success"
+rm "$heartbeat_root/request"
+# 원격 업로드가 실패하면 완료 신호를 보내지 않는다.
+if BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
+  FAKE_HEARTBEAT_ROOT="$heartbeat_root" FAKE_RCLONE_FAIL_AT=2 \
+  run_cycle "$new_upload_failure_root" >/dev/null 2>&1; then
+  fail 'backup failure with heartbeat unexpectedly succeeded'
+fi
+assert_no_file "$heartbeat_root/request"
+printf '%s' 'http://uptime.betterstack.com/api/v1/heartbeat/test-secret-token' > "$heartbeat_root/url"
+BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
+FAKE_HEARTBEAT_ROOT="$heartbeat_root" \
+run_cycle "$heartbeat_root" >/dev/null 2>&1
+assert_no_file "$heartbeat_root/request"
 
 printf 'PASS: backup cycle creates, verifies, uploads, retains, and fails closed\n'

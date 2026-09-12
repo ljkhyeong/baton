@@ -11,7 +11,7 @@ BATON이 확정한 운영 회차와 반복 업무 실행 마감을 BATON CAL의 
 
 ## 2. 고정한 외부 계약
 
-BATON은 공개 불변 사전 릴리스
+BATON은 공개 고정 사전 릴리스
 [`contracts-v1.1.0-rc.2`](https://github.com/ljkhyeong/baton-cal/releases/tag/contracts-v1.1.0-rc.2)를
 생산자 검증 기준으로 고정한다. 운영 안정 기준은 계약 의미를 검증해 정식 버전으로 승격하기 전까지
 `1.0.0`으로 유지한다.
@@ -31,7 +31,7 @@ BATON은 공개 불변 사전 릴리스
 
 ### 시즌 표시 이름 계약
 
-시즌 이름은 CAL의 불변 사전 릴리스 `1.1.0-rc.2`에서 제공하는
+시즌 이름은 CAL의 고정 사전 릴리스 `1.1.0-rc.2`에서 제공하는
 `PUT /internal/api/v1/seasons/{seasonId}/calendar-metadata`로 전달한다. 현재 BATON에는
 `CalendarSeasonMetadataClient` 포트, HTTP 어댑터와 원본 변경의 아웃박스 전달이 구현되어 있다.
 최초 시즌 생성·이름 수정·다음 시즌 생성은 원본 저장 트랜잭션 안에서 이름을 기록한다.
@@ -345,7 +345,7 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
 - Actuator Prometheus의 `baton_integration_delivery_items`와
   `baton_integration_delivery_actionable_failed_items`가 `integration="calendar"` 범위에서 MySQL
   아웃박스의 상태별 현재 행 수와 조치 대상 실패 수를 노출하는지 공통 운영 지표 테스트로 검증한다.
-- `./ops/tests/calendar-consumer-contract.sh`가 CAL 불변 사전 릴리스 `1.1.0-rc.2` 소스의 실제
+- `./ops/tests/calendar-consumer-contract.sh`가 CAL 고정 사전 릴리스 `1.1.0-rc.2` 소스의 실제
   PostgreSQL 컨테이너를 띄우고 BATON 운영 클라이언트로 생성·변경·취소, 응답 유실 재전달과 역순
   전달을 검증한다.
 - 같은 실행에서 시즌 이름 최초 수신·변경·중복·역순·충돌을 함께 검증한다. 실제 HTTP 요청 바이트를 고정한 스키마에
@@ -369,7 +369,7 @@ CAL·WATCH·BRIEF·이메일 지표를 읽으며 실패 행을 자동 재처리�
    DB 상태에서 `baton_integration_delivery_actionable_failed_items{integration="calendar"}`가
    `0`인지 확인한 뒤
    `BATON_CAL_DELIVERY_ENABLED=true`로 전환한다.
-5. 두 점검 명령을 다시 실행해 `pending`, `processing`, `failed`가 모두 `0`으로 수렴했는지 확인하고
+5. 두 점검 명령을 다시 실행해 `pending`, `processing`, `failed`가 모두 `0`인지 확인하고
    CAL 시즌 피드의 대표 회차·마감을 확인한다.
 
 ### 시즌 이름 최초 보정·캡처 재개

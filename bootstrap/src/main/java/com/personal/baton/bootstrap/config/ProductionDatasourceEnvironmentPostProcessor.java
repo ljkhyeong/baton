@@ -74,7 +74,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
     private void requireConfigured(String value, String environmentName) {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException(
-                    "production 프로필에는 " + environmentName + " 설정이 필요합니다"
+                    "운영 프로필에는 " + environmentName + " 설정이 필요합니다"
             );
         }
     }
@@ -83,7 +83,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         String normalizedUrl = url.toLowerCase(Locale.ROOT);
         if (!normalizedUrl.startsWith("jdbc:mysql://")) {
             throw new IllegalStateException(
-                    "production 프로필의 DB_URL은 MySQL JDBC 주소여야 합니다"
+                    "운영 프로필의 DB_URL은 MySQL JDBC 주소여야 합니다"
             );
         }
         if (url.indexOf('#') >= 0) {
@@ -103,7 +103,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         String databaseName = url.substring(databasePathStart + 1, queryStart);
         if (!DATABASE_NAME.matcher(databaseName).matches()) {
             throw new IllegalStateException(
-                    "production 프로필의 DB_URL은 단일 데이터베이스 이름을 가져야 합니다"
+                    "운영 프로필의 DB_URL은 단일 데이터베이스 이름을 가져야 합니다"
             );
         }
 
@@ -185,7 +185,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
                 .orElse("");
         if (!REQUIRED_CONNECTION_INIT_SQL.equals(connectionInitSql)) {
             throw new IllegalStateException(
-                    "production 프로필의 DB 세션 초기화 SQL은 잠금 대기 제한 설정만 허용합니다"
+                    "운영 프로필의 DB 세션 초기화 SQL은 잠금 대기 제한 설정만 허용합니다"
             );
         }
     }
@@ -194,7 +194,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         Matcher matcher = SINGLE_HOST_AUTHORITY.matcher(authority);
         if (!matcher.matches()) {
             throw new IllegalStateException(
-                    "production 프로필의 DB_URL은 속성 없는 단일 MySQL host만 허용합니다"
+                    "운영 프로필의 DB_URL은 속성 없는 단일 MySQL 호스트만 허용합니다"
             );
         }
 
@@ -203,7 +203,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
             int portNumber = Integer.parseInt(port);
             if (portNumber < 1 || portNumber > 65535) {
                 throw new IllegalStateException(
-                        "production 프로필의 DB_URL port는 1~65535 범위여야 합니다"
+                        "운영 프로필의 DB_URL 포트는 1~65535 범위여야 합니다"
                 );
             }
         }
@@ -211,13 +211,13 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
 
     private IllegalStateException alternateDatasourceProperty(String propertyName) {
         return new IllegalStateException(
-                "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: " + propertyName
+                "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: " + propertyName
         );
     }
 
     private IllegalStateException insecureTlsUrl() {
         return new IllegalStateException(
-                "production 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
+                "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
         );
     }
 
@@ -225,7 +225,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         if (!DATABASE_USERNAME.matcher(username).matches()
                 || username.equalsIgnoreCase("root")) {
             throw new IllegalStateException(
-                    "production 프로필의 DB_USERNAME은 root가 아닌 1~32자 영문·숫자·밑줄이어야 합니다"
+                    "운영 프로필의 DB_USERNAME은 root가 아닌 1~32자 영문·숫자·밑줄이어야 합니다"
             );
         }
     }
@@ -233,7 +233,7 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
     private void requireSafePassword(String password) {
         if (!DATABASE_PASSWORD.matcher(password).matches()) {
             throw new IllegalStateException(
-                    "production 프로필의 DB_PASSWORD는 32~200자 URL-safe ASCII여야 합니다"
+                    "운영 프로필의 DB_PASSWORD는 32~200자 URL 안전 ASCII여야 합니다"
             );
         }
     }

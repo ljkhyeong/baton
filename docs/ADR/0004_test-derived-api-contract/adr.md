@@ -7,7 +7,7 @@
 
 BATON은 MockMvc와 Spring REST Docs로 HTTP 요청·응답, 헤더, 상태와 오류 예시를 이미 검증한다. 프런트엔드는 같은 계약을 수기 TypeScript 타입으로 다시 적고 있어 DTO·열거형·필수 헤더가 바뀔 때 두 표현이 어긋날 수 있다.
 
-파일럿에서는 계약의 단일 기준을 유지하면서도 프런트 단독 빌드와 기존 `apiRequest`, `ApiError`, React Query 캐시 키, 내구성 있는 멱등 재시도 정책을 보존해야 한다.
+파일럿에서는 계약의 단일 기준을 유지하면서도 프런트 단독 빌드와 기존 `apiRequest`, `ApiError`, React Query 캐시 키, 응답 유실 복구용 멱등 재시도 정책을 보존해야 한다.
 
 ## 결정
 
@@ -73,7 +73,12 @@ cd frontend && npm ci && cd ..
 ./gradlew --no-daemon checkApiContract
 ```
 
-`generateApiContract`는 REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 순서대로 실행한다. `checkApiContract`는 새 OpenAPI를 추적 파일과 바이트 단위로 비교한 뒤 openapi-typescript의 `--check`로 TypeScript 생성물이 최신인지 검사한다. 오퍼레이션별 경로·메서드·본문·헤더·상태와 공통 헤더는 실제 MockMvc REST Docs 계약 테스트와 디스크립터가 검증하므로 별도의 수기 오퍼레이션 목록이나 의미 검증기를 중복 관리하지 않는다. Spring Security가 직접 처리하는 로컬 세션·로그아웃도 실제 필터 체인 기반 REST Docs로 생성 OpenAPI에 포함하고, OAuth 시작·콜백 경로만 실제 필터 체인 보안 통합 테스트로 고정한다. 반복 업무 정의 보관·복원은 `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive` `operationId`로 고정한다. GitHub Actions 품질 관문도 풀 리퀘스트와 `main` 푸시에서 `build checkApiContract`를 한 Gradle 호출로 실행해 전체 회귀와 같은 계약 검사를 함께 수행한다.
+- `generateApiContract`: REST Docs 테스트, OpenAPI 생성·동기화와 TypeScript 생성을 실행한다.
+- `checkApiContract`: 새 OpenAPI와 추적 파일, TypeScript 생성물이 최신인지 검사한다.
+- MockMvc REST Docs: 오퍼레이션과 공통 헤더를 검증한다. 별도 수기 목록이나 중복 검증기는 두지 않는다.
+- Spring Security: 자체 세션·로그아웃은 실제 필터 체인으로 문서화하고 OAuth 시작·콜백 경로는 보안 통합 테스트로 확인한다.
+- 반복 업무 보관·복원: `PATCH /api/v1/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive`와 `updateRoutineArchive`로 고정한다.
+- CI: 풀 리퀘스트와 `main` 푸시에서 `build checkApiContract`를 한 번 실행한다.
 
 ## 결과
 

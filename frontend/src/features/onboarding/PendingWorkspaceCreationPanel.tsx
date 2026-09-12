@@ -19,7 +19,7 @@ type PendingWorkspaceCreationPanelProps = {
 
 function formatCreatedAt(value: number) {
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '저장 시각 확인 불가'
+  if (Number.isNaN(date.getTime())) return '저장 시각 없음'
   return new Intl.DateTimeFormat('ko-KR', {
     month: 'short',
     day: 'numeric',
@@ -32,8 +32,8 @@ function formatLocalDate(value: string) {
   return value.replaceAll('-', '.')
 }
 
-const loadedNoticeMessage = '입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘작업 공간 다시 확인’을 누르세요.'
-const discardBusyMessage = '다른 탭에서 작업 공간 생성 결과를 확인 중입니다. 처리가 끝난 뒤 다시 시도해 주세요.'
+const loadedNoticeMessage = '저장된 입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘생성 결과 다시 확인’을 누르세요.'
+const discardBusyMessage = '다른 탭에서 생성 결과를 확인하고 있습니다. 끝난 뒤 다시 시도해 주세요.'
 
 export default function PendingWorkspaceCreationPanel({
   items,
@@ -103,8 +103,8 @@ export default function PendingWorkspaceCreationPanel({
     if (result === 'discarded' || result === 'missing') {
       setConfirmingId(null)
       setNotice(result === 'discarded'
-        ? '목록에서 지웠습니다. 생성된 작업 공간은 삭제하지 않습니다.'
-        : '다른 탭에서 이미 정리한 임시 기록입니다.')
+        ? '목록에서 삭제했습니다. 생성된 작업 공간은 그대로 유지됩니다.'
+        : '다른 탭에서 이미 삭제한 임시 기록입니다.')
       onRefresh()
       requestAnimationFrame(() => {
         if (nextItem) {
@@ -129,7 +129,7 @@ export default function PendingWorkspaceCreationPanel({
       onRefresh()
       return
     }
-    setError('목록에서 지우지 못했습니다. 브라우저 저장을 허용한 뒤 다시 시도하세요.')
+    setError('목록에서 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')
   }
 
   const load = (item: PendingWorkspaceCreationItem) => {
@@ -142,7 +142,7 @@ export default function PendingWorkspaceCreationPanel({
   return (
     <section
       className="pending-workspaces-region"
-      aria-label="생성 확인이 필요한 작업 공간"
+      aria-label="생성 결과 확인 필요"
     >
       {items.length > 0 && (
         <details
@@ -151,11 +151,11 @@ export default function PendingWorkspaceCreationPanel({
           onToggle={(event) => setOpen(event.currentTarget.open)}
         >
           <summary>
-            <span>생성 확인이 필요한 작업 공간 <strong>{items.length}개</strong></span>
-            <small>작업 공간이 만들어졌는지 확인해 주세요</small>
+            <span>생성 결과 확인 필요 <strong>{items.length}개</strong></span>
+            <small>작업 공간이 만들어졌는지 확인하세요</small>
           </summary>
           <p className="pending-workspaces-intro">
-            작업 공간이 만들어졌는지 확인하지 못했습니다. 저장된 입력을 불러와 다시 제출하세요. 이미 만들어졌다면 같은 작업 공간을 엽니다.
+            생성 결과를 받지 못했습니다. 저장된 입력을 불러와 다시 확인하세요. 이미 만들어졌다면 기존 작업 공간을 엽니다.
           </p>
           <ul>
             {items.map((item) => {
@@ -185,7 +185,7 @@ export default function PendingWorkspaceCreationPanel({
                       onClick={() => load(item)}
                       aria-label={`${label} 저장된 입력 불러오기`}
                     >
-                      {selected ? '입력 불러옴' : '입력 불러오기'}
+                      {selected ? '입력 불러오기 완료' : '입력 불러오기'}
                     </button>
                     <button
                       type="button"
@@ -211,9 +211,9 @@ export default function PendingWorkspaceCreationPanel({
                       role="group"
                       aria-labelledby={confirmationTitleId}
                     >
-                      <strong id={confirmationTitleId}>이 목록에서 지울까요?</strong>
+                      <strong id={confirmationTitleId}>목록에서 삭제할까요?</strong>
                       <p>
-                        작업 공간이 이미 생성됐다면 공유 링크를 이 브라우저에서 다시 찾지 못할 수 있습니다. 작업 공간의 내용은 삭제되지 않습니다.
+                        작업 공간은 삭제되지 않습니다. 다만 이 브라우저에서 공유 링크를 다시 찾지 못할 수 있습니다.
                       </p>
                       <div>
                         <button

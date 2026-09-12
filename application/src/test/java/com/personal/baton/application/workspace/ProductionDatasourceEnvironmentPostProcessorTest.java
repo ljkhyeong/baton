@@ -60,7 +60,7 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                 });
     }
 
-    @DisplayName("production 프로필은 데이터베이스 주소가 없으면 시작을 거절한다")
+    @DisplayName("운영 프로필은 데이터베이스 주소가 없으면 시작을 거절한다")
     @Test
     void rejectsMissingDatabaseUrlInProduction() {
         productionContextRunner
@@ -74,12 +74,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필에는 DB_URL 설정이 필요합니다"
+                                    "운영 프로필에는 DB_URL 설정이 필요합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 데이터베이스 사용자가 없으면 시작을 거절한다")
+    @DisplayName("운영 프로필은 데이터베이스 사용자가 없으면 시작을 거절한다")
     @Test
     void rejectsMissingDatabaseUsernameInProduction() {
         productionContextRunner
@@ -93,12 +93,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필에는 DB_USERNAME 설정이 필요합니다"
+                                    "운영 프로필에는 DB_USERNAME 설정이 필요합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 데이터베이스 비밀번호가 없으면 시작을 거절한다")
+    @DisplayName("운영 프로필은 데이터베이스 비밀번호가 없으면 시작을 거절한다")
     @Test
     void rejectsMissingDatabasePasswordInProduction() {
         productionContextRunner
@@ -112,12 +112,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필에는 DB_PASSWORD 설정이 필요합니다"
+                                    "운영 프로필에는 DB_PASSWORD 설정이 필요합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 TLS를 강제하지 않는 데이터베이스 주소를 거절한다")
+    @DisplayName("운영 프로필은 TLS를 강제하지 않는 데이터베이스 주소를 거절한다")
     @Test
     void rejectsInsecureDatabaseUrlInProduction() {
         productionContextRunner
@@ -131,12 +131,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
+                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 URL fragment 뒤의 가짜 TLS 설정을 거절한다")
+    @DisplayName("운영 프로필은 URL 조각 뒤의 가짜 TLS 설정을 거절한다")
     @Test
     void rejectsTlsModeHiddenBehindUrlFragmentInProduction() {
         productionContextRunner
@@ -151,12 +151,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
+                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 중복된 TLS 설정을 거절한다")
+    @DisplayName("운영 프로필은 중복된 TLS 설정을 거절한다")
     @Test
     void rejectsDuplicateTlsModesInProduction() {
         productionContextRunner
@@ -171,12 +171,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
+                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 공백으로 숨긴 중복 TLS 설정을 거절한다")
+    @DisplayName("운영 프로필은 공백으로 숨긴 중복 TLS 설정을 거절한다")
     @Test
     void rejectsWhitespaceHiddenDuplicateTlsModeInProduction() {
         productionContextRunner
@@ -191,12 +191,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
+                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 host별 TLS 덮어쓰기가 있는 주소를 거절한다")
+    @DisplayName("운영 프로필은 호스트별 TLS 덮어쓰기가 있는 주소를 거절한다")
     @Test
     void rejectsHostSpecificTlsOverrideInProduction() {
         productionContextRunner
@@ -211,12 +211,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_URL은 속성 없는 단일 MySQL host만 허용합니다"
+                                    "운영 프로필의 DB_URL은 속성 없는 단일 MySQL 호스트만 허용합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 Hikari driver 속성의 TLS 덮어쓰기를 거절한다")
+    @DisplayName("운영 프로필은 Hikari 드라이버 속성의 TLS 덮어쓰기를 거절한다")
     @Test
     void rejectsHikariDriverPropertyTlsOverrideInProduction() {
         productionContextRunner
@@ -231,13 +231,13 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
+                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.datasource.hikari.data-source-properties"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 Hikari JDBC 주소 덮어쓰기를 거절한다")
+    @DisplayName("운영 프로필은 Hikari JDBC 주소 덮어쓰기를 거절한다")
     @Test
     void rejectsHikariJdbcUrlOverrideInProduction() {
         productionContextRunner
@@ -253,13 +253,13 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
+                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.datasource.hikari.jdbc-url"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 relaxed alias로 지정한 Hikari JNDI를 거절한다")
+    @DisplayName("운영 프로필은 완화된 별칭으로 지정한 Hikari JNDI를 거절한다")
     @Test
     void rejectsRelaxedHikariJndiOverrideInProduction() {
         productionContextRunner
@@ -274,13 +274,13 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
+                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.datasource.hikari.data-source-jndi"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 빈 Hikari 비밀번호 덮어쓰기도 거절한다")
+    @DisplayName("운영 프로필은 빈 Hikari 비밀번호 덮어쓰기도 거절한다")
     @Test
     void rejectsBlankHikariPasswordOverrideInProduction() {
         productionContextRunner
@@ -295,13 +295,13 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
+                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.datasource.hikari.password"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 Flyway 전용 JDBC 주소를 거절한다")
+    @DisplayName("운영 프로필은 Flyway 전용 JDBC 주소를 거절한다")
     @Test
     void rejectsFlywaySpecificDatabaseUrlInProduction() {
         productionContextRunner
@@ -317,13 +317,13 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
+                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.flyway.url"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 Flyway JDBC 속성의 TLS 덮어쓰기를 거절한다")
+    @DisplayName("운영 프로필은 Flyway JDBC 속성의 TLS 덮어쓰기를 거절한다")
     @Test
     void rejectsFlywayJdbcPropertyTlsOverrideInProduction() {
         productionContextRunner
@@ -338,13 +338,13 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
+                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
                                             + "spring.flyway.jdbc-properties"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 잠금 대기 제한이 아닌 DB 세션 초기화 SQL을 거절한다")
+    @DisplayName("운영 프로필은 잠금 대기 제한이 아닌 DB 세션 초기화 SQL을 거절한다")
     @Test
     void rejectsUnsafeConnectionInitSqlInProduction() {
         productionContextRunner
@@ -359,12 +359,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB 세션 초기화 SQL은 잠금 대기 제한 설정만 허용합니다"
+                                    "운영 프로필의 DB 세션 초기화 SQL은 잠금 대기 제한 설정만 허용합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 root 데이터베이스 사용자를 거절한다")
+    @DisplayName("운영 프로필은 root 계정인 데이터베이스 사용자를 거절한다")
     @Test
     void rejectsRootDatabaseUsernameInProduction() {
         productionContextRunner
@@ -378,12 +378,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_USERNAME은 root가 아닌 1~32자 영문·숫자·밑줄이어야 합니다"
+                                    "운영 프로필의 DB_USERNAME은 root가 아닌 1~32자 영문·숫자·밑줄이어야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 약한 데이터베이스 비밀번호를 거절한다")
+    @DisplayName("운영 프로필은 약한 데이터베이스 비밀번호를 거절한다")
     @Test
     void rejectsWeakDatabasePasswordInProduction() {
         productionContextRunner
@@ -397,12 +397,12 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "production 프로필의 DB_PASSWORD는 32~200자 URL-safe ASCII여야 합니다"
+                                    "운영 프로필의 DB_PASSWORD는 32~200자 URL 안전 ASCII여야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 명시적인 TLS 데이터베이스 설정을 허용한다")
+    @DisplayName("운영 프로필은 명시적인 TLS 데이터베이스 설정을 허용한다")
     @Test
     void acceptsExplicitSecureDatasourceConfigurationInProduction() {
         productionContextRunner

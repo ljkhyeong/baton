@@ -112,7 +112,7 @@ export function Sidebar({
           <span className="avatar avatar-dark">{activeMemberCount}</span>
           <span><strong>{activeMemberCount}명 활동 중</strong><small>{workspace.season.name}</small></span>
           <span className="profile-actions">
-            <button type="button" onClick={onShare} title="공유 링크 복사">공유</button>
+            <button type="button" onClick={onShare} title="작업 공간 공유">공유</button>
             <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
           </span>
         </div>
@@ -145,8 +145,8 @@ export function MobileTopbar({
         aria-label={`${teamName} ${seasonName}. 시즌 전환`}
         onClick={onSwitchSeason}
       >
-        <span>{teamName}</span>
-        <small>{seasonName}</small>
+        <span className="mobile-team-copy"><strong>{teamName}</strong><small>{seasonName}</small></span>
+        <Icon name="chevron" size={15} />
       </button>
       <span className="mobile-workspace-actions">
         <Link className="team-list-link" to="/my-teams">내 팀</Link>
@@ -242,12 +242,12 @@ export function ContentCreationCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="새 항목 추가를 위한 임시 기록 삭제"
+      aria-label="임시 기록 삭제 필요"
     >
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>새 항목을 추가하려면 브라우저의 임시 기록을 지워야 합니다.</strong>
+          <strong>새 항목을 추가하려면 남아 있는 임시 기록을 먼저 삭제하세요.</strong>
           <small>{message}</small>
         </span>
       </div>
@@ -258,7 +258,7 @@ export function ContentCreationCleanupBanner({
           disabled={pending}
           onClick={onRetry}
         >
-          {pending ? '임시 기록 정리 중…' : '임시 기록 정리'}
+          {pending ? '임시 기록 삭제 중…' : '임시 기록 삭제'}
         </button>
       </div>
     </section>

@@ -105,7 +105,7 @@ class SchedulingConfigTest {
         });
     }
 
-    @DisplayName("메일 발송을 비활성화하면 이메일 인증 전용 scheduler 실행기를 만들지 않는다")
+    @DisplayName("메일 발송을 비활성화하면 이메일 인증 전용 스케줄러 실행기를 만들지 않는다")
     @Test
     void omitsEmailVerificationSchedulerWhenDeliveryIsDisabled() {
         new ApplicationContextRunner()

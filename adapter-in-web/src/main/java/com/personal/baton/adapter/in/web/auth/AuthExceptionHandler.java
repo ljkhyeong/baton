@@ -7,6 +7,8 @@ import com.personal.baton.application.identity.error.PasswordResetException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
 import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
+import com.personal.baton.application.identity.error.HumanVerificationRejectedException;
+import com.personal.baton.application.identity.error.HumanVerificationUnavailableException;
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
@@ -97,6 +99,30 @@ public class AuthExceptionHandler {
                 HttpStatus.CONFLICT,
                 "IDENTITY_CONFLICT",
                 "요청한 신원을 사용할 수 없습니다"
+        );
+    }
+
+    @ExceptionHandler(HumanVerificationRejectedException.class)
+    public ResponseEntity<ErrorResponse> handleHumanVerificationRejected(
+            HumanVerificationRejectedException exception
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "HUMAN_VERIFICATION_FAILED",
+                "자동 요청 방지 확인을 다시 완료해 주세요"
+        );
+    }
+
+    @ExceptionHandler(HumanVerificationUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleHumanVerificationUnavailable(
+            HumanVerificationUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        HttpObservationErrors.mark(request, exception);
+        return error(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "HUMAN_VERIFICATION_UNAVAILABLE",
+                "자동 요청 방지 확인을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요"
         );
     }
 

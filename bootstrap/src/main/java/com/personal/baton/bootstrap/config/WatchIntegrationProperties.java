@@ -24,13 +24,13 @@ public record WatchIntegrationProperties(
             return DISABLED_SOURCE_NAMESPACE;
         }
         if (sourceNamespace.isBlank()) {
-            throw new IllegalStateException("WATCH 연동을 켤 때 source namespace는 필수입니다");
+            throw new IllegalStateException("WATCH 연동을 켤 때 원본 네임스페이스는 필수입니다");
         }
         return sourceNamespace;
     }
 
     URI requiredBaseUri() {
-        return ExternalHttpOrigin.requireHttps("WATCH base URL", baseUrl);
+        return ExternalHttpOrigin.requireHttps("WATCH 기본 URL", baseUrl);
     }
 
     String requiredBearerToken() {
@@ -40,7 +40,7 @@ public record WatchIntegrationProperties(
     Duration requiredConnectTimeout() {
         return OutboundHttpSettings.requirePositiveTimeout(
                 "WATCH",
-                "connect timeout",
+                "연결 시간 제한",
                 connectTimeout
         );
     }
@@ -48,7 +48,7 @@ public record WatchIntegrationProperties(
     Duration requiredReadTimeout() {
         return OutboundHttpSettings.requirePositiveTimeout(
                 "WATCH",
-                "read timeout",
+                "읽기 시간 제한",
                 readTimeout
         );
     }

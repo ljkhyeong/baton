@@ -187,7 +187,7 @@ class WorkspaceSecurityTest {
                 .andExpect(jsonPath("$.status").value("DONE"));
     }
 
-    @DisplayName("명시하지 않은 경로는 fallback 인증과 세션 없이 거부한다")
+    @DisplayName("별도 인증 규칙이 없는 경로는 인증이나 세션을 적용하지 않고 거부한다")
     @Test
     void deniesUnknownPathsWithoutFallbackAuthenticationOrSession() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/private"))

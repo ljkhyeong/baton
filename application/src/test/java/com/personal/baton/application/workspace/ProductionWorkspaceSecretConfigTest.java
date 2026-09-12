@@ -30,19 +30,19 @@ class ProductionWorkspaceSecretConfigTest {
         });
     }
 
-    @DisplayName("production 프로필은 워크스페이스 생성 키가 없으면 시작을 거절한다")
+    @DisplayName("운영 프로필은 워크스페이스 생성 키가 없으면 시작을 거절한다")
     @Test
     void rejectsMissingCreationKeyInProduction() {
         productionContextRunner.run(context -> {
             assertThat(context).hasFailed();
             assertThat(context.getStartupFailure())
                     .hasRootCauseMessage(
-                            "production 프로필에는 BATON_WORKSPACE_CREATION_KEY 설정이 필요합니다"
+                            "운영 프로필에는 BATON_WORKSPACE_CREATION_KEY 설정이 필요합니다"
                     );
         });
     }
 
-    @DisplayName("production 프로필은 워크스페이스 복구 키가 비어 있으면 시작을 거절한다")
+    @DisplayName("운영 프로필은 워크스페이스 복구 키가 비어 있으면 시작을 거절한다")
     @Test
     void rejectsBlankRecoveryKeyInProduction() {
         productionContextRunner
@@ -54,7 +54,7 @@ class ProductionWorkspaceSecretConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage(
-                                    "production 프로필에는 BATON_WORKSPACE_RECOVERY_KEY 설정이 필요합니다"
+                                    "운영 프로필에는 BATON_WORKSPACE_RECOVERY_KEY 설정이 필요합니다"
                             );
                 });
     }
@@ -72,7 +72,7 @@ class ProductionWorkspaceSecretConfigTest {
                             .hasRootCauseInstanceOf(BindValidationException.class)
                             .hasStackTraceContaining("creationKey")
                             .hasStackTraceContaining(
-                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
@@ -90,7 +90,7 @@ class ProductionWorkspaceSecretConfigTest {
                             .hasRootCauseInstanceOf(BindValidationException.class)
                             .hasStackTraceContaining("recoveryKey")
                             .hasStackTraceContaining(
-                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
@@ -108,12 +108,12 @@ class ProductionWorkspaceSecretConfigTest {
                             .hasRootCauseInstanceOf(BindValidationException.class)
                             .hasStackTraceContaining("creationKey")
                             .hasStackTraceContaining(
-                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
 
-    @DisplayName("URL-safe ASCII가 아닌 워크스페이스 운영 키는 바인딩을 거절한다")
+    @DisplayName("URL 안전 ASCII가 아닌 워크스페이스 운영 키는 바인딩을 거절한다")
     @Test
     void rejectsUnsafeWorkspaceSecret() {
         localContextRunner
@@ -126,12 +126,12 @@ class ProductionWorkspaceSecretConfigTest {
                             .hasRootCauseInstanceOf(BindValidationException.class)
                             .hasStackTraceContaining("creationKey")
                             .hasStackTraceContaining(
-                                    "32~200자의 URL-safe ASCII 문자이거나 비어 있어야 합니다"
+                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 생성 키와 복구 키가 같으면 시작을 거절한다")
+    @DisplayName("운영 프로필은 생성 키와 복구 키가 같으면 시작을 거절한다")
     @Test
     void rejectsSameCreationAndRecoveryKeyInProduction() {
         productionContextRunner
@@ -143,12 +143,12 @@ class ProductionWorkspaceSecretConfigTest {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage(
-                                    "production 프로필의 생성 키와 복구 키는 서로 달라야 합니다"
+                                    "운영 프로필의 생성 키와 복구 키는 서로 달라야 합니다"
                             );
                 });
     }
 
-    @DisplayName("production 프로필은 생성 키와 복구 키가 모두 있으면 보안 설정을 구성한다")
+    @DisplayName("운영 프로필은 생성 키와 복구 키가 모두 있으면 보안 설정을 구성한다")
     @Test
     void acceptsConfiguredWorkspaceSecretsInProduction() {
         productionContextRunner

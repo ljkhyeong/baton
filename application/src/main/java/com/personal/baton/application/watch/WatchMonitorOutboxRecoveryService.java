@@ -29,7 +29,7 @@ public class WatchMonitorOutboxRecoveryService implements RecoverWatchMonitorOut
                 source.resourceReferencePrefix()
         )) {
             throw new IllegalStateException(
-                    "WATCH source namespace가 기존 outbox resource reference와 다릅니다"
+                    "WATCH 원본 네임스페이스가 기존 아웃박스 자료 참조와 다릅니다"
             );
         }
     }

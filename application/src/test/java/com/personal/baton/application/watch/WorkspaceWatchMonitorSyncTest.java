@@ -148,7 +148,7 @@ class WorkspaceWatchMonitorSyncTest {
         verifyNoInteractions(inspectionClient);
     }
 
-    @DisplayName("역할 자료와 시즌 변경은 WATCH outbox에 중복 없이 단조 증가하는 snapshot을 저장한다")
+    @DisplayName("역할 자료와 시즌이 바뀌면 WATCH 아웃박스에 중복 없이 증가하는 스냅샷을 저장한다")
     @Test
     void recordsWorkspaceResourceAndSeasonChangesInWatchOutbox() {
         CreatedWorkspaceResult workspace = lifecycleUseCase.createWorkspace(

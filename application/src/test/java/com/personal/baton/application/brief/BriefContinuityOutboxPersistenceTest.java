@@ -69,7 +69,7 @@ class BriefContinuityOutboxPersistenceTest {
         jdbcTemplate.update("DELETE FROM brief_continuity_outbox");
     }
 
-    @DisplayName("claim은 만료된 lease를 회수하고 같은 신호의 후속 리비전을 앞선 종료 뒤에 연다")
+    @DisplayName("처리를 시작할 때 만료된 임대를 회수하고, 같은 신호의 다음 리비전은 앞선 처리가 끝난 뒤 연다")
     @Test
     void reclaimsExpiredLeaseAndPreservesPerSignalOrder() {
         insertOutbox(FIRST_SIGNAL_ID, 1, "ROLE_UNASSIGNED");

@@ -106,7 +106,7 @@ class ContinuitySignalAnalyzerTest {
                         assertThat(signal.reason()).contains("현재 담당자와 같은", "넘길 수 없습니다"));
     }
 
-    @DisplayName("위험 신호가 있는 역할은 책임과 활성 인수인계 항목과 자료의 실제 공백을 함께 설명한다")
+    @DisplayName("주의사항이 있는 역할은 책임과 활성 인수인계 항목과 자료의 실제 공백을 함께 설명한다")
     @Test
     void explainsPreparationGapsAndIgnoresArchivedItems() {
         Role prepared = role(

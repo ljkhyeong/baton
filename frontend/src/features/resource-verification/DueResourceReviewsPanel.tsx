@@ -5,8 +5,8 @@ import { ApiError } from '@/shared/api/ApiError'
 import { dueReviewsKey, getDueReviews } from './api'
 import './resource-verification.scss'
 
-export function DueResourceReviewsPanel({ scope, timeZone, ended, onOpenRole }: {
-  scope: WorkspaceScope; timeZone: string; ended: boolean; onOpenRole: (roleId: string) => void
+export function DueResourceReviewsPanel({ scope, timeZone, ended, onOpenResource }: {
+  scope: WorkspaceScope; timeZone: string; ended: boolean; onOpenResource: (roleId: string, resourceId: string) => void
 }) {
   const query = useQuery({ queryKey: dueReviewsKey(scope), queryFn: () => getDueReviews(scope, timeZone),
     enabled: !ended, staleTime: 30_000, refetchOnWindowFocus: true,
@@ -22,7 +22,7 @@ export function DueResourceReviewsPanel({ scope, timeZone, ended, onOpenRole }: 
           <p>{formatLocalDate(query.data.today)} · {timeZone} 기준으로 확인 기한이 된 자료입니다.</p>
           {query.data.resources.length === 0 ? <p>지금 재확인할 자료가 없습니다.</p>
             : <ul>{query.data.resources.map(row => <li key={row.resourceId}>
-              <button type="button" onClick={() => onOpenRole(row.roleId)}>
+              <button type="button" onClick={() => onOpenResource(row.roleId, row.resourceId)}>
                 <strong>{row.title}</strong><span>{row.roleName} · {row.memberName ?? '담당자 지정 필요'}</span>
                 <small>{formatLocalDate(row.nextReviewOn)} 확인 기한 · 자료 확인하기</small>
               </button>

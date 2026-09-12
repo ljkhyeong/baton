@@ -32,6 +32,11 @@ test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역�
     await page.setViewportSize({ width, height: 844 })
 
     const topbar = page.locator('.mobile-topbar')
+    await expect(topbar.locator('.mobile-team strong')).toBeInViewport()
+    expect(await topbar.locator('.mobile-team strong').evaluate(element =>
+      element.scrollWidth <= element.clientWidth,
+    )).toBe(true)
+    await expect(page.locator('.role-row .next-cell')).toBeVisible()
     const workspaceActions = [
       topbar.getByRole('button', { name: '공유' }),
       topbar.getByRole('button', { name: '링크 관리' }),
@@ -84,7 +89,7 @@ test('@smoke @responsive 오늘은 업무에 집중하고 필요한 역할과 �
     .toHaveAttribute('aria-current', 'page')
 })
 
-test('@responsive 390x844에서 구성원 관리 동작과 focus 복귀를 유지한다', async ({ page }, testInfo) => {
+test('@responsive 390x844에서 구성원 관리 동작과 초점 복귀를 유지한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', '모바일 프로젝트에서만 실행합니다.')
   await installApi(page)
   await openSharedWorkspace(page)
@@ -164,7 +169,7 @@ test('@responsive 모바일 역할 상세는 닫힌 대화상자 접근을 차�
   await expect(opener).toBeFocused()
 })
 
-test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지한다', async ({ page }, testInfo) => {
+test('@responsive 보조 문구와 경고 및 키보드 초점 대비를 유지한다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
   initialProjection.rounds.find((round) => round.id === ROUND_ONE_ID)!.archivedAt = '2026-07-21T12:00:00Z'
   await installApi(page, initialProjection)
@@ -201,6 +206,12 @@ test('@responsive 보조 문구와 경고 및 키보드 focus 대비를 유지�
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
   const selectedRoleTab = page.getByRole('tab', { selected: true })
+  if (testInfo.project.name === 'mobile') {
+    const prepareButton = page.getByRole('button', { name: '인수인계 준비 시작' })
+    const prepareBounds = await prepareButton.boundingBox()
+    const navBounds = await navigation(page, testInfo.project.name).boundingBox()
+    expect(prepareBounds!.y + prepareBounds!.height).toBeLessThanOrEqual(navBounds!.y)
+  }
   await selectedRoleTab.focus()
   await page.keyboard.press('Tab')
 

@@ -26,33 +26,6 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-sha256_file() {
-  local target="$1"
-  local output
-  if command -v sha256sum >/dev/null 2>&1; then
-    output="$(sha256sum -- "$target")"
-  elif command -v shasum >/dev/null 2>&1; then
-    output="$(shasum -a 256 -- "$target")"
-  else
-    printf 'sha256sum or shasum is required.\n' >&2
-    return 1
-  fi
-  printf '%s\n' "${output%% *}"
-}
-
-sha256_stream() {
-  local output
-  if command -v sha256sum >/dev/null 2>&1; then
-    output="$(sha256sum)"
-  elif command -v shasum >/dev/null 2>&1; then
-    output="$(shasum -a 256)"
-  else
-    printf 'sha256sum or shasum is required.\n' >&2
-    return 1
-  fi
-  printf '%s\n' "${output%% *}"
-}
-
 backup_epoch_from_name() {
   local backup_name="$1"
   local timestamp
@@ -87,24 +60,11 @@ encryption_is_disabled() {
 verify_remote_objects() {
   local backup_path="$1"
   local backup_name="$2"
-  local expected_backup_hash="$3"
-  local checksum_path="$backup_path.sha256"
-  local remote_backup_hash
-  local local_checksum_hash
-  local remote_checksum_hash
 
-  remote_backup_hash="$(rclone cat "$remote/$backup_name" --retries 5 --retries-sleep 30s | sha256_stream)"
-  if [[ "$remote_backup_hash" != "$expected_backup_hash" ]]; then
-    printf 'Remote backup hash does not match: %s\n' "$backup_name" >&2
-    return 1
-  fi
-
-  local_checksum_hash="$(sha256_file "$checksum_path")"
-  remote_checksum_hash="$(rclone cat "$remote/$backup_name.sha256" --retries 5 --retries-sleep 30s | sha256_stream)"
-  if [[ "$remote_checksum_hash" != "$local_checksum_hash" ]]; then
-    printf 'Remote checksum sidecar does not match: %s.sha256\n' "$backup_name" >&2
-    return 1
-  fi
+  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
+  printf '%s\n' "$backup_name" "$backup_name.sha256" | \
+    rclone check "$backup_dir" "$remote" --download --one-way --files-from-raw - \
+      --retries 5 --retries-sleep 30s
 }
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -240,7 +200,7 @@ for backup_path in "${backups[@]}"; do
   if [[ "$backup_is_verified" == false ]]; then
     rclone copyto "$backup_path" "$remote/$backup_name" --immutable --retries 5 --retries-sleep 30s
     rclone copyto "$checksum_path" "$remote/$backup_name.sha256" --immutable --retries 5 --retries-sleep 30s
-    verify_remote_objects "$backup_path" "$backup_name" "$expected_backup_hash"
+    verify_remote_objects "$backup_path" "$backup_name"
 
     temporary_path="$(mktemp "$backup_dir/.baton-uploaded.XXXXXX")"
     printf '%s\n%s\n' "$expected_backup_hash" "$remote" > "$temporary_path"
@@ -278,10 +238,7 @@ if [[ "$defer_cycle_finalization" == false ]]; then
       continue
     fi
     expired_name="$(basename -- "$expired_backup")"
-    expired_checksum_line=""
-    IFS= read -r expired_checksum_line < "$expired_backup.sha256"
-    expired_hash="${expired_checksum_line%% *}"
-    verify_remote_objects "$expired_backup" "$expired_name" "$expired_hash"
+    verify_remote_objects "$expired_backup" "$expired_name"
     rm -f -- "$expired_backup" "$expired_backup.sha256" "$expired_backup.uploaded"
     pruned=$((pruned + 1))
   done < <(find "$backup_dir" -maxdepth 1 -type f -name 'baton-*.sql.gz' -mtime "+$retention_days" -print0)

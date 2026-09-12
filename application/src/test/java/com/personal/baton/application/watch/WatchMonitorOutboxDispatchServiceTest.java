@@ -24,7 +24,7 @@ class WatchMonitorOutboxDispatchServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-01T04:00:00Z");
 
-    @DisplayName("WATCH 성공과 stale revision은 같은 outbox 전달 완료로 수렴한다")
+    @DisplayName("WATCH 성공과 오래된 리비전 응답은 아웃박스 전달 완료로 기록한다")
     @Test
     void completesDeliveredAndStaleMessages() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);
@@ -76,7 +76,7 @@ class WatchMonitorOutboxDispatchServiceTest {
         );
     }
 
-    @DisplayName("WATCH가 ACTIVE URL을 거절하면 실패 기록과 INACTIVE 보상 snapshot을 원자적으로 남긴다")
+    @DisplayName("WATCH가 ACTIVE URL을 거절하면 실패 기록과 INACTIVE 보상 스냅샷을 원자적으로 남긴다")
     @Test
     void compensatesInvalidTargetWithInactiveSnapshot() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);

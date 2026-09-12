@@ -121,7 +121,7 @@ class BriefEditionRestDocsTest {
     }
 
     @Test
-    @DisplayName("선택한 브리프의 지난주 마지막 에디션과 ETag를 반환한다")
+    @DisplayName("선택한 주간 요약의 지난주 마지막 요약과 ETag를 반환한다")
     void documentsPreviousWeekEdition() throws Exception {
         when(briefEditionUseCase.findPreviousWeekEdition(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
                 .thenReturn(new LatestEditionResult(edition(), ETAG));
@@ -130,13 +130,13 @@ class BriefEditionRestDocsTest {
                 .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.ETAG, ETAG))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getPreviousWeekBriefEdition",
-                        "선택한 브리프와 같은 시간대의 정확한 지난주 마지막 에디션을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.", "BRIEF 지난주 에디션 조회",
+                        "선택한 주간 요약과 같은 시간대의 지난주 마지막 요약을 조회한다. 없으면 404이며 다른 주차로 대체하지 않는다.", "BRIEF 지난주 요약 조회",
                         pathParameters(parameterWithName("teamId").description("팀 UUID"), parameterWithName("seasonId").description("시즌 UUID"),
-                                parameterWithName("editionId").description("비교 대상 브리프 UUID")),
+                                parameterWithName("editionId").description("비교 대상 주간 요약 UUID")),
                         readHeaders(), editionResponseHeaders(), editionResponseFields()));
     }
 
-    @DisplayName("BRIEF 최신 에디션 API는 권한 범위의 불변 에디션과 ETag를 반환한다")
+    @DisplayName("BRIEF 최신 요약 API는 권한 범위의 저장된 주간 요약과 ETag를 반환한다")
     @Test
     void documentsLatestEdition() throws Exception {
         when(briefEditionUseCase.findLatestEdition(new LatestEditionQuery(
@@ -157,8 +157,8 @@ class BriefEditionRestDocsTest {
                 .andExpect(jsonPath("$.items[1].section").value("CARRY_OVER"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getLatestBriefEdition",
-                        "인증된 BATON 계정의 활성 팀 멤버십과 워크스페이스 접근 키를 확인한 뒤 BRIEF 최신 불변 에디션을 중계한다.",
-                        "BRIEF 최신 에디션 조회",
+                        "인증된 BATON 계정의 활성 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF의 최신 주간 요약을 전달한다.",
+                        "BRIEF 최신 주간 요약 조회",
                         scopedPathParameters(),
                         readHeaders(),
                         editionResponseHeaders(),
@@ -166,7 +166,7 @@ class BriefEditionRestDocsTest {
                 ));
     }
 
-    @DisplayName("BRIEF 에디션 생성 API는 BATON 실행 기록과 생성 결과를 반환한다")
+    @DisplayName("BRIEF 주간 요약 생성 API는 BATON 요청 기록과 생성 결과를 반환한다")
     @Test
     void documentsEditionGeneration() throws Exception {
         when(briefEditionUseCase.generateEdition(new GenerateEditionCommand(
@@ -196,18 +196,18 @@ class BriefEditionRestDocsTest {
                 .andExpect(jsonPath("$.executionId").value(EXECUTION_ID.toString()))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "generateBriefEdition",
-                        "BATON이 시즌 시간대의 현재 주차와 완료된 BRIEF 이벤트 전달 watermark를 실행 기록에 고정하고 BRIEF 에디션 생성을 호출한다.",
-                        "BRIEF 에디션 생성",
+                        "BATON이 현재 주차와 전달 완료 범위를 요청 기록에 저장한 뒤 BRIEF 주간 요약 생성을 호출한다.",
+                        "BRIEF 주간 요약 생성",
                         scopedPathParameters(),
                         generationHeaders(),
                         generationResponseHeaders(),
                         responseFields(
-                                fieldWithPath("executionId").description("BATON의 내구성 있는 생성 실행 UUID"),
-                                fieldWithPath("deliveryWatermark").description("생성 전에 완료를 확인한 BATON BRIEF outbox 최대 ID"),
-                                fieldWithPath("editionId").description("BRIEF가 반환한 불변 에디션 UUID"),
-                                fieldWithPath("generation").description("작업공간·시즌 범위 에디션 세대"),
-                                fieldWithPath("sourceCursor").description("BRIEF 로컬 수신 순서 cursor"),
-                                fieldWithPath("created").description("새 에디션을 만들었으면 true, 직전 상태를 재사용했으면 false")
+                                fieldWithPath("executionId").description("재시도해도 유지되는 BATON 생성 요청 UUID"),
+                                fieldWithPath("deliveryWatermark").description("생성 전에 전달 완료를 확인한 BATON BRIEF 아웃박스 최대 ID"),
+                                fieldWithPath("editionId").description("BRIEF가 반환한 주간 요약 UUID"),
+                                fieldWithPath("generation").description("작업 공간·시즌 단위 요약 버전"),
+                                fieldWithPath("sourceCursor").description("BRIEF 로컬 수신 순서 커서"),
+                                fieldWithPath("created").description("새 요약을 만들었으면 true, 직전 결과를 재사용했으면 false")
                         )
                 ));
     }
@@ -242,36 +242,36 @@ class BriefEditionRestDocsTest {
     private Snippet editionResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
-                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                        .description("서버가 생성한 요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL).description("민감 응답 캐시 금지"),
-                headerWithName(HttpHeaders.ETAG).description("BRIEF 불변 에디션 검증자")
+                headerWithName(HttpHeaders.ETAG).description("저장된 주간 요약 검증자")
         );
     }
 
     private Snippet generationResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
-                        .description("서버가 생성한 불투명 요청 진단 식별자"),
+                        .description("서버가 생성한 요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL).description("민감 응답 캐시 금지"),
-                headerWithName(HttpHeaders.ETAG).description("생성 결과 BRIEF 에디션 검증자"),
-                headerWithName(HttpHeaders.LOCATION).description("최신 BRIEF 에디션 조회 경로")
+                headerWithName(HttpHeaders.ETAG).description("생성한 주간 요약 검증자"),
+                headerWithName(HttpHeaders.LOCATION).description("최신 주간 요약 조회 경로")
         );
     }
 
     private Snippet editionResponseFields() {
         var fields = new ArrayList<FieldDescriptor>(List.of(
-                fieldWithPath("editionId").description("불변 에디션 UUID"),
-                fieldWithPath("workspaceId").description("BATON 팀 UUID와 같은 BRIEF 작업공간 UUID"),
+                fieldWithPath("editionId").description("주간 요약 UUID"),
+                fieldWithPath("workspaceId").description("BATON 팀 UUID와 같은 BRIEF 작업 공간 UUID"),
                 fieldWithPath("seasonId").description("BATON 시즌 UUID"),
-                fieldWithPath("generation").description("작업공간·시즌 범위 에디션 세대"),
+                fieldWithPath("generation").description("작업 공간·시즌 단위 요약 버전"),
                 fieldWithPath("weekStart").description("시즌 시간대 기준 월요일"),
                 fieldWithPath("zoneId").description("BATON 시즌 IANA 시간대"),
                 fieldWithPath("windowStart").description("주간 구간 시작 UTC 시각"),
                 fieldWithPath("windowEnd").description("주간 구간 종료 UTC 시각"),
-                fieldWithPath("sourceCursor").description("BRIEF 로컬 수신 순서 cursor"),
-                fieldWithPath("generatedAt").description("에디션 생성 UTC 시각"),
+                fieldWithPath("sourceCursor").description("BRIEF 로컬 수신 순서 커서"),
+                fieldWithPath("generatedAt").description("주간 요약 생성 UTC 시각"),
                 fieldWithPath("ruleVersion").description("BRIEF 선정 규칙 버전"),
-                fieldWithPath("items").description("불변 에디션 항목 목록")
+                fieldWithPath("items").description("저장된 주간 요약 항목 목록")
 
         ));
         fields.addAll(itemFields("items[]."));
@@ -279,12 +279,12 @@ class BriefEditionRestDocsTest {
     }
 
     @Test
-    @DisplayName("에디션 이력은 과거 방향 커서와 저장된 요약을 제공한다")
+    @DisplayName("주간 요약 이력은 과거 방향 커서와 저장된 요약을 제공한다")
     void documentsHistory() throws Exception {
         when(briefEditionUseCase.findEditionHistory(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY),
                 new BriefEditionHistory.Query(4L, 1))).thenReturn(new BriefEditionHistory(List.of(summary()), 3L));
         var fields = new ArrayList<FieldDescriptor>();
-        fields.add(fieldWithPath("editions").description("생성 순번 내림차순의 저장된 브리프"));
+        fields.add(fieldWithPath("editions").description("요약 버전 내림차순의 저장된 주간 요약"));
         fields.addAll(summaryFields("editions[]."));
         fields.add(fieldWithPath("nextBeforeGeneration").optional().description("다음 과거 페이지의 배타 커서. 마지막은 null"));
         mockMvc.perform(RestDocumentationRequestBuilders
@@ -293,7 +293,7 @@ class BriefEditionRestDocsTest {
                         .param("beforeGeneration", "4").param("limit", "1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.nextBeforeGeneration").value(3))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andDo(MockMvcRestDocumentationWrapper.document("getBriefEditionHistory", "권한 범위의 저장된 브리프를 과거 방향으로 조회한다.", "BRIEF 이력 조회",
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefEditionHistory", "권한 범위의 저장된 주간 요약을 최신순으로 조회한다.", "BRIEF 이력 조회",
                         scopedPathParameters(), readHeaders(), queryParameters(
                                 parameterWithName("beforeGeneration").optional().description("이 생성 순번 미만, 양수"),
                                 parameterWithName("limit").optional().description("1~100, 기본 20")), responseFields(fields)));
@@ -304,7 +304,7 @@ class BriefEditionRestDocsTest {
     }
 
     @Test
-    @DisplayName("선택한 에디션은 불변 본문과 ETag를 유지한다")
+    @DisplayName("선택한 주간 요약은 저장된 본문과 ETag를 유지한다")
     void documentsSelectedEdition() throws Exception {
         when(briefEditionUseCase.findEdition(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
                 .thenReturn(new LatestEditionResult(edition(), ETAG));
@@ -312,12 +312,12 @@ class BriefEditionRestDocsTest {
                         .get(BriefEditionController.EDITION_PATH, TEAM_ID, SEASON_ID, EDITION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.ETAG, ETAG))
-                .andDo(MockMvcRestDocumentationWrapper.document("getBriefEdition", "선택한 브리프의 팀·시즌 권한을 확인하고 고정된 내용을 반환한다.", "BRIEF 단건 조회",
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefEdition", "선택한 주간 요약의 팀·시즌 권한을 확인하고 저장된 내용을 반환한다.", "BRIEF 단건 조회",
                         editionPaths(), readHeaders(), editionResponseHeaders(), editionResponseFields()));
     }
 
     @Test
-    @DisplayName("브리프 비교는 추가·제외·변경과 이전 분류를 그대로 중계한다")
+    @DisplayName("주간 요약 비교는 추가·제외·변경과 이전 분류를 그대로 반환한다")
     void documentsComparison() throws Exception {
         var before = edition().items().getFirst();
         var after = new BriefEditionSnapshot.Item(before.sourceReference(), before.reasonCode(), before.severity(), before.status(),
@@ -326,8 +326,8 @@ class BriefEditionRestDocsTest {
                 .thenReturn(new BriefEditionComparison(new BriefEditionHistory.Summary(ACCOUNT_ID, 2, summary().weekStart(), summary().zoneId(),
                         summary().generatedAt(), 16, 2, 2), summary(), List.of(before), List.of(before), List.of(new BriefEditionComparison.Change(before, after))));
         var fields = new ArrayList<FieldDescriptor>();
-        fields.add(fieldWithPath("from").description("비교 기준 브리프")); fields.addAll(summaryFields("from."));
-        fields.add(fieldWithPath("to").description("비교 대상 브리프")); fields.addAll(summaryFields("to."));
+        fields.add(fieldWithPath("from").description("비교 기준 주간 요약")); fields.addAll(summaryFields("from."));
+        fields.add(fieldWithPath("to").description("비교 대상 주간 요약")); fields.addAll(summaryFields("to."));
         fields.add(fieldWithPath("added").description("대상에만 포함된 항목")); fields.addAll(itemFields("added[]."));
         fields.add(fieldWithPath("removed").description("대상에서 제외된 항목. 해소 판정이 아님")); fields.addAll(itemFields("removed[]."));
         fields.add(fieldWithPath("changed").description("고정 필드가 달라진 항목"));
@@ -337,12 +337,12 @@ class BriefEditionRestDocsTest {
                         .get(BriefEditionController.COMPARISON_PATH, TEAM_ID, SEASON_ID, EDITION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY).with(authentication(accountAuthentication())).param("fromEditionId", ACCOUNT_ID.toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.changed[0].after.section").value("CARRY_OVER"))
-                .andDo(MockMvcRestDocumentationWrapper.document("compareBriefEditions", "양쪽 브리프의 팀·시즌 권한을 확인하고 저장된 차이만 중계한다.", "BRIEF 비교",
-                        editionPaths(), readHeaders(), queryParameters(parameterWithName("fromEditionId").description("기준 브리프 UUID")), responseFields(fields)));
+                .andDo(MockMvcRestDocumentationWrapper.document("compareBriefEditions", "두 주간 요약의 팀·시즌 권한을 확인하고 저장된 차이만 반환한다.", "BRIEF 비교",
+                        editionPaths(), readHeaders(), queryParameters(parameterWithName("fromEditionId").description("기준 주간 요약 UUID")), responseFields(fields)));
     }
 
     @Test
-    @DisplayName("현재 업무 정보는 불변 브리프와 분리해 조회한다")
+    @DisplayName("현재 업무 정보는 저장된 주간 요약과 분리해 조회한다")
     void documentsSources() throws Exception {
         var identity = new BriefSourceContext.Identity(BriefAttentionPage.EventType.ROUTINE_REPEATEDLY_OVERDUE, "baton-continuity:" + EDITION_ID);
         when(contextUseCase.resolveSources(new Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), List.of(identity)))
@@ -362,7 +362,7 @@ class BriefEditionRestDocsTest {
                                 new EnumFields(BriefAttentionPage.EventType.class).withPath("sources[].eventType").description("요청한 신호 유형"),
                                 fieldWithPath("sources[].sourceReference").description("요청한 원본 참조"),
                                 fieldWithPath("sources[].target").optional().description("현재 업무. 이전 참조·삭제·범위 불일치는 null"),
-                                fieldWithPath("sources[].target.title").description("현재 업무 이름. 브리프 생성 당시 이름이 아님"),
+                                fieldWithPath("sources[].target.title").description("현재 업무 이름. 주간 요약 생성 당시 이름이 아님"),
                                 fieldWithPath("sources[].target.roleId").description("같은 팀·시즌 역할 UUID"),
                                 fieldWithPath("sources[].target.routineId").optional().description("루틴이면 UUID, 역할이면 null"),
                                 fieldWithPath("sources[].target.archived").description("현재 루틴 보관 여부"))));
@@ -380,14 +380,14 @@ class BriefEditionRestDocsTest {
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefGenerationReadiness", "현재 시즌의 전달 기록과 이번 주 생성 실행을 읽는다. 생성 시 다시 확인하며 BRIEF 연결 성공을 보장하지 않는다.", "BRIEF 생성 준비 상태",
                         scopedPathParameters(), readHeaders(), responseFields(
                                 new EnumFields(BriefGenerationReadiness.Status.class).withPath("status").description("전달·생성 요청 준비 상태"),
-                                fieldWithPath("pendingCount").description("전달 대기·진행 중인 이벤트 수"),
+                                fieldWithPath("pendingCount").description("전달 대기·처리 중인 이벤트 수"),
                                 fieldWithPath("failedCount").description("전달 영구 실패 이벤트 수"),
                                 fieldWithPath("lastDeliveredAt").optional().description("마지막 전달 성공 시각. 성공 기록이 없으면 null"),
                                 fieldWithPath("checkedAt").description("BATON 확인 UTC 시각"))));
     }
 
     @Test
-    @DisplayName("브리프 추가 전달 조회는 선택한 에디션과 상태·확인 시각을 별도 응답으로 반환한다")
+    @DisplayName("추가 전달 조회는 선택한 주간 요약과 상태·확인 시각을 별도 응답으로 반환한다")
     void documentsEditionDeliveryStatus() throws Exception {
         when(briefEditionUseCase.findEditionDeliveryStatus(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
                 .thenReturn(new BriefEditionDeliveryStatus(EDITION_ID, BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES, edition().generatedAt()));
@@ -397,20 +397,20 @@ class BriefEditionRestDocsTest {
                 .andExpect(header().doesNotExist(HttpHeaders.ETAG))
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefEditionDeliveryStatus",
-                        "선택한 에디션의 권한을 확인하고 BATON의 마지막 성공 생성·재사용 경계 이후 추가 전달 완료 기록을 조회한다. 근거가 없으면 UNKNOWN이다.", "BRIEF 추가 전달 확인",
+                        "선택한 주간 요약의 권한을 확인하고 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 근거가 없으면 UNKNOWN이다.", "BRIEF 추가 전달 확인",
                         editionPaths(), readHeaders(), responseFields(
-                                fieldWithPath("editionId").description("확인한 불변 에디션 UUID"),
+                                fieldWithPath("editionId").description("확인한 주간 요약 UUID"),
                                 new EnumFields(BriefEditionDeliveryStatus.Status.class).withPath("status").description("추가 전달 있음·없음 또는 확인 근거 없음"),
                                 fieldWithPath("checkedAt").description("BATON 확인 UTC 시각"))));
     }
 
     private Snippet editionPaths() {
         return pathParameters(parameterWithName("teamId").description("팀 UUID"), parameterWithName("seasonId").description("시즌 UUID"),
-                parameterWithName("editionId").description("선택한 브리프 UUID"));
+                parameterWithName("editionId").description("선택한 주간 요약 UUID"));
     }
 
     private List<FieldDescriptor> summaryFields(String prefix) {
-        return List.of(fieldWithPath(prefix + "editionId").description("불변 에디션 UUID"),
+        return List.of(fieldWithPath(prefix + "editionId").description("주간 요약 UUID"),
                 fieldWithPath(prefix + "generation").description("시즌 안에서 증가하는 생성 순번"),
                 fieldWithPath(prefix + "weekStart").description("주간 시작 월요일"),
                 fieldWithPath(prefix + "zoneId").description("저장된 IANA 시간대"),
@@ -434,10 +434,10 @@ class BriefEditionRestDocsTest {
                 fieldWithPath(prefix + "status").description("생성 시점 신호 상태"),
                 fieldWithPath(prefix + "observedAt").description("원본 상태 관찰 시각"),
                 fieldWithPath(prefix + "ruleVersion").description("항목 투영 규칙 버전"),
-                fieldWithPath(prefix + "aggregateRevision").optional().description("원본 신호 집계 리비전. 이전 에디션의 미기록 값은 null"),
-                fieldWithPath(prefix + "revisionGap").optional().description("생성 시점 누적 리비전 공백 여부. 이전 에디션의 미기록 값은 null"),
+                fieldWithPath(prefix + "aggregateRevision").optional().description("원본 변경 번호. 이전 주간 요약의 미기록 값은 null"),
+                fieldWithPath(prefix + "revisionGap").optional().description("생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null"),
                 new EnumFields(BriefEditionSnapshot.Section.class).withPath(prefix + "section").optional()
-                        .description("생성 당시 이번 주 변경 또는 이전 미해소 분류. 이전 에디션은 null")
+                        .description("생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null")
         );
     }
 

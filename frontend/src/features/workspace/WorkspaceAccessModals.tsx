@@ -8,9 +8,11 @@ import type { SaveResult } from './WorkspaceModalPrimitives'
 
 export function ShareLinkFallback({
   shareUrl,
+  accountAccessEnabled,
   onClose,
 }: {
   shareUrl: string
+  accountAccessEnabled: boolean
   onClose: () => void
 }) {
   return (
@@ -29,7 +31,9 @@ export function ShareLinkFallback({
           onFocus={(event) => event.currentTarget.select()}
           onClick={(event) => event.currentTarget.select()}
         />
-        <p>이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.</p>
+        <p>{accountAccessEnabled
+          ? '로그인한 팀 구성원만 부여된 권한으로 이용할 수 있습니다.'
+          : '이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.'}</p>
         <button type="button" className="primary-button full-button" onClick={onClose}>확인</button>
       </div>
     </ModalShell>

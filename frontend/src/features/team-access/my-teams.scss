@@ -3,19 +3,23 @@
 .my-teams-content header { margin-bottom: 36px; }
 .my-teams-content nav { display: flex; gap: 24px; }
 .my-teams-content a { color: var(--ink); }
+.pending-invitation-notice { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; padding: 16px; border: 1px solid var(--rule); border-radius: 8px; }
+.pending-invitation-notice p { margin-bottom: 0; color: var(--muted); }
+.pending-invitation-notice a { flex-shrink: 0; }
 .my-teams-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.my-teams-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
-.my-teams-list li { background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.my-teams-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.my-teams-list li { background: var(--paper); border-bottom: 1px solid var(--rule); padding: 20px 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .my-teams-list h3 { margin: 0; overflow-wrap: anywhere; }
 .my-teams-list p { color: var(--muted); overflow-wrap: anywhere; }
 .my-teams-list a { flex-shrink: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
 .my-teams-note { color: var(--muted); line-height: 1.7; }
-@media (max-width: 600px) { .my-teams-page { padding: 24px 16px; } .my-teams-list li { align-items: stretch; flex-direction: column; } }
+@media (max-width: 600px) { .my-teams-page { padding: 24px 16px; } .pending-invitation-notice, .my-teams-list li { align-items: stretch; flex-direction: column; } }
 .team-list-link { color: inherit; font-size: 12px; }
 
-.my-work-across-teams { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); }
-.my-work-across-teams ul { list-style: none; padding: 0; display: grid; gap: 10px; }
-.my-work-across-teams li a { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--rule); border-radius: 8px; overflow-wrap: anywhere; }
+.my-work-across-teams, .my-recent-records { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.my-work-across-teams ul, .my-recent-records ul { list-style: none; padding: 0; display: grid; gap: 10px; }
+.my-work-across-teams li a, .my-recent-records li a { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--rule); border-radius: 8px; overflow-wrap: anywhere; }
 .my-work-across-teams label { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .my-work-across-teams select { padding: 8px; }
-.my-work-across-teams p { overflow-wrap: anywhere; }
+.my-work-across-teams p, .my-recent-records p { overflow-wrap: anywhere; }
+.my-recent-records li span, .my-recent-records li small { color: var(--muted); }

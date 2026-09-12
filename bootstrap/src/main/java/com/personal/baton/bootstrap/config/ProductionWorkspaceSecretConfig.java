@@ -25,7 +25,7 @@ public class ProductionWorkspaceSecretConfig {
             requireConfigured(recoveryKey, "BATON_WORKSPACE_RECOVERY_KEY");
             if (creationKey.equals(recoveryKey)) {
                 throw new IllegalStateException(
-                        "production 프로필의 생성 키와 복구 키는 서로 달라야 합니다"
+                        "운영 프로필의 생성 키와 복구 키는 서로 달라야 합니다"
                 );
             }
         }
@@ -33,7 +33,7 @@ public class ProductionWorkspaceSecretConfig {
         private void requireConfigured(String value, String environmentName) {
             if (value.isBlank()) {
                 throw new IllegalStateException(
-                        "production 프로필에는 " + environmentName + " 설정이 필요합니다"
+                        "운영 프로필에는 " + environmentName + " 설정이 필요합니다"
                 );
             }
         }

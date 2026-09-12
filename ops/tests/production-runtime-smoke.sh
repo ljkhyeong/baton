@@ -46,6 +46,7 @@ export BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-google-oau
 export BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET=runtime-smoke-disabled-naver-oauth
 export BATON_SECRET_CAL_BEARER_TOKEN=runtime-smoke-disabled-cal-bearer-token
 export BATON_HOLIDAYS_ENABLED=false
+export BATON_SECRET_TURNSTILE_SECRET_KEY=runtime-smoke-disabled-turnstile-secret-key
 export BATON_SECRET_HOLIDAYS_SERVICE_KEY=runtime-smoke-disabled-holidays-service-key
 export BATON_SECRET_SMTP_PASSWORD=runtime-smoke-disabled-smtp-password
 export BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
@@ -780,7 +781,7 @@ if MISSING_DATASOURCE_OUTPUT="$("$REAL_DOCKER" run --rm \
   log "DB 설정이 없는 production app 이미지가 시작됐습니다."
   exit 1
 fi
-if [[ "$MISSING_DATASOURCE_OUTPUT" != *"production 프로필에는 DB_URL 설정이 필요합니다"* ]]; then
+if [[ "$MISSING_DATASOURCE_OUTPUT" != *"DB_URL 설정이 필요합니다"* ]]; then
   log "production DB fail-closed 오류를 확인하지 못했습니다."
   printf '%s\n' "$MISSING_DATASOURCE_OUTPUT" >&2
   exit 1
@@ -874,6 +875,10 @@ assert_matches '<div[[:space:]]+id="root"></div>' "$RUN_DIR/root.body" \
   "production 프런트엔드 root 문서를 찾지 못했습니다."
 assert_matches '^content-security-policy:' "$RUN_DIR/root.headers" \
   "Caddy CSP header가 없습니다."
+assert_matches "script-src[^;]*https://challenges.cloudflare.com" "$RUN_DIR/root.headers" \
+  "Turnstile 스크립트가 CSP에서 차단됩니다."
+assert_matches "frame-src https://challenges.cloudflare.com" "$RUN_DIR/root.headers" \
+  "Turnstile 프레임이 CSP에서 차단됩니다."
 assert_matches '^strict-transport-security:' "$RUN_DIR/root.headers" \
   "Caddy HSTS header가 없습니다."
 assert_matches '^x-content-type-options:[[:space:]]*nosniff' "$RUN_DIR/root.headers" \

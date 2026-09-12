@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { formatInstant } from '@/features/workspace/WorkspaceViews'
 import { activateTeamAccess, changeTeamPermission, createTeamInvitation, getTeamAccess,
   permissionNames, revokeTeamInvitation, type AccessScope, type Permission } from './api'
 import './team-access.scss'
+
+type InvitationLink = { invitationId: string; url: string }
 
 export function TeamAccessPanel({ scope }: { scope: WorkspaceScope }) {
   const session = useAuthSession()
@@ -25,8 +27,40 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   const [confirmed, setConfirmed] = useState(false)
   const [memberId, setMemberId] = useState('')
   const [permission, setPermission] = useState<Permission>('MEMBER')
-  const [invitationUrl, setInvitationUrl] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [invitationLink, setInvitationLink] = useState<InvitationLink | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const invitations = query.data?.invitations
+    if (!invitations) return
+    const expirations = invitations
+      .filter(invitation => !invitation.acceptedAt && !invitation.revokedAt)
+      .map(invitation => Date.parse(invitation.expiresAt))
+      .sort((left, right) => left - right)
+    let timeoutId: number | undefined
+    const updateExpiration = () => {
+      const current = Date.now()
+      setNow(current)
+      const next = expirations.find(expiration => expiration > current)
+      if (next !== undefined) timeoutId = window.setTimeout(updateExpiration, next - current)
+    }
+    updateExpiration()
+    return () => { if (timeoutId !== undefined) window.clearTimeout(timeoutId) }
+  }, [query.data?.invitations])
+  const copyInvitationUrl = async () => {
+    if (!invitationLink) return
+    setCopyStatus('idle')
+    if (!navigator.clipboard?.writeText) {
+      setCopyStatus('failed')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(invitationLink.url)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
+    }
+  }
   const mutation = useMutation({ mutationFn: async (action: { kind: 'activate' | 'invite' | 'revoke' | 'permission'; id?: string; permission?: Permission | null }) => {
     if (action.kind === 'activate') {
       const key = recoveryKey
@@ -35,11 +69,11 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     }
     if (action.kind === 'invite') {
       const created = await createTeamInvitation(scope, memberId, permission)
-      setInvitationUrl(`${window.location.origin}/join#invite=${created.token}`)
-      setCopied(false)
+      setInvitationLink({ invitationId: created.invitation.id, url: `${window.location.origin}/join#invite=${created.token}` })
+      setCopyStatus('idle')
       return getTeamAccess(scope)
     }
-    if (action.kind === 'revoke') { setInvitationUrl(''); return revokeTeamInvitation(scope, action.id!) }
+    if (action.kind === 'revoke') { setCopyStatus('idle'); return revokeTeamInvitation(scope, action.id!) }
     return changeTeamPermission(scope, action.id!, action.permission ?? null)
   }, onSuccess: data => {
     client.setQueryData(queryKey, data)
@@ -49,6 +83,12 @@ function AccessContent({ scope }: { scope: AccessScope }) {
   if (query.isError) return <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
+  const invitationCandidates = access.members.filter(member => member.active && !member.permission)
+  const invitationMemberId = invitationCandidates.some(member => member.memberId === memberId) ? memberId : ''
+  const visibleInvitationLink = invitationLink && access.invitations.some(invitation =>
+    invitation.id.toLowerCase() === invitationLink.invitationId.toLowerCase()
+    && !invitation.acceptedAt && !invitation.revokedAt && Date.parse(invitation.expiresAt) > now)
+    ? invitationLink : null
   return <div>
     <p>{access.accountAccessEnabled ? `로그인한 계정으로 이용 중입니다. 내 권한: ${access.permission ? permissionNames[access.permission] : '접근 권한 해제'}`
       : '현재는 공유 링크로 이용합니다. 관리자를 지정하면 관리자와 초대받은 계정만 이용할 수 있습니다.'}</p>
@@ -75,24 +115,36 @@ function AccessContent({ scope }: { scope: AccessScope }) {
         </select> : <span>연결된 계정 없음</span>}
       </li>)}</ul>
       <h4>구성원 초대</h4>
-      <form onSubmit={event => { event.preventDefault(); if (memberId && !mutation.isPending) mutation.mutate({ kind: 'invite' }) }}>
-        <label>초대할 구성원<select value={memberId} required onChange={event => setMemberId(event.target.value)}>
-          <option value="">구성원 선택</option>{access.members.filter(member => member.active && !member.permission).map(member => <option key={member.memberId} value={member.memberId}>{member.memberName}</option>)}
+      <form onSubmit={event => { event.preventDefault(); if (invitationMemberId && !mutation.isPending) mutation.mutate({ kind: 'invite' }) }}>
+        <label>초대할 구성원<select value={invitationMemberId} required onChange={event => setMemberId(event.target.value)}>
+          <option value="">구성원 선택</option>{invitationCandidates.map(member => <option key={member.memberId} value={member.memberId}>{member.memberName}</option>)}
         </select></label>
         <label>초대 권한<select value={permission} onChange={event => setPermission(event.target.value as Permission)}>
           {Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
         <p>열람자는 조회, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리를 할 수 있습니다.</p>
-        <button type="submit" disabled={!memberId || mutation.isPending}>초대 링크 만들기</button>
+        <button type="submit" disabled={!invitationMemberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
-      {invitationUrl && <div><label>생성한 초대 링크<input readOnly value={invitationUrl} /></label>
-        <button type="button" onClick={() => void navigator.clipboard.writeText(invitationUrl).then(() => setCopied(true)).catch(() => setCopied(false))}>{copied ? '복사했습니다' : '초대 링크 복사'}</button>
+      {visibleInvitationLink && <div><label>생성한 초대 링크<input readOnly value={visibleInvitationLink.url} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
+        <button type="button" onClick={() => void copyInvitationUrl()}>초대 링크 복사</button>
+        {copyStatus === 'copied' && <p role="status">초대 링크를 복사했습니다.</p>}
+        {copyStatus === 'failed' && <p role="alert">자동으로 복사하지 못했습니다. 위 링크를 선택해 직접 복사해 주세요.</p>}
         <p>초대한 구성원에게 전달하세요. 7일 동안 사용할 수 있습니다. 새 링크를 만들면 같은 구성원의 미수락 초대는 취소됩니다.</p>
       </div>}
       <h4>초대 목록</h4>
-      <ul>{access.invitations.map(invite => <li key={invite.id}><span>{access.members.find(member => member.memberId === invite.memberId)?.memberName} · {permissionNames[invite.permission]}<small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
-        {!invite.acceptedAt && !invite.revokedAt && <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ kind: 'revoke', id: invite.id })}>초대 취소</button>}
-      </li>)}</ul>
+      {access.invitations.length === 0 ? <p>아직 만든 초대가 없습니다.</p>
+        : <ul>{access.invitations.map(invite => {
+          const expired = Date.parse(invite.expiresAt) <= now
+          const pending = !invite.acceptedAt && !invite.revokedAt && !expired
+          const memberName = access.members.find(member => member.memberId === invite.memberId)?.memberName ?? '알 수 없는 구성원'
+          return <li key={invite.id}><span>{memberName} · {permissionNames[invite.permission]}
+            <small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : expired ? '기간 만료' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
+            {pending && <button type="button" disabled={mutation.isPending} onClick={() => {
+              if (window.confirm(`${memberName}님의 초대를 취소할까요? 이 초대 링크는 즉시 사용할 수 없게 됩니다.`))
+                mutation.mutate({ kind: 'revoke', id: invite.id })
+            }}>초대 취소</button>}
+          </li>
+        })}</ul>}
       <details><summary>최근 권한 변경 이력</summary><ul>{access.audit.map(item => <li key={item.id}><span>
         {access.members.find(member => member.memberId === item.memberId)?.memberName} · {({ ADMIN_RECOVERY: '관리자 지정·복구', INVITED: '초대 생성', INVITATION_REVOKED: '초대 취소', INVITATION_ACCEPTED: '초대 수락', PERMISSION_CHANGED: '권한 변경', ACCOUNT_DEACTIVATED: '계정 비활성화' } as Record<string, string>)[item.action] ?? '접근 설정 변경'}
         <small>변경한 사람: {access.members.find(member => member.accountId === item.actorAccountId)?.memberName ?? '연결된 구성원 없음'}</small>

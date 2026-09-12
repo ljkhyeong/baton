@@ -71,6 +71,13 @@ baton:
   auth:
     local-registration-enabled: ${BATON_AUTH_LOCAL_REGISTRATION_ENABLED:false}
     password-reset-enabled: ${BATON_AUTH_PASSWORD_RESET_ENABLED:false}
+    turnstile:
+      enabled: ${BATON_TURNSTILE_ENABLED:false}
+      site-key: ${BATON_TURNSTILE_SITE_KEY:}
+      secret-key: ${BATON_TURNSTILE_SECRET_KEY:}
+      expected-hostname: ${BATON_TURNSTILE_EXPECTED_HOSTNAME:}
+      connect-timeout: ${BATON_TURNSTILE_CONNECT_TIMEOUT:PT2S}
+      read-timeout: ${BATON_TURNSTILE_READ_TIMEOUT:PT5S}
     oauth2:
       enabled: false
   identity:

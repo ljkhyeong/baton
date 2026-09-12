@@ -76,7 +76,7 @@ class RestClientWatchMonitorClientTest {
     }
 
     @Test
-    @DisplayName("Boot가 관리하는 RestClient builder의 customizer를 WATCH client에 보존한다")
+    @DisplayName("Spring Boot가 관리하는 RestClient 빌더 설정을 WATCH 클라이언트에 유지한다")
     void preserveBootRestClientBuilderCustomizers() {
         AtomicBoolean intercepted = new AtomicBoolean();
         AtomicBoolean requestFactoryBuilderCustomized = new AtomicBoolean();
@@ -133,7 +133,7 @@ class RestClientWatchMonitorClientTest {
     }
 
     @Test
-    @DisplayName("WATCH client는 Boot 관리 request factory 설정을 보존하고 전용 timeout과 redirect 정책만 덮어쓴다")
+    @DisplayName("WATCH 클라이언트는 Spring Boot의 요청 팩터리 설정을 유지하고 전용 타임아웃과 리디렉션 정책만 바꾼다")
     void preserveManagedRequestFactoryAndHttpClientSettings() {
         AtomicReference<HttpClientSettings> appliedSettings = new AtomicReference<>();
         ClientHttpRequestFactoryBuilder<ClientHttpRequestFactory> requestFactoryBuilder =
@@ -170,7 +170,7 @@ class RestClientWatchMonitorClientTest {
     }
 
     @Test
-    @DisplayName("ACTIVE snapshot은 인증된 PUT 요청으로 URL과 revision을 전달한다")
+    @DisplayName("ACTIVE 스냅샷은 인증된 PUT 요청으로 URL과 리비전을 전달한다")
     void synchronizeActiveMonitor() {
         server.expect(requestTo(BASE_URL + "/api/v1/resource-monitors/" + ENCODED_RESOURCE_REFERENCE))
                 .andExpect(method(HttpMethod.PUT))
@@ -189,7 +189,7 @@ class RestClientWatchMonitorClientTest {
     }
 
     @Test
-    @DisplayName("INACTIVE snapshot은 targetUrl을 null로 전달한다")
+    @DisplayName("INACTIVE 스냅샷은 targetUrl을 null로 전달한다")
     void synchronizeInactiveMonitor() {
         server.expect(requestTo(BASE_URL + "/api/v1/resource-monitors/" + ENCODED_RESOURCE_REFERENCE))
                 .andExpect(content().json(

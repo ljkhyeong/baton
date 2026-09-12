@@ -194,7 +194,7 @@ class RoundGrantSecurityConfigTest {
                         """, true));
     }
 
-    @DisplayName("ROUND refresh의 CSRF 거부는 token cookie를 지우지 않고 stable 403을 반환한다")
+    @DisplayName("ROUND 갱신 요청이 CSRF로 거부되면 토큰 쿠키를 유지하고 항상 403을 반환한다")
     @Test
     void mapsRefreshCsrfFailureWithoutExpiringGrantCookie() throws Exception {
         UsernamePasswordAuthenticationToken authentication =
@@ -219,7 +219,7 @@ class RoundGrantSecurityConfigTest {
                 .andExpect(jsonPath("$.code").value("REQUEST_FORBIDDEN"));
     }
 
-    @DisplayName("ROUND refresh는 CSRF보다 먼저 계정 session을 확인하고 미인증 cookie를 만료한다")
+    @DisplayName("ROUND 갱신은 CSRF 검사 전에 계정 세션을 확인하고 미인증 쿠키를 만료한다")
     @Test
     void rejectsAnonymousRefreshBeforeController() throws Exception {
         mockMvc.perform(post(REFRESH_PATH)
@@ -234,7 +234,7 @@ class RoundGrantSecurityConfigTest {
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
-    @DisplayName("ROUND 관리 경로의 미인증 요청은 actual chain에서 stable 401을 반환한다")
+    @DisplayName("ROUND 관리 경로의 미인증 요청은 실제 필터 체인에서 항상 401을 반환한다")
     @Test
     void rejectsAnonymousRoundAdministrationThroughSecurityChain() throws Exception {
         mockMvc.perform(sameOrigin(post(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH))
@@ -250,7 +250,7 @@ class RoundGrantSecurityConfigTest {
                         """, true));
     }
 
-    @DisplayName("ROUND 관리 경로의 CSRF 거부는 actual chain에서 stable 403을 반환한다")
+    @DisplayName("ROUND 관리 경로의 CSRF 거부는 실제 필터 체인에서 항상 403을 반환한다")
     @Test
     void rejectsRoundAdministrationWithoutCsrfThroughSecurityChain() throws Exception {
         UsernamePasswordAuthenticationToken authentication =

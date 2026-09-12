@@ -7,8 +7,8 @@ const OTHER_SEASON = '00000000-0000-4000-8000-000000000903'
 const ACTIVE_SEASON = '00000000-0000-4000-8000-000000000904'
 const ENDED_SEASON = '00000000-0000-4000-8000-000000000905'
 
-test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동하고 접근이 거부된 팀은 제외한다', async ({ page }, testInfo) => {
-  await page.clock.install()
+test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본으로 이동하고 접근이 거부되거나 구성원 상태가 바뀐 팀은 제외한다', async ({ page }, testInfo) => {
+  await page.clock.install({ time: new Date('2026-07-18T00:00:00Z') })
   const current = makeProjection()
   current.team.accountAccessEnabled = true; current.team.permission = 'MEMBER'
   const other = structuredClone(current)
@@ -16,6 +16,8 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
   other.season = { ...other.season, id: OTHER_SEASON, name: '가을 시즌' }
   other.seasons = [other.season]
   other.rounds[0]!.routineExecutions[1]!.title = '두 번째 팀 회고 정리'
+  other.decisions[0]!.title = '두 번째 팀 최근 결정'
+  other.decisions[0]!.createdAt = '2026-07-17T12:00:00Z'
   const active = structuredClone(current)
   active.season = { ...active.season, id: ACTIVE_SEASON, name: '추가 진행 시즌' }
   const ended = { ...current.season, id: ENDED_SEASON, name: '종료 시즌', endedAt: '2026-09-01T00:00:00Z' }
@@ -39,11 +41,31 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
     return route.fulfill(allowed ? { json: other }
       : { status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '권한이 회수되었습니다.' } })
   })
+  await page.route('**/api/v1/notification-preferences', route => route.fulfill({ json: {
+    accountId: ACCOUNT, version: 0, deadlineSoonEnabled: true, overdueEnabled: true,
+    handoffEnabled: true, deadlineLeadHours: 24,
+  } }))
   await page.goto('/my-teams')
   const work = page.getByRole('region', { name: '모든 팀의 내 할 일' })
   const task = work.getByRole('link', { name: /두 번째 팀 회고 정리/ })
   await expect(task).toBeVisible()
+  await expect(task).toContainText('마감 임박')
+  await work.getByLabel('업무 구분').selectOption('soon')
+  await expect(task).toBeVisible()
+  await expect(work.getByRole('link', { name: /문제 5개 선정/ })).toHaveCount(0)
+  await work.getByLabel('업무 구분').selectOption({ label: '그 밖의 남은 업무' })
+  await expect(task).toHaveCount(0)
+  await expect(work.getByRole('link', { name: /문제 5개 선정/ }).first()).toContainText('남은 업무')
+  await work.getByLabel('업무 구분').selectOption('all')
   await expect(work.getByRole('link', { name: /다른 진행 시즌의 회고/ })).toBeVisible()
+  const recent = page.getByRole('region', { name: '최근 추가된 기록' })
+  const recentDecision = recent.getByRole('link', { name: /두 번째 팀 최근 결정/ })
+  await expect(recentDecision).toContainText('두 번째 운영 팀 · 가을 시즌')
+  await recentDecision.click()
+  await expect(page).toHaveURL(new RegExp(`/teams/${OTHER_TEAM}/seasons/${OTHER_SEASON}\\?recordKind=decision`))
+  await expect(page.getByRole('heading', { name: '두 번째 팀 최근 결정' })).toBeVisible()
+  await page.getByRole('link', { name: '내 팀', exact: true }).filter({ visible: true }).click()
+  await expect(task).toBeVisible()
   expect(api.calls.some(call => call.path.includes(ENDED_SEASON))).toBe(false)
   await expect(task).toHaveAttribute('href', new RegExp(`/teams/${OTHER_TEAM}/seasons/${OTHER_SEASON}\\?workKind=execution`))
   const first = work.getByRole('link', { name: /알고리즘 한 바퀴/ }).first()
@@ -68,5 +90,11 @@ test('@smoke @responsive 여러 팀의 업무를 모아 원본 회차로 이동�
   allowed = true
   await work.getByRole('button', { name: '업무 새로고침' }).click()
   await expect(task).toBeVisible()
+  await expect(work.getByRole('alert')).toHaveCount(0)
+  other.members.find(member => member.id === MEMBER_ONE_ID)!.deactivatedAt = '2026-07-18T01:00:00Z'
+  await work.getByRole('button', { name: '업무 새로고침' }).click()
+  await expect(work.getByRole('alert')).toContainText('일부 팀이나 시즌의 업무가 빠져 있습니다')
+  await expect(task).toHaveCount(0)
+  await expect(recent.getByRole('link', { name: /두 번째 팀 최근 결정/ })).toHaveCount(0)
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))
 })

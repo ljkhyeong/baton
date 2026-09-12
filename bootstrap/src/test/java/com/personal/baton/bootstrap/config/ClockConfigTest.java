@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ClockConfigTest {
 
-    @DisplayName("운영 Clock은 MySQL 저장 정밀도에 맞춰 UTC instant를 마이크로초로 제한한다")
+    @DisplayName("운영 시계는 MySQL 저장 정밀도에 맞춰 UTC 시각을 마이크로초 단위로 제한한다")
     @Test
     void limitsProductionClockToDatabasePrecision() {
         Instant sourceInstant = Instant.parse("2026-08-01T12:34:56.123456789Z");

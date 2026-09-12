@@ -17,7 +17,7 @@ import static org.mockito.Mockito.when;
 @Tag("policy")
 class WatchMonitorReconciliationServiceTest {
 
-    @DisplayName("reconciliation은 고정 크기 UUID keyset page를 끝까지 순회한다")
+    @DisplayName("상태 조정은 고정 크기 UUID 키셋 페이지를 끝까지 조회한다")
     @Test
     void reconcilesCandidatesAcrossKeysetPages() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);
@@ -56,7 +56,7 @@ class WatchMonitorReconciliationServiceTest {
         );
     }
 
-    @DisplayName("reconciliation 후보가 없으면 빈 결과로 끝난다")
+    @DisplayName("상태 조정 후보가 없으면 빈 결과로 끝난다")
     @Test
     void completesWithEmptyResultWhenNoCandidateExists() {
         WatchMonitorOutboxPort outboxPort = mock(WatchMonitorOutboxPort.class);

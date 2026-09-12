@@ -68,7 +68,7 @@ public record CalendarIntegrationProperties(
     }
 
     URI requiredBaseUri() {
-        return ExternalHttpOrigin.requireHttps("CAL base URL", baseUrl);
+        return ExternalHttpOrigin.requireHttps("CAL 기본 URL", baseUrl);
     }
 
     String requiredBearerToken() {
@@ -78,7 +78,7 @@ public record CalendarIntegrationProperties(
     Duration requiredConnectTimeout() {
         return OutboundHttpSettings.requirePositiveTimeout(
                 "CAL",
-                "connect timeout",
+                "연결 시간 제한",
                 connectTimeout
         );
     }
@@ -86,7 +86,7 @@ public record CalendarIntegrationProperties(
     Duration requiredReadTimeout() {
         return OutboundHttpSettings.requirePositiveTimeout(
                 "CAL",
-                "read timeout",
+                "읽기 시간 제한",
                 readTimeout
         );
     }
