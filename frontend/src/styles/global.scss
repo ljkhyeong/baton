@@ -163,6 +163,7 @@ a {
 }
 
 .auth-brand { width: fit-content; padding: 0; color: inherit; text-decoration: none; }
+.service-status-link { display: inline-flex; align-items: center; width: fit-content; min-height: 44px; color: var(--muted); font-size: 13px; }
 .auth-story-copy { max-width: 570px; margin: 56px 0 auto; padding: 0; }
 .auth-story-copy .section-kicker { color: var(--muted); }
 .auth-story-copy h1 { margin: 12px 0 16px; font-size: 26px; font-weight: 650; letter-spacing: -.035em; line-height: 1.45; }

@@ -16,6 +16,7 @@ COPY frontend/src ./src
 
 ARG VITE_SENTRY_DSN=
 ARG VITE_SENTRY_ENVIRONMENT=production
+ARG VITE_STATUS_PAGE_ENABLED=false
 RUN npm run build
 
 FROM ${CADDY_BUILDER_IMAGE} AS caddy-build

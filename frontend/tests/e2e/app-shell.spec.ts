@@ -38,5 +38,7 @@ test('예상하지 못한 화면 오류에서 안전한 복구 행동을 제공�
   await expect(page.getByRole('heading', { name: '화면을 불러오지 못했습니다.' })).toBeVisible()
   await expect(page.getByRole('button', { name: '다시 불러오기' })).toBeVisible()
   await expect(page.getByRole('link', { name: '처음 화면으로 이동' })).toHaveAttribute('href', '/')
+  await expect(page.getByRole('link', { name: '서비스 상태 (새 탭)' }))
+    .toHaveCount((process.env.VITE_STATUS_PAGE_ENABLED ?? 'true') === 'true' ? 1 : 0)
   await expect(page).toHaveTitle('오류 — BATON')
 })

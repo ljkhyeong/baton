@@ -33,6 +33,7 @@ export default defineConfig({
     command: 'npm run dev -- --host 127.0.0.1 --port 3100 --strictPort',
     env: {
       VITE_WORKSPACE_SYNC_INTERVAL_MS: '2000',
+      VITE_STATUS_PAGE_ENABLED: process.env.VITE_STATUS_PAGE_ENABLED ?? 'true',
     },
     url: TEST_BASE_URL,
     reuseExistingServer: false,

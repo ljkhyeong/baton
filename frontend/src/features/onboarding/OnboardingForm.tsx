@@ -1,6 +1,7 @@
 import { workspaceTemplates } from './workspaceTemplates'
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
 import { Link } from 'react-router-dom'
+import ServiceStatusLink from '@/shared/ui/ServiceStatusLink'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import { useOnboardingWorkspaceFlow } from './useOnboardingWorkspaceFlow'
 import {
@@ -41,6 +42,7 @@ export default function OnboardingForm() {
           <li><strong>업무와 담당자</strong><small>누가 무엇을 맡는지 정합니다.</small></li>
           <li><strong>인수인계</strong><small>다음 담당자에게 업무와 자료를 전달합니다.</small></li>
         </ol>
+        <ServiceStatusLink />
       </section>
 
       <section className="onboarding-form-panel" aria-labelledby="workspace-form-title">

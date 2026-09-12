@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import ServiceStatusLink from '@/shared/ui/ServiceStatusLink'
 
 type AuthPageShellProps = {
   formTitle: string
@@ -28,6 +29,7 @@ export default function AuthPageShell({
             같은 이메일이어도 로그인 방법이 다르면 별도 계정입니다.
           </p>
         </div>
+        <ServiceStatusLink />
       </section>
 
       <section className="auth-panel">

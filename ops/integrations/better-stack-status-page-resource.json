@@ -1,0 +1,9 @@
+{
+  "resource_id": "REPLACE_WITH_PUBLIC_MONITOR_ID",
+  "resource_type": "Monitor",
+  "public_name": "BATON 접속",
+  "explanation": "3분마다 확인한 서버 응답입니다. 개별 업무 기능의 정상 동작을 보장하지는 않습니다.",
+  "widget_type": "history",
+  "mark_as_down_for": "any_incident",
+  "mark_as_degraded_for": "no_incident"
+}

@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import ServiceStatusLink from '@/shared/ui/ServiceStatusLink'
 
 type AppErrorBoundaryProps = {
   children: ReactNode
@@ -38,6 +39,7 @@ export default class AppErrorBoundary extends Component<
                 다시 불러오기
               </button>
               <a className="secondary-button" href="/">처음 화면으로 이동</a>
+              <ServiceStatusLink className="secondary-button" />
             </div>
           </section>
         </main>

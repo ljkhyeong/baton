@@ -1,0 +1,16 @@
+{
+  "company_name": "BATON",
+  "company_url": "https://b4ton.com",
+  "subdomain": "b4ton",
+  "custom_domain": "status.b4ton.com",
+  "timezone": "Seoul",
+  "history": 90,
+  "design": "v2",
+  "theme": "system",
+  "layout": "horizontal",
+  "published": false,
+  "automatic_reports": false,
+  "subscribable": false,
+  "whitelabeled": false,
+  "hide_from_search_engines": true
+}

@@ -189,6 +189,7 @@ services:
       args:
         VITE_SENTRY_DSN: ${BATON_SENTRY_BROWSER_DSN:-}
         VITE_SENTRY_ENVIRONMENT: ${BATON_SENTRY_ENVIRONMENT:-production}
+        VITE_STATUS_PAGE_ENABLED: ${BATON_STATUS_PAGE_ENABLED:-false}
     restart: unless-stopped
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}

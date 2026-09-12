@@ -701,6 +701,18 @@ assert_not_contains 'compose.round.production.yml' "$(cat "$test_root/docker.log
 assert_not_contains 'pull --quiet' "$(cat "$test_root/docker.log")" \
   'disabled ROUND runtime image pull'
 
+for status_page_enabled in true false; do
+  status_page_env="$test_root/status-page-$status_page_enabled.env"
+  write_valid_env "$status_page_env"
+  printf 'BATON_STATUS_PAGE_ENABLED=%s\n' "$status_page_enabled" >> "$status_page_env"
+  "$production_env_validator_script" "$status_page_env" >/dev/null \
+    || fail "서비스 상태 링크 설정 거부: $status_page_enabled"
+done
+status_page_invalid_env="$test_root/status-page-invalid.env"
+write_valid_env "$status_page_invalid_env"
+printf '%s\n' 'BATON_STATUS_PAGE_ENABLED=yes' >> "$status_page_invalid_env"
+expect_preflight_failure '서비스 상태 링크 설정 오타' "$status_page_invalid_env" 'BATON_STATUS_PAGE_ENABLED'
+
 round_runtime_enabled_env="$test_root/round-runtime-enabled.env"
 write_valid_env "$round_runtime_enabled_env"
 append_enabled_round_runtime "$round_runtime_enabled_env"

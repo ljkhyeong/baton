@@ -258,6 +258,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_BRIEF_SERVICE_TRUSTSTORE_FILE)
       seen_baton_brief_service_truststore_file=true
       ;;
+    BATON_STATUS_PAGE_ENABLED)
+      production_validation_validate_boolean fail "$key" "$value"
+      ;;
     BATON_SENTRY_DSN|\
       BATON_SENTRY_BROWSER_DSN|\
       BATON_SENTRY_ENVIRONMENT|\
