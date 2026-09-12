@@ -2,7 +2,8 @@
 
 ## 공통 운영 준비
 
-- 실제 공개 URL을 `BATON_HEALTH_URL`에 설정해 `외부 상태 감시`를 수동 실행한다. 성공 후 `BATON_EXTERNAL_MONITOR_ENABLED=true`로 예약 검사를 켜고 첫 실행과 담당 계정의 실패 알림 수신을 확인한다.
+- [무료 외부 연동](docs/runbooks/free-integrations.md)에 따라 Brevo 무료 SMTP·Better Stack 공개 상태/백업 하트비트·Google Drive crypt 원격 저장소의 계정과 비밀값을 준비한다. `b4ton.com`의 실제 HTTPS·메일 수신·첫 하트비트·원격 업로드/복원을 확인한다.
+- 외부 상태 감시는 Better Stack 또는 기존 GitHub Actions 중 하나를 선택한다. GitHub Actions를 사용하면 `BATON_HEALTH_URL=https://b4ton.com/actuator/health`로 수동 성공을 확인한 뒤 예약 검사를 켠다. Better Stack 전환 후에는 `BATON_EXTERNAL_MONITOR_ENABLED=false`로 기존 예약 검사를 끈다.
 - 파일럿 데이터를 넣기 전에 암호화 원격 백업을 별도 환경에 복구한다. `last-restore-recovery-targets.tsv`의 팀별로 새 키를 발급하고 이전 링크의 `403`, 새 링크의 접근과 복구 후 재백업을 확인한다.
 - 아래 기능별 공개 HTTPS·실기기 검증을 마친 뒤 운영을 활성화한다. 로컬 검증만으로 완료 처리하지 않는다.
 
