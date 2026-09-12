@@ -1,18 +1,15 @@
 import type {
-  AcceptRoleHandoffResponse,
-  CancelRoleHandoffResponse,
   CreateNextSeasonResponse,
   Decision,
   HandoffItem,
   Member,
-  PrepareRoleHandoffResponse,
   Role,
+  RoleHandoffTransitionResponse,
   RoleResource,
   Routine,
   RoutineExecution,
   SeasonRound,
   SeasonSummary,
-  TransferRoleHandoffResponse,
   WorkspaceProjection,
 } from './types'
 import {
@@ -378,46 +375,15 @@ export function decodeRole(value: unknown, expectedId?: string): Role {
   return decodeForExpectedId<Role>(value, isRole, 'Role response', expectedId)
 }
 
-function decodeRoleHandoffTransitionResponse<T>(
+export function decodeRoleHandoffTransitionResponse(
   value: unknown,
   scope: { roleId: string; handoffId?: string },
-): T {
-  return decodeRequiredShape<T>(
+): RoleHandoffTransitionResponse {
+  return decodeRequiredShape(
     value,
     (candidate) => isRoleHandoffTransitionResponse(candidate, scope),
     'Role handoff response',
   )
-}
-
-export function decodePrepareRoleHandoffResponse(
-  value: unknown,
-  roleId: string,
-): PrepareRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, { roleId })
-}
-
-export function decodeTransferRoleHandoffResponse(
-  value: unknown,
-  roleId: string,
-  handoffId: string,
-): TransferRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, { roleId, handoffId })
-}
-
-export function decodeAcceptRoleHandoffResponse(
-  value: unknown,
-  roleId: string,
-  handoffId: string,
-): AcceptRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, { roleId, handoffId })
-}
-
-export function decodeCancelRoleHandoffResponse(
-  value: unknown,
-  roleId: string,
-  handoffId: string,
-): CancelRoleHandoffResponse {
-  return decodeRoleHandoffTransitionResponse(value, { roleId, handoffId })
 }
 
 export function decodeRoutine(value: unknown, expectedId?: string): Routine {

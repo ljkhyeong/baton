@@ -13,20 +13,17 @@ import {
   decodeRotateAccessKeyResponse,
 } from './workspaceCredentialResponseDecoder'
 import {
-  decodeAcceptRoleHandoffResponse,
-  decodeCancelRoleHandoffResponse,
   decodeCreateNextSeasonResponse,
   decodeDecision,
   decodeHandoffItem,
   decodeMember,
-  decodePrepareRoleHandoffResponse,
   decodeRole,
+  decodeRoleHandoffTransitionResponse,
   decodeRoleResource,
   decodeRoutine,
   decodeRoutineExecution,
   decodeSeasonRound,
   decodeSeasonSummary,
-  decodeTransferRoleHandoffResponse,
   decodeWorkspaceProjectionForScope,
 } from './workspaceProjectionDecoder'
 import type {
@@ -358,7 +355,7 @@ export function prepareRoleHandoff(
     roleId,
   })
   return workspaceRequest<PrepareRoleHandoffResponse>(path, {
-    decode: (value) => decodePrepareRoleHandoffResponse(value, roleId),
+    decode: (value) => decodeRoleHandoffTransitionResponse(value, { roleId }),
     method: endpoint.method,
     headers: contentCreationHeaders(
       scope,
@@ -382,7 +379,7 @@ export function transferRoleHandoff(
     handoffId,
   })
   return workspaceRequest<TransferRoleHandoffResponse>(path, {
-    decode: (value) => decodeTransferRoleHandoffResponse(value, roleId, handoffId),
+    decode: (value) => decodeRoleHandoffTransitionResponse(value, { roleId, handoffId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies TransferRoleHandoffHeaders,
     body: request,
@@ -403,7 +400,7 @@ export function acceptRoleHandoff(
     handoffId,
   })
   return workspaceRequest<AcceptRoleHandoffResponse>(path, {
-    decode: (value) => decodeAcceptRoleHandoffResponse(value, roleId, handoffId),
+    decode: (value) => decodeRoleHandoffTransitionResponse(value, { roleId, handoffId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies AcceptRoleHandoffHeaders,
     body: request,
@@ -424,7 +421,7 @@ export function cancelRoleHandoff(
     handoffId,
   })
   return workspaceRequest<CancelRoleHandoffResponse>(path, {
-    decode: (value) => decodeCancelRoleHandoffResponse(value, roleId, handoffId),
+    decode: (value) => decodeRoleHandoffTransitionResponse(value, { roleId, handoffId }),
     method: endpoint.method,
     headers: scopedHeaders(scope) satisfies CancelRoleHandoffHeaders,
     body: request,

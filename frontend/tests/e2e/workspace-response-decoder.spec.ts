@@ -7,16 +7,9 @@ import type {
 } from '../../src/features/workspace/types'
 import { makeProjection } from './support/workspaceApiHarness'
 
-type DecoderName =
-  | 'decodeAcceptRoleHandoffResponse'
-  | 'decodeCancelRoleHandoffResponse'
-  | 'decodeCreateNextSeasonResponse'
-  | 'decodePrepareRoleHandoffResponse'
-  | 'decodeTransferRoleHandoffResponse'
-
 type DecoderScope =
   | { kind: 'next-season'; sourceSeasonId: string }
-  | { kind: 'role-handoff'; roleId: string; handoffId: string }
+  | { kind: 'role-handoff'; roleId: string; handoffId?: string }
 
 type BrowserRequestResult =
   | { ok: true; value: unknown }
@@ -32,31 +25,19 @@ const INVALID_RESPONSE_ERROR = {
 async function decodedResponseRequestFromBrowser(
   page: Page,
   path: string,
-  decoderName: DecoderName,
   decoderScope: DecoderScope,
 ): Promise<BrowserRequestResult> {
-  return page.evaluate(async ({ requestPath, responseDecoderName, scope }) => {
+  return page.evaluate(async ({ requestPath, scope }) => {
     const { apiRequest } = await import('/src/shared/api/client.ts')
     const responseDecoders = await import(
       '/src/features/workspace/workspaceProjectionDecoder.ts'
     )
 
     const decode = (value: unknown) => {
-      if (responseDecoderName === 'decodeCreateNextSeasonResponse') {
-        if (scope.kind !== 'next-season') throw new TypeError('Missing next-season scope.')
+      if (scope.kind === 'next-season') {
         return responseDecoders.decodeCreateNextSeasonResponse(value, scope.sourceSeasonId)
       }
-      if (scope.kind !== 'role-handoff') throw new TypeError('Missing role-handoff scope.')
-      if (responseDecoderName === 'decodePrepareRoleHandoffResponse') {
-        return responseDecoders.decodePrepareRoleHandoffResponse(value, scope.roleId)
-      }
-      if (responseDecoderName === 'decodeTransferRoleHandoffResponse') {
-        return responseDecoders.decodeTransferRoleHandoffResponse(value, scope.roleId, scope.handoffId)
-      }
-      if (responseDecoderName === 'decodeAcceptRoleHandoffResponse') {
-        return responseDecoders.decodeAcceptRoleHandoffResponse(value, scope.roleId, scope.handoffId)
-      }
-      return responseDecoders.decodeCancelRoleHandoffResponse(value, scope.roleId, scope.handoffId)
+      return responseDecoders.decodeRoleHandoffTransitionResponse(value, scope)
     }
 
     try {
@@ -73,7 +54,7 @@ async function decodedResponseRequestFromBrowser(
         kind: apiError.kind,
       }
     }
-  }, { requestPath: path, responseDecoderName: decoderName, scope: decoderScope })
+  }, { requestPath: path, scope: decoderScope })
 }
 
 async function workspaceRequestFromBrowser(
@@ -208,28 +189,21 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/')
 })
 
-test('역할 인수인계 endpoint decoder는 서버가 반환한 도메인 상태를 재계산하지 않는다', async ({ page }) => {
+test('역할 인수인계 응답은 준비·변경 단계 모두 서버 상태를 재계산하지 않는다', async ({ page }) => {
   const response = domainInconsistentRoleHandoffResponse()
-  const decoders: DecoderName[] = [
-    'decodePrepareRoleHandoffResponse',
-    'decodeTransferRoleHandoffResponse',
-    'decodeAcceptRoleHandoffResponse',
-    'decodeCancelRoleHandoffResponse',
-  ]
+  const path = '/response-decoder/role-handoff'
+  await page.route(`**${path}`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(response),
+  }))
 
-  for (const [index, decoder] of decoders.entries()) {
-    await test.step(decoder, async () => {
-      const path = `/response-decoder/role-handoff-${index}`
-      await page.route(`**${path}`, (route) => route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(response),
-      }))
-
-      await expect(decodedResponseRequestFromBrowser(page, path, decoder, {
+  for (const handoffId of [undefined, response.handoff.id]) {
+    await test.step(handoffId === undefined ? '새 인수인계 준비' : '기존 인수인계 변경', async () => {
+      await expect(decodedResponseRequestFromBrowser(page, path, {
         kind: 'role-handoff',
         roleId: response.role.id,
-        handoffId: response.handoff.id,
+        handoffId,
       })).resolves.toEqual({
         ok: true,
         value: response,
@@ -251,7 +225,6 @@ test('다음 시즌 decoder는 원본과 후속 시즌 계보만 검증한다', 
   await expect(decodedResponseRequestFromBrowser(
     page,
     path,
-    'decodeCreateNextSeasonResponse',
     { kind: 'next-season', sourceSeasonId: response.sourceSeason.id },
   )).resolves.toEqual({ ok: true, value: response })
 
@@ -260,7 +233,6 @@ test('다음 시즌 decoder는 원본과 후속 시즌 계보만 검증한다', 
   await expect(decodedResponseRequestFromBrowser(
     page,
     path,
-    'decodeCreateNextSeasonResponse',
     { kind: 'next-season', sourceSeasonId: response.sourceSeason.id },
   )).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
