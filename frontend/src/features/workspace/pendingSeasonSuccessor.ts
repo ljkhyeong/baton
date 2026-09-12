@@ -34,17 +34,13 @@ function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`
 }
 
-function lockName(teamId: string) {
-  return `${LOCK_NAME_PREFIX}${teamId}`
-}
-
 function normalizedRequest(request: CreateNextSeasonRequest) {
   return JSON.stringify({
     name: request.name.trim(),
     startDate: request.startDate.trim(),
     endDate: request.endDate.trim(),
-    copyRoleIds: [...request.copyRoleIds].map((id) => id.trim()).sort(),
-    copyRoutineIds: [...request.copyRoutineIds].map((id) => id.trim()).sort(),
+    copyRoleIds: request.copyRoleIds.map((id) => id.trim()).sort(),
+    copyRoutineIds: request.copyRoutineIds.map((id) => id.trim()).sort(),
   })
 }
 
@@ -147,5 +143,5 @@ export async function runWithSeasonSuccessorLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,
 ): Promise<BrowserLockResult<Value>> {
-  return runWithBrowserLock(lockName(teamId), operation)
+  return runWithBrowserLock(`${LOCK_NAME_PREFIX}${teamId}`, operation)
 }

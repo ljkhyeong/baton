@@ -920,31 +920,56 @@ test('@handoff Web Locks를 사용할 수 없으면 인수인계 생성 요청�
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@handoff Web Locks 요청이 실패하면 인수인계 생성 요청을 보내지 않는다', async ({ page }, testInfo) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'locks', {
-      configurable: true,
-      value: {
-        request: () => Promise.reject(new Error('Web Locks request failed')),
-      },
-    })
+for (const failurePoint of ['잠금 접근', '잠금 요청', '요청 준비'] as const) {
+  test(`@handoff @webkit ${failurePoint} 실패 후 인수인계 생성 요청을 다시 보낼 수 있다`, async ({ page }, testInfo) => {
+    const api = await installApi(page)
+    await openSharedWorkspace(page)
+    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+    await page.getByRole('button', { name: '항목 추가' }).click()
+
+    const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
+    await dialog.getByLabel('남길 내용').fill('Web Locks 요청 실패 차단')
+    await page.evaluate((point) => {
+      const failure = new Error('일회성 생성 요청 실패')
+      if (point === '잠금 접근') {
+        const locks = navigator.locks
+        Object.defineProperty(navigator, 'locks', {
+          configurable: true,
+          get() {
+            Object.defineProperty(navigator, 'locks', { configurable: true, value: locks })
+            throw failure
+          },
+        })
+      } else if (point === '잠금 요청') {
+        const request = navigator.locks.request.bind(navigator.locks)
+        navigator.locks.request = () => {
+          navigator.locks.request = request
+          return Promise.reject(failure)
+        }
+      } else {
+        const randomUUID = crypto.randomUUID.bind(crypto)
+        crypto.randomUUID = () => {
+          crypto.randomUUID = randomUUID
+          throw failure
+        }
+      }
+    }, failurePoint)
+    await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+
+    await expect(dialog.getByRole('alert'))
+      .toContainText('새 항목을 만들 수 없습니다.')
+    expect(api.calls.filter(
+      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
+    )).toHaveLength(0)
+    await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+
+    await dialog.getByRole('button', { name: '항목 추가하기' }).click()
+    await expect(page.getByRole('checkbox', { name: 'Web Locks 요청 실패 차단' })).toBeVisible()
+    expect(api.calls.filter(
+      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
+    )).toHaveLength(1)
   })
-  const api = await installApi(page)
-  await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
-  await page.getByRole('button', { name: '항목 추가' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
-  await dialog.getByLabel('남길 내용').fill('Web Locks 요청 실패 차단')
-  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
-
-  await expect(dialog.getByRole('alert'))
-    .toContainText('새 항목을 만들 수 없습니다.')
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-  )).toHaveLength(0)
-  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
-})
+}
 
 test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임시 기록을 지우지 않는다', async ({ page }, testInfo) => {
   const firstKey = 'content-race-key-00000000000000000001'

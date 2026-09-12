@@ -21,10 +21,6 @@ function storageKey(teamId: string) {
   return `${STORAGE_KEY_PREFIX}${teamId}`
 }
 
-function lockName(teamId: string) {
-  return `${ROTATION_LOCK_PREFIX}${teamId}`
-}
-
 function isPendingAccessKeyChange(value: unknown): value is PendingAccessKeyChange {
   if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingAccessKeyChange>
@@ -32,16 +28,8 @@ function isPendingAccessKeyChange(value: unknown): value is PendingAccessKeyChan
     && isValidIdempotencyKey(candidate.idempotencyKey)
 }
 
-function readPendingAccessKeyChange(teamId: string) {
-  return readValidatedJson(storageKey(teamId), isPendingAccessKeyChange)
-}
-
-function writePendingAccessKeyChange(teamId: string, pending: PendingAccessKeyChange) {
-  return writeJson(storageKey(teamId), pending)
-}
-
 export function pendingAccessKeyRotation(teamId: string) {
-  return readPendingAccessKeyChange(teamId)?.idempotencyKey ?? null
+  return readValidatedJson(storageKey(teamId), isPendingAccessKeyChange)?.idempotencyKey ?? null
 }
 
 export function idempotencyKeyForAccessKeyRotation(teamId: string): string | null {
@@ -52,7 +40,7 @@ export function idempotencyKeyForAccessKeyRotation(teamId: string): string | nul
     operation: ROTATE_OPERATION,
     idempotencyKey: crypto.randomUUID(),
   }
-  return writePendingAccessKeyChange(teamId, next) ? next.idempotencyKey : null
+  return writeJson(storageKey(teamId), next) ? next.idempotencyKey : null
 }
 
 export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: string) {
@@ -67,5 +55,5 @@ export async function runWithAccessKeyRotationLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,
 ): Promise<BrowserLockResult<Value>> {
-  return runWithBrowserLock(lockName(teamId), operation)
+  return runWithBrowserLock(`${ROTATION_LOCK_PREFIX}${teamId}`, operation)
 }

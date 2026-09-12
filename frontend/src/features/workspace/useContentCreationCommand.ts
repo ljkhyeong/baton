@@ -141,8 +141,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       if (preparation.status === 'blocked') return preparation
 
       const { idempotencyKey } = preparation
-      try {
-        const result = await mutation.mutateAsync({ request, idempotencyKey })
+      const clearPendingRequest = () => {
         const cleanupRetry = markPendingContentCreationCleanupRequired(
           scope,
           operation,
@@ -153,19 +152,14 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
         if (!isJsonCleanupComplete(cleanupResult)) {
           setStorageError(contentCreationCleanupRequiredMessage)
         }
+      }
+      try {
+        const result = await mutation.mutateAsync({ request, idempotencyKey })
+        clearPendingRequest()
         onSuccess(result, request)
       } catch (error) {
         if (isTerminalContentCreationError(error)) {
-          const cleanupRetry = markPendingContentCreationCleanupRequired(
-            scope,
-            operation,
-            request,
-            idempotencyKey,
-          )
-          const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
-          if (!isJsonCleanupComplete(cleanupResult)) {
-            setStorageError(contentCreationCleanupRequiredMessage)
-          }
+          clearPendingRequest()
         }
       }
       return { status: 'requested' as const }
