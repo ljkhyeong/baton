@@ -1124,12 +1124,12 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
     )
     sessionStorage.setItem('unrelated-session-setting', 'keep')
 
-    let accessKeyRemovalFailed = false
+    let accessKeyRemovalFailures = 0
     Storage.prototype.removeItem = function removeItem(key) {
       if (this === localStorage
         && key === accessKeyStorageKey
-        && !accessKeyRemovalFailed) {
-        accessKeyRemovalFailed = true
+        && accessKeyRemovalFailures < 2) {
+        accessKeyRemovalFailures += 1
         throw new DOMException('Storage disabled', 'SecurityError')
       }
       originalRemoveItem.call(this, key)
@@ -1154,9 +1154,16 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
 
   await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
 
+  await expect(page.getByRole('alert')).toContainText(
+    '사이트 데이터 저장을 허용했는지 확인해 주세요.',
+  )
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
+  await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
+
   await expect(page.getByRole('status')).toContainText(
     '이 기기에 저장된 팀 접속 정보를 지웠습니다.',
   )
+  await expect(page.getByRole('alert')).toHaveCount(0)
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
     key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'

@@ -74,8 +74,7 @@ export default function LoginForm() {
   const capabilitiesQuery = useAuthCapabilities()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [deviceStateCleanupError, setDeviceStateCleanupError] = useState('')
-  const [deviceStateCleanupSuccess, setDeviceStateCleanupSuccess] = useState('')
+  const [logoutCleanupFailed, setLogoutCleanupFailed] = useState(false)
   const [oauthCallbackError] = useState(() => (
     oauthCallbackErrorMessage(location.search)
   ))
@@ -131,8 +130,8 @@ export default function LoginForm() {
       if (!session.authenticated) {
         throw new Error('로그인 상태를 확인하지 못했습니다.')
       }
-      setDeviceStateCleanupError('')
-      setDeviceStateCleanupSuccess('')
+      setLogoutCleanupFailed(false)
+      deviceStateCleanupMutation.reset()
     },
   })
   const deviceStateCleanupMutation = useMutation({
@@ -140,16 +139,6 @@ export default function LoginForm() {
       if (!clearAllWorkspaceDeviceState()) {
         throw new Error(deviceStateCleanupRetryFailureMessage)
       }
-    },
-    onMutate: () => {
-      setDeviceStateCleanupSuccess('')
-    },
-    onSuccess: () => {
-      setDeviceStateCleanupError('')
-      setDeviceStateCleanupSuccess('저장된 공유 링크, 최근 방문 목록, ROUND 접속 정보를 지웠습니다.')
-    },
-    onError: () => {
-      setDeviceStateCleanupError(deviceStateCleanupRetryFailureMessage)
     },
   })
   const logoutMutation = useMutation({
@@ -162,12 +151,13 @@ export default function LoginForm() {
       queryClient.removeQueries({ queryKey: workspaceKeys.all })
       clearRememberedAuthReturnTo()
       deviceStateCleanupMutation.reset()
-      setDeviceStateCleanupSuccess('')
-      setDeviceStateCleanupError(deviceStateCleared
-        ? ''
-        : deviceStateCleanupFailureMessage)
+      setLogoutCleanupFailed(!deviceStateCleared)
     },
   })
+  const deviceStateCleanupError = deviceStateCleanupMutation.isSuccess
+    ? ''
+    : deviceStateCleanupMutation.error?.message
+      ?? (logoutCleanupFailed ? deviceStateCleanupFailureMessage : '')
 
   if (sessionQuery.isPending) {
     return <div className="auth-loading" role="status">로그인 상태를 확인하고 있습니다.</div>
@@ -255,10 +245,10 @@ export default function LoginForm() {
         </div>
       )}
 
-      {deviceStateCleanupSuccess && (
+      {deviceStateCleanupMutation.isSuccess && (
         <div className="auth-capability-state" role="status">
           <strong>이 기기에 저장된 팀 접속 정보를 지웠습니다.</strong>
-          <p>{deviceStateCleanupSuccess}</p>
+          <p>저장된 공유 링크, 최근 방문 목록, ROUND 접속 정보를 지웠습니다.</p>
         </div>
       )}
 
