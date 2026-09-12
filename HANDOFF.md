@@ -16,6 +16,7 @@
 - [공개 인증서 만료 알림](docs/runbooks/free-integrations.md#공개-인증서-만료-알림-blackbox-exporter)의 Blackbox Exporter 내부 주소와 설정을 연결한다. 실제 만료일 수집·경보·갱신 후 해제 알림을 확인한다. Cloudflare 프록시 사용 시 원본 인증서는 별도로 확인한다. Exporter 준비 전에는 `baton-https` 작업과 해당 경보 파일을 함께 제외한다.
 - Dependabot 설정이 기본 브랜치에 반영되면 첫 `docker-compose` 점검에서 [대상 파일](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)과 그룹 PR을 확인한다. 이미지 변경 제안은 기존 CI를 통과한 뒤 검토하며, 비공개 저장소의 Actions 초과 사용 차단을 확인한다.
 - 파일럿 데이터를 넣기 전에 암호화 원격 백업을 별도 환경에 복구한다. `last-restore-recovery-targets.tsv`의 팀별로 새 키를 발급하고 이전 링크의 `403`, 새 링크의 접근과 복구 후 재백업을 확인한다.
+- [홈서버 저장 공간 감시](docs/runbooks/free-integrations.md#홈서버-저장-공간-감시-node-exporter)는 node_exporter 내부 주소와 호스트 파일시스템 접근을 준비한다. 실제 DB·백업 디스크의 지표를 대조한 뒤 선택 수집·경보 설정을 연결하고 시험 경보·해제의 수신을 확인한다. 기본 미연결이며 홈서버·수집기 설치는 실행하지 않았다.
 - 아래 기능별 공개 HTTPS·실기기 검증을 마친 뒤 운영을 활성화한다. 로컬 검증만으로 완료 처리하지 않는다.
 - [기기 앱 공유](docs/runbooks/free-integrations.md#기기-앱-공유-web-share-api)는 실제 iOS·Android에서 작업 공간·팀 초대·주간 요약의 앱 선택·취소와 전달된 링크의 접근 권한을 확인한다. 브라우저 검증은 공유·클립보드 API를 대역 처리했다.
 

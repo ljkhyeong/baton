@@ -257,7 +257,7 @@ openssl rand -hex 32
 
 [Trivy 이미지 검사](docs/runbooks/free-integrations.md#배포-이미지-취약점-검사-trivy)는 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 JSON 보고서로 남긴다. `./ops/scan-images.sh IMAGE [IMAGE ...]`로 실행하며 GitHub Actions 작업은 추가하지 않는다.
 
-고정 다이제스트는 운영자가 선택한 이미지를 식별한다. 게시자 서명이나 빌드 출처를 증명하지는 않는다. 실제 DNS 연결, 외부 80/443 접근, 공인 인증서 발급과 호스트 디스크 여유는 운영자가 별도로 확인한다.
+고정 다이제스트는 운영자가 선택한 이미지를 식별한다. 게시자 서명이나 빌드 출처를 증명하지는 않는다. 실제 DNS 연결, 외부 80/443 접근과 공인 인증서 발급은 운영자가 별도로 확인한다. 호스트 디스크 여유는 [Node Exporter 연동](docs/runbooks/free-integrations.md#홈서버-저장-공간-감시-node-exporter)을 연결한 뒤 감시할 수 있다.
 
 `production-compose.sh`는 매번 환경 설정을 검사하고 충돌할 수 있는 셸의 배포·Compose 변수를 제거한다. Docker는 Linux 로컬 `unix:///var/run/docker.sock`, 프로젝트와 DB 볼륨은 `baton-production`, Compose 파일은 저장소의 프로덕션 설정으로 고정한다. MySQL은 호스트 포트를 열지 않고 애플리케이션과 내부 TLS로 통신한다.
 

@@ -20,6 +20,7 @@
 | 내부 연동 장애 알림 | Prometheus + Alertmanager → Brevo SMTP 또는 Discord | 기존 지표의 경보 규칙과 수신 설정을 사용한다. Discord를 선택하면 SMTP 장애 중에도 운영 알림을 받을 수 있다. |
 | 감시 시스템 중단 확인 | Prometheus → Alertmanager → Better Stack 하트비트 | 감시 경로에서 5분마다 신호를 보낸다. 신호가 끊기면 홈서버 밖에서 알린다. 별도 예약 작업이나 발송기는 추가하지 않는다. |
 | 백업 중단 감시 | Better Stack 무료 하트비트 | 새 백업의 원격 검증이 끝나면 완료 신호를 보낸다. 홈서버 정전으로 신호가 끊겨도 외부에서 감지한다. |
+| 홈서버 저장 공간 감시 | Node Exporter → Prometheus·Alertmanager | 디스크 여유가 10% 미만으로 10분 지속되면 기존 운영 채널로 알린다. 수집·디스크 조회 오류도 구분한다. 선택 설정이며 서버 설치는 포함하지 않는다. |
 | 원격 백업 | Google Drive API를 지원하는 rclone + crypt | 기존 원격 저장 기능을 사용한다. 직접 다운로드·해시 비교하던 코드는 rclone의 `check --download`로 대체했다. |
 | 배포 이미지 취약점 검사 | Trivy | 빌드한 로컬 이미지의 HIGH·CRITICAL 취약점을 검사하고 JSON 보고서를 남긴다. GitHub Actions 실행은 추가하지 않는다. |
 | 라이브러리·운영 이미지 업데이트 점검 | GitHub Dependabot | 기존 Java·npm·Actions·Dockerfile 점검에 Compose의 MySQL·Caddy를 추가했다. 새 버전 조회와 PR 생성은 GitHub가 처리한다. |
@@ -319,6 +320,26 @@ Exporter와 공개 HTTPS 대상이 준비된 뒤 수집을 시작한다. 내부 
 이 검사는 접속 지점에서 보이는 인증서를 확인한다. Cloudflare 프록시를 사용하면 Cloudflare 인증서를 보므로 **홈서버 원본 인증서까지 검사한 결과가 아니다**. 홈서버 안에서 실행할 때는 NAT 루프백·분할 DNS에 따라 접속 경로가 달라질 수 있다. 같은 홈서버가 중단되면 알림도 멈추므로 외부 Better Stack 감시는 유지한다. 인증서 자동 갱신이나 도메인 등록 갱신은 수행하지 않는다.
 
 위 로컬 검증 명령에 만료 경계·갱신·검사 실패·수집 중단·지표 누락 사례를 포함했다. 실제 인증서 조회와 알림 수신은 미검증이며 공개 환경에서 확인해야 한다. 제공 범위는 연동 설정으로, 홈서버나 k3s를 설치하지 않는다.
+
+## 홈서버 저장 공간 감시: Node Exporter
+
+DB·백업 디스크의 여유 공간을 [공식 Node Exporter](https://prometheus.io/docs/guides/node-exporter/)의 지표로 확인한다. Apache 2.0 도구이며 별도 서비스 요금·API 키가 필요 없다. BATON에 디스크 조회 코드나 예약 작업을 추가하지 않고 기존 Prometheus·Alertmanager와 선택한 SMTP·Discord 채널을 사용한다.
+
+1. Ubuntu **호스트의 파일시스템**을 읽는 node_exporter와 내부 접속 주소를 준비한다. `--collector.disable-defaults --collector.filesystem`으로 필요한 수집기만 켤 수 있다. 컨테이너로 실행한다면 [공식 호스트 연결 기준](https://github.com/prometheus/node_exporter#using-docker)의 호스트 경로·네임스페이스와 `--path.rootfs`를 적용한다. 일반 컨테이너 내부의 디스크를 홈서버 디스크로 해석하지 않는다.
+2. 실제 DB·백업 경로가 속한 파일시스템을 `findmnt -T <경로>`와 `df -h <경로>`로 확인하고 지표의 `mountpoint`·`device`와 대조한다. k3s의 local-path 볼륨도 실제 호스트 저장 경로를 기준으로 확인한다. 별도 디스크가 수집기에서 보이는지 확인하기 전에는 운영 검증을 완료하지 않는다.
+3. [선택 수집 설정](../../ops/integrations/prometheus-host.yml.example)의 `node-exporter:9100`을 실제 내부 주소로 바꾸고, `rule_files`와 `scrape_configs` 목록을 기존 Prometheus 설정의 같은 목록에 추가한다. [경보 파일](../../ops/integrations/baton-host-alerts.yml)은 기존 규칙 파일과 같은 디렉터리에 둔다. **기존 수집·알림 설정 전체를 예시 파일로 교체하지 않는다.** 기본 `prometheus.yml`에는 이 선택 구성이 연결되어 있지 않다.
+4. 내부 Prometheus에서 `node_filesystem_avail_bytes{job="baton-host"}`와 `node_filesystem_size_bytes{job="baton-host"}`를 조회한다. 비관리자 프로세스가 쓸 수 있는 공간을 기준으로 한다. 기존 운영 검사로 설정을 검증한 뒤 실제 수집과 시험 경보·해제의 수신을 확인한다.
+
+| 상태 | 경보 조건 |
+| --- | --- |
+| 저장 공간 부족 | 여유 공간이 전체의 10% 미만으로 10분 지속 |
+| 디스크 상태 확인 불가 | 수집 중단·대상 누락·파일시스템 수집 실패·장치 조회 오류 또는 파일시스템 크기 지표 없음이 2분 지속 |
+
+수집할 지표는 공간·크기·장치 조회 오류와 파일시스템 수집 성공 여부로 제한한다. 메모리 파일시스템·컨테이너 overlay 등은 제외한다. 업무 파일의 이름·내용은 수집하지 않으며 파일·백업을 자동 삭제하지 않는다. 용량 부족 조건이 해소되면 기존 Alertmanager 설정에 따라 해제를 알린다. 수집이 끊겨도 용량 경보가 해제될 수 있으므로 상태 확인 불가 경보를 함께 확인한다.
+
+Exporter는 공개 포트·도메인으로 노출하지 않는다. 같은 홈서버의 전체 중단은 이 구성만으로 알릴 수 없으므로 외부 Better Stack 감시를 유지한다. Google Drive의 원격 저장 한도와 inode 고갈은 이 용량 경보 범위에 포함되지 않는다.
+
+로컬에서는 HTTP 지표 대역과 실제 Prometheus의 저장·필터 처리, 용량 경계·회복·수집 장애 및 알림 수신 경로를 확인했다. Ubuntu 디스크의 실제 수집과 SMTP·Discord 수신은 운영 연결 후 확인해야 한다. 홈서버·k3s·node_exporter 설치는 실행하지 않았다.
 
 ## 원격 백업: Google Drive + rclone
 
