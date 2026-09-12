@@ -1,0 +1,35 @@
+groups:
+  - name: baton-https
+    rules:
+      - alert: BatonHttpsCheckUnavailable
+        expr: |
+          (up{job="baton-https"} == 0)
+          or absent(up{job="baton-https"})
+          or (
+            (up{job="baton-https"} == 1)
+            unless on (job, instance) (
+              (probe_success{job="baton-https"} == 1)
+              and on (job, instance) (probe_ssl_earliest_cert_expiry{job="baton-https"} > 0)
+            )
+          )
+        for: 2m
+        labels:
+          service: baton
+          severity: warning
+        annotations:
+          summary: BATON 공개 HTTPS 인증서를 확인할 수 없습니다.
+          description: Blackbox Exporter 수집, DNS·네트워크, HTTPS 응답과 인증서 유효성을 확인하세요.
+
+      - alert: BatonTlsCertificateExpiring
+        expr: |
+          (probe_ssl_earliest_cert_expiry{job="baton-https"} - time() < 14 * 24 * 60 * 60)
+          and (probe_ssl_earliest_cert_expiry{job="baton-https"} > 0)
+          and on (job, instance) (up{job="baton-https"} == 1)
+          and on (job, instance) (probe_success{job="baton-https"} == 1)
+        for: 5m
+        labels:
+          service: baton
+          severity: warning
+        annotations:
+          summary: BATON 공개 인증서의 만료까지 14일 미만 남았습니다.
+          description: '{{ $labels.instance }}의 인증서 갱신 상태를 확인하세요. Cloudflare 프록시 사용 시 원본 서버 인증서는 별도 확인해야 합니다.'

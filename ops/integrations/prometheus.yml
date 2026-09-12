@@ -5,6 +5,7 @@ global:
 
 rule_files:
   - baton-alerts.yml
+  - baton-https-alerts.yml
 
 alerting:
   alertmanagers:
@@ -22,3 +23,19 @@ scrape_configs:
       - source_labels: [__name__]
         regex: baton_integration_.*
         action: keep
+
+  - job_name: baton-https
+    scrape_interval: 1m
+    metrics_path: /probe
+    params:
+      module: [baton_https]
+    static_configs:
+      - targets: ['https://b4ton.com/actuator/health']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        # 실제 내부 Blackbox Exporter 주소로 지정한다.
+        replacement: blackbox-exporter:9115

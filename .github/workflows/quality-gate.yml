@@ -144,7 +144,7 @@ jobs:
         run: bash ops/tests/pilot-readiness-test.sh
       - name: 외부 연동 전달 장애 점검 테스트
         run: bash ops/tests/integration-delivery-check-test.sh
-      - name: Prometheus 경보 및 SMTP 알림 설정 검사
+      - name: Prometheus 경보·SMTP 알림·HTTPS 검사 설정 확인
         run: bash ops/tests/integration-alerts-test.sh
       - name: 운영 systemd 유닛 검증
         run: |
