@@ -25,14 +25,23 @@
 
 ## 추가 후보와 도입 조건
 
-아래 두 항목은 구현하지 않은 후보다. 현재 구현과 공식 문서를 대조했으며, 도입 조건이 충족되면 해당 범위부터 진행한다.
+아래 항목은 구현하지 않은 후보다. 현재 구현과 공식 문서를 대조했으며, 도입 조건이 충족되면 해당 범위부터 진행한다.
 
 | 우선순위 | 후보 | 줄일 수 있는 작업과 도입 조건 |
 | --- | --- | --- |
+| 우선 권장 | Sentry 오류 수집 SDK | 브라우저·서버 오류 수집과 같은 오류 묶기를 맡긴다. [Developer 무료 플랜](https://sentry.io/pricing/)은 운영자 1명·월 오류 5,000건이며 [종량 과금을 지원하지 않는다](https://www.sentry.help/en/articles/13965037-can-i-set-up-an-on-demand-pay-as-you-go-budget-for-my-free-developer-plan). 유료 플랜으로 전환하지 않고 오류 수집부터 연결한다. |
+| 메일 운영 시 권장 | Brevo 발송 결과 Webhook | SMTP 접수 이후 반송·차단·전달 결과를 공급자가 알려 준다. [무료 플랜에 포함](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans)되며 별도 상태 조회 작업을 만들지 않아도 된다. 수신 인증·중복 처리와 발송 기록 연결은 필요하다. |
+| Drive 자료 사용이 많을 때 | Google Picker | Google의 파일 선택창으로 자료 이름과 링크를 가져온다. [공식 선택창](https://developers.google.com/workspace/drive/picker/guides/overview)을 사용하지만 OAuth 동의·프로젝트 설정이 추가된다. 현재는 링크 입력만으로 충분해 보류한다. |
 | 운영자가 Discord를 사용할 때 | Alertmanager → Discord Webhook | 장애·복구 알림을 운영 채널에 보낸다. [기본 Discord 수신 설정](https://prometheus.io/docs/alerting/latest/configuration/#discord_config)이 발송을 처리하므로 봇 서버나 별도 HTTP 발송기를 만들지 않는다. 채널 웹훅과 수신 담당자가 필요하다. |
 | 방문·로딩 통계가 필요할 때 | Cloudflare Web Analytics | 방문과 실제 페이지 로딩 성능을 [무료 통계 서비스](https://www.cloudflare.com/web-analytics/)에서 확인한다. 공개 소개 화면부터 검토하며 수집할 경로와 URL·토큰 제외 기준을 먼저 정한다. |
 
 Discord는 운영 경보의 선택 수신 채널이다. 사용자 업무·인수인계 알림의 외부 발송은 기존 RELAY 범위로 유지한다. 방문 통계는 외부 스크립트와 전송 경로를 추가하므로, 현재 [CSP](../../ops/Caddyfile)를 일괄 완화하거나 로그인·초대·작업 공간 주소를 그대로 수집하지 않는다.
+
+### 추가 검토 근거
+
+- [AppErrorBoundary](../../frontend/src/app/AppErrorBoundary.tsx)는 복구 화면만 표시하며 오류를 외부에 모으지 않는다. Sentry는 기존 상태 감시·Prometheus 지표에 오류 발생 위치와 반복 횟수를 보완한다. React SDK와 [Spring Boot 4용 공식 연동](https://github.com/getsentry/sentry-java/tree/main/sentry-spring-boot-4-starter)을 사용할 수 있다. 연결 시 공유 키·인증 토큰·입력 본문을 제외하고 화면 녹화·AI 분석은 켜지 않는다. 프로젝트·DSN과 실제 오류 수신 확인이 필요하다.
+- [SMTP 어댑터](../../adapter-out-external/src/main/java/com/personal/baton/adapter/out/external/identity/SmtpEmailVerificationDeliveryAdapter.java)는 발송 요청이 접수되면 반환한다. [Brevo 이벤트](https://developers.brevo.com/docs/transactional-webhooks)를 받으면 이후 반송·차단을 확인할 수 있다. 현재 아웃박스에는 공급자 메시지 ID 연결이 없으므로 설정만으로 끝나지 않는다. 기존 SMTP 전송 상태와 공급자 결과를 분리하고, 전달 이벤트를 사용자의 읽음·이메일 인증 완료로 처리하지 않는다.
+- [자료 등록 화면](../../frontend/src/features/workspace/WorkspaceRecordModals.tsx)은 이름과 주소를 입력받는다. Picker는 이 입력을 줄이지만 파일 접근 권한은 Drive가 계속 관리한다. Google 로그인과 파일 접근 동의는 별개이며, BATON 팀 공유만으로 Drive 파일 권한이 생기지는 않는다. Drive API를 함께 사용할 경우 아래 사용 한도 조건을 따른다.
 
 ## 가입·재설정 봇 방지: Cloudflare Turnstile
 
@@ -182,6 +191,8 @@ Exporter와 공개 HTTPS 대상이 준비된 뒤 수집을 시작한다. 내부 
 ## 원격 백업: Google Drive + rclone
 
 Google 계정의 무료 저장 공간은 Gmail·Drive·Photos가 공유하는 [15GB](https://support.google.com/googleone/answer/9004013?hl=en)다. 백업 전용 계정의 남은 공간 안에서 사용하고 저장 공간 업그레이드를 구매하지 않는다.
+
+[Drive API 사용 한도](https://developers.google.com/workspace/drive/api/guides/limits)는 저장 공간과 별개다. 현재 표준 사용은 추가 비용이 없지만 Google은 2026년 후반 한도 초과 과금 도입을 예고했다. 사용하는 OAuth 프로젝트의 적용 한도와 과금 조건을 활성화 전에 확인하고, 유료 한도 확대나 과금 계정 추가는 하지 않는다. API 사용이 항상 무제한 무료라고 전제하지 않는다.
 
 - [rclone Drive 설정](https://rclone.org/drive/)으로 `baton_drive`를 만든다. 가능한 경우 `drive.file` 범위로 백업 도구가 만든 파일에만 접근하게 한다. OAuth 토큰 갱신은 rclone이 처리한다.
 - [crypt 원격 저장소](https://rclone.org/crypt/) `baton_crypt`를 만들고 대상은 `baton_drive:baton-backups`로 지정한다. 파일 내용·이름 암호화를 켜고 복호화 비밀을 별도 보관한다.
