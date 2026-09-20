@@ -8,7 +8,90 @@
 
 진행 순서: **서버 확인 → DNS·인증서 → 이미지 빌드 → 비밀값 → 배포 파일 생성 → BATON → CAL·ROUND → RAG 검색 → 공개 접속 확인 → OpenAI 활성화 → 백업·운영**.
 
+처음 읽는다면 [기본 개념과 명령 읽는 법](#처음-읽는-사람을-위한-kubernetes-설명)을 먼저 읽고 1절부터 진행한다. 진행 중 오류가 나면 [문제 확인 순서](#문제가-생겼을-때-확인하는-순서)를 참고한다. 긴 설정 생성기는 7절의 파일별 설명을 읽은 뒤 실행하면 된다.
+
+## 처음 읽는 사람을 위한 Kubernetes 설명
+
+### 이 서버에서 Kubernetes가 하는 일
+
+Ubuntu는 실제 서버의 운영체제이고, k3s는 그 위에서 Kubernetes를 실행하는 배포판이다. Kubernetes는 컨테이너를 실행하고 상태를 확인하며, 선언한 개수보다 실행 인스턴스가 줄면 다시 만든다. 이번에는 홈서버 한 대가 클러스터의 유일한 **노드(Node)**다. 서버 자체가 꺼지면 Kubernetes도 서비스를 유지할 수 없다.
+
+우리는 `kubectl`이라는 관리 명령으로 k3s에 설정을 전달한다. 설정 파일에는 “이 이미지로 BATON을 하나 실행하고, 이 DB에 연결하며, 메모리를 이만큼 허용한다”는 내용을 적는다. Kubernetes는 그 설정과 실제 상태를 맞춘다. 따라서 실행 중인 컨테이너를 수동으로 고치는 대신 **설정 파일을 고쳐 다시 적용**하는 것이 기본 작업 방식이다.
+
+### 배포하면서 만나는 용어
+
+| 용어 | 뜻 | 이 문서에서의 예 |
+| --- | --- | --- |
+| 이미지(Image) | 프로그램과 실행 환경을 포장한 파일 | `baton-app:릴리스번호` |
+| 컨테이너(Container) | 이미지를 실제로 실행한 프로세스 환경 | Java로 실행 중인 BATON |
+| Pod | Kubernetes가 배치하는 실행 단위. 하나 이상의 컨테이너를 포함한다 | 이 문서는 대부분 Pod 하나에 컨테이너 하나 |
+| Deployment | 지정한 이미지·설정·개수에 맞게 Pod를 생성하고 교체하는 관리자 | BATON 앱을 항상 1개 실행 |
+| StatefulSet | 이름과 저장 공간의 연결을 일정하게 유지하며 Pod를 관리 | `mysql-0`과 그 DB 저장 공간 |
+| Namespace | 같은 클러스터에서 리소스를 구분하는 이름 범위 | `baton`, `portfolio`, 기존 happyGallery |
+| Service | Pod가 교체되어 IP가 바뀌어도 같은 이름으로 접근하게 하는 내부 연결 지점 | BATON이 `mysql:3306`에 연결 |
+| ClusterIP | 이 문서의 Service에 부여하는 클러스터 내부 IP | CAL 내부 TLS 프록시 주소 |
+| Ingress | 도메인·URL 경로별로 어느 Service에 보낼지 적은 규칙 | `b4ton.com` 요청을 `web` Service로 전달 |
+| Traefik | Ingress 규칙을 읽고 실제 외부 요청을 전달하는 프로그램 | 기존 80·443 포트를 담당 |
+| ConfigMap | 비밀이 아닌 실행 설정을 보관 | CAL 기능 활성화 여부 |
+| Secret | 비밀번호·토큰·인증서 등을 앱 설정과 분리해 보관 | DB 비밀번호, OpenAI 키 |
+| PVC / PV | PVC는 저장 공간 요청, PV는 그 요청에 연결된 실제 저장 리소스 | MySQL 데이터가 저장되는 볼륨 |
+| StorageClass | 저장 공간을 어떤 방식으로 마련할지 정하는 설정 | 홈서버 디스크를 쓰는 `local-path-retain` |
+| NetworkPolicy | 어떤 Pod가 다른 Pod의 어느 포트에 접근할 수 있는지 정하는 규칙 | 검색 API만 Elasticsearch에 접근 |
+| 매니페스트(Manifest) | 위 리소스의 원하는 상태를 적은 YAML 또는 JSON 파일 | `manifests/20-baton.json` |
+
+Namespace를 나눈다고 메모리·네트워크가 자동으로 완전히 분리되지는 않는다. 이 문서에서는 컨테이너 자원 설정과 NetworkPolicy를 별도로 지정한다. Secret을 만들었다고 저장 데이터가 자동으로 암호화되는 것은 아니다. 읽기 권한과 저장 시 암호화는 클러스터 설정에 달려 있다. [Pod](https://kubernetes.io/docs/concepts/workloads/pods/), [Service](https://kubernetes.io/docs/concepts/services-networking/service/), [Secret 공식 설명](https://kubernetes.io/docs/concepts/configuration/secret/).
+
+### BATON 요청 하나가 이동하는 과정
+
+브라우저에서 `https://b4ton.com`을 열면 DNS가 공인 IP를 알려 준다. 공유기가 443 요청을 홈서버로 보내고, Traefik이 인증서를 제시한 뒤 Ingress 규칙에 따라 BATON `web` Service로 전달한다. Service는 준비된 웹 Pod에 연결한다. Caddy는 화면 파일을 제공하고 API 요청은 `app` Service로 보낸다. BATON 앱은 필요할 때 `mysql` Service로 DB에 접근한다.
+
+이처럼 **인터넷 주소, Service 이름, Pod IP는 서로 다르다.** `mysql:3306`은 BATON 네임스페이스 안에서 쓰는 주소이며 개인 PC 브라우저에서 열 수 없다. 다른 네임스페이스에서는 `mysql.baton.svc.cluster.local`처럼 어느 네임스페이스의 Service인지 함께 지정한다.
+
+### 명령 읽는 법과 실행 위치
+
+`kubectl -n baton get pods`는 “현재 연결한 클러스터의 baton 네임스페이스에서 Pod 목록을 조회한다”는 뜻이다. `-n`을 빼면 다른 기본 네임스페이스를 보게 되어, 배포한 리소스가 없다고 착각할 수 있다. `-A`는 모든 네임스페이스를 뜻한다.
+
+| 명령·옵션 | 하는 일 | 서버 변경 여부 |
+| --- | --- | --- |
+| `get`, `describe`, `logs`, `top` | 목록·상세 상태·로그·사용량 조회 | 조회만 |
+| `create` | 새 리소스 생성 | 변경. 같은 이름이 이미 있으면 실패할 수 있음 |
+| `apply -f 파일` | 파일에 적힌 리소스를 생성하거나 설정 변경 | 변경. 성공 출력과 기동 성공은 다름 |
+| `--dry-run=client -o yaml` | 서버에 저장하지 않고 YAML을 출력 | 이 옵션 자체는 저장하지 않음 |
+| `--dry-run=server` | 서버가 설정을 받아들일 수 있는지 저장 없이 검사 | Pod를 실행하지 않음 |
+| `rollout status` | 배포가 준비 상태에 도달하는지 기다림 | 조회만. 애플리케이션 기능 테스트는 아님 |
+| `rollout restart` | 관리 대상 Pod를 새로 만들어 실행 | 변경. 통화·세션이 끊길 수 있음 |
+| `exec … -- 명령` | 실행 중인 컨테이너 안에서 명령 수행 | 안에서 실행한 명령에 따라 다름 |
+| `port-forward` | 명령을 실행한 컴퓨터의 포트를 Pod로 임시 연결 | 연결 중에만 유효. 종료는 Ctrl+C |
+
+`create … --dry-run=client -o yaml | kubectl apply -f -`는 앞에서 만든 YAML을 뒤의 `apply`가 실제 저장한다. **명령 전체가 조회 전용인 것은 아니다.** `-f -`의 마지막 `-`는 파일 대신 앞 명령의 출력을 읽는다는 뜻이다.
+
+코드 블록은 위에서 아래로 실행하되, 오류가 나면 다음 블록으로 넘어가지 않는다. 아래 형식도 알아 두면 좋다.
+
+- `export 이름=값`: 현재 터미널과 그곳에서 실행하는 프로그램에 값을 전달한다. 새 터미널에는 자동으로 복사되지 않는다.
+- `cat > 파일 <<'ENV' … ENV`: 두 `ENV` 사이의 내용을 파일로 저장한다. 편집기에서 같은 파일을 작성해도 된다. `>`는 기존 파일을 덮어쓴다.
+- `$(명령)`: 명령 출력으로 값을 채운다. 비밀값이 들어가는 명령은 디버그 출력(`set -x`)을 켜지 않는다.
+- 줄 끝 `\`: 명령이 다음 줄에 이어진다는 뜻이다. 한 블록을 줄바꿈까지 그대로 복사한다.
+- `실제_…`, `위에서_…`: 운영자가 교체할 자리다. 예시 문자열 그대로 실행하지 않는다.
+- `umask 077`: 이후 생성하는 파일·폴더의 기본 접근 권한을 소유자 중심으로 제한한다. 이미 있는 파일의 권한은 바꾸지 않는다.
+
+**4절의 이미지 빌드는 개발 PC**, 나머지 서버 명령은 홈서버에서 수행한다. Cloudflare·Google·OpenAI·포트폴리오 호스팅 설정은 각 관리 화면에서 수행한다. `port-forward`를 홈서버에서 열었다면 `127.0.0.1` 확인 명령도 홈서버의 다른 터미널에서 실행해야 한다.
+
+### 상태 표시와 메모리 숫자 읽기
+
+- Pod의 `Running`은 컨테이너가 시작됐다는 상태다. 요청을 처리할 수 있는지는 `READY` 열과 실제 기능으로 확인한다. 이번 단일 컨테이너 Pod는 준비되면 보통 `1/1`로 표시된다.
+- `startupProbe`는 처음 기동할 시간을 주면서 시작 성공을 확인한다. `readinessProbe`가 실패하면 일반적인 Service의 전달 대상에서 제외한다. readiness 실패 자체가 컨테이너를 재시작시키지는 않는다.
+- `livenessProbe`는 설정된 경우 실행 중 응답 불능을 감지해 재시작시키는 검사다. 이 문서의 생성기는 liveness를 공통으로 추가하지 않는다. 프로세스 종료·시작 검사 실패와 readiness 실패를 구분한다.
+- 메모리 `requests`는 배치 판단에 쓰는 요청량이지 실제 사용량 표시가 아니다. `limits`는 허용 상한이다. `512Mi`는 512MiB, `1Gi`는 1GiB다.
+- CPU `50m`은 0.05 CPU에 해당하는 요청량이다. 이미지 빌드·문서 색인처럼 순간 부하가 큰 작업에서는 평소보다 사용량이 늘 수 있다.
+- JVM 힙은 Java가 객체를 보관하는 메모리다. 스레드·클래스·네트워크 버퍼 등은 별도이므로 컨테이너 메모리 상한과 같은 크기로 잡지 않는다.
+
+처음부터 모든 명령을 외울 필요는 없다. 배포 중에는 **실행 위치, 네임스페이스, 변경 대상, 정상 결과** 네 가지를 확인하면서 진행한다.
+
 ## 1. 최종 구성과 운영 기준
+
+**이 단계는 배포 범위를 정하는 단계다.** 아직 서버를 변경하지 않는다. 어떤 앱을 실행하고 어떤 주소를 공개할지 먼저 정해야 이후 이미지·인증서·네트워크 설정이 같은 구성을 가리킨다.
+
+DB까지 모두 서비스별로 공개하지 않고, 외부 사용자가 직접 이용하는 경로만 공개한다. 관리·내부 전달 경로를 분리하면 공개 주소에서 인증 토큰을 받는 불필요한 접점을 줄일 수 있다. 아래 구성·주소·메모리 예산을 확정하면 2절로 넘어간다.
 
 - 기존 k3s·Traefik·Prometheus·Grafana를 재사용한다. happyGallery 리소스는 변경하지 않는다.
 - `baton` 네임스페이스: BATON 웹·앱·MySQL, CAL·PostgreSQL·공개 프록시, 내부 TLS 프록시, ROUND 웹·시그널링·coturn.
@@ -63,6 +146,12 @@ ROUND 시그널링 → 내부 TLS 프록시 → BATON 공개 JWK
 
 ## 2. 사전 확인 — 홈서버
 
+**목적은 기존 서버에 새 서비스를 추가할 여유와 필요한 기능이 있는지 확인하는 것이다.** 이 절의 명령은 조회용이다. 먼저 확인해야 메모리 부족, 잘못 선택한 클러스터, 저장 공간 설정 누락으로 기존 서비스까지 영향을 받는 일을 줄일 수 있다.
+
+`current-context`는 지금 관리 명령이 어느 클러스터로 가는지, `get nodes`는 서버가 정상인지, `top`은 현재 사용량을 보여 준다. `describe node`에서는 배치 가능한 자원과 이벤트를 확인한다. `free -h`는 운영체제 관점, `df -h`는 디스크 관점이므로 `top` 결과와 수치가 같을 필요는 없다.
+
+**정상 결과:** 대상이 홈서버 클러스터이고 노드가 Ready이며 기존 서비스가 정상이다. **멈춰야 할 경우:** 노드 NotReady, 메모리·디스크 압박, 기존 Pod의 반복 재시작. 이때는 BATON 설치보다 기존 문제 해결이 먼저다. 처음 설치하는 `baton`, `portfolio` 조회의 NotFound는 아직 만들지 않았다는 뜻이므로 예상되는 결과다.
+
 명령은 Bash 기준이다. 이미 사용 중인 k3s 관리 계정에서 실행한다. `kubectl` 권한이 없으면 기존 happyGallery 작업 때 쓰던 `sudo k3s kubectl`을 사용한다. kubeconfig를 공개하거나 권한을 전체 사용자에게 열지 않는다.
 
 ```bash
@@ -99,6 +188,14 @@ kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.podC
 
 ## 3. DNS·인증서·포트 준비
 
+**이 단계는 인터넷에서 홈서버까지 들어오는 경로와 HTTPS 신뢰를 준비한다.** DNS는 도메인을 IP에 연결하고, 공유기는 해당 IP로 들어온 포트를 사설 IP의 홈서버로 전달한다. 인증서는 접속한 서버가 요청한 도메인의 서버인지 확인하는 데 사용한다. 셋 중 하나만 맞아도 되는 것이 아니라 모두 연결되어야 한다.
+
+TLS 인증서의 `fullchain.pem`은 서버 인증서와 중간 인증서 묶음이고, `privkey.pem`은 그 인증서에 대응하는 개인 키다. `SAN`은 인증서가 유효한 도메인 목록이다. 이 키는 HTTPS 연결용이며 뒤에서 만드는 ROUND 참여권 서명 키와는 별개다.
+
+TURN 포트를 따로 준비하는 이유는 브라우저의 음성·영상이 일반 HTTP 요청과 다르기 때문이다. 페이지와 WebSocket이 열려도 NAT 환경에서 미디어 연결은 실패할 수 있다. coturn이 그때 미디어를 중계한다. `hostNetwork`는 coturn이 Pod 전용 네트워크 대신 홈서버의 네트워크를 직접 쓰게 하는 설정이다.
+
+**이 단계의 완료 기준:** DNS가 의도한 공인 IP를 가리키고 인증서가 해당 호스트를 포함하며 포워딩·방화벽 규칙을 준비했다. 아직 앱을 공개하지 않았으므로 사이트가 안 열리는 것은 예상된다. **문제 구분:** 잘못된 IP는 DNS, 연결 시간 초과는 포트·방화벽, 도메인 불일치는 인증서부터 확인한다.
+
 Cloudflare에 `b4ton.com`, `cal.b4ton.com`, `rag.b4ton.com`, `turn.b4ton.com`을 같은 공인 IP로 등록한다. 첫 검증은 **DNS only**로 진행한다. 특히 TURN은 계속 DNS only다. 사용하지 않는 AAAA 레코드가 있으면 잘못된 IPv6 경로가 생기지 않도록 정리한다.
 
 | 공유기 → 홈서버 | 프로토콜 | 용도 |
@@ -125,6 +222,14 @@ Ubuntu 방화벽에도 같은 TURN 포트를 허용한다. 사용 중인 방화�
 각 인증서의 호스트·만료·개인 키 짝을 확인한다. 기존 cert-manager를 쓰고 있다면 해당 네임스페이스에 Certificate를 만들어 아래 Secret 이름으로 발급해도 된다. 이후의 수동 Secret 생성 명령과 중복 실행하지 않는다.
 
 ## 4. 이미지 준비 — 개발 PC
+
+**소스 코드를 홈서버에서 실행할 이미지로 만드는 단계다.** BATON JAR와 React 빌드 결과 등 실행에 필요한 파일을 이미지에 묶는다. 빌드 중에는 CPU·메모리를 많이 사용하므로 서비스가 실행 중인 홈서버 대신 개발 PC에서 처리한다.
+
+`--platform`은 실행할 서버의 CPU 종류를 선택한다. Apple Silicon 개발 PC에서 만들더라도 서버가 Intel/AMD이면 `linux/amd64`가 필요하다. `--load`는 완성한 이미지를 개발 PC Docker에 넣고, `docker image save`는 그 이미지들을 전송 가능한 `images.tar`로 묶는다. 이 파일에는 DB 데이터가 들어 있지 않다.
+
+`RELEASE`는 이번 빌드를 구별하는 태그다. 이전 릴리스로 되돌리려면 기존 태그를 덮어쓰지 않아야 한다. CAL의 `bootBuildImage`는 Dockerfile 대신 Spring Boot의 이미지 빌드 기능을 이용한다. ROUND는 BATON용 웹 이미지와 시그널링 이미지를 따로 만든다.
+
+**정상 결과:** 모든 빌드가 성공하고 서버 아키텍처와 일치하는 이미지·archive·원본 프록시 설정이 준비된다. **실패 시:** 이 단계는 개발 PC 작업이므로 홈서버 Pod를 재시작해도 해결되지 않는다. 실패한 빌드의 JDK·Docker·의존성 다운로드·대상 아키텍처부터 확인한다.
 
 홈서버에서 빌드를 병렬로 실행하지 않는다. 다음 네 저장소를 같은 상위 디렉터리에 준비한다. 실제 checkout 리비전을 기록하고 미커밋 변경이 없는지 확인한다.
 
@@ -175,6 +280,14 @@ cp "$SRC_ROOT/webRTC/ops/coturn/turnserver.conf.example" "$OUT/turnserver.conf.s
 전송 전 `docker image inspect <이미지> --format '{{.Os}}/{{.Architecture}} {{.Id}}'`로 모두 서버 아키텍처와 일치하는지 확인한다. `images.tar`와 `OUT`의 나머지 파일을 홈서버 `~/baton-deploy/release/`에 복사한다. 이미지 archive에는 운영 비밀값을 넣지 않는다.
 
 ## 5. 작업 폴더·네임스페이스·비밀값 — 홈서버
+
+**이 단계부터 클러스터에 리소스를 만든다.** 작업 폴더는 배포 입력과 생성 결과를 보관하고, 네임스페이스는 BATON과 포트폴리오의 리소스 이름을 구분한다. `k3s ctr images import`는 archive의 이미지를 k3s가 사용하는 containerd에 등록한다. 홈서버에 Docker 이미지가 있다고 k3s에서도 자동으로 보이는 것은 아니다.
+
+`settings.env`에는 IP·릴리스 번호 등 공개 설정만 둔다. `set -a`로 환경변수 자동 전달을 켠 뒤 `source`로 읽고, `set +a`로 자동 전달 설정을 끝낸다. `source`는 단순 데이터 조회가 아니라 셸 실행이므로 직접 작성한 이 파일에만 사용한다. 비밀값 파일은 `kubectl --from-file`이나 `--from-env-file`로 읽힌다.
+
+DB 비밀번호는 로그인 인증, CAL 토큰은 BATON→CAL 호출 인증에 사용한다. `BATON_CAL_SUBSCRIPTION_GENERATION`은 구독 주소의 유효한 세대를 식별하는 값이므로 매 배포마다 바꾸면 안 된다. ROUND 개인 키는 BATON이 참여권을 서명할 때, 공개 키는 ROUND가 진위를 확인할 때 사용한다. 개인 키는 ROUND에 전달하지 않는다.
+
+**정상 결과:** 네임스페이스·TLS Secret·서비스별 Secret이 생성되고 이미지 import가 끝난다. 아직 애플리케이션은 실행되지 않는다. **AlreadyExists가 나오면:** 이미 만든 리소스일 수 있으므로 재생성으로 덮어쓰지 말고 현재 네임스페이스와 기존 배포 여부를 확인한다. Secret 내용 전체를 출력해 확인하지 않는다.
 
 이후 명령은 **같은 Bash 세션**, `~/baton-deploy`에서 실행한다. 접속을 다시 열면 `cd`와 공개 설정을 다시 읽는다. 실제 값이 있는 작업 폴더는 Git에 넣지 않는다.
 
@@ -247,6 +360,8 @@ kubectl -n portfolio create secret generic knowledge-secret --from-file=KNOWLEDG
 
 ### BATON 로그인 준비
 
+배포만 해도 로그인 공급자가 자동으로 등록되는 것은 아니다. Google OAuth는 사용자가 Google에서 로그인한 뒤 BATON으로 돌아오는 흐름이다. 리디렉션 URI는 그 돌아올 주소이며 Google 설정과 BATON 주소가 정확히 일치해야 한다. 다른 주소라면 로그인 화면은 열려도 마지막 콜백에서 실패할 수 있다. 테스트 상태의 동의 화면은 등록한 테스트 사용자만 로그인할 수 있으므로 첫 운영 계정부터 등록한다.
+
 본 절차는 SMTP를 추가하지 않고 Google OAuth로 로그인한다. Google Cloud에서 웹 애플리케이션 OAuth 클라이언트를 준비한다. 승인된 리디렉션 URI는 `https://b4ton.com/login/oauth2/code/google`이다. 동의 화면이 테스트 상태면 로그인할 계정을 테스트 사용자로 등록한다.
 
 `secrets/google.env`를 편집기로 작성한다. 값은 따옴표 없이 기록하고 셸에서 `source`하지 않는다.
@@ -264,6 +379,12 @@ kubectl -n baton create secret generic google-oauth --from-env-file=secrets/goog
 
 ## 6. 내부 TLS 서비스 주소 확보
 
+**실행할 프록시보다 먼저 고정된 내부 연결 주소를 만드는 단계다.** Service는 연결할 Pod가 아직 없어도 만들 수 있다. 여기서는 그 ClusterIP를 받아 BATON·ROUND Pod의 이름 해석 설정에 기록한다.
+
+일반적으로 내부 호출은 `http://cal:8080`처럼 Service 이름으로 처리할 수 있지만, BATON의 CAL 연동은 HTTPS를 요구한다. 단순히 HTTP로 바꾸면 시작 단계에서 거절된다. 따라서 CAL 인증서와 이름이 맞는 `https://cal.b4ton.com:8443`을 쓰되 해당 Pod 안에서는 내부 프록시 IP로 연결한다. ROUND의 JWK 조회도 같은 방식으로 외부 DNS·공유기 되돌아가기 경로에 의존하지 않게 한다.
+
+`hostAliases`는 특정 Pod의 호스트 이름 대응을 추가하는 설정이다. Cloudflare DNS나 다른 Pod의 DNS를 변경하지 않는다. **정상 결과:** `INTERNAL_TLS_IP`에 내부 IP가 들어 있다. 프록시를 아직 배포하지 않았으므로 지금 연결이 실패하는 것은 정상이며, 실제 TLS 검사는 9절에서 한다.
+
 CAL 내부 API를 인터넷에 노출하지 않으면서 BATON의 HTTPS 요구사항을 유지한다. 내부 프록시는 준비한 공개 CA 인증서를 제시한다. BATON Pod 안에서만 `cal.b4ton.com`을, ROUND Pod 안에서만 `b4ton.com`을 이 프록시의 ClusterIP로 연결한다. 클러스터 전체 DNS나 happyGallery DNS는 수정하지 않는다.
 
 ```bash
@@ -274,6 +395,28 @@ export INTERNAL_TLS_IP="$(kubectl -n baton get svc internal-tls -o jsonpath='{.s
 서비스를 삭제해 ClusterIP가 바뀌면 해당 Pod의 hostAliases도 갱신하고 재시작해야 한다. 아래 생성기가 같은 Service의 selector를 설정한다.
 
 ## 7. 배포 파일 생성
+
+**앞에서 정한 값을 Kubernetes 리소스 파일로 옮기는 단계다.** 아래 코드는 `render.py` 파일을 만들고, 이후 `python3 render.py`가 JSON 설정 파일을 생성한다. 코드 블록을 붙여 넣는 것과 생성기를 실행하는 것, 생성 결과를 클러스터에 적용하는 것은 서로 다른 작업이다.
+
+생성기는 반복되는 Deployment·Service 형식을 함수로 묶었을 뿐 별도 서버 프로그램이 아니다. 모든 줄을 직접 수정할 필요는 없다. 처음에는 `settings.env`, Secret 파일, 단계별 기능 설정 파일만 실제 환경에 맞춰 작성하고 생성 결과를 확인한다.
+
+| 생성 파일 | 만드는 대상 | 나눈 이유 |
+| --- | --- | --- |
+| `00-network.json` | 접근 허용·차단 규칙 | 외부 공개 전에 통신 범위 지정 |
+| `10-databases.json` | MySQL·PostgreSQL, 저장 공간 요청 | 앱보다 DB를 먼저 준비 |
+| `20-baton.json`, `21-web.json` | BATON 앱·웹 | API 기동과 웹 전달을 구분 |
+| `30-cal.json`, `31-cal-public.json` | CAL 앱·공개 구독 프록시 | 내부 쓰기 API와 공개 구독 경로 분리 |
+| `32-internal-tls.json` | CAL 호출·JWK 조회용 TLS 프록시 | 내부 호출의 HTTPS 계약 유지 |
+| `40-round.json`, `41-turn.json` | ROUND 웹·시그널링, coturn | 방 연결과 실제 미디어 중계를 구분 |
+| `50-es.json`, `51-knowledge.json`, `52-rag-web.json` | 색인 저장소·검색 API·공개 프록시 | 저장소 준비 후 검색 제공 |
+| `60-ingress.json` | 외부 HTTPS 라우팅 | 내부 서비스 확인 후 공개 |
+| `61-http.json` | HTTP→HTTPS 전환 | 11절에서 추가 생성 |
+
+파일 안의 `metadata.name`은 리소스 이름, `namespace`는 소속, `spec`은 실행 설정이다. `labels`는 Pod에 붙인 분류표이고 `selector`는 그 분류표로 전달 대상을 고른다. 예를 들어 `web` Service의 selector와 웹 Pod의 label이 맞아야 요청이 연결된다. 파일 이름을 바꾸는 것과 리소스 이름을 바꾸는 것은 다르다.
+
+`imagePullPolicy=IfNotPresent`는 해당 이미지가 노드에 있으면 사용하고 없으면 registry에서 받으려는 설정이다. 따라서 자체 이미지를 import하지 않았거나 태그가 다르면 이미지 다운로드 오류가 날 수 있다. `Recreate`는 기존 앱 Pod를 내린 뒤 새 Pod를 올리는 방식으로, 단일 복제본·작은 메모리 예산에 맞춘 대신 짧은 중단을 허용한다.
+
+**정상 결과:** `manifests/`에 파일이 생성된다. 아직 Pod가 생기지는 않는다. 단, 생성·검토 절의 `create secret`은 Secret을 실제 저장한다. `dry-run`은 형식·서버 정책을 검사하는 단계이며, 이미지 내용·실제 비밀번호·통화 성공까지 확인하지 않는다.
 
 아래 Python은 Kubernetes가 읽을 수 있는 JSON 매니페스트와 프록시 설정을 **로컬 파일로만 생성**한다. 아직 배포하지 않는다. Python 표준 라이브러리만 사용한다. 중복 YAML을 줄이기 위한 문서 내 생성기이며 실제 생성 결과를 다음 절에서 확인한다.
 
@@ -491,6 +634,14 @@ done
 
 ## 8. DB와 BATON부터 배포
 
+**이제 실제 DB와 BATON 프로세스를 실행한다.** NetworkPolicy를 먼저 적용하고 DB를 만든 뒤, 접속 확인에 성공하면 앱·웹을 순서대로 올린다. Kubernetes는 Compose의 `depends_on`처럼 별도 Deployment의 기동 완료를 자동으로 기다리지 않으므로 이 순서를 직접 확인한다.
+
+DB StatefulSet을 만들면 PVC가 생성되고 local-path provisioner가 저장 공간을 연결한다. `WaitForFirstConsumer` StorageClass는 사용할 Pod의 배치가 정해진 뒤 볼륨을 마련하므로 처음 잠깐 PVC가 Pending일 수 있다. 오래 지속되면 Pod와 PVC의 이벤트를 확인한다.
+
+처음 MySQL을 실행할 때만 `MYSQL_*` 환경변수로 DB·사용자를 초기화한다. BATON이 시작되면 Flyway가 DB 스키마 이력을 확인하고 필요한 마이그레이션을 적용한다. 따라서 **앱 시작도 DB 변경을 일으킬 수 있다.** 기존 데이터를 옮기는 경우 백업이 먼저 필요한 이유다.
+
+**정상 결과:** DB 접속 확인 성공, 앱 로그의 기동 완료, 웹·앱 Pod Ready. **앱이 실패하면:** DB 준비·비밀번호·Secret 참조·마이그레이션 오류를 순서대로 확인한다. 연동 기능은 아직 꺼져 있어도 정상이며 다음 절에서 준비 후 켠다.
+
 초기 기능 설정 파일을 만든다. 이후 기능 활성화도 이 파일을 수정해서 반영한다.
 
 ```bash
@@ -530,6 +681,14 @@ BATON 로그에서 Flyway 성공·기동 완료를 확인한다. `ddl-auto`를 `
 첫 접근은 11절의 Ingress 적용 후 가능하다. 지금은 상태와 로그만 확인한다.
 
 ## 9. CAL·ROUND·TURN 배포
+
+**일정 전달과 통화 구성 요소를 본체에 연결하는 단계다.** CAL은 PostgreSQL에 일정과 구독 상태를 저장한다. 공개 프록시는 캘린더 앱의 읽기 요청만 받고, 내부 TLS 프록시는 BATON의 인증된 전달 요청을 받는다. 두 경로를 나눠야 인터넷에 CAL 관리 API를 열지 않을 수 있다.
+
+ROUND 웹은 통화 화면, 시그널링은 참가자끼리 연결 정보를 교환하는 서버다. 실제 영상은 가능한 경우 브라우저끼리 전달하며 직접 연결이 안 되면 coturn을 거친다. 이 때문에 웹·시그널링·TURN을 각각 확인해야 한다.
+
+CAL의 `capture`는 BATON 변경 사항을 보낼 목록에 기록하고, `backfill`은 기존 데이터의 누락을 보정하며, `delivery`는 기록한 목록을 CAL로 전달한다. 이 목록을 **아웃박스**라고 한다. 먼저 기록·보정을 확인하고 전달을 켜야 연결 문제와 데이터 준비 문제를 구분할 수 있다. 구독 발급은 전달 성공 후 마지막으로 켠다.
+
+**정상 결과:** 각 Pod가 준비되고 내부 HTTPS에서 인증 없이 보낸 요청이 거절되며, 실제 전달은 유효한 토큰으로 성공한다. **연결 오류는** Service·NetworkPolicy·인증서, **401/403은** 인증 토큰, **전달 실패는** 계약·대상 데이터와 앱 로그를 확인한다. TURN의 완료 판단은 Running 상태가 아니라 12절 외부 망 테스트다.
 
 ```bash
 kubectl apply -f manifests/30-cal.json
@@ -576,6 +735,14 @@ kubectl -n baton logs deployment/app --tail=150
 
 ## 10. RAG 검색 배포 — AI 호출 전
 
+**AI 공급자 없이도 문서를 찾을 수 있는지 먼저 확인한다.** Elasticsearch는 공개 문서의 검색용 인덱스를 저장하고, 검색 API는 사용자 요청을 받아 문서를 찾는다. 인덱스는 원본 문서를 빠르게 찾도록 가공한 자료다. 초기 `disabled` 프로필은 단어 일치 기반 BM25 검색만 사용한다.
+
+`vm.max_map_count`는 한 프로세스가 사용할 수 있는 메모리 매핑 영역 수의 운영체제 설정이다. Elasticsearch가 색인 파일을 다룰 때 필요하다. 값을 높인다고 그 숫자만큼 RAM을 즉시 할당하는 것은 아니다. 이 설정은 Pod만이 아니라 홈서버 운영체제에 적용되므로 현재 값을 확인한 뒤 조정한다.
+
+`KNOWLEDGE_SYNC_ON_STARTUP=true`는 앱 시작 시 이미지에 포함된 공개 문서를 색인하라는 뜻이다. 이 단계에서 검색이 동작해야 이후 OpenAI 문제를 색인·네트워크 문제와 분리해서 진단할 수 있다.
+
+**정상 결과:** Elasticsearch와 검색 API가 준비되고 문서 색인 로그가 정상이다. **실패 시:** Elasticsearch 저장 권한·메모리·커널 설정부터 보고, API의 연결 주소와 준비 상태를 확인한다. 공개 검색은 11절에서 확인한다.
+
 Elasticsearch 8.19의 mmap 요구사항을 확인한다. 현재 값이 더 크면 낮추지 않는다.
 
 ```bash
@@ -610,6 +777,12 @@ kubectl -n portfolio logs deployment/knowledge-api --tail=100
 Elasticsearch 1노드의 `yellow`는 replica 부족으로 발생할 수 있다. `red`를 정상으로 취급하지 않는다. API readiness는 Elasticsearch 연결·상태를 확인하지만 자료의 최신 여부까지 증명하지 않는다.
 
 ## 11. 공개 경로와 HTTPS 연결
+
+**내부에서 준비한 서비스를 사용자에게 공개하는 단계다.** Ingress를 적용하면 기존 Traefik이 새 도메인·경로 규칙을 읽고 각 Service로 전달한다. HTTPS 인증서는 해당 네임스페이스의 TLS Secret을 참조한다. 아직 Ingress를 만들기 전에는 내부 앱이 정상이어도 외부에서 열리지 않을 수 있다.
+
+Traefik에서 HTTPS를 처리한 뒤 웹 프록시에는 내부 HTTP로 전달한다. 외부 TLS와 6절의 내부 CAL HTTPS는 서로 다른 연결이다. HTTP→HTTPS 리디렉션은 사용자가 암호화되지 않은 주소를 입력했을 때 최종 HTTPS 주소로 이동시키는 역할이다.
+
+**정상 결과:** BATON 화면·RAG 검색은 열리고, CAL 내부 API·Actuator 같은 비공개 경로는 열리지 않는다. **502/503이면** Service의 준비된 대상 Pod와 전달 포트, **404이면** 도메인·경로 규칙과 의도된 차단 여부, **TLS 오류이면** 인증서·Secret을 확인한다. 허용하지 않은 경로의 404를 해결하려고 공개 범위를 `/`로 넓히지 않는다.
 
 기존 80 → HTTPS 리디렉션이 Traefik 전체에 설정되어 있으면 유지한다. 없다면 아래처럼 **새 도메인에만** 리디렉션을 추가한다. happyGallery의 마이크·카메라 차단 헤더 미들웨어를 BATON에 복사하지 않는다. ROUND 통화가 막힐 수 있다.
 
@@ -649,6 +822,12 @@ curl --fail-with-body "https://$RAG_HOST/api/v1/knowledge/search" \
 
 ## 12. BATON·CAL·ROUND 실사용 확인
 
+**배포 상태가 아니라 사용자 기능을 검증하는 단계다.** Ready 표시는 각 프로그램이 설정된 상태 검사에 응답한다는 뜻이며, 로그인·권한·외부 캘린더·두 기기 통화가 모두 된다는 보장은 아니다.
+
+첫 팀과 모임은 테스트임을 알아볼 수 있는 이름으로 만든다. CAL은 일정 생성부터 실제 캘린더 앱 수신까지, ROUND는 방 권한부터 외부 망 미디어 연결까지 전체 흐름을 확인한다. 특히 같은 Wi-Fi에서만 통화하면 TURN 없이 직접 연결될 수 있어 중계 설정 오류를 놓친다.
+
+**정상 결과:** 아래 기능별 확인을 모두 통과한다. 실패하면 어느 지점까지 성공했는지 기록한다. 예를 들어 화면은 보이는데 영상만 안 보이면 웹 이미지 재배포보다 ICE·TURN 연결을 먼저 확인한다. 실제 운영 계정을 대량 생성하거나 데이터 삭제로 테스트하지 않는다.
+
 ### BATON
 
 1. Google 로그인 후 계정 화면이 열린다.
@@ -684,6 +863,14 @@ TURN 실패 시 인증 비밀값 일치 → 공인/사설 IP 매핑 → 공유�
 
 ## 13. OpenAI·Turnstile 활성화
 
+**정상 동작하는 검색에 벡터 검색과 근거 기반 답변을 추가한다.** 임베딩은 문서·질문을 의미 비교에 쓸 숫자 배열로 바꾸는 작업이다. RAG는 관련 문서를 검색한 뒤 그 근거와 질문을 모델에 보내 답변을 만든다. 문서를 모델에 학습시키는 작업과는 다르다.
+
+처음에는 검색 자체를 검증하고, 이제 API 키·모델 프로필·새 인덱스를 함께 전환한다. 기존 검색 전용 인덱스에는 필요한 임베딩이 없으므로 OpenAI용 인덱스를 별도로 색인한다. 프로필과 인덱스 이름 하나만 바꾸면 충분하지 않다.
+
+Turnstile은 공개 답변 API를 자동으로 반복 호출하는 것을 줄인다. 사이트 키는 브라우저에서 검증 화면을 여는 공개값이고, 비밀 키는 API 서버가 검증 결과를 확인하는 값이다. 비용 통제는 Turnstile·호출 제한·실제 공급자 사용량 확인을 함께 사용한다.
+
+**정상 결과:** 새 인덱스의 `upToDate=true`, 웹에서 검증 후 출처 있는 답변, 검증 없는 요청의 거절. **실패 시:** OpenAI 인증·사용량 제한, Turnstile 웹 호스트·키, 색인 상태, 프런트엔드 빌드 설정을 나눠 확인한다. 이 절부터 실제 API 호출료가 발생할 수 있다.
+
 ### 선택 이유와 비용
 
 이 서버에서는 Ollama 대신 OpenAI가 적합하다. 로컬 기본 모델 `qwen3:8b`·`bge-m3`를 추가하면 모델 상주 메모리와 추론 CPU가 필요하다. 이미 여러 JVM과 Elasticsearch가 있으므로 홈서버는 검색만 담당하고 답변·임베딩은 외부 API로 처리한다.
@@ -698,6 +885,8 @@ TURN 실패 시 인증 비밀값 일치 → 공인/사설 IP 매핑 → 공유�
 4. API 키를 브라우저의 `VITE_*`에 넣지 않는다. 외부 요청에 공개 문서 근거와 사용자 질문이 전달됨을 포트폴리오에서 안내한다.
 
 ### Turnstile 준비
+
+이 절에서는 Secret에 공급자 키를 넣고 ConfigMap에 활성화 설정을 넣는다. 환경변수로 주입한 Secret·ConfigMap은 실행 중인 Java 프로세스에 자동 반영되지 않으므로 변경 후 API를 재시작한다. 새 프로필과 새 키가 같은 시점에 적용되어야 한다. 내부 동기화용 `port-forward`는 관리 권한으로 여는 임시 통로이며, 공개 Ingress가 내부 API를 차단하는지 검사하는 용도로 쓰면 안 된다.
 
 Cloudflare Turnstile에 **포트폴리오 웹의 호스트**를 등록한다. 예를 들어 현재 웹이 `ljkportfolio.netlify.app`이면 그 호스트다. API 호스트 `rag.b4ton.com`과 혼동하지 않는다.
 
@@ -753,6 +942,8 @@ curl --fail-with-body -H @secrets/knowledge-header \
 
 ### 프런트엔드 연결 — 현재 포트폴리오 호스팅
 
+홈서버에 API를 올려도 기존 웹 페이지가 새 주소를 자동으로 알지는 못한다. `VITE_*` 값은 웹을 빌드할 때 정적 파일에 들어가므로 호스팅 설정을 바꾼 뒤 웹을 다시 배포해야 한다. API Secret을 갱신하는 작업과는 별개다. `CORS`는 브라우저가 다른 출처의 API 응답을 읽을 수 있는지 정하는 정책이다. 실제 웹 주소가 `KNOWLEDGE_CORS_ALLOWED_ORIGINS`와 달라지면 터미널 요청은 성공해도 브라우저에서는 차단될 수 있다.
+
 현재 정적 웹 호스팅의 빌드 환경에 다음 두 값을 설정하고 웹을 다시 빌드·배포한다. 저장소의 포트폴리오 자료도 API 이미지와 같은 리비전을 사용한다.
 
 ```dotenv
@@ -772,6 +963,12 @@ VITE_KNOWLEDGE_TURNSTILE_SITE_KEY=실제_공개_사이트_키
 작업이 끝나면 `port-forward`를 Ctrl+C로 종료한다.
 
 ## 14. 모니터링·인증서 갱신
+
+**운영 중 문제를 발견하고 HTTPS 만료를 예방하는 단계다.** Prometheus는 주기적으로 앱의 숫자 지표를 수집하고 Grafana는 이를 보여 준다. 앱 로그는 개별 오류 원인을 확인하는 용도다. 지표와 로그를 함께 봐야 재시작·지연·전달 실패의 원인을 좁힐 수 있다.
+
+관리 포트용 Service를 따로 만드는 이유는 업무 API와 지표 포트가 다를 수 있기 때문이다. `kubectl expose`는 Service만 만들며 그 자체로 인터넷에 공개하지 않는다. 여기서는 기본 ClusterIP를 사용하고 기존 Prometheus에서 접근하도록 NetworkPolicy를 맞춘다.
+
+인증서 파일을 갱신하는 것, Secret을 갱신하는 것, 실행 프로그램이 새 인증서를 읽는 것은 서로 다른 단계다. **정상 결과:** 기존 수집기에서 새 대상이 UP이고 갱신 후 실제 연결에 새 인증서가 사용된다. **실패 시:** 관리 Service 포트·NetworkPolicy·수집기 설정을 확인한다. 인증서 갱신 후에는 내부 TLS와 TURN도 확인한다.
 
 별도 Prometheus·Grafana·Alloy를 추가하지 않는다. 기존 수집기에 다음 대상을 **추가**한다. 기존 수집 설정을 덮어쓰지 않는다.
 
@@ -799,6 +996,12 @@ CAL 관리 수집 주소는 실제로 `cal-metrics.baton.svc.cluster.local:8081`
 4. 외부 HTTPS와 앱→CAL 내부 TLS·ROUND JWK·TURN TLS를 다시 확인한다. 만료 전에 갱신됐는지 모니터링한다.
 
 ## 15. 백업·업데이트·복구
+
+**장애나 잘못된 배포에서 되돌아올 수 있도록 준비하는 단계다.** 이미지는 실행 프로그램, 매니페스트는 배포 설정, DB 백업은 사용자 데이터이므로 서로 대신할 수 없다. PVC는 재시작 시 데이터를 유지하는 역할이며, 디스크 고장·실수로 인한 데이터 변경을 되돌리는 백업은 아니다.
+
+MySQL의 SQL dump는 데이터·구조를 SQL로 내보내고, PostgreSQL의 `-Fc` dump는 `pg_restore`로 읽는 형식이다. 파일 크기만 확인하지 말고 별도 환경에서 복원 후 실제 조회가 되는지 확인해야 한다. CAL 구독 세대와 서명 키 같은 비밀값도 복구에 필요한 설정으로 함께 보관한다.
+
+업데이트는 새 이미지와 설정을 적용하는 작업이다. 이미지 롤백은 실행 프로그램만 이전 버전으로 돌리며 이미 적용한 DB 변경을 자동으로 취소하지 않는다. **정상 결과:** 백업과 이전 배포본을 찾을 수 있고 복원 확인 기록이 있다. **배포 실패 시:** 반복 재시작이나 PVC 삭제보다 먼저 데이터 변경 여부와 구버전 호환성을 확인한다.
 
 ### 백업
 
@@ -844,6 +1047,10 @@ Elasticsearch는 공개 문서 JSON과 같은 모델·차원·청크 설정을 �
 
 ## 16. 배포 완료 기준
 
+**마지막으로 실제 운영에 필요한 조건을 확인한다.** 아래 체크는 자동으로 채워지는 항목이 아니다. 운영자가 해당 기능을 직접 확인한 뒤 표시한다. 사용하지 않은 경로·실행하지 않은 테스트는 성공으로 표시하지 않는다.
+
+Pod가 모두 Running이어도 외부 통화·인증서 갱신·복구가 미확인이라면 그 항목은 남겨 둔다. 남은 항목에는 증상과 다음 확인 대상을 짧게 기록하면 이후 문제를 다시 처음부터 추적하지 않아도 된다.
+
 - [ ] happyGallery가 배포 전과 동일하게 동작한다.
 - [ ] BATON Google 로그인·권한·업무 저장이 정상이다.
 - [ ] CAL 내부 API가 공개되지 않고 실제 구독·변경·해지가 동작한다.
@@ -854,9 +1061,71 @@ Elasticsearch는 공개 문서 JSON과 같은 모델·차원·청크 설정을 �
 - [ ] 메모리 여유가 있고 OOMKilled·지속 재시작·디스크 부족이 없다.
 - [ ] 인증서 갱신·백업·별도 복원 확인을 담당할 절차가 있다.
 
+## 문제가 생겼을 때 확인하는 순서
+
+### 1. 어느 리소스가 준비되지 않았는지 찾기
+
+아래 명령은 조회용이다. 먼저 문제가 BATON 쪽인지 포트폴리오 쪽인지 구분한다. `get all`은 Secret·PVC 등 모든 종류를 보여 주는 명령이 아니므로 필요한 종류를 명시한다.
+
+```bash
+kubectl -n baton get deployments,statefulsets,pods,services,pvc
+kubectl -n portfolio get deployments,statefulsets,pods,services,pvc
+kubectl -n baton get events --sort-by=.metadata.creationTimestamp
+kubectl -n portfolio get events --sort-by=.metadata.creationTimestamp
+```
+
+`RESTARTS`가 계속 증가하는지, `READY`가 `0/1`인지, PVC가 `Pending`인지 확인한다. 이벤트는 배치 실패·볼륨 연결·이미지 다운로드·상태 검사 실패 등 Kubernetes 관점의 원인을 보여 준다. 예전 이벤트가 남을 수 있으므로 발생 시각도 함께 본다.
+
+### 2. 상태에 따라 확인 대상 좁히기
+
+| 상태·증상 | 의미 | 먼저 확인할 곳 |
+| --- | --- | --- |
+| `Pending` | 아직 실행할 준비가 안 됨 | Pod 이벤트의 메모리·CPU 부족, nodeSelector 불일치, PVC 연결 대기 |
+| `ContainerCreating`이 지속됨 | 이미지·볼륨·네트워크 준비 중 | 이미지 수신, Secret·ConfigMap mount, 볼륨 권한 |
+| `ErrImagePull` / `ImagePullBackOff` | 이미지를 가져오지 못함 | import한 이름·태그와 매니페스트 image 일치, 아키텍처, registry 접근 |
+| `CreateContainerConfigError` | 컨테이너 실행 설정을 만들지 못함 | 존재하지 않는 Secret·ConfigMap, 잘못된 키 이름 |
+| `CrashLoopBackOff` | 프로세스가 반복 종료되어 재시도 간격이 늘어남 | 직전 컨테이너 로그, 종료 코드, 설정·DB 연결 오류 |
+| `OOMKilled` | 메모리 부족으로 프로세스가 종료됨 | 컨테이너 상한·JVM 힙·노드 메모리 압박. 종료 코드 137만으로 OOM을 단정하지 않음 |
+| `Running`, `READY 0/1` | 실행됐지만 상태 검사에 통과하지 못함 | readiness 주소·포트, DB·Elasticsearch 상태 |
+| `exec format error` | 서버가 실행 파일 형식을 처리하지 못함 | 우선 이미지 CPU 아키텍처를 확인 |
+| 외부 `502` / `503` | 프록시가 정상 업스트림 응답을 받지 못함 | Service 대상·포트·준비 상태·NetworkPolicy |
+| 브라우저만 CORS 오류 | 웹 출처가 허용되지 않았거나 preflight 실패 | 웹의 실제 origin, API 허용 목록, 프록시 OPTIONS 전달 |
+| `AlreadyExists` | 같은 종류·이름의 리소스가 이미 있음 | 앞 단계를 실행했는지 확인. 비밀값 생성부터 다시 시작하지 않음 |
+
+### 3. 해당 앱의 이벤트와 로그 읽기
+
+예를 들어 BATON 앱이 문제라면 다음을 실행한다. 조회 대상만 포트폴리오의 `knowledge-api`로 바꾸면 RAG에도 같은 방법을 쓸 수 있다.
+
+```bash
+kubectl -n baton describe deployment app
+kubectl -n baton describe pod -l app=app
+kubectl -n baton logs deployment/app --tail=100
+# 재시작 이력이 있을 때: 바로 이전 컨테이너의 종료 직전 로그
+kubectl -n baton logs deployment/app --previous --tail=100
+```
+
+`describe deployment`는 어떤 설정으로 실행하려는지, `describe pod`는 실제 실행·종료·상태 검사 이벤트를 보여 준다. `logs`는 애플리케이션이 남긴 내용이다. `--previous`는 재시작된 직전 컨테이너가 없으면 오류가 날 수 있으며 그 자체가 추가 장애는 아니다.
+
+로그를 읽은 뒤 원인에 맞는 설정 파일을 수정한다. 변경한 ConfigMap·Secret이 환경변수로 들어간다면 해당 앱을 재시작하고 `rollout status`를 확인한다. Pod만 삭제하고 같은 잘못된 설정으로 다시 만들면 같은 오류가 반복된다. 비밀값이 포함된 로그·설정을 공유할 때는 원문을 그대로 게시하지 않는다.
+
+### 4. 앱이 정상인데 접속이 안 될 때
+
+```bash
+kubectl -n baton get ingress
+kubectl -n baton get service app web
+kubectl -n baton get endpointslices -l kubernetes.io/service-name=app
+kubectl -n baton get networkpolicy
+```
+
+EndpointSlice는 Service가 연결할 Pod 주소와 준비 상태를 보여 준다. 대상이 없으면 Service selector와 Pod label을 비교하고 readiness를 확인한다. 대상이 있는데 연결되지 않으면 포트·NetworkPolicy·앱 로그를 확인한다. 그다음 외부 DNS·Ingress·TLS 순서로 범위를 넓힌다.
+
+문제를 고친 뒤에는 실패했던 단계부터 다시 확인한다. 전체 설치를 처음부터 반복하거나 Secret 생성·PVC 삭제를 해결 방법으로 쓰지 않는다. 특히 `kubectl delete namespace baton`은 앱 하나의 재시작이 아니라 해당 네임스페이스 리소스를 제거하는 작업이다.
+
 ## 문서 검증 범위
 
 작성 시 Bash 코드 블록 문법, Python 생성기 실행, 생성 리소스 50개의 kubeconform strict 검사, 문서 상대 링크를 확인했다. Caddy의 BATON·RAG·내부 TLS 설정과 Nginx 공개 CAL 설정은 포트를 열지 않는 로컬 임시 컨테이너에서 검사했다. Nginx 문법 검사는 로컬 1.31.3 이미지로 수행했으며 배포 예시의 1.31.4 이미지 기동 확인을 대신하지 않는다. 내부 TLS 문법 검사에는 운영 인증서 대신 임시 인증서를 사용했다.
+
+초보자 설명 보완 시 기존 배포 명령·생성기 코드가 그대로임을 비교했고, 추가 조회 명령의 Bash 문법과 문서 링크를 확인했다. 기존과 같은 설정에 대한 이미지·프록시 검사는 반복하지 않았다.
 
 실제 k3s 적용, DB 초기화·복원, 공개 인증서 체인, 외부 망 TURN 통화, OAuth·OpenAI·Turnstile 공급자 연동과 부하 검증은 실행하지 않았다. 위 단계별 확인과 배포 완료 기준을 운영 환경에서 통과해야 배포 완료다.
 
