@@ -790,6 +790,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 
 ## 문서 진입점
 
+- 16GB 홈서버 수동 배포: [BATON·CAL·ROUND·포트폴리오 RAG](docs/runbooks/homeserver-k3s.md)
 - 제품 기준: [PRD-0001](docs/PRD/0001_product-baseline/spec.md)
 - API 계약: [PRD-0002](docs/PRD/0002_api-contract/spec.md)
 - 제품 개발 우선순위: [PRD-0003](docs/PRD/0003_product-roadmap/spec.md)
