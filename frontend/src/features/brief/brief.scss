@@ -9,10 +9,12 @@
 
   summary { cursor: pointer; font-weight: 600; font-size: 14px; }
   p { line-height: 1.6; }
-  button, select { padding: .55rem .7rem; border: 1px solid var(--rule-strong); border-radius: 6px; background: var(--paper); }
+  button, select { padding: .55rem .7rem; border: 1px solid var(--rule-strong); border-radius: var(--radius); background-color: var(--paper); }
+  select { padding-right: 34px; }
   button:not(:disabled) { cursor: pointer; }
   button:not(:disabled):hover { border-color: var(--baton-dark); }
   [role="alert"] { color: var(--warning); }
+  [role="alert"] button { margin-left: 8px; color: var(--ink); }
 }
 .brief-summary, .brief-filters, .brief-pagination { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
 .brief-summary button { text-align: left; flex: 1 1 160px; }
@@ -29,10 +31,10 @@
 .brief-transitions li { display: grid; gap: .35rem; margin: 1rem 0; }
 .brief-transitions span { font-size: .85rem; color: var(--muted); }
 
-.brief-readiness { display: grid; gap: .65rem; padding: 1rem; margin: 1rem 0; background: var(--paper-warm, var(--paper)); border: 1px solid var(--rule); border-radius: 8px; }
+.brief-readiness { display: grid; gap: .65rem; padding: 1rem; margin: 1rem 0; background: var(--paper-warm, var(--paper)); border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .brief-readiness p { margin: 0; }
 .brief-readiness button { justify-self: start; }
-.brief-comparison { margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule-strong); border-radius: 8px; }
+.brief-comparison { margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); }
 .brief-change { border-top: 1px solid var(--rule); padding-top: .5rem; }
 .brief-change-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .brief-change-columns > div { min-width: 0; }
@@ -45,7 +47,7 @@
 .brief-filters select { width: 100%; }
 @media (max-width: 600px) { .brief-change-columns { grid-template-columns: minmax(0, 1fr); } }
 
-.brief-delivery-status { display: grid; gap: .6rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule); border-radius: 8px; }
+.brief-delivery-status { display: grid; gap: .6rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .brief-delivery-status p, .brief-delivery-status .brief-evidence { margin: 0; }
 .brief-delivery-status button { justify-self: start; }
 .brief-action-description { flex-basis: 100%; }
