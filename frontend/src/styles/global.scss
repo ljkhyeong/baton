@@ -348,8 +348,7 @@ a {
 }
 .pending-workspaces > summary > span { font-size: 13px; font-weight: 680; }
 .pending-workspaces > summary strong { color: var(--warning); }
-.pending-workspaces > summary small { color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
-.pending-workspaces > summary small { margin-left: auto; }
+.pending-workspaces > summary small { margin-left: auto; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .pending-workspaces-intro { margin: 0; padding: 2px 0 13px; color: var(--muted); font-size: 12px; line-height: 1.65; word-break: keep-all; }
 .pending-workspaces ul { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
 .pending-workspaces li {
@@ -1192,46 +1191,6 @@ a {
   background: var(--warning-soft);
 }
 
-.decision-preview {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 17px 0 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.decision-preview time,
-.decision-preview > span {
-  color: var(--faint);
-  font-size: 11px;
-}
-
-.decision-preview blockquote {
-  margin: 12px 0 9px;
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.55;
-}
-
-.decision-preview p {
-  display: -webkit-box;
-  overflow: hidden;
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.decision-preview:hover blockquote { color: var(--baton-dark); }
-
 .today-round-checklist {
   margin-top: 0;
   padding-top: 0;
@@ -1284,8 +1243,6 @@ a {
 .role-row.selected { background: #f8f9fb;
   box-shadow: none;
 }
-
-.role-row.selected { box-shadow: none; }
 
 .role-main,
 .person-cell,
@@ -2933,7 +2890,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .today-page .routine-owner .avatar { flex-basis: 22px; width: 22px; height: 22px; }
   .today-page .check-button { grid-row: 1 / span 2; }
   .today-secondary > summary { min-height: 44px; }
-  .decision-preview blockquote { font-size: 16px; }
   .directory-head { display: none; }
   .role-directory { border-top: 1px solid var(--rule); }
   .role-row { align-items: flex-start; }

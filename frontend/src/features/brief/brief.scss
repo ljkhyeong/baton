@@ -31,7 +31,7 @@
 .brief-transitions li { display: grid; gap: .35rem; margin: 1rem 0; }
 .brief-transitions span { font-size: .85rem; color: var(--muted); }
 
-.brief-readiness { display: grid; gap: .65rem; padding: 1rem; margin: 1rem 0; background: var(--paper-warm, var(--paper)); border: 1px solid var(--rule); border-radius: var(--radius-lg); }
+.brief-readiness { display: grid; gap: .65rem; padding: 1rem; margin: 1rem 0; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .brief-readiness p { margin: 0; }
 .brief-readiness button { justify-self: start; }
 .brief-comparison { margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); }
