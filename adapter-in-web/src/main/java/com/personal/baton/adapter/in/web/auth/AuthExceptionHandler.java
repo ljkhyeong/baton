@@ -172,10 +172,7 @@ public class AuthExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(
-            AccessDeniedException exception,
-            HttpServletRequest request
-    ) {
+    public ResponseEntity<ErrorResponse> handleAccessDenied() {
         return error(HttpStatus.FORBIDDEN, "FORBIDDEN", "인증된 계정이 필요합니다");
     }
 

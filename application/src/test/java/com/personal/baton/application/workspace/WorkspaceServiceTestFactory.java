@@ -176,7 +176,6 @@ final class WorkspaceServiceTestFactory {
                         briefContinuitySignalRecorder
                 );
         return new Services(
-                new WorkspaceAccessService(scopeAuthorizer),
                 new WorkspaceLifecycleService(
                         projectionReader,
                         accessControl,
@@ -210,7 +209,6 @@ final class WorkspaceServiceTestFactory {
     }
 
     record Services(
-            WorkspaceAccessService access,
             WorkspaceLifecycleService lifecycle,
             WorkspacePeopleService people,
             WorkspaceOperationsService operations,

@@ -57,7 +57,6 @@ public class ResourceVerification {
     public UUID getId() { return id; }
     public UUID getResourceId() { return resourceId; }
     public long getResourceVersion() { return resourceVersion; }
-    public UUID getAccountId() { return accountId; }
     public UUID getMemberId() { return memberId; }
     public String getMemberName() { return memberName; }
     public String getUrl() { return url; }

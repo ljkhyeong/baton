@@ -74,7 +74,6 @@ class CalendarSubscriptionRestDocsTest {
             "00000000-0000-0000-0000-000000002645"
     );
     private static final String ACCESS_KEY = "workspace-access-key";
-    private static final String ETAG = "\"brief-edition-v1-test\"";
 
     private CalendarSubscriptionUseCase subscriptions;
     private MockMvc mockMvc;

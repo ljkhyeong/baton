@@ -1,7 +1,6 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import java.util.Set;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -21,9 +20,6 @@ import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 
 class AccountSessionSecurityContextRepositoryTest {
-
-    private static final UUID ACCOUNT_ID =
-            UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
 
     @DisplayName("BATON 계정이 아닌 OAuth 인증 결과는 저장하지 않고 차단한다")
     @Test
