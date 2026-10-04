@@ -1,5 +1,7 @@
 package com.personal.baton.application.watch;
 
+import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.RetryBackoff;
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient.SynchronizationResult;
@@ -19,11 +21,11 @@ public class WatchMonitorOutboxDispatchService implements DispatchWatchMonitorOu
     private static final Log log = LogFactory.getLog(WatchMonitorOutboxDispatchService.class);
     private static final int DEFAULT_BATCH_SIZE = 1;
     private static final Duration DEFAULT_LEASE_DURATION = Duration.ofMinutes(1);
+    private static final RetryBackoff RETRY_BACKOFF = new RetryBackoff(Duration.ofSeconds(10), Duration.ofHours(1));
 
     private final WatchMonitorOutboxPort outboxPort;
     private final WatchMonitorClient client;
     private final Clock clock;
-    private final WatchMonitorRetryPolicy retryPolicy;
 
     public WatchMonitorOutboxDispatchService(
             WatchMonitorOutboxPort outboxPort,
@@ -33,7 +35,6 @@ public class WatchMonitorOutboxDispatchService implements DispatchWatchMonitorOu
         this.outboxPort = outboxPort;
         this.client = client;
         this.clock = clock;
-        this.retryPolicy = new WatchMonitorRetryPolicy();
     }
 
     @Override
@@ -88,13 +89,13 @@ public class WatchMonitorOutboxDispatchService implements DispatchWatchMonitorOu
             }
             case RETRYABLE_FAILURE -> {
                 Instant availableAt = completedAt.plus(
-                        retryPolicy.delayAfterAttempt(delivery.attemptCount())
+                        RETRY_BACKOFF.delayAfterAttempt(delivery.attemptCount())
                 );
                 outboxPort.markRetry(
                         delivery.sourceRevision(),
                         delivery.leaseToken(),
                         availableAt,
-                        normalizedErrorCode(result.code())
+                        DeliveryErrorCode.normalized(result.code(), "WATCH_SYNC_FAILED")
                 );
                 yield false;
             }
@@ -103,17 +104,10 @@ public class WatchMonitorOutboxDispatchService implements DispatchWatchMonitorOu
                         delivery.sourceRevision(),
                         delivery.leaseToken(),
                         completedAt,
-                        normalizedErrorCode(result.code())
+                        DeliveryErrorCode.normalized(result.code(), "WATCH_SYNC_FAILED")
                 );
                 yield false;
             }
         };
-    }
-
-    private String normalizedErrorCode(String errorCode) {
-        if (errorCode == null || errorCode.isBlank()) {
-            return "WATCH_SYNC_FAILED";
-        }
-        return errorCode.length() <= 64 ? errorCode : errorCode.substring(0, 64);
     }
 }

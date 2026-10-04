@@ -1,5 +1,6 @@
 package com.personal.baton.application.identity;
 
+import com.personal.baton.application.delivery.RetryBackoff;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
 import com.personal.baton.application.identity.port.in.DispatchEmailVerificationOutboxUseCase;
 import com.personal.baton.application.identity.port.out.EmailVerificationDeliveryPort;
@@ -28,12 +29,12 @@ public class EmailVerificationOutboxDispatchService
     private static final String DELIVERY_FAILURE_CODE = "EMAIL_DELIVERY_UNAVAILABLE";
     private static final String PAYLOAD_KEY_FAILURE_CODE = "EMAIL_PAYLOAD_KEY_UNAVAILABLE";
     private static final String INVALID_PAYLOAD_CODE = "EMAIL_PAYLOAD_INVALID";
+    private static final RetryBackoff RETRY_BACKOFF = new RetryBackoff(Duration.ofSeconds(30), Duration.ofMinutes(30));
 
     private final EmailVerificationOutboxPort outboxPort;
     private final EmailVerificationOutboxPayloadProtector payloadProtector;
     private final EmailVerificationDeliveryPort deliveryPort;
     private final Clock clock;
-    private final EmailVerificationRetryPolicy retryPolicy;
 
     public EmailVerificationOutboxDispatchService(
             EmailVerificationOutboxPort outboxPort,
@@ -45,7 +46,6 @@ public class EmailVerificationOutboxDispatchService
         this.payloadProtector = payloadProtector;
         this.deliveryPort = deliveryPort;
         this.clock = clock;
-        this.retryPolicy = new EmailVerificationRetryPolicy();
     }
 
     @Override
@@ -155,7 +155,7 @@ public class EmailVerificationOutboxDispatchService
         outboxPort.markRetry(
                 delivery.deliveryId(),
                 delivery.leaseToken(),
-                failedAt.plus(retryPolicy.delayAfterAttempt(delivery.attemptCount())),
+                failedAt.plus(RETRY_BACKOFF.delayAfterAttempt(delivery.attemptCount())),
                 errorCode
         );
     }

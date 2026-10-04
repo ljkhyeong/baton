@@ -5,6 +5,8 @@ import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.RetryBackoff;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -19,8 +21,7 @@ public class CalendarOutboxDispatchService implements DispatchCalendarOutboxUseC
     private static final Log log = LogFactory.getLog(CalendarOutboxDispatchService.class);
     private static final int BATCH_SIZE = 1;
     private static final Duration LEASE_DURATION = Duration.ofMinutes(1);
-    private static final Duration INITIAL_RETRY_DELAY = Duration.ofSeconds(10);
-    private static final Duration MAXIMUM_RETRY_DELAY = Duration.ofHours(1);
+    private static final RetryBackoff RETRY_BACKOFF = new RetryBackoff(Duration.ofSeconds(10), Duration.ofHours(1));
 
     private final CalendarOutboxPort outboxPort;
     private final CalendarSnapshotClient client;
@@ -97,14 +98,14 @@ public class CalendarOutboxDispatchService implements DispatchCalendarOutboxUseC
                     delivery.payload(),
                     delivery.leaseToken(),
                     completedAt,
-                    normalizedCode(result.code(), "CAL_DELIVERED")
+                    DeliveryErrorCode.normalized(result.code(), "CAL_DELIVERED")
             );
             case RETRYABLE_FAILURE -> {
                 outboxPort.markRetry(
                         delivery.payload(),
                         delivery.leaseToken(),
-                        completedAt.plus(retryDelay(delivery.attemptCount())),
-                        normalizedCode(result.code(), "CAL_DELIVERY_FAILED")
+                        completedAt.plus(RETRY_BACKOFF.delayAfterAttempt(delivery.attemptCount())),
+                        DeliveryErrorCode.normalized(result.code(), "CAL_DELIVERY_FAILED")
                 );
                 yield false;
             }
@@ -113,26 +114,10 @@ public class CalendarOutboxDispatchService implements DispatchCalendarOutboxUseC
                         delivery.payload(),
                         delivery.leaseToken(),
                         completedAt,
-                        normalizedCode(result.code(), "CAL_DELIVERY_REJECTED")
+                        DeliveryErrorCode.normalized(result.code(), "CAL_DELIVERY_REJECTED")
                 );
                 yield false;
             }
         };
-    }
-
-    private Duration retryDelay(int attemptCount) {
-        int exponent = Math.min(attemptCount - 1, 16);
-        long seconds = Math.multiplyExact(
-                INITIAL_RETRY_DELAY.toSeconds(),
-                1L << exponent
-        );
-        return Duration.ofSeconds(Math.min(seconds, MAXIMUM_RETRY_DELAY.toSeconds()));
-    }
-
-    private String normalizedCode(String code, String fallback) {
-        if (code == null || code.isBlank()) {
-            return fallback;
-        }
-        return code.length() <= 64 ? code : code.substring(0, 64);
     }
 }

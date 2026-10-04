@@ -4,6 +4,7 @@ import com.personal.baton.application.brief.port.in.DispatchBriefContinuityOutbo
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
 import com.personal.baton.application.brief.port.out.BriefContinuityClient.DeliveryResult;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
+import com.personal.baton.application.delivery.DeliveryErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -71,14 +72,14 @@ public class BriefContinuityOutboxDispatchService
                     delivery.outboxId(),
                     delivery.leaseToken(),
                     completedAt,
-                    normalizedCode(result.code(), "BRIEF_DELIVERED")
+                    DeliveryErrorCode.normalized(result.code(), "BRIEF_DELIVERED")
             );
             case RETRYABLE_FAILURE -> {
                 outboxPort.markRetry(
                         delivery.outboxId(),
                         delivery.leaseToken(),
                         completedAt,
-                        normalizedCode(result.code(), "BRIEF_RETRYABLE_FAILURE")
+                        DeliveryErrorCode.normalized(result.code(), "BRIEF_RETRYABLE_FAILURE")
                 );
                 yield false;
             }
@@ -87,17 +88,10 @@ public class BriefContinuityOutboxDispatchService
                         delivery.outboxId(),
                         delivery.leaseToken(),
                         completedAt,
-                        normalizedCode(result.code(), "BRIEF_DELIVERY_FAILED")
+                        DeliveryErrorCode.normalized(result.code(), "BRIEF_DELIVERY_FAILED")
                 );
                 yield false;
             }
         };
-    }
-
-    private String normalizedCode(String code, String fallback) {
-        if (code == null || code.isBlank()) {
-            return fallback;
-        }
-        return code.length() <= 64 ? code : code.substring(0, 64);
     }
 }
