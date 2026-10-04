@@ -172,46 +172,13 @@ validate_identifier() {
   fi
 }
 
-validate_secret_file_boundary() {
-  local name="$1"
-  local target="$2"
-  local canonical_target
-  local directory
-  local file_mode
-  local directory_mode
-
-  [[ "$target" == /* ]] || fail "$name must be an absolute file path"
-  [[ ! -L "$target" ]] || fail "$name must not be a symbolic link"
-  [[ -f "$target" && -r "$target" ]] \
-    || fail "$name must be a readable regular file"
-  [[ -O "$target" ]] || fail "$name must be owned by the current user"
-
-  canonical_target="$(production_validation_canonical_file fail "$target")"
-  [[ ! -L "$canonical_target" && -f "$canonical_target" && -r "$canonical_target" ]] \
-    || fail "$name canonical target must be a readable regular file"
-  [[ -O "$canonical_target" ]] || fail "$name canonical target must be owned by the current user"
-
-  directory="$(dirname -- "$canonical_target")"
-  [[ -O "$directory" ]] || fail "$name parent directory must be owned by the current user"
-  directory_mode="$(production_validation_portable_mode fail "$directory")"
-  file_mode="$(production_validation_portable_mode fail "$canonical_target")"
-  [[ "$directory_mode" =~ ^[0-7]{3,4}$ && "$file_mode" =~ ^[0-7]{3,4}$ ]] \
-    || fail "$name permissions are invalid"
-  if (( (8#$directory_mode & 077) != 0 )); then
-    fail "$name parent directory must not grant group or other permissions"
-  fi
-  if (( (8#$file_mode & 077) != 0 )); then
-    fail "$name must not grant group or other permissions"
-  fi
-}
-
 validate_scalar_secret_file() {
   local name="$1"
   local target="$2"
   local size
   local invalid_bytes
 
-  validate_secret_file_boundary "$name" "$target"
+  production_validation_secret_file fail "$name" "$target" > /dev/null
   size="$(wc -c < "$target" | tr -d '[:space:]')"
   if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 1 || size > 512 )); then
     fail "$name must contain 1-512 bytes"
@@ -238,7 +205,7 @@ validate_truststore_file() {
   local name="$1"
   local target="$2"
 
-  validate_secret_file_boundary "$name" "$target"
+  production_validation_secret_file fail "$name" "$target" > /dev/null
   command -v keytool >/dev/null 2>&1 \
     || fail "keytool is required to validate the BRIEF service truststore"
   if ! keytool -list -rfc -storetype PKCS12 -storepass changeit \
@@ -283,7 +250,7 @@ validate_public_key() {
   local bits
   local size
 
-  validate_secret_file_boundary "$name" "$target"
+  production_validation_secret_file fail "$name" "$target" > /dev/null
   size="$(wc -c < "$target" | tr -d '[:space:]')"
   if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 256 || size > 65536 )); then
     fail "$name PEM size is invalid"
@@ -306,7 +273,7 @@ validate_private_key() {
   local last_line
   local size
 
-  validate_secret_file_boundary "$name" "$target"
+  production_validation_secret_file fail "$name" "$target" > /dev/null
   size="$(wc -c < "$target" | tr -d '[:space:]')"
   if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 512 || size > 65536 )); then
     fail "$name PEM size is invalid"

@@ -192,34 +192,10 @@ validate_turn_secret_file() {
   local name="$1"
   local target="$2"
   local canonical_target
-  local directory
-  local directory_mode
-  local file_mode
   local size
   local value
 
-  [[ "$target" == /* ]] || fail "$name must be an absolute file path"
-  [[ ! -L "$target" ]] || fail "$name must not be a symbolic link"
-  [[ -f "$target" && -r "$target" ]] \
-    || fail "$name must be a readable regular file"
-  [[ -O "$target" ]] || fail "$name must be owned by the current user"
-  canonical_target="$(production_validation_canonical_file fail "$target")"
-  [[ ! -L "$canonical_target" && -f "$canonical_target" && -r "$canonical_target" ]] \
-    || fail "$name canonical target must be a readable regular file"
-  [[ -O "$canonical_target" ]] || fail "$name canonical target must be owned by the current user"
-
-  directory="$(dirname -- "$canonical_target")"
-  [[ -O "$directory" ]] || fail "$name parent directory must be owned by the current user"
-  directory_mode="$(production_validation_portable_mode fail "$directory")"
-  file_mode="$(production_validation_portable_mode fail "$canonical_target")"
-  [[ "$directory_mode" =~ ^[0-7]{3,4}$ && "$file_mode" =~ ^[0-7]{3,4}$ ]] \
-    || fail "$name permissions are invalid"
-  if (( (8#$directory_mode & 077) != 0 )); then
-    fail "$name parent directory must not grant group or other permissions"
-  fi
-  if (( (8#$file_mode & 077) != 0 )); then
-    fail "$name must not grant group or other permissions"
-  fi
+  canonical_target="$(production_validation_secret_file fail "$name" "$target")" || exit 1
 
   size="$(wc -c < "$canonical_target" | tr -d '[:space:]')"
   value="$(< "$canonical_target")"

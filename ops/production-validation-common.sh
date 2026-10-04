@@ -135,3 +135,39 @@ production_validation_canonical_file() {
     || "$fail_callback" "could not resolve secret parent directory: $target"
   printf '%s/%s' "$directory" "$(basename -- "$target")"
 }
+
+production_validation_secret_file() {
+  local fail_callback="$1"
+  local name="$2"
+  local target="$3"
+  local canonical_target
+  local directory
+  local directory_mode
+  local file_mode
+
+  [[ "$target" == /* ]] || "$fail_callback" "$name must be an absolute file path"
+  [[ ! -L "$target" ]] || "$fail_callback" "$name must not be a symbolic link"
+  [[ -f "$target" && -r "$target" ]] \
+    || "$fail_callback" "$name must be a readable regular file"
+  [[ -O "$target" ]] || "$fail_callback" "$name must be owned by the current user"
+
+  canonical_target="$(production_validation_canonical_file "$fail_callback" "$target")" || exit 1
+  [[ ! -L "$canonical_target" && -f "$canonical_target" && -r "$canonical_target" ]] \
+    || "$fail_callback" "$name canonical target must be a readable regular file"
+  [[ -O "$canonical_target" ]] \
+    || "$fail_callback" "$name canonical target must be owned by the current user"
+
+  directory="$(dirname -- "$canonical_target")"
+  [[ -O "$directory" ]] || "$fail_callback" "$name parent directory must be owned by the current user"
+  directory_mode="$(production_validation_portable_mode "$fail_callback" "$directory")" || exit 1
+  file_mode="$(production_validation_portable_mode "$fail_callback" "$canonical_target")" || exit 1
+  [[ "$directory_mode" =~ ^[0-7]{3,4}$ && "$file_mode" =~ ^[0-7]{3,4}$ ]] \
+    || "$fail_callback" "$name permissions are invalid"
+  if (( (8#$directory_mode & 077) != 0 )); then
+    "$fail_callback" "$name parent directory must not grant group or other permissions"
+  fi
+  if (( (8#$file_mode & 077) != 0 )); then
+    "$fail_callback" "$name must not grant group or other permissions"
+  fi
+  printf '%s' "$canonical_target"
+}
