@@ -12,7 +12,6 @@ export default function AccountSecurityPage() {
       <>
         <title>내 계정 — BATON</title>
         <AuthPageShell
-          formTitle="계정 설정"
           title="내 계정"
           description="로그인 방법을 확인하고 계정을 관리하세요."
         >
@@ -27,7 +26,6 @@ export default function AccountSecurityPage() {
       <>
         <title>내 계정 — BATON</title>
         <AuthPageShell
-          formTitle="계정 설정"
           title="내 계정"
           description="로그인 방법을 확인하고 계정을 관리하세요."
         >
@@ -57,7 +55,6 @@ export default function AccountSecurityPage() {
     <>
       <title>내 계정 — BATON</title>
       <AuthPageShell
-        formTitle="계정 설정"
         title="내 계정"
         description="캘린더 구독, 로그인 방법, 비밀번호를 관리합니다."
       >
