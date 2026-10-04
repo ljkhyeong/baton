@@ -942,9 +942,12 @@ for (const failurePoint of ['잠금 접근', '잠금 요청', '요청 준비'] a
           },
         })
       } else if (point === '잠금 요청') {
-        const request = navigator.locks.request.bind(navigator.locks)
-        navigator.locks.request = () => {
-          navigator.locks.request = request
+        // WebKit은 참조가 없는 LockManager 래퍼를 다시 만들 수 있어 바꾼 메서드가 사라지지 않게 붙잡아 둔다.
+        const lockManager = navigator.locks
+        Object.defineProperty(window, 'batonTestLockManager', { configurable: true, value: lockManager })
+        const request = lockManager.request.bind(lockManager)
+        lockManager.request = () => {
+          lockManager.request = request
           return Promise.reject(failure)
         }
       } else {
