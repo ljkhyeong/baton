@@ -160,6 +160,7 @@ test('@memory 결정 저장 응답이 유실된 뒤 새로고침해도 같은 �
   await expect(retryDialog.getByRole('status').filter({ hasText: '저장 결과를 확인하지 못했습니다.' })).toContainText('저장 결과를 확인하지 못했습니다.')
   await retryDialog.getByRole('button', { name: '결정 기록하기' }).click()
 
+  await expect(retryDialog).toBeHidden()
   await expect(page.getByRole('heading', { name: '응답 유실 재시도 규칙을 유지한다' })).toBeVisible()
   const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/decisions`)
   expect(attempts).toHaveLength(2)
