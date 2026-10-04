@@ -10,8 +10,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 0 32px;
-  border-bottom: 1px solid var(--rule);
-  background: rgba(255, 255, 255, .94);
+  background: rgba(242, 244, 246, .92);
   backdrop-filter: saturate(1.4) blur(8px);
 }
 .account-topbar .brand { padding: 0; color: var(--ink); text-decoration: none; }
@@ -34,13 +33,13 @@
 .my-teams-heading h2 { margin: 0; font-size: 17px; letter-spacing: -.03em; }
 .my-teams-description { max-width: 64ch; margin: -6px 0 16px; color: var(--muted); font-size: 13px; line-height: 1.65; word-break: keep-all; }
 
-.my-teams-state { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius); color: var(--muted); background: var(--nav); font-size: 13px; line-height: 1.6; }
+.my-teams-state { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius); color: var(--muted); background: var(--paper); font-size: 13px; line-height: 1.6; }
 .my-teams-state-warning { color: var(--warning); background: var(--warning-soft); }
 .my-teams-state > p { margin: 0 0 10px; }
 .my-teams-empty { margin: 0; padding: 28px 16px; border: 1px dashed var(--rule-strong); border-radius: var(--radius-lg); color: var(--muted); font-size: 13px; text-align: center; word-break: keep-all; }
 
 .my-teams-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.my-team-card { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-content: start; gap: 4px 12px; padding: 18px; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--paper); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.my-team-card { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-content: start; gap: 4px 12px; padding: 18px; border: 1px solid transparent; border-radius: var(--radius-lg); background: var(--paper); transition: border-color 150ms ease, box-shadow 150ms ease; }
 .my-team-card:hover { border-color: var(--rule-strong); box-shadow: 0 4px 14px rgba(24, 28, 36, .06); }
 .my-team-card .workspace-symbol { width: 36px; height: 36px; }
 .my-team-copy { min-width: 0; }
@@ -51,10 +50,10 @@
 .my-work-filter { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .my-work-filter select { min-width: 180px; color: var(--ink); font-weight: 500; }
 
-.my-work-list { margin: 0; padding: 0; border-top: 1px solid var(--rule); list-style: none; }
-.my-work-list li { border-bottom: 1px solid var(--rule); }
+.my-work-list { margin: 0; padding: 0 12px; border-radius: var(--radius-lg); background: var(--paper); list-style: none; }
+.my-work-list li + li { border-top: 1px solid var(--rule); }
 .my-work-row { display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 8px; color: var(--ink); text-decoration: none; }
-.my-work-row:hover { background: var(--nav); }
+.my-work-row:hover { border-radius: var(--radius); background: var(--nav); }
 .my-work-copy { display: grid; min-width: 0; gap: 3px; }
 .my-work-copy strong { font-size: 14px; overflow-wrap: anywhere; }
 .my-work-copy span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }

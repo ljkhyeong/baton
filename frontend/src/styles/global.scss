@@ -1,17 +1,17 @@
 :root {
-  color: #292a2d;
-  background: #ffffff;
+  color: #191f28;
+  background: #f2f4f6;
   font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --canvas: #ffffff;
+  --canvas: #f2f4f6;
   --paper: #ffffff;
-  --ink: #292a2d;
+  --ink: #191f28;
   --muted: #60646c;
   --faint: #686e78;
-  --rule: #e3e5e8;
-  --rule-strong: #cbd0d8;
-  --nav: #f7f8fa;
+  --rule: #e5e8eb;
+  --rule-strong: #d1d6db;
+  --nav: #f2f4f6;
   --nav-muted: #60646c;
   --baton: #ef643d;
   --baton-dark: #b94126;
@@ -23,9 +23,9 @@
   --warning-soft: #fff1eb;
   --info: #2f5f98;
   --info-soft: #edf3fc;
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 10px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
   --field-border-hover: #a9b0ba;
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%2360646c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
 }
@@ -2753,6 +2753,62 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   outline-offset: 4px;
 }
 
+// 카드형 화면: 회색 바탕 위에 주요 구역을 흰 카드로 나눈다. 기본 규칙 뒤, 반응형 규칙 앞에 둔다.
+@media screen {
+  .sidebar { background: var(--canvas); border-right: 0; }
+  .side-nav button { border-radius: var(--radius); }
+  .side-nav button:hover { background: #e8ebee; }
+  .side-nav button.active { background: var(--paper); font-weight: 650; }
+  .workspace-toolbar { border-bottom: 0; }
+
+  .today-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 12px; }
+  .today-summary > div { min-width: 0; padding: 16px 18px; border-radius: var(--radius-lg); background: var(--paper); }
+  .today-summary dt { color: var(--muted); font-size: 12px; font-weight: 600; }
+  .today-summary dd { margin: 6px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.03em; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .today-summary dd small { display: block; margin-top: 4px; color: var(--faint); font-size: 12px; font-weight: 500; letter-spacing: 0; }
+  .today-summary .needs-attention dd { color: var(--baton-dark); }
+
+  .relay-board,
+  .today-secondary,
+  .today-lower .plain-section,
+  .role-directory,
+  .rhythm-timeline,
+  .memory-ledger,
+  .handoff-workspace,
+  .record-search-panel,
+  .record-search-results {
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--paper);
+  }
+
+  .relay-board { padding: 4px 20px 8px; }
+  .today-list-toolbar { border-top: 0; }
+  .today-list-columns { border-radius: var(--radius-sm); border-bottom: 0; }
+  .today-lower { margin-top: 12px; }
+  .today-lower .plain-section { padding: 6px 20px; }
+  .today-secondary { margin-top: 12px; padding: 0 20px; }
+  .today-secondary[open] { padding-bottom: 16px; }
+  .role-directory { overflow: hidden; }
+  .directory-head { background: transparent; }
+  .rhythm-timeline { padding: 0 20px; }
+  .rhythm-phase:last-child { border-bottom: 0; }
+  .memory-ledger { padding: 4px 20px; }
+  .handoff-role-tabs { gap: 8px; margin-bottom: 12px; border: 0; }
+  .handoff-role-tabs button { flex: 0 1 220px; border-right: 0; border-radius: var(--radius); background: transparent; }
+  .handoff-role-tabs button.active { background: var(--paper); box-shadow: none; }
+  .handoff-workspace { padding: 0 24px; }
+  .record-search-panel { padding: 20px; }
+  .record-search-results { margin-top: 12px; padding: 8px 20px; }
+  .round-schedule-card { border: 0; background: var(--paper); }
+  .mobile-team { border-color: transparent; background: var(--paper); }
+  .timing-label { padding: 2px 8px; border-radius: 999px; }
+
+  @media (min-width: 1241px) {
+    .inspector { margin: 12px 12px 12px 0; border-left: 0; border-radius: var(--radius-lg); background: var(--paper); }
+  }
+}
+
 @media (max-width: 1240px) {
   .app-shell { grid-template-columns: 232px minmax(0, 1fr); }
   .inspector {
@@ -3059,3 +3115,21 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 
 .workspace-template-preview { border: 1px solid var(--rule); padding: 16px; overflow-wrap: anywhere; }
 .workspace-template-preview h3 { margin-top: 0; }
+
+@media (max-width: 720px) {
+  .today-summary { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 2px 16px; border-radius: var(--radius-lg); background: var(--paper); }
+  .today-summary > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 0; border-radius: 0; background: transparent; }
+  .today-summary > div + div { border-top: 1px solid var(--rule); }
+  .today-summary dd { margin: 0; font-size: 16px; text-align: right; }
+  .today-summary dd small { display: none; }
+  .mobile-topbar { background: rgba(242, 244, 246, .96); }
+  .mobile-team { border-color: transparent; background: var(--paper); }
+  .relay-board { padding: 4px 16px 8px; }
+  .today-secondary,
+  .today-lower .plain-section,
+  .rhythm-timeline,
+  .memory-ledger,
+  .handoff-workspace,
+  .record-search-panel,
+  .record-search-results { padding-right: 16px; padding-left: 16px; }
+}

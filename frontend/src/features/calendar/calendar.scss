@@ -1,4 +1,5 @@
-.calendar-panel { scroll-margin-top: 90px; margin-bottom: 26px; padding-bottom: 0; border-block: 1px solid var(--rule); color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-panel { scroll-margin-top: 90px; margin: 12px 0; padding: 0 20px; border-radius: var(--radius-lg); color: var(--ink); background: var(--paper); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-panel[open] { padding-bottom: 16px; }
 .calendar-panel > summary { padding: 16px 0; cursor: pointer; }
 .calendar-panel h2 { display: inline; margin: 0 12px 0 4px; font-size: 14px; }
 .calendar-panel > summary > span { color: var(--muted); font-size: 12px; }

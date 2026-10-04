@@ -76,10 +76,19 @@ export function TodayView({
     UNSCHEDULED: 3,
     COMPLETED: 4,
   }
+  const summaryDeadline = new Intl.DateTimeFormat('ko-KR', {
+    month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: season.timeZone,
+  })
   const orderedRoutines = routineTimelineItems(routines, selectedRound).sort((left, right) => {
     return timingPriority[left.execution?.timingStatus ?? 'UNSCHEDULED']
       - timingPriority[right.execution?.timingStatus ?? 'UNSCHEDULED']
   })
+  const executionCount = selectedRound?.routineExecutions.length ?? 0
+  const completionRate = executionCount ? Math.round((completedCount / executionCount) * 100) : 0
+  const nextDeadline = orderedRoutines
+    .flatMap(({ execution }) => execution?.deadlineAt && execution.status !== 'DONE' ? [execution.deadlineAt] : [])
+    .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
+  const signalCount = workspace.continuitySignals.length
   return (
     <>
       <PageHeader
@@ -88,6 +97,22 @@ export function TodayView({
         description="끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요."
         action={<PrimaryButton onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>{roles.length ? '업무 추가' : '역할 추가'}</PrimaryButton>}
       />
+      {selectedRound && (
+        <dl className="today-summary">
+          <div>
+            <dt>회차 완료율</dt>
+            <dd>{completionRate}%<small>{executionCount}개 중 {completedCount}개 완료</small></dd>
+          </div>
+          <div>
+            <dt>다음 마감</dt>
+            <dd>{nextDeadline ? summaryDeadline.format(new Date(nextDeadline)) : '없음'}<small>남은 업무 기준</small></dd>
+          </div>
+          <div className={signalCount ? 'needs-attention' : undefined}>
+            <dt>조치 필요</dt>
+            <dd>{signalCount ? `${signalCount}건` : '없음'}<small>역할·인수인계 점검</small></dd>
+          </div>
+        </dl>
+      )}
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="today-list-toolbar">
           <RoundControl
