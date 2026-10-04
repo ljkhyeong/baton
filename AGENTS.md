@@ -18,7 +18,7 @@
 | 모듈·패키지 경계 | [ADR-0001](docs/ADR/0001_hexagonal-architecture/adr.md) |
 | 테스트 선택·작성 기준 | [ADR-0002](docs/ADR/0002_test-strategy/adr.md) |
 
-로컬 `.agents/skills/baton-*` 스킬은 담당 작업에 맞는 것만 사용한다. HTTP 계약, DB 마이그레이션, 시간 계산, 프런트엔드, 테스트 정리, 문서 작업을 구분하고 나머지 백엔드 작업에는 `baton-spring-backend`를 사용한다. 참고 문서와 다른 스킬을 일괄로 읽지 않는다. 스킬이 없는 환경에서는 위 문서와 실제 코드·설정으로 판단한다.
+로컬 `.agents/skills/baton-*`(Codex)·`.claude/skills/baton-*`(Claude Code) 스킬은 담당 작업에 맞는 것만 사용한다. HTTP 계약, DB 마이그레이션, 시간 계산, 프런트엔드, 테스트 정리, 문서 작업을 구분하고 나머지 백엔드 작업에는 `baton-spring-backend`를 사용한다. 참고 문서와 다른 스킬을 일괄로 읽지 않는다. 스킬이 없는 환경에서는 위 문서와 실제 코드·설정으로 판단한다.
 
 ## 구현에서 지킬 경계
 
