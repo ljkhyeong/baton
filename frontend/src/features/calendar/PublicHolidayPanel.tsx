@@ -45,7 +45,7 @@ export function PublicHolidayPanel({ date, meetingDate }: { date: string; meetin
         <input type="month" value={month} onChange={event => setChosenMonth(event.target.value)} />
       </label>
       {query.isPending && <p role="status">공휴일을 불러오는 중입니다.</p>}
-      {query.isError && <p role="alert">공휴일을 불러오지 못했습니다. <button type="button" onClick={() => void query.refetch()}>다시 확인</button></p>}
+      {query.isError && <p role="alert">공휴일을 불러오지 못했습니다. <button className="secondary-button" type="button" onClick={() => void query.refetch()}>다시 확인</button></p>}
       {query.data?.status === 'DISABLED' && <p>현재 공휴일 조회를 사용할 수 없습니다.</p>}
       {query.data?.status === 'UNAVAILABLE' && <p role="status">공휴일 정보를 확인하지 못했습니다. 잠시 후 다시 확인해 주세요.</p>}
       {query.data?.status === 'OUT_OF_RANGE' && <p>공휴일은 작년부터 내년까지 조회할 수 있습니다.</p>}

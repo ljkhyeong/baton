@@ -183,7 +183,7 @@ export function DecisionModal({
               </label>
             ))}
           </div>
-          {!roleIds.length && <small className="form-hint">관련 역할을 하나 이상 선택해 주세요.</small>}
+          {!roleIds.length && <small className="form-hint form-hint-warning">관련 역할을 하나 이상 선택해 주세요.</small>}
         </fieldset>
         {editing
           ? <FormError error={error} />

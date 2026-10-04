@@ -63,6 +63,7 @@ export default function AccountMembershipPanel({
         <div className="account-membership-error" role="alert">
           <p>로그인 상태를 확인하지 못했습니다. 다시 확인해 주세요.</p>
           <button
+            className="secondary-button"
             type="button"
             disabled={sessionQuery.isFetching}
             onClick={() => void sessionQuery.refetch()}
@@ -127,7 +128,7 @@ export default function AccountMembershipPanel({
         ? (
             <div className="account-membership-error" role="alert">
               <p>{errorMessage(membershipQuery.error)}</p>
-              <button type="button" onClick={() => membershipQuery.refetch()}>다시 확인</button>
+              <button className="secondary-button" type="button" onClick={() => membershipQuery.refetch()}>다시 확인</button>
             </div>
           )
         : activeMembers.length > 0

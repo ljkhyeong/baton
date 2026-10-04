@@ -106,7 +106,6 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
       {localIdentity && (
         <section className="account-security-card" aria-labelledby="password-change-title">
           <header>
-            <span className="section-kicker">PASSWORD</span>
             <h3 id="password-change-title">비밀번호 변경</h3>
             <p>비밀번호를 변경하면 모든 기기에서 로그아웃합니다.</p>
           </header>
@@ -179,7 +178,6 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
 
       <section className="account-security-card account-session-card" aria-labelledby="session-revocation-title">
         <header>
-          <span className="section-kicker">SESSIONS</span>
           <h3 id="session-revocation-title">모든 기기에서 로그아웃</h3>
           <p>현재 기기를 포함해 모든 기기에서 로그아웃합니다.</p>
         </header>

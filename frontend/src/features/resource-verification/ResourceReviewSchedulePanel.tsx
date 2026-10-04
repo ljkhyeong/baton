@@ -21,7 +21,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
   return <section className="resource-review-schedule" aria-label="자료 재확인 주기">
     <h4>재확인 주기</h4>
     {query.isPending ? <p role="status">재확인 일정을 불러오고 있습니다.</p>
-      : query.isError ? <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
+      : query.isError ? <p role="alert">{query.error.message} <button className="secondary-button" type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
         : <p>{data!.nextReviewOn ? `${data!.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(data!.nextReviewOn)}${data!.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 확인이 꺼져 있습니다.'}</p>}
     {editable && data && <form onSubmit={event => { event.preventDefault(); if (!query.isError && !query.isFetching && !save.isPending) save.mutate() }}>
       <fieldset disabled={save.isPending || query.isError || query.isFetching}>
@@ -31,7 +31,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
           <label>다음 확인일<input type="date" required value={values.nextReviewOn} onChange={event => setDraft({ ...values, nextReviewOn: event.target.value })} /></label>
           <p>‘사용 가능’으로 기록한 날부터 설정한 일수 뒤가 다음 확인일이 됩니다. ‘수정 필요’이면 날짜를 유지합니다.</p>
         </>}
-        <button type="submit">{save.isPending ? '주기 저장 중…' : '재확인 주기 저장'}</button>
+        <button className="primary-button" type="submit">{save.isPending ? '주기 저장 중…' : '재확인 주기 저장'}</button>
       </fieldset>
     </form>}
     {save.isError && <p role="alert">{save.error.message} 저장된 일정을 확인한 뒤 다시 저장해 주세요.</p>}

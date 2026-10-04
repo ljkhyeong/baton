@@ -20,7 +20,7 @@ export function NotificationPreferencesPanel({ accountId }: { accountId: string 
   if (query.isPending) return <p role="status">알림 설정을 불러오고 있습니다.</p>
   return <section className="notification-preferences" aria-label="개인 알림 설정">
     <p>내 알림에 표시할 항목을 고르세요. 모든 팀과 기기에 같은 설정이 적용됩니다.</p>
-    {query.isError && <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>}
+    {query.isError && <p role="alert">{query.error.message} <button className="secondary-button" type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>}
     {values && <form onSubmit={event => { event.preventDefault(); if (!query.isError && !query.isFetching && !save.isPending) save.mutate() }}>
       <fieldset disabled={query.isError || query.isFetching || save.isPending}>
         <legend>표시할 알림</legend>
@@ -29,7 +29,7 @@ export function NotificationPreferencesPanel({ accountId }: { accountId: string 
           onChange={event => setDraft({ ...values, deadlineLeadHours: Number(event.target.value) })} /></label>
         <label><input type="checkbox" checked={values.overdueEnabled} onChange={event => setDraft({ ...values, overdueEnabled: event.target.checked })} />기한 지남</label>
         <label><input type="checkbox" checked={values.handoffEnabled} onChange={event => setDraft({ ...values, handoffEnabled: event.target.checked })} />인수인계 수락 요청</label>
-        <button type="submit">{save.isPending ? '알림 설정 저장 중…' : '알림 설정 저장'}</button>
+        <button className="primary-button" type="submit">{save.isPending ? '알림 설정 저장 중…' : '알림 설정 저장'}</button>
       </fieldset>
     </form>}
     {save.isError && <p role="alert">{save.error.message} 최신 설정을 확인한 뒤 다시 저장해 주세요.</p>}

@@ -142,14 +142,14 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       )}
       <small>공개 URL 연결 상태이며 로그인 후 접근 권한은 확인하지 않습니다.</small>
       {enabled && (
-        <button type="button" disabled={offline || query.isFetching}
+        <button className="secondary-button" type="button" disabled={offline || query.isFetching}
           onClick={refreshHealth}
           aria-label={`${title} 상태 새로고침`}>
           {query.isFetching ? '상태 조회 중' : '상태 새로고침'}
         </button>
       )}
       {!changesDisabled && result?.checkRequestAllowed && (
-        <button type="button" disabled={checkPending || remainingSeconds > 0 || !currentResult}
+        <button className="secondary-button" type="button" disabled={checkPending || remainingSeconds > 0 || !currentResult}
           onClick={() => mutation.mutate({ previousConclusiveAt: result.lastConclusiveAt, submittedAt: Date.now() })}
           aria-label={`${title} 다시 점검`}>
           {checkPending ? '점검 요청 중' : remainingSeconds > 0 ? `다시 점검 (${remainingSeconds}초)` : '다시 점검'}

@@ -38,7 +38,6 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
   }
   return <section className="account-security-card calendar-subscription-list" aria-labelledby="my-calendar-title">
     <header>
-      <span className="section-kicker">MY CALENDARS</span>
       <h3 id="my-calendar-title">내 캘린더 구독</h3>
       <p>내 캘린더 구독을 확인하거나 해제하세요. 팀을 떠난 뒤에도 해제할 수 있습니다.</p>
     </header>

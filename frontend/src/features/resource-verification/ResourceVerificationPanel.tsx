@@ -42,7 +42,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
   return <div>
     <p>링크가 열리고 내용이 맞는지 확인한 뒤 결과를 남기세요.</p>
     {history.isPending ? <p role="status">확인 기록을 불러오고 있습니다.</p>
-      : history.isError ? <p role="alert">{history.error.message} <button type="button" onClick={() => void history.refetch()}>다시 불러오기</button></p>
+      : history.isError ? <p role="alert">{history.error.message} <button className="secondary-button" type="button" onClick={() => void history.refetch()}>다시 불러오기</button></p>
         : <>
           <strong>{!latest ? '아직 확인한 기록이 없습니다.' : !latest.current ? '자료가 변경되어 재확인이 필요합니다.'
             : latest.status === 'CONFIRMED' ? '사용할 수 있는 자료로 확인했습니다.' : '자료 수정이 필요합니다.'}</strong>
@@ -62,10 +62,10 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
         <option value="CONFIRMED">사용 가능</option><option value="NEEDS_UPDATE">수정 필요</option>
       </select></label>
       <label>확인 메모<textarea maxLength={500} rows={2} value={note} onChange={event => setNote(event.target.value)} /></label>
-      <button type="submit" disabled={mutation.isPending || !history.data || history.isError || history.isFetching}>
+      <button className="primary-button" type="submit" disabled={mutation.isPending || !history.data || history.isError || history.isFetching}>
         {mutation.isPending ? '확인 결과 저장 중…' : '확인 결과 저장'}
       </button>
-    </form> : <button type="button" onClick={onManageMembership}>내 이름 선택 후 확인 기록 남기기</button>)}
+    </form> : <button className="secondary-button" type="button" onClick={onManageMembership}>내 이름 선택 후 확인 기록 남기기</button>)}
     {mutation.isError && <p role="alert">{mutation.error.message} 최신 자료를 다시 확인한 뒤 기록해 주세요.</p>}
     {mutation.isSuccess && <p role="status">확인 기록을 저장했습니다.</p>}
   </div>

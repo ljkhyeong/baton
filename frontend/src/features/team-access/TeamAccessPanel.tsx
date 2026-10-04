@@ -90,7 +90,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
     void client.invalidateQueries({ queryKey: ['teams', scope.teamId] })
   } })
   if (query.isPending) return <p role="status">팀 권한을 불러오고 있습니다.</p>
-  if (query.isError) return <p role="alert">{query.error.message} <button type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
+  if (query.isError) return <p role="alert">{query.error.message} <button className="secondary-button" type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
   const access = query.data
   const mine = access.members.find(member => member.memberId === access.memberId)
   const invitationCandidates = access.members.filter(member => member.active && !member.permission)
@@ -108,7 +108,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
       <p>{mine?.memberName}님으로 연결된 내 계정을 팀 관리자로 지정합니다. 이후에는 기존 공유 링크를 사용할 수 없고, 다른 사람은 초대를 받아 로그인해야 합니다.</p>
       <label>운영자 복구 키<input type="password" autoComplete="off" value={recoveryKey} onChange={event => setRecoveryKey(event.target.value)} required /></label>
       <label className="team-access-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required />기존 공유 링크를 막고 내 계정을 관리자로 지정하는 데 동의합니다.</label>
-      <button type="submit" disabled={mutation.isPending || !confirmed || !recoveryKey}>계정 로그인으로 전환</button>
+      <button className="primary-button" type="submit" disabled={mutation.isPending || !confirmed || !recoveryKey}>계정 로그인으로 전환</button>
     </form> : <p>먼저 ‘내 이름 선택’에서 본인 이름을 선택하세요. 전환하려면 운영자 복구 키가 필요합니다.</p>)}
     {access.permission === 'ADMIN' && <>
       <h4>구성원 권한</h4>
@@ -133,12 +133,12 @@ function AccessContent({ scope }: { scope: AccessScope }) {
           {Object.entries(permissionNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
         <p>열람자는 조회, 구성원은 업무 기록 변경, 관리자는 구성원·초대·시즌 관리를 할 수 있습니다.</p>
-        <button type="submit" disabled={!invitationMemberId || mutation.isPending}>초대 링크 만들기</button>
+        <button className="primary-button" type="submit" disabled={!invitationMemberId || mutation.isPending}>초대 링크 만들기</button>
       </form>
       {visibleInvitationLink && <div><label>생성한 초대 링크<input readOnly value={visibleInvitationLink.url} autoComplete="off" spellCheck={false} onFocus={event => event.currentTarget.select()} /></label>
         <div className="team-invitation-actions">
-          <button type="button" disabled={mutation.isPending || linkStatus === 'sharing'} onClick={() => void shareInvitationUrl(visibleInvitationLink.url)}>초대 링크 공유</button>
-          <button type="button" disabled={mutation.isPending || linkStatus === 'sharing'} onClick={() => void copyInvitationUrl(visibleInvitationLink.url)}>초대 링크 복사</button>
+          <button className="secondary-button" type="button" disabled={mutation.isPending || linkStatus === 'sharing'} onClick={() => void shareInvitationUrl(visibleInvitationLink.url)}>초대 링크 공유</button>
+          <button className="secondary-button" type="button" disabled={mutation.isPending || linkStatus === 'sharing'} onClick={() => void copyInvitationUrl(visibleInvitationLink.url)}>초대 링크 복사</button>
         </div>
         {linkStatus === 'copied' && <p role="status">초대 링크를 복사했습니다.</p>}
         {linkStatus === 'copyFailed' && <p role="alert">자동으로 복사하지 못했습니다. 위 링크를 선택해 직접 복사해 주세요.</p>}
@@ -153,7 +153,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
           const memberName = access.members.find(member => member.memberId === invite.memberId)?.memberName ?? '알 수 없는 구성원'
           return <li key={invite.id}><span>{memberName} · {permissionNames[invite.permission]}
             <small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : expired ? '기간 만료' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
-            {pending && <button type="button" disabled={mutation.isPending} onClick={() => {
+            {pending && <button className="secondary-button" type="button" disabled={mutation.isPending} onClick={() => {
               if (window.confirm(`${memberName}님의 초대를 취소할까요? 이 초대 링크는 즉시 사용할 수 없게 됩니다.`))
                 mutation.mutate({ kind: 'revoke', id: invite.id })
             }}>초대 취소</button>}

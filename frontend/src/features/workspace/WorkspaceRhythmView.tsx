@@ -161,13 +161,14 @@ export function RhythmView({
       )}
       {timelineItems.length ? (
         <div className="rhythm-timeline">
-          {phases.map((phase, phaseIndex) => (
+          {phases.map((phase, phaseIndex) => {
+            const phaseItems = timelineItems.filter(({ routine, execution }) => (execution?.phase ?? routine?.phase) === phase)
+            return (
             <section className="rhythm-phase" key={phase}>
               <div className="phase-marker"><span>{String(phaseIndex + 1).padStart(2, '0')}</span><h2>{phaseCopy[phase]}</h2></div>
               <div className="phase-content">
-                {timelineItems.filter(({ routine, execution }) => {
-                  return (execution?.phase ?? routine?.phase) === phase
-                }).map(({ id, routine, execution }) => {
+                {phaseItems.length === 0 && <p className="phase-empty">{phaseCopy[phase]}에 할 반복 업무가 없습니다.</p>}
+                {phaseItems.map(({ id, routine, execution }) => {
                   const ownerRoleId = execution?.ownerRoleId ?? routine?.ownerRoleId
                   return (
                     <RoutineRow
@@ -189,7 +190,8 @@ export function RhythmView({
                 })}
               </div>
             </section>
-          ))}
+            )
+          })}
         </div>
       ) : <ActionableEmpty title={archivedRoutines.length ? '사용 중인 반복 업무가 없어요' : '아직 반복 업무가 없어요'} description={archivedRoutines.length ? '보관함에서 다시 필요한 반복 업무를 복원하거나 새 반복 업무를 추가해 주세요.' : '모임마다 반복할 업무와 담당 역할을 정하세요.'} actionLabel={roles.length ? '새 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
       {timelineItems.length > 0 && <button type="button" className="add-routine-line" disabled={changesDisabled} onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}

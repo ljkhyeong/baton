@@ -899,8 +899,11 @@ a {
 
 .secondary-button {
   border: 1px solid var(--rule-strong);
+  color: var(--ink);
   background: var(--paper);
 }
+
+:is([role="alert"], [role="status"]) > .secondary-button { margin-left: 8px; vertical-align: middle; }
 
 .secondary-button:hover { background: #f3f4f6; }
 
@@ -1410,6 +1413,7 @@ a {
 .phase-marker span { color: var(--faint); font-size: 11px; font-weight: 700; }
 .phase-marker h2 { margin: 5px 0 0; font-size: 16px; }
 .phase-content { padding-left: 20px; }
+.phase-empty { margin: 0; padding: 30px 0; color: var(--faint); font-size: 12px; }
 
 .routine-row {
   display: grid;
@@ -2226,7 +2230,8 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   font-size: 11px;
   line-height: 1.65;
 }
-.form-hint { display: block; margin-top: 7px; color: var(--warning); font-size: 11px; }
+.form-hint { display: block; margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.form-hint-warning { color: var(--warning); }
 .form-error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); color: var(--warning); background: var(--warning-soft); font-size: 12px; line-height: 1.55; }
 .form-retry-notice { margin: 0; padding: 10px 12px; border-left: 3px solid var(--success); color: var(--ink); background: var(--success-soft); font-size: 12px; line-height: 1.55; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 5px; }
@@ -2943,12 +2948,13 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .phase-marker { display: flex; align-items: baseline; gap: 10px; padding: 20px 0 10px; border-right: 0; }
   .phase-marker::after { display: none; }
   .phase-content { padding-left: 0; }
+  .phase-empty { padding: 4px 0 16px; }
   .routine-row { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 6px; min-height: 84px; }
   .routine-owner { display: none; }
   .routine-copy { flex-direction: column; align-items: flex-start; gap: 3px; }
   .routine-copy time { max-width: none; text-align: left; }
   .check-button { position: relative; width: 44px; min-height: 44px; border: 0; background: transparent; }
-  .check-button::before { position: absolute; inset: 11px; border: 1px solid var(--rule-strong); border-radius: 5px; content: ""; }
+  .check-button::before { position: absolute; inset: 11px; border: 1px solid var(--rule-strong); border-radius: var(--radius); content: ""; }
   .check-button > svg { position: relative; z-index: 1; }
   .routine-row.completed .check-button { background: transparent; }
   .routine-row.completed .check-button::before { background: var(--success); border-color: var(--success); }

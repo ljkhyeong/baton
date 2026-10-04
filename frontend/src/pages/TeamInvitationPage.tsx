@@ -25,7 +25,7 @@ function InvitationPageContent() {
     <span className="section-kicker">팀 초대</span><h1>팀 초대 확인</h1>
     {!token ? <p>초대 링크를 다시 열어 주세요. 링크에는 유효 기간이 있습니다.</p>
       : session.isPending ? <p role="status">로그인 상태를 확인하고 있습니다.</p>
-        : session.isError ? <p role="alert">{session.error.message} <button type="button" onClick={() => void session.refetch()}>다시 확인</button></p>
+        : session.isError ? <p role="alert">{session.error.message} <button className="secondary-button" type="button" onClick={() => void session.refetch()}>다시 확인</button></p>
           : !session.data?.authenticated ? <>
             <p>초대를 받을 계정으로 로그인한 뒤 팀과 구성원 이름을 확인해 주세요.</p>
             {stored ? <Link to="/login?returnTo=%2Fjoin" className="primary-button">로그인하고 초대 확인</Link>
@@ -43,7 +43,7 @@ function InvitationContent({ accountId, token }: { accountId: string; token: str
     void navigate(`/teams/${value.teamId}/seasons/${value.seasonId}`, { replace: true })
   } })
   if (preview.isPending || preview.isIdle) return <p role="status">초대 내용을 확인하고 있습니다.</p>
-  if (preview.isError) return <div><p role="alert">{preview.error.message} <button type="button" onClick={() => preview.mutate()}>다시 확인</button></p>
+  if (preview.isError) return <div><p role="alert">{preview.error.message} <button className="secondary-button" type="button" onClick={() => preview.mutate()}>다시 확인</button></p>
     <button type="button" className="secondary-button" onClick={() => {
       clearTeamInvitationToken()
       void navigate('/my-teams', { replace: true })

@@ -166,7 +166,7 @@ export function RoutineModal({
           </label>
         </div>
         <p className="form-hint">
-          ‘기한 설명’는 설명용입니다. 지연 여부는 마감 기준일과 시각을 시즌 시간대로 계산합니다.
+          ‘기한 설명’은 설명용입니다. 지연 여부는 마감 기준일과 시각을 시즌 시간대로 계산합니다.
         </p>
         <label>
           <span>세부 설명</span>
