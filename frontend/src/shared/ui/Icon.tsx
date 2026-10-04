@@ -17,11 +17,9 @@ const paths = {
 type IconProps = {
   name: keyof typeof paths
   size?: number
-  strokeWidth?: number
-  className?: string
 }
 
-export function Icon({ name, size = 18, strokeWidth = 1.8, className }: IconProps) {
+export function Icon({ name, size = 18 }: IconProps) {
   return (
     <svg
       width={size}
@@ -29,10 +27,9 @@ export function Icon({ name, size = 18, strokeWidth = 1.8, className }: IconProp
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={strokeWidth}
+      strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={className}
       aria-hidden="true"
     >
       {paths[name]}

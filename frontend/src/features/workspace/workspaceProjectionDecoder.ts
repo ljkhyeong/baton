@@ -16,7 +16,9 @@ import {
   isInstant,
   isJsonObject as isRecord,
   isNullableInstant,
+  isNullableUuid,
   isSameUuid,
+  isStringArray,
   isUuid,
 } from '@/shared/api/responseValidation'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
@@ -25,10 +27,6 @@ const LOCAL_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)
 
 function isNullableString(value: unknown) {
   return value === null || typeof value === 'string'
-}
-
-function isNullableUuid(value: unknown) {
-  return value === null || isUuid(value)
 }
 
 function isNumber(value: unknown): value is number {
@@ -41,10 +39,6 @@ function isNullableNumber(value: unknown): value is number | null {
 
 function isNullableCalendarDate(value: unknown): value is string | null {
   return value === null || isCalendarDate(value)
-}
-
-function isStringArray(value: unknown) {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
 function isUuidArray(value: unknown) {

@@ -1,5 +1,5 @@
 import type { operations } from '@/generated/api'
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
@@ -26,9 +26,8 @@ export function getNotifications(scope: NotificationScope, signal?: AbortSignal)
     decode: value => decode(value, scope) })
 }
 export async function readNotification(scope: NotificationScope, notificationId: string) {
-  const csrf = await getCsrfToken()
   return apiRequest(`${path(scope)}/${encodeURIComponent(notificationId)}/read`, { method: 'POST',
-    headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken },
+    headers: { 'X-Baton-Access-Key': scope.accessKey, ...await csrfHeaders() },
     body: { expectedAccountId: scope.accountId }, decode: value => decode(value, scope) })
 }
 
@@ -46,7 +45,6 @@ export function getNotificationPreferences(accountId: string) {
   return apiRequest('/api/v1/notification-preferences', { method: 'GET', decode: value => decodePreferences(value, accountId) })
 }
 export async function configureNotificationPreferences(accountId: string, request: ConfigurePreferences) {
-  const csrf = await getCsrfToken()
   return apiRequest('/api/v1/notification-preferences', { method: 'POST', body: request,
-    headers: { [csrf.csrfHeaderName]: csrf.csrfToken }, decode: value => decodePreferences(value, accountId) })
+    headers: await csrfHeaders(), decode: value => decodePreferences(value, accountId) })
 }

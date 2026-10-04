@@ -1,7 +1,7 @@
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import { ApiClientError } from '@/shared/api/ApiError'
 import { apiRequest } from '@/shared/api/client'
-import { isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
+import { isJsonObject, isNullableUuid, isSameUuid, isUuid } from '@/shared/api/responseValidation'
 import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarSubscription, CalendarSubscriptionList, CalendarSubscriptionSummary, CalendarListFilters } from './types'
 
 const statuses: CalendarStatus[] = ['NOT_CREATED', 'IN_PROGRESS', 'ACTIVE', 'REISSUE_REQUIRED', 'REVOKED', 'REVOCATION_PENDING']
@@ -31,15 +31,13 @@ export function getCalendarSubscription(scope: CalendarScope, signal: AbortSigna
     headers: { 'X-Baton-Account-Id': scope.accountId }, decode: (value) => decodeStatus(value, scope) })
 }
 export async function issueCalendarSubscription(scope: CalendarScope, rotate: boolean) {
-  const csrf = await getCsrfToken()
   return apiRequest(`${path(scope)}${rotate ? '/rotate' : ''}`, { method: 'POST',
-    headers: { 'X-Baton-Access-Key': scope.accessKey, 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken },
+    headers: { 'X-Baton-Access-Key': scope.accessKey, 'X-Baton-Account-Id': scope.accountId, ...await csrfHeaders() },
     decode: (value) => decodeCredential(value, scope) })
 }
 export async function revokeCalendarSubscription(scope: CalendarScope, signal?: AbortSignal) {
-  const csrf = await getCsrfToken(signal)
   return apiRequest(path(scope), { method: 'DELETE', responseType: 'no-content', signal,
-    headers: { 'X-Baton-Account-Id': scope.accountId, [csrf.csrfHeaderName]: csrf.csrfToken } })
+    headers: { 'X-Baton-Account-Id': scope.accountId, ...await csrfHeaders(signal) } })
 }
 
 const managementStatuses: CalendarSubscriptionSummary['managementStatus'][] = ['CHECK_REQUIRED', 'IN_PROGRESS', 'REVOKED', 'REVOCATION_PENDING']
@@ -48,7 +46,7 @@ export function getCalendarSubscriptions(accountId: string, afterSeasonId: strin
     query: { afterSeasonId, query: filters.query || undefined, includeRevoked: filters.includeRevoked ? undefined : false },
     headers: { 'X-Baton-Account-Id': accountId }, decode: (value): CalendarSubscriptionList => {
       if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Array.isArray(value.subscriptions)
-        || !(value.nextAfterSeasonId === null || isUuid(value.nextAfterSeasonId))) throw invalid()
+        || !isNullableUuid(value.nextAfterSeasonId)) throw invalid()
       const subscriptions = value.subscriptions.map((row): CalendarSubscriptionSummary => {
         if (!isJsonObject(row) || !isUuid(row.subscriptionId) || !isUuid(row.teamId) || !isUuid(row.seasonId)
           || typeof row.teamName !== 'string' || typeof row.seasonName !== 'string'

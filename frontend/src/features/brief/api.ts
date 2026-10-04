@@ -1,7 +1,7 @@
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isUuid, isSameUuid } from '@/shared/api/responseValidation'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, AttentionItem, AttentionPage, AttentionSummary, AttentionTransitions,
   BriefEdition, BriefGeneration, BriefScope, BriefEditionHistory, BriefComparison, BriefSources, BriefReadiness, BriefDeliveryStatus, WeeklyResolutions } from './types'
@@ -161,9 +161,8 @@ export function getLatestEdition(scope: BriefScope, signal: AbortSignal) {
 }
 
 export async function generateEdition(scope: BriefScope): Promise<BriefGeneration> {
-  const csrf = await getCsrfToken()
   return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions`, {
-    method: 'POST', headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken },
+    method: 'POST', headers: { 'X-Baton-Access-Key': scope.accessKey, ...await csrfHeaders() },
     decode: (value) => {
       if (!isJsonObject(value) || !isUuid(value.executionId) || !isUuid(value.editionId)
         || !isPositiveInteger(value.generation) || !isNonNegativeInteger(value.deliveryWatermark) || !isNonNegativeInteger(value.sourceCursor)
@@ -233,12 +232,12 @@ export function compareEditions(scope: BriefScope, fromId: string, toId: string,
 }
 
 export async function queryBriefSources(scope: BriefScope, sources: AttentionCursor[], signal: AbortSignal): Promise<BriefSources> {
-  const csrf = await getCsrfToken()
+  const csrf = await csrfHeaders()
   const result: BriefSources['sources'] = []
   for (let offset = 0; offset < sources.length; offset += 100) {
     const batch = sources.slice(offset, offset + 100)
     const response = await apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/sources/query`, {
-      method: 'POST', signal, headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken }, body: { sources: batch },
+      method: 'POST', signal, headers: { 'X-Baton-Access-Key': scope.accessKey, ...csrf }, body: { sources: batch },
       decode: (value): BriefSources => {
         if (!isJsonObject(value) || !Array.isArray(value.sources) || value.sources.length !== batch.length) throw new Error('현재 업무 정보를 확인할 수 없습니다.')
         return { sources: value.sources.map((source, index) => {

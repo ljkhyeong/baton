@@ -135,7 +135,7 @@ type RoundSelection = {
   roundId: string
   source: 'relevant-default' | 'user'
 }
-type WorkspaceAppProps = WorkspaceScope & {
+type WorkspaceAppProps = Omit<WorkspaceScope, 'accountId'> & {
   accessDeniedAction?: ReactNode
   onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
   onSelectSeason: (seasonId: string, accessKey: string) => void
@@ -181,13 +181,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const scope = { teamId, seasonId, accessKey: currentAccessKey,
     accountId: sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous' }
   const workspaceQuery = useWorkspaceQuery(scope)
-  const briefNavigation = useBriefNavigation(JSON.stringify([
-    teamId, seasonId, currentAccessKey,
-    sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
-  ]))
+  const briefNavigation = useBriefNavigation(JSON.stringify([teamId, seasonId, currentAccessKey, scope.accountId]))
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
-    teamId, seasonId, currentAccessKey,
-    sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous',
+    teamId, seasonId, currentAccessKey, scope.accountId,
     workspaceQuery.error instanceof ApiError && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED',
   ]))
   const preserveConflictDraft = conflictDraftFlow.preserve

@@ -8,7 +8,6 @@ import {
 } from './queries'
 import { useSeasonSuccessorCommand } from './useSeasonSuccessorCommand'
 import type {
-  CreateNextSeasonRequest,
   UpdateRoundScheduleRequest,
   UpdateSeasonRequest,
   WorkspaceProjection,
@@ -149,10 +148,6 @@ export function useWorkspaceSeasonLifecycleFlow({
     })
   }
 
-  const createSuccessor = (request: CreateNextSeasonRequest) => {
-    return successorCommand.submit(request)
-  }
-
   const retrySuccessorCleanup = () => {
     const cleanup = successorCommand.retryCleanup()
     if (cleanup === false) return
@@ -163,7 +158,7 @@ export function useWorkspaceSeasonLifecycleFlow({
 
   return {
     actions: {
-      createSuccessor,
+      createSuccessor: successorCommand.submit,
       openEdit,
       openRoundSchedule,
       openSuccessor,

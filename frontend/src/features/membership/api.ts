@@ -1,4 +1,4 @@
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import {
   decodeClaimedAccountMembershipForScope,
   decodeCurrentAccountMembershipForScope,
@@ -35,13 +35,12 @@ export async function claimAccountMembership(
   request: ClaimAccountMembershipRequest,
   accessKey: string,
 ): Promise<ClaimedAccountMembership> {
-  const csrf = await getCsrfToken()
   return apiRequest(MEMBERSHIP_CLAIM_PATH, {
     method: 'POST',
     body: request,
     headers: {
       [ACCESS_KEY_HEADER]: accessKey,
-      [csrf.csrfHeaderName]: csrf.csrfToken,
+      ...await csrfHeaders(),
     },
     decode: (value) => decodeClaimedAccountMembershipForScope(
       value,

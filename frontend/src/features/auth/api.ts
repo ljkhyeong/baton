@@ -41,8 +41,8 @@ export function getCsrfToken(signal?: AbortSignal): Promise<CsrfToken> {
   })
 }
 
-async function mutationHeaders() {
-  const token = await getCsrfToken()
+export async function csrfHeaders(signal?: AbortSignal) {
+  const token = await getCsrfToken(signal)
   return { [token.csrfHeaderName]: token.csrfToken }
 }
 
@@ -52,7 +52,7 @@ export async function registerLocalAccount(
   return apiRequest(`${AUTH_ROOT}/local/registrations`, {
     method: 'POST',
     body: request,
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     decode: decodeLocalRegistration,
   })
 }
@@ -61,7 +61,7 @@ export async function verifyLocalEmail(token: string, password: string): Promise
   await apiRequest(`${AUTH_ROOT}/local/email-verifications`, {
     method: 'POST',
     body: { token, password },
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     responseType: 'no-content',
   })
 }
@@ -70,7 +70,7 @@ export async function createLocalSession(email: string, password: string): Promi
   await apiRequest(`${AUTH_ROOT}/local/session`, {
     method: 'POST',
     body: new URLSearchParams({ email, password }),
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     responseType: 'no-content',
   })
 }
@@ -78,7 +78,7 @@ export async function createLocalSession(email: string, password: string): Promi
 export async function deleteAuthSession(): Promise<void> {
   await apiRequest(`${AUTH_ROOT}/logout`, {
     method: 'POST',
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     responseType: 'no-content',
   })
 }
@@ -93,7 +93,7 @@ export async function requestPasswordReset(
       email,
       ...(turnstileToken ? { turnstileToken } : {}),
     },
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     decode: decodePasswordResetRequest,
   })
 }
@@ -102,7 +102,7 @@ export async function resetPassword(token: string, password: string): Promise<vo
   await apiRequest(`${AUTH_ROOT}/local/password-resets`, {
     method: 'POST',
     body: { token, password },
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     responseType: 'no-content',
   })
 }
@@ -120,7 +120,7 @@ export async function changeLocalPassword(
   await apiRequest(`${AUTH_ROOT}/local/password-changes`, {
     method: 'POST',
     body: request,
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     responseType: 'no-content',
   })
 }
@@ -128,13 +128,13 @@ export async function changeLocalPassword(
 export async function revokeAccountSessions(): Promise<void> {
   await apiRequest(`${AUTH_ROOT}/session-revocations`, {
     method: 'POST',
-    headers: await mutationHeaders(),
+    headers: await csrfHeaders(),
     responseType: 'no-content',
   })
 }
 
 export async function deactivateAccount(request: AccountDeactivationRequest): Promise<void> {
   await apiRequest(`${AUTH_ROOT}/account-deactivations`, {
-    method: 'POST', body: request, headers: await mutationHeaders(), responseType: 'no-content',
+    method: 'POST', body: request, headers: await csrfHeaders(), responseType: 'no-content',
   })
 }

@@ -1,4 +1,4 @@
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import {
   decodeActiveRoundRoomMappingForScope,
   decodeCurrentRoundRoomMappingsForScope,
@@ -18,10 +18,9 @@ const ROUND_ROOM_MAPPINGS_PATH = '/api/v1/round-room-mappings'
 const ACCESS_KEY_HEADER = 'X-Baton-Access-Key'
 
 async function roundMutationHeaders(accessKey: string) {
-  const csrf = await getCsrfToken()
   return {
     [ACCESS_KEY_HEADER]: accessKey,
-    [csrf.csrfHeaderName]: csrf.csrfToken,
+    ...await csrfHeaders(),
   }
 }
 

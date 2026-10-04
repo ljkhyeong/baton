@@ -8,6 +8,7 @@ import type {
   Season,
   WorkspaceProjection,
 } from '../types'
+import { formatInstant } from '../WorkspaceViews'
 import {
   compareRecordSearchResults,
   isRecordSearchDateRangeValid,
@@ -30,19 +31,6 @@ const kindCopy = {
   handoff: '인수인계',
   resource: '자료',
 } satisfies Record<RecordSearchResult['kind'], string>
-
-function formatRecordTime(value: string | null, timeZone: string) {
-  if (!value) return '작성일을 알 수 없음'
-  const date = new Date(value)
-  return new Intl.DateTimeFormat('ko-KR', {
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'long',
-    timeZone,
-    year: 'numeric',
-  }).format(date)
-}
 
 function resultActionLabel(result: RecordSearchResult) {
   if (result.kind === 'decision') return '결정 기록에서 보기'
@@ -243,7 +231,7 @@ export function RecordSearchView({
                       <span className="record-kind">{kindCopy[result.kind]}</span>
                       <span>{result.originSeason.name}</span>
                       <time dateTime={result.createdAt ?? undefined}>
-                        {formatRecordTime(result.createdAt, result.originSeason.timeZone)}
+                        {result.createdAt ? formatInstant(result.createdAt, result.originSeason.timeZone) : '작성일을 알 수 없음'}
                       </time>
                       {result.archivedAt && <span className="record-archived">보관됨</span>}
                     </div>

@@ -41,3 +41,11 @@ export function isInstant(value: unknown): value is string {
 export function isNullableInstant(value: unknown): value is string | null {
   return value === null || isInstant(value)
 }
+
+export function isNullableUuid(value: unknown): value is string | null {
+  return value === null || isUuid(value)
+}
+
+export function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}

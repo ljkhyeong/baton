@@ -1,4 +1,4 @@
-import { isJsonObject } from '@/shared/api/responseValidation'
+import { isJsonObject, isStringArray } from '@/shared/api/responseValidation'
 import {
   clearMatchingJsonItem,
   readValidatedJson,
@@ -42,10 +42,6 @@ function normalizedRequest(request: CreateNextSeasonRequest) {
     copyRoleIds: request.copyRoleIds.map((id) => id.trim()).sort(),
     copyRoutineIds: request.copyRoutineIds.map((id) => id.trim()).sort(),
   })
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
 function isNormalizedPayload(value: unknown): value is string {

@@ -1,4 +1,4 @@
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { apiRequest } from '@/shared/api/client'
 import { isJsonObject, isSameUuid, isNullableInstant } from '@/shared/api/responseValidation'
@@ -52,10 +52,9 @@ export function getResourceHealth(scope: ResourceHealthScope, signal?: AbortSign
 }
 
 export async function requestResourceCheck(scope: ResourceHealthScope): Promise<ResourceCheck> {
-  const csrf = await getCsrfToken()
   return apiRequest(`${resourcePath(scope)}/check-requests`, {
     method: 'POST',
-    headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken,
+    headers: { 'X-Baton-Access-Key': scope.accessKey, ...await csrfHeaders(),
       ...(scope.accountId && scope.accountId !== 'anonymous' ? { 'X-Baton-Account-Id': scope.accountId } : {}) },
     decode: (value) => {
       if (!isJsonObject(value) || !isSameUuid(value.resourceId, scope.resourceId)

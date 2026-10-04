@@ -1,4 +1,4 @@
-import { getCsrfToken } from '@/features/auth/api'
+import { csrfHeaders } from '@/features/auth/api'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isSameUuid, isUuid } from '@/shared/api/responseValidation'
@@ -34,9 +34,8 @@ export function getVerificationHistory(scope: WorkspaceScope, resourceId: string
     headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: value => decode(value, scope, resourceId) })
 }
 export async function verifyResource(scope: WorkspaceScope, resourceId: string, request: VerifyResourceRequest) {
-  const csrf = await getCsrfToken()
   return apiRequest(path(scope, resourceId), { method: 'POST', body: request,
-    headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken },
+    headers: { 'X-Baton-Access-Key': scope.accessKey, ...await csrfHeaders() },
     decode: value => decode(value, scope, resourceId) })
 }
 
@@ -60,9 +59,8 @@ export function getReviewSchedule(scope: WorkspaceScope, resourceId: string) {
     decode: value => decodeSchedule(value, scope, resourceId) })
 }
 export async function configureReviewSchedule(scope: WorkspaceScope, resourceId: string, request: ConfigureReviewSchedule) {
-  const csrf = await getCsrfToken()
   return apiRequest(`${path(scope, resourceId)}/schedule`, { method: 'POST', body: request,
-    headers: { 'X-Baton-Access-Key': scope.accessKey, [csrf.csrfHeaderName]: csrf.csrfToken },
+    headers: { 'X-Baton-Access-Key': scope.accessKey, ...await csrfHeaders() },
     decode: value => decodeSchedule(value, scope, resourceId) })
 }
 
