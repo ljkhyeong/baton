@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
+
 import com.personal.baton.application.identity.EmailVerificationOutboxDelivery;
 import com.personal.baton.domain.identity.EmailChallengePurpose;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
@@ -400,9 +402,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                 : errorCode.substring(0, MAXIMUM_ERROR_CODE_LENGTH);
     }
 
-    private static LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-    }
 
     private record ClaimCandidate(
             long deliveryId,

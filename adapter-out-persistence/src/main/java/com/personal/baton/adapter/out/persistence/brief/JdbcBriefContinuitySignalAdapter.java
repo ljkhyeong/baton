@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.brief;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
+
 import com.personal.baton.application.brief.BriefContinuityEvent;
 import com.personal.baton.application.brief.BriefContinuitySignalScope;
 import com.personal.baton.application.brief.BriefContinuitySignalState;
@@ -8,7 +10,6 @@ import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -260,7 +261,4 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
         return UUID.fromString(sourceReference.substring(SOURCE_REFERENCE_PREFIX.length()));
     }
 
-    private static LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-    }
 }

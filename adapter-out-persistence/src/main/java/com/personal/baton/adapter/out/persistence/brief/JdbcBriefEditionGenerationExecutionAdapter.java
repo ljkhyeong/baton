@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.brief;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
+
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
 import java.time.Duration;
 import java.time.Instant;
@@ -305,9 +307,6 @@ public class JdbcBriefEditionGenerationExecutionAdapter
         ) == 1;
     }
 
-    private static LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-    }
 
     private record StoredExecution(
             UUID executionId,

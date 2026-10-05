@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.watch;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
+
 import com.personal.baton.application.watch.WatchHealthChangedEvent;
 import com.personal.baton.application.watch.WatchResourceHealth;
 import com.personal.baton.application.watch.port.out.WatchHealthEventInboxPort;
@@ -122,9 +124,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
         );
     }
 
-    private static LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-    }
 
     private static Instant instant(LocalDateTime micros, int nanoRemainder) {
         return micros.toInstant(ZoneOffset.UTC).plusNanos(nanoRemainder);

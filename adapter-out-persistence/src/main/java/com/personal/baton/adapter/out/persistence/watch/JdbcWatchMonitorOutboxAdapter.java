@@ -1,6 +1,6 @@
 package com.personal.baton.adapter.out.persistence.watch;
 
-import static com.personal.baton.adapter.out.persistence.LeasedOutboxTable.utc;
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
 
 import com.personal.baton.adapter.out.persistence.LeasedOutboxTable;
 import com.personal.baton.application.watch.WatchMonitorCandidate;

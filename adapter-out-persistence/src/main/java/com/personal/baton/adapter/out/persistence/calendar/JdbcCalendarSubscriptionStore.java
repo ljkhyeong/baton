@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence.calendar;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
+
 import com.personal.baton.application.calendar.CalendarSubscriptionException;
 import com.personal.baton.application.calendar.CalendarSubscriptionException.Reason;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
@@ -169,5 +171,4 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
                 rs.getBoolean("revoked"), rs.getBoolean("revocation_pending"), lease == null ? null : lease.toInstant(ZoneOffset.UTC));
     }
     private Object[] args(Owner owner) { return new Object[] { owner.accountId().toString(), owner.teamId().toString(), owner.seasonId().toString() }; }
-    private LocalDateTime utc(Instant instant) { return LocalDateTime.ofInstant(instant, ZoneOffset.UTC); }
 }
