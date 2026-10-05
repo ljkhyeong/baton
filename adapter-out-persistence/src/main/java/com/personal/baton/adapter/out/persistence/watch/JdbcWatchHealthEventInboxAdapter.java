@@ -3,10 +3,6 @@ package com.personal.baton.adapter.out.persistence.watch;
 import com.personal.baton.application.watch.WatchHealthChangedEvent;
 import com.personal.baton.application.watch.WatchResourceHealth;
 import com.personal.baton.application.watch.port.out.WatchHealthEventInboxPort;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -19,9 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPort {
-
-    private static final byte PRESENT = 1;
-    private static final byte ABSENT = 0;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -40,7 +33,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
 
         UUID resourceId = event.resourceId();
         Instant persistedAcceptedAt = acceptedAt.truncatedTo(ChronoUnit.MICROS);
-        byte[] fingerprint = fingerprint(event);
         jdbcTemplate.update(
                 """
                 INSERT INTO watch_health_event_inbox (
@@ -54,7 +46,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                     current_health,
                     changed_at,
                     changed_at_nano_remainder,
-                    payload_fingerprint,
                     accepted_at
                 ) VALUES (
                     UUID_TO_BIN(?),
@@ -63,7 +54,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                     ?,
                     ?,
                     UUID_TO_BIN(?),
-                    ?,
                     ?,
                     ?,
                     ?,
@@ -83,15 +73,11 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                 event.currentHealth().name(),
                 utc(event.changedAt().truncatedTo(ChronoUnit.MICROS)),
                 event.changedAt().getNano() % 1_000,
-                fingerprint,
                 utc(persistedAcceptedAt)
         );
 
         StoredEnvelope stored = findForUpdate(event.eventId());
-        WatchHealthEventInboxStatus status = MessageDigest.isEqual(
-                fingerprint,
-                stored.payloadFingerprint()
-        ) && stored.matches(event, resourceId)
+        WatchHealthEventInboxStatus status = stored.matches(event, resourceId)
                 ? WatchHealthEventInboxStatus.ACCEPTED
                 : WatchHealthEventInboxStatus.CONFLICT;
         return new WatchHealthEventInboxResult(status, stored.acceptedAt());
@@ -111,7 +97,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                     current_health,
                     changed_at,
                     changed_at_nano_remainder,
-                    payload_fingerprint,
                     accepted_at
                 FROM watch_health_event_inbox
                 WHERE event_id = UUID_TO_BIN(?)
@@ -130,64 +115,11 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                                 resultSet.getObject("changed_at", LocalDateTime.class),
                                 resultSet.getInt("changed_at_nano_remainder")
                         ),
-                        resultSet.getBytes("payload_fingerprint"),
                         resultSet.getObject("accepted_at", LocalDateTime.class)
                                 .toInstant(ZoneOffset.UTC)
                 ),
                 eventId.toString()
         );
-    }
-
-    private static byte[] fingerprint(WatchHealthChangedEvent event) {
-        MessageDigest digest = sha256();
-        append(digest, uuidBytes(event.eventId()));
-        append(digest, utf8(event.eventType()));
-        append(digest, utf8(event.resourceReference()));
-        append(digest, ByteBuffer.allocate(Long.BYTES)
-                .putLong(event.sourceRevision())
-                .array());
-        append(digest, event.attemptId() == null ? null : uuidBytes(event.attemptId()));
-        append(digest, utf8(event.previousHealth().name()));
-        append(digest, utf8(event.currentHealth().name()));
-        append(digest, ByteBuffer.allocate(Long.BYTES + Integer.BYTES)
-                .putLong(event.changedAt().getEpochSecond())
-                .putInt(event.changedAt().getNano())
-                .array());
-        return digest.digest();
-    }
-
-    private static MessageDigest sha256() {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256을 사용할 수 없습니다", exception);
-        }
-    }
-
-    private static void append(MessageDigest digest, byte[] value) {
-        if (value == null) {
-            digest.update(ABSENT);
-            digest.update(intBytes(0));
-            return;
-        }
-        digest.update(PRESENT);
-        digest.update(intBytes(value.length));
-        digest.update(value);
-    }
-
-    private static byte[] intBytes(int value) {
-        return ByteBuffer.allocate(Integer.BYTES).putInt(value).array();
-    }
-
-    private static byte[] uuidBytes(UUID value) {
-        return ByteBuffer.allocate(Long.BYTES * 2)
-                .putLong(value.getMostSignificantBits())
-                .putLong(value.getLeastSignificantBits())
-                .array();
-    }
-
-    private static byte[] utf8(String value) {
-        return value.getBytes(StandardCharsets.UTF_8);
     }
 
     private static LocalDateTime utc(Instant instant) {
@@ -216,7 +148,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
             WatchResourceHealth previousHealth,
             WatchResourceHealth currentHealth,
             Instant changedAt,
-            byte[] payloadFingerprint,
             Instant acceptedAt
     ) {
 

@@ -761,7 +761,6 @@ CREATE TABLE `watch_health_event_inbox` (
   `current_health` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `changed_at` datetime(6) NOT NULL,
   `changed_at_nano_remainder` smallint NOT NULL,
-  `payload_fingerprint` binary(32) NOT NULL,
   `accepted_at` datetime(6) NOT NULL,
   PRIMARY KEY (`event_id`),
   KEY `idx_watch_health_event_inbox_resource_revision` (`resource_id`,`source_revision`,`changed_at`,`event_id`),

@@ -639,11 +639,10 @@ class IntegrationDeliveryMetricsTest {
                     current_health,
                     changed_at,
                     changed_at_nano_remainder,
-                    payload_fingerprint,
                     accepted_at
                 ) VALUES (
                     UUID_TO_BIN(?), UUID_TO_BIN(?), 'RESOURCE_HEALTH_CHANGED', ?, 1,
-                    'HEALTHY', 'BROKEN', ?, 0, UNHEX(REPEAT('01', 32)), ?
+                    'HEALTHY', 'BROKEN', ?, 0, ?
                 )
                 """,
                 eventId.toString(),

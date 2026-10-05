@@ -125,15 +125,6 @@ class WatchHealthEventInboxPersistenceTest {
                 Integer.class,
                 EVENT_ID.toString()
         )).isEqualTo(789);
-        assertThat(jdbcTemplate.queryForObject(
-                """
-                SELECT OCTET_LENGTH(payload_fingerprint)
-                FROM watch_health_event_inbox
-                WHERE event_id = UUID_TO_BIN(?)
-                """,
-                Integer.class,
-                EVENT_ID.toString()
-        )).isEqualTo(32);
     }
 
     @DisplayName("MySQL DATETIME의 양 끝 changedAt도 나노초까지 저장하고 재생한다")
@@ -294,24 +285,6 @@ class WatchHealthEventInboxPersistenceTest {
                 "SELECT COUNT(*) FROM watch_health_event_inbox",
                 Long.class
         )).isEqualTo(2L);
-    }
-
-    @DisplayName("WATCH envelope fingerprint의 canonical framing을 안정되게 유지한다")
-    @Test
-    void keepsCanonicalFingerprintFramingStable() {
-        inboxPort.accept(baseEvent(), FIRST_ACCEPTED_AT);
-
-        assertThat(jdbcTemplate.queryForObject(
-                """
-                SELECT HEX(payload_fingerprint)
-                FROM watch_health_event_inbox
-                WHERE event_id = UUID_TO_BIN(?)
-                """,
-                String.class,
-                EVENT_ID.toString()
-        )).isEqualTo(
-                "E7F4DB17FFE0E0C10174A39F533BDBF6E7F1CAE1970030844C07F5042CF00A8A"
-        );
     }
 
     @DisplayName("같은 eventId의 canonical envelope 필드가 하나라도 다르면 최초 행을 보존하고 충돌한다")

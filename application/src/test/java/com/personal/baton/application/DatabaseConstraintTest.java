@@ -699,16 +699,14 @@ class DatabaseConstraintTest {
         jdbc.update(
                 "INSERT INTO watch_health_event_inbox ("
                         + "event_id, resource_id, event_type, resource_reference, source_revision, "
-                        + "previous_health, current_health, changed_at, changed_at_nano_remainder, "
-                        + "payload_fingerprint, accepted_at"
+                        + "previous_health, current_health, changed_at, changed_at_nano_remainder, accepted_at"
                         + ") VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), 'RESOURCE_HEALTH_CHANGED', ?, 17, "
-                        + "'DEGRADED', 'BROKEN', ?, ?, ?, ?)",
+                        + "'DEGRADED', 'BROKEN', ?, ?, ?)",
                 newId(),
                 resourceId,
                 "baton-manager:pilot:role-resource:" + resourceId,
                 AT,
                 nanoRemainder,
-                new byte[32],
                 AT.plusMinutes(1)
         );
     }
