@@ -28,6 +28,7 @@ export function RoleInspector({
   progress,
   open,
   overlay,
+  dismissible,
   blocked,
   onClose,
   onOpenHandoff,
@@ -49,6 +50,7 @@ export function RoleInspector({
   progress: number
   open: boolean
   overlay: boolean
+  dismissible: boolean
   blocked: boolean
   onClose: () => void
   onOpenHandoff: () => void
@@ -179,7 +181,7 @@ export function RoleInspector({
 
   return (
     <aside
-      className={`inspector ${open ? 'is-open' : ''}`}
+      className={`inspector ${open ? 'is-open' : ''} ${dismissible ? 'dismissible' : ''}`}
       aria-label={`선택한 역할 상세: ${role.name}`}
     >
       {inspectorContent}

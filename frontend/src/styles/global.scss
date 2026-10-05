@@ -1832,7 +1832,9 @@ dialog.inspector::backdrop {
   backdrop-filter: blur(3px);
 }
 
-.inspector-close { display: none; }
+.inspector-close { position: absolute; top: 20px; right: 19px; display: none; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 50%; background: var(--canvas); cursor: pointer; }
+.inspector.dismissible .inspector-close { display: grid; }
+.inspector.dismissible .inspector-topline { padding-right: 35px; }
 .inspector-topline { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; font-weight: 680; letter-spacing: .05em; }
 .inspector h2 { margin: 20px 0 10px; font-size: 20px; letter-spacing: -.04em; }
 .inspector-purpose { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
@@ -2877,7 +2879,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   }
   .inspector.is-open { transform: translateX(0); }
   dialog.inspector { height: 100%; max-height: none; }
-  .inspector-close { position: absolute; top: 20px; right: 19px; display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 50%; background: var(--canvas); cursor: pointer; }
+  .inspector-close { display: grid; }
   .inspector-topline { padding-right: 35px; }
   .toast { right: 24px; }
 }

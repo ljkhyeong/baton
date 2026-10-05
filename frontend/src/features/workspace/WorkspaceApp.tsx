@@ -830,7 +830,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoutineArchive,
     updateSeasonRoundArchive,
   } = contentActions
+  // 넓은 화면에서는 역할 화면에만 상세를 고정하고, 다른 화면에서는 역할을 눌러 연 경우에만 표시한다.
+  const roleInspectorPinned = view === 'roles'
   const showRoleInspector = Boolean(selectedRole) && view !== 'today'
+    && (inspectorOverlay || roleInspectorPinned || inspectorOpen)
   const workspaceInactive = showRoleInspector && inspectorOverlay && inspectorOpen
 
   return (
@@ -1054,6 +1057,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             progress={handoffProgress(selectedRole.id)}
             open={inspectorOpen}
             overlay={inspectorOverlay}
+            dismissible={!roleInspectorPinned}
             blocked={Boolean(modal)}
             onClose={() => dismissInspector(true)}
             onAddResource={openRoleResourceModal}
