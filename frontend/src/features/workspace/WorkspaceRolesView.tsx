@@ -7,6 +7,7 @@ import {
 } from './WorkspaceViews'
 import {
   getMember,
+  isActiveMember,
   latestRoleHandoff,
   memberDisplayName,
 } from './workspacePresentation'
@@ -40,6 +41,7 @@ export function RolesView({
   return (
     <>
       <PageHeader
+        eyebrow={`역할 ${roles.length}개 · 활동 중인 구성원 ${members.filter(isActiveMember).length}명`}
         title="역할과 담당자"
         description="현재 담당자와 다음 담당자, 담당 업무를 확인하세요."
         action={(

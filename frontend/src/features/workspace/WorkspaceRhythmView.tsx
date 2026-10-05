@@ -1,5 +1,4 @@
 import { formatInstant, formatLocalTime } from '@/shared/lib/dateTimeFormat'
-import { Icon } from '@/shared/ui/Icon'
 import { PublicHolidayPanel } from '@/features/calendar/PublicHolidayPanel'
 import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
 import {
@@ -75,7 +74,7 @@ export function RhythmView({
     && routines.length === 0
   return (
     <>
-      <PageHeader title="일정" description="회차와 단계별 반복 업무를 관리하고 회차별 완료 여부를 확인합니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
+      <PageHeader eyebrow={`반복 업무 ${routines.length}개 · 회차 ${rounds.length}개`} title="일정" description="회차와 단계별 반복 업무를 관리하고 회차별 완료 여부를 확인합니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
       <section
         className={`round-schedule-card ${season.roundSchedule?.enabled ? 'active' : ''}`}
         aria-labelledby="round-schedule-title"
@@ -193,7 +192,6 @@ export function RhythmView({
           })}
         </div>
       ) : <ActionableEmpty icon="rhythm" title={archivedRoutines.length ? '사용 중인 반복 업무가 없어요' : '아직 반복 업무가 없어요'} description={archivedRoutines.length ? '보관함에서 다시 필요한 반복 업무를 복원하거나 새 반복 업무를 추가해 주세요.' : '모임마다 반복할 업무와 담당 역할을 정하세요.'} actionLabel={roles.length ? '새 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
-      {timelineItems.length > 0 && <button type="button" className="add-routine-line" disabled={changesDisabled} onClick={onAddRoutine}><Icon name="plus" size={15} /> 반복할 일 추가하기</button>}
       {archivedRoutines.length > 0 && (
         <details className="archive-shelf routine-archive-shelf">
           <summary>보관한 반복 업무 {archivedRoutines.length}개</summary>

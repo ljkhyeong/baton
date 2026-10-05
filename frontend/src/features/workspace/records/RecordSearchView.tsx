@@ -92,13 +92,6 @@ export function RecordSearchView({
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <h1>기록 검색</h1>
-          <p>선택한 시즌의 결정·인수인계·자료를 검색합니다.</p>
-        </div>
-      </header>
-
       <form
         className="record-search-panel"
         role="search"
@@ -184,16 +177,17 @@ export function RecordSearchView({
             날짜는 각 시즌의 시간대를 기준으로 검색합니다. 현재 시즌의 시간대는 <strong>{season.timeZone}</strong>입니다.
           </p>
         </details>
-        <div className="record-search-footer">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={!hasFilters}
-            onClick={() => onFiltersChange(initialRecordSearchFilters)}
-          >
-            검색 조건 지우기
-          </button>
-        </div>
+        {hasFilters && (
+          <div className="record-search-footer">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => onFiltersChange(initialRecordSearchFilters)}
+            >
+              검색 조건 지우기
+            </button>
+          </div>
+        )}
       </form>
 
       {!validDateRange ? (
@@ -204,11 +198,10 @@ export function RecordSearchView({
         <section className="record-search-results" aria-labelledby="record-search-result-title">
           <div className="record-search-summary">
             <div>
-              <span className="section-kicker">최근 기록</span>
               <h2 id="record-search-result-title">{partial ? '불러온 시즌에서 ' : ''}{results.length}개의 기록을 찾았어요</h2>
             </div>
             <p aria-live="polite" aria-atomic="true">
-              검색 결과 {results.length}개. 최신 기록부터 표시합니다.
+              <span className="visually-hidden">검색 결과 {results.length}개. </span>최신 기록부터 표시합니다.
             </p>
           </div>
 

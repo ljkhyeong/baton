@@ -22,7 +22,7 @@ type Props = { navigation: BriefNavigation; workspace: WorkspaceProjection; acce
 export function BriefAttentionPanel(props: Props) {
   const { selection, update } = props.navigation
   return <details className="brief-attention" open={selection.open} onToggle={(event) => update({ open: event.currentTarget.open })}>
-    <summary>주간 업무 점검</summary>
+    <summary><strong>주간 업무 점검</strong><span>이번 주 담당 공백·지연 항목</span></summary>
     {selection.open && <BriefAttentionAccess {...props} />}
   </details>
 }

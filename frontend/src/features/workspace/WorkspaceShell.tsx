@@ -4,6 +4,7 @@ import '@/features/team-access/my-teams.scss'
 import { Icon } from '@/shared/ui/Icon'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { seasonProgress } from './seasonCalendar'
+import { PageHeader, PrimaryButton } from './WorkspaceViews'
 import { formatLocalDate, isActiveMember } from './workspacePresentation'
 import type { ViewKey, WorkspaceProjection } from './types'
 
@@ -30,11 +31,7 @@ function navKey(view: ViewKey): ViewKey {
 }
 
 function formatSyncTime(value: number) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(value))
+  return new Intl.DateTimeFormat('ko-KR', { timeStyle: 'short' }).format(new Date(value))
 }
 
 export function WorkspaceState({
@@ -119,7 +116,7 @@ export function Sidebar({
         </div>
         <div className="profile-row">
           <span className="avatar avatar-dark">{activeMemberCount}</span>
-          <span><strong>{activeMemberCount}명 활동 중</strong><small>{workspace.season.name}</small></span>
+          <span><strong>구성원 {activeMemberCount}명</strong><small>활동 중</small></span>
           <span className="profile-actions">
             <button type="button" onClick={onShare} title="작업 공간 공유">공유</button>
             <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
@@ -190,7 +187,37 @@ export function MobileNav({
   )
 }
 
-export function RecordsSwitch({
+export function RecordsHeader({
+  view,
+  decisionCount,
+  createDisabled,
+  onOpenDecision,
+  onNavigate,
+}: {
+  view: ViewKey
+  decisionCount: number
+  createDisabled: boolean
+  onOpenDecision: () => void
+  onNavigate: (key: ViewKey) => void
+}) {
+  return (
+    <>
+      <PageHeader
+        eyebrow={`결정 ${decisionCount}개`}
+        title="기록"
+        description={view === 'records'
+          ? '결정·인수인계·자료를 시즌별로 다시 찾습니다.'
+          : '결정한 내용과 이유, 검토한 대안을 남깁니다.'}
+        action={view === 'memory'
+          ? <PrimaryButton onClick={onOpenDecision} disabled={createDisabled}>결정 남기기</PrimaryButton>
+          : undefined}
+      />
+      <RecordsSwitch view={view} onNavigate={onNavigate} />
+    </>
+  )
+}
+
+function RecordsSwitch({
   view,
   onNavigate,
 }: {

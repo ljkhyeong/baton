@@ -46,7 +46,7 @@ export function ModalShell({
   title,
   description,
   className,
-  kicker = 'BATON',
+  kicker,
   closeDisabled = false,
   closeGuardRef,
   initialFocusRef,
@@ -117,7 +117,7 @@ export function ModalShell({
         >
           <Icon name="close" />
         </button>
-        <span className="section-kicker">{kicker}</span>
+        {kicker && <span className="section-kicker">{kicker}</span>}
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId} className="modal-description">{description}</p>
         {children}

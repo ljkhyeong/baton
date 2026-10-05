@@ -5,7 +5,6 @@ import { nearestRelayRole, RelayCard } from './WorkspaceRelayCard'
 import {
   ActionableEmpty,
   PageHeader,
-  PrimaryButton,
   RoundControl,
   RoutineRow,
   routineTimelineItems,
@@ -107,12 +106,16 @@ export function TodayView({
   return (
     <>
       <PageHeader
-        eyebrow={`${calendarLabel} · ${season.name}`}
+        eyebrow={calendarLabel}
         title={`남은 업무 ${pendingCount}개`}
         description={roundComplete
           ? '이번 회차 업무를 모두 끝냈어요. 다음 회차와 인수인계를 준비하세요.'
           : '끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요.'}
-        action={<PrimaryButton onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>{roles.length ? '업무 추가' : '역할 추가'}</PrimaryButton>}
+        action={(
+          <button type="button" className="secondary-button" onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>
+            <Icon name="plus" size={15} />{roles.length ? '업무 추가' : '역할 추가'}
+          </button>
+        )}
       />
       {selectedRound && (
         <dl className="today-summary">
@@ -129,7 +132,7 @@ export function TodayView({
             <dd>
               {signalCount
                 ? <button type="button" className="summary-jump" aria-label={`조치할 항목 ${signalCount}건 보기`} onClick={openSignals}>{signalCount}건<Icon name="chevron" size={16} /></button>
-                : '없음'}
+                : '0건'}
               <small>역할·인수인계 점검</small>
             </dd>
           </div>
@@ -250,11 +253,13 @@ export function TodayView({
           </section>
         </div>
       )}
-      <details className="today-secondary">
-        <summary>내 업무와 확인할 자료</summary>
-        <div className="today-support">{personalWork}</div>
-      </details>
-      {weeklyBrief}
+      <div className="today-more">
+        <details className="today-secondary">
+          <summary><strong>내 업무와 확인할 자료</strong><span>내가 맡은 업무와 재확인할 자료</span></summary>
+          <div className="today-support">{personalWork}</div>
+        </details>
+        {weeklyBrief}
+      </div>
     </>
   )
 }

@@ -119,15 +119,17 @@ export function DecisionModal({
         </label>
         <fieldset className="decision-text-editor">
           <legend>결정 이유와 대안</legend>
-          <label>
-            <span>본문 형식</span>
-            <select value={textFormat} onChange={(event) => setTextFormat(event.target.value as 'PLAIN_TEXT' | 'MARKDOWN')}>
-              <option value="PLAIN_TEXT">일반 텍스트</option>
-              <option value="MARKDOWN">Markdown</option>
-            </select>
-          </label>
-          <button type="button" className="decision-preview-toggle" aria-pressed={preview}
-            onClick={() => setPreview(!preview)}>{preview ? '본문 편집' : '미리보기'}</button>
+          <div className="decision-editor-tools">
+            <label>
+              <span>본문 형식</span>
+              <select value={textFormat} onChange={(event) => setTextFormat(event.target.value as 'PLAIN_TEXT' | 'MARKDOWN')}>
+                <option value="PLAIN_TEXT">일반 텍스트</option>
+                <option value="MARKDOWN">Markdown</option>
+              </select>
+            </label>
+            <button type="button" className="decision-preview-toggle" aria-pressed={preview}
+              onClick={() => setPreview(!preview)}>{preview ? '본문 편집' : '미리보기'}</button>
+          </div>
           {preview ? <div className="decision-preview" aria-label="결정 본문 미리보기">
             <strong>이유</strong><DecisionText text={reason || '이유를 입력해 주세요.'} format={textFormat} />
             <strong>검토한 대안</strong><DecisionText text={alternative || '아직 대안을 입력하지 않았습니다.'} format={textFormat} />

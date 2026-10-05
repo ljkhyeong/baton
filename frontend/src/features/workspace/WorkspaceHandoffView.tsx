@@ -6,7 +6,6 @@ import {
   ActionableEmpty,
   formatDateRange,
   PageHeader,
-  PrimaryButton,
 } from './WorkspaceViews'
 import {
   categoryCopy,
@@ -130,7 +129,7 @@ export function HandoffView({
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="역할 인수인계"
         description="담당 업무와 참고 자료를 정리해 다음 담당자에게 전달합니다."
-        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><PrimaryButton onClick={onPreview} icon={false}>인수인계 문서 미리보기</PrimaryButton></div>}
+        action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><button type="button" className="secondary-button" onClick={onPreview}>인수인계 문서 미리보기</button></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 인수인계" aria-orientation="horizontal">
         {roles.map((role, index) => {

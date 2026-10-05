@@ -105,7 +105,7 @@ import {
   ContentCreationCleanupBanner,
   MobileNav,
   MobileTopbar,
-  RecordsSwitch,
+  RecordsHeader,
   Sidebar,
   WorkspaceState,
   WorkspaceSyncStatus,
@@ -117,7 +117,7 @@ import { MemoryView } from './WorkspaceMemoryView'
 import { RhythmView } from './WorkspaceRhythmView'
 import { RolesView } from './WorkspaceRolesView'
 import { formatPilotToday, pilotCalendarDate } from './seasonCalendar'
-import { latestRoleHandoff, mutationError } from './workspacePresentation'
+import { isActiveMember, latestRoleHandoff, mutationError } from './workspacePresentation'
 import {
   createWorkspaceEditorActions,
   type WorkspaceEditor,
@@ -849,9 +849,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <main className="main-surface" tabIndex={-1}>
           <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
         <div className="workspace-toolbar">
-          <div className="workspace-breadcrumb" aria-label="현재 작업 공간">
-            <span>{workspace.team.name}</span><span aria-hidden="true">/</span><span>{workspace.season.name}</span>
-          </div>
           <button type="button" className="workspace-search-button" onClick={() => openView('records')}>
             <Icon name="search" size={16} />기록 검색
           </button>
@@ -985,7 +982,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             />
           )}
           {(view === 'memory' || view === 'records') && (
-            <RecordsSwitch view={view} onNavigate={openView} />
+            <RecordsHeader
+              view={view}
+              decisionCount={activeDecisions.length}
+              createDisabled={contentChangesDisabled || !roles.length || !members.some(isActiveMember)}
+              onOpenDecision={openDecisionModal}
+              onNavigate={openView}
+            />
           )}
           {view === 'memory' && (
             <MemoryView

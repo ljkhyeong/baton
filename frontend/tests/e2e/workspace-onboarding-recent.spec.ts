@@ -50,7 +50,7 @@ test.describe('조직 달력 날짜 경계', () => {
     await openSharedWorkspace(page)
 
     await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText(
-      '7월 1일 수요일 · 2026 여름 시즌',
+      '7월 1일 수요일',
     )
   })
 
@@ -97,7 +97,7 @@ test.describe('조직 달력 날짜 경계', () => {
     await openSharedWorkspace(page)
 
     await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText(
-      '9월 18일 금요일 · 2026 여름 시즌',
+      '9월 18일 금요일',
     )
     await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
 
