@@ -171,6 +171,26 @@ function invalidateUnlessContentConflict(invalidate: () => Promise<void>) {
   }
 }
 
+type WorkspaceCommandOptions = {
+  // 시즌 목록·구성원처럼 팀의 다른 시즌 화면에도 보이는 변경
+  teamWide?: boolean
+  // 수정 충돌이면 충돌 복구 흐름이 최신 내용을 보여 줄 때까지 다시 불러오지 않는다.
+  keepOnContentConflict?: boolean
+}
+
+function useWorkspaceCommand<TVariables, TData>(
+  scope: WorkspaceScope,
+  mutationFn: (variables: TVariables) => Promise<TData>,
+  { teamWide = false, keepOnContentConflict = false }: WorkspaceCommandOptions = {},
+) {
+  const { invalidate, invalidateTeam } = useInvalidateWorkspace(scope)
+  const refresh = teamWide ? invalidateTeam : invalidate
+  return useWorkspaceMutation<TData, Error, TVariables>(scope, {
+    mutationFn,
+    onSettled: keepOnContentConflict ? invalidateUnlessContentConflict(refresh) : refresh,
+  })
+}
+
 export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
   const queryClient = useQueryClient()
 
@@ -189,193 +209,162 @@ export function useRotateAccessKeyMutation(scope: WorkspaceScope) {
 }
 
 export function useUpdateSeasonMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: (request: UpdateSeasonRequest) => updateSeason(scope, request),
-    onSettled: invalidateUnlessContentConflict(invalidateTeam),
-  })
+  return useWorkspaceCommand(
+    scope,
+    (request: UpdateSeasonRequest) => updateSeason(scope, request),
+    { teamWide: true, keepOnContentConflict: true },
+  )
 }
 
 export function useUpdateRoundScheduleMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: (request: UpdateRoundScheduleRequest) =>
-      updateRoundSchedule(scope, request),
-    onSettled: invalidateUnlessContentConflict(invalidateTeam),
-  })
+  return useWorkspaceCommand(
+    scope,
+    (request: UpdateRoundScheduleRequest) => updateRoundSchedule(scope, request),
+    { teamWide: true, keepOnContentConflict: true },
+  )
 }
 
 export function useUpdateSeasonEndingMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: (request: UpdateSeasonEndingRequest) =>
-      updateSeasonEnding(scope, request),
-    onSettled: invalidateUnlessContentConflict(invalidateTeam),
-  })
+  return useWorkspaceCommand(
+    scope,
+    (request: UpdateSeasonEndingRequest) => updateSeasonEnding(scope, request),
+    { teamWide: true, keepOnContentConflict: true },
+  )
 }
 
 export function useCreateNextSeasonMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({
-      request,
-      idempotencyKey,
-    }: IdempotentCreateCommand<CreateNextSeasonRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateNextSeasonRequest>) =>
       createNextSeason(scope, request, idempotencyKey),
-    onSettled: invalidateTeam,
-  })
+    { teamWide: true },
+  )
 }
 
 export function useCreateRoleMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleRequest>) =>
       createRole(scope, request, idempotencyKey),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useCreateMemberMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
       createMember(scope, request, idempotencyKey),
-    onSettled: invalidateTeam,
-  })
+    { teamWide: true },
+  )
 }
 
 export function useUpdateMemberMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateMemberRequest>) =>
-      updateMember(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidateTeam),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateMemberRequest>) => updateMember(scope, id, request),
+    { teamWide: true, keepOnContentConflict: true },
+  )
 }
 
 export function useUpdateMemberDeactivationMutation(scope: WorkspaceScope) {
-  const { invalidateTeam } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateMemberDeactivationRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateMemberDeactivationRequest>) =>
       updateMemberDeactivation(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidateTeam),
-  })
+    { teamWide: true, keepOnContentConflict: true },
+  )
 }
 
 export function useUpdateRoleMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateRoleRequest>) =>
-      updateRole(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateRoleRequest>) => updateRole(scope, id, request),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({
-      request,
+  return useWorkspaceCommand(
+    scope,
+    ({
+      request: { roleId, ...body },
       idempotencyKey,
-    }: IdempotentCreateCommand<PrepareRoleHandoffCommandRequest>) => {
-      const { roleId, ...body } = request
-      return prepareRoleHandoff(scope, roleId, body, idempotencyKey)
-    },
-    onSettled: invalidate,
-  })
+    }: IdempotentCreateCommand<PrepareRoleHandoffCommandRequest>) =>
+      prepareRoleHandoff(scope, roleId, body, idempotencyKey),
+  )
 }
 
 export function useTransferRoleHandoffMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({
-      roleId,
-      handoffId,
-      request,
-    }: RoleHandoffTransitionCommand<TransferRoleHandoffRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ roleId, handoffId, request }: RoleHandoffTransitionCommand<TransferRoleHandoffRequest>) =>
       transferRoleHandoff(scope, roleId, handoffId, request),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useAcceptRoleHandoffMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({
-      roleId,
-      handoffId,
-      request,
-    }: RoleHandoffTransitionCommand<ConfirmRoleHandoffRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ roleId, handoffId, request }: RoleHandoffTransitionCommand<ConfirmRoleHandoffRequest>) =>
       acceptRoleHandoff(scope, roleId, handoffId, request),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useCancelRoleHandoffMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({
-      roleId,
-      handoffId,
-      request,
-    }: RoleHandoffTransitionCommand<CancelRoleHandoffRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ roleId, handoffId, request }: RoleHandoffTransitionCommand<CancelRoleHandoffRequest>) =>
       cancelRoleHandoff(scope, roleId, handoffId, request),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useCreateRoutineMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoutineRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoutineRequest>) =>
       createRoutine(scope, request, idempotencyKey),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useUpdateRoutineMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateRoutineRequest>) =>
-      updateRoutine(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateRoutineRequest>) => updateRoutine(scope, id, request),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useRoutineArchiveMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, archived }: ArchiveCommand) =>
-      setRoutineArchived(scope, id, archived),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, archived }: ArchiveCommand) => setRoutineArchived(scope, id, archived),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateSeasonRoundRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateSeasonRoundRequest>) =>
       createSeasonRound(scope, request, idempotencyKey),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useUpdateSeasonRoundMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateSeasonRoundRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateSeasonRoundRequest>) =>
       updateSeasonRound(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useSeasonRoundArchiveMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, archived }: ArchiveCommand) =>
-      setSeasonRoundArchived(scope, id, archived),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, archived }: ArchiveCommand) => setSeasonRoundArchived(scope, id, archived),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
@@ -410,47 +399,44 @@ export function useRoutineExecutionCompletionMutation(scope: WorkspaceScope) {
 }
 
 export function useCreateDecisionMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateDecisionRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateDecisionRequest>) =>
       createDecision(scope, request, idempotencyKey),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useUpdateDecisionMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateDecisionRequest>) =>
-      updateDecision(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateDecisionRequest>) => updateDecision(scope, id, request),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useDecisionArchiveMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, archived }: ArchiveCommand) => setDecisionArchived(scope, id, archived),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, archived }: ArchiveCommand) => setDecisionArchived(scope, id, archived),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateHandoffItemRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateHandoffItemRequest>) =>
       createHandoffItem(scope, request, idempotencyKey),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useUpdateHandoffItemMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateHandoffItemRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateHandoffItemRequest>) =>
       updateHandoffItem(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useHandoffCompletionMutation(scope: WorkspaceScope) {
@@ -487,37 +473,34 @@ export function useHandoffCompletionMutation(scope: WorkspaceScope) {
 }
 
 export function useHandoffItemArchiveMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, archived }: ArchiveCommand) =>
-      setHandoffItemArchived(scope, id, archived),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, archived }: ArchiveCommand) => setHandoffItemArchived(scope, id, archived),
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useCreateRoleResourceMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleResourceRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleResourceRequest>) =>
       createRoleResource(scope, request, idempotencyKey),
-    onSettled: invalidate,
-  })
+  )
 }
 
 export function useUpdateRoleResourceMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, request }: UpdateCommand<UpdateRoleResourceRequest>) =>
+  return useWorkspaceCommand(
+    scope,
+    ({ id, request }: UpdateCommand<UpdateRoleResourceRequest>) =>
       updateRoleResource(scope, id, request),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+    { keepOnContentConflict: true },
+  )
 }
 
 export function useRoleResourceArchiveMutation(scope: WorkspaceScope) {
-  const { invalidate } = useInvalidateWorkspace(scope)
-  return useWorkspaceMutation(scope, {
-    mutationFn: ({ id, archived }: ArchiveCommand) =>
-      setRoleResourceArchived(scope, id, archived),
-    onSettled: invalidateUnlessContentConflict(invalidate),
-  })
+  return useWorkspaceCommand(
+    scope,
+    ({ id, archived }: ArchiveCommand) => setRoleResourceArchived(scope, id, archived),
+    { keepOnContentConflict: true },
+  )
 }
