@@ -173,6 +173,39 @@ test('@responsive 모바일 역할 상세는 닫힌 대화상자 접근을 차�
   await expect(opener).toBeFocused()
 })
 
+test('@responsive 어두운 화면 설정에서 색 토큰을 바꾸고 글자와 주 버튼 대비를 유지한다', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  const palette = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement)
+    const color = (name: string) => style.getPropertyValue(name).trim()
+    return {
+      background: style.backgroundColor,
+      canvas: color('--canvas'),
+      paper: color('--paper'),
+      ink: color('--ink'),
+      muted: color('--muted'),
+      faint: color('--faint'),
+      onInk: color('--on-ink'),
+      success: color('--success'),
+      warning: color('--warning'),
+      warningSoft: color('--warning-soft'),
+      focusRing: color('--focus-ring'),
+    }
+  })
+
+  expect(palette.background).toBe('rgb(15, 18, 22)')
+  expect(contrastRatio(palette.ink, palette.paper)).toBeGreaterThanOrEqual(7)
+  expect(contrastRatio(palette.muted, palette.paper)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.faint, palette.canvas)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.onInk, palette.ink)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.onInk, palette.success)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.warning, palette.warningSoft)).toBeGreaterThanOrEqual(4.5)
+  expect(contrastRatio(palette.focusRing, palette.canvas)).toBeGreaterThanOrEqual(3)
+})
+
 test('@responsive 보조 문구와 경고 및 키보드 초점 대비를 유지한다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
   initialProjection.rounds.find((round) => round.id === ROUND_ONE_ID)!.archivedAt = '2026-07-21T12:00:00Z'

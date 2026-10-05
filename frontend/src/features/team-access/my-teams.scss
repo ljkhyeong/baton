@@ -10,7 +10,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 0 32px;
-  background: rgba(242, 244, 246, .92);
+  background: var(--canvas-translucent);
   backdrop-filter: saturate(1.4) blur(8px);
 }
 .account-topbar .brand { padding: 0; color: var(--ink); text-decoration: none; }
