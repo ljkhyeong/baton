@@ -294,8 +294,8 @@ class CalendarSeasonMetadataMaintenanceTest {
     private UUID insertSeason(int index, String name) {
         UUID id = seasonId(index);
         jdbc.update("""
-                INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at)
-                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, '2026-08-01', '2026-08-31', UTC_TIMESTAMP(6))
+                INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at, time_zone)
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, '2026-08-01', '2026-08-31', UTC_TIMESTAMP(6), 'Asia/Seoul')
                 """, id.toString(), TEAM_ID.toString(), name);
         return id;
     }

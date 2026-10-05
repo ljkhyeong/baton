@@ -629,8 +629,8 @@ class WatchMonitorOutboxPersistenceTest {
 
     private void insertSeason(UUID seasonId, UUID teamId, String name, LocalDateTime endedAt) {
         jdbcTemplate.update(
-                "INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at) "
-                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?)",
+                "INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at, time_zone) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?, 'Asia/Seoul')",
                 seasonId.toString(),
                 teamId.toString(),
                 name,

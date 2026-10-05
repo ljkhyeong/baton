@@ -103,8 +103,8 @@ class CalendarSubscriptionServiceTest {
             UUID seasonId = UUID.randomUUID();
             seasons.add(seasonId);
             jdbc.update("""
-                    INSERT INTO seasons (id,team_id,name,start_date,end_date,ended_at)
-                    VALUES (UUID_TO_BIN(?),UUID_TO_BIN(?),?,'2026-08-01','2026-08-31','2026-09-01')
+                    INSERT INTO seasons (id,team_id,name,start_date,end_date,ended_at,time_zone)
+                    VALUES (UUID_TO_BIN(?),UUID_TO_BIN(?),?,'2026-08-01','2026-08-31','2026-09-01','Asia/Seoul')
                     """, seasonId.toString(), scope.teamId().toString(), "지난 시즌 " + index);
             var claim = store.claim(new Owner(scope.accountId(), scope.teamId(), seasonId), true, false, NOW);
             store.release(claim, false);

@@ -1,7 +1,0 @@
-ALTER TABLE decisions
-    ADD COLUMN archived_at DATETIME(6) NULL,
-    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
-
-ALTER TABLE handoff_items
-    ADD COLUMN archived_at DATETIME(6) NULL,
-    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

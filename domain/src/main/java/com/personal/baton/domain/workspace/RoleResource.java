@@ -33,7 +33,7 @@ public class RoleResource {
     @Column(length = 1000)
     private String description;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "archived_at")

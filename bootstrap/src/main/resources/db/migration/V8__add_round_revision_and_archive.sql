@@ -1,3 +1,0 @@
-ALTER TABLE season_rounds
-    ADD COLUMN archived_at DATETIME(6) NULL,
-    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

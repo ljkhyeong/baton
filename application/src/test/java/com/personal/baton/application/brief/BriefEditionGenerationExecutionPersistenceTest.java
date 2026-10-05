@@ -79,10 +79,10 @@ class BriefEditionGenerationExecutionPersistenceTest {
         );
         jdbcTemplate.update(
                 """
-                INSERT INTO seasons (id, team_id, name, start_date, end_date)
+                INSERT INTO seasons (id, team_id, name, start_date, end_date, time_zone)
                 VALUES (
                     UUID_TO_BIN(?), UUID_TO_BIN(?), 'BRIEF 실행 시즌',
-                    '2026-08-01', '2026-09-30'
+                    '2026-08-01', '2026-09-30', 'Asia/Seoul'
                 )
                 """,
                 SEASON_ID.toString(),

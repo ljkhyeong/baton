@@ -40,7 +40,7 @@ public class SeasonRound {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(name = "meeting_date")
+    @Column(name = "meeting_date", nullable = false)
     private LocalDate meetingDate;
 
     @Enumerated(EnumType.STRING)
