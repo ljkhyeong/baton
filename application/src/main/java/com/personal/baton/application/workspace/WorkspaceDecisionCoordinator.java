@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -71,14 +72,18 @@ final class WorkspaceDecisionCoordinator {
                 seasonId,
                 ContentCreationOperation.DECISION,
                 idempotencyKey,
-                contentIdempotency.fingerprintDecisionRequest(teamId, seasonId, decision),
-                decision.getId()
+                decision.getId(),
+                decision.getTitle(),
+                decision.getReason(),
+                decision.getAlternative(),
+                decision.getAuthorMemberId(),
+                decision.getRoleIds(),
+                decision.getTextFormat()
         );
-        if (attempt.replayResourceId() != null) {
-            Decision existing = recordsRepository.findDecisionById(attempt.replayResourceId())
-                    .filter(found -> found.getSeasonId().equals(seasonId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.DECISION));
+        Optional<Decision> replayed = attempt.replay(id -> recordsRepository.findDecisionById(id)
+                .filter(found -> found.getSeasonId().equals(seasonId)));
+        if (replayed.isPresent()) {
+            Decision existing = replayed.get();
             Member existingAuthor = memberResolver.requireMember(
                     teamId,
                     existing.getAuthorMemberId()

@@ -11,6 +11,7 @@ import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.HandoffItem;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -61,16 +62,15 @@ final class WorkspaceHandoffItemCoordinator {
                 seasonId,
                 ContentCreationOperation.HANDOFF_ITEM,
                 idempotencyKey,
-                contentIdempotency.fingerprintHandoffItemRequest(teamId, seasonId, item),
-                item.getId()
+                item.getId(),
+                item.getRoleId(),
+                item.getLabel(),
+                item.getCategory()
         );
-        if (attempt.replayResourceId() != null) {
-            HandoffItem existing = recordsRepository.findHandoffItemById(attempt.replayResourceId())
-                    .orElseThrow(() -> contentIdempotency.missingResource(
-                            ContentCreationOperation.HANDOFF_ITEM
-                    ));
-            roleResolver.requireRole(teamId, seasonId, existing.getRoleId());
-            return resultMapper.toHandoffItemResult(existing);
+        Optional<HandoffItem> replayed = attempt.replay(recordsRepository::findHandoffItemById);
+        if (replayed.isPresent()) {
+            roleResolver.requireRole(teamId, seasonId, replayed.get().getRoleId());
+            return resultMapper.toHandoffItemResult(replayed.get());
         }
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
         contentIdempotency.reserve(attempt);

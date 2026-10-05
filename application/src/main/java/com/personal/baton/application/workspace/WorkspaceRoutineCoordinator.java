@@ -12,6 +12,7 @@ import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -66,16 +67,20 @@ final class WorkspaceRoutineCoordinator {
                 seasonId,
                 ContentCreationOperation.ROUTINE,
                 idempotencyKey,
-                contentIdempotency.fingerprintRoutineRequest(teamId, seasonId, routine),
-                routine.getId()
+                routine.getId(),
+                routine.getTitle(),
+                routine.getPhase(),
+                routine.getDueLabel(),
+                routine.getOwnerRoleId(),
+                routine.getDetail(),
+                routine.getDeadlineDayOffset(),
+                routine.getDeadlineTime()
         );
-        if (attempt.replayResourceId() != null) {
-            Routine existing = repository.findRoutineById(attempt.replayResourceId())
-                    .filter(found -> found.getSeasonId().equals(seasonId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.ROUTINE));
-            roleResolver.requireRole(teamId, seasonId, existing.getOwnerRoleId());
-            return resultMapper.toRoutineResult(existing);
+        Optional<Routine> replayed = attempt.replay(id -> repository.findRoutineById(id)
+                .filter(found -> found.getSeasonId().equals(seasonId)));
+        if (replayed.isPresent()) {
+            roleResolver.requireRole(teamId, seasonId, replayed.get().getOwnerRoleId());
+            return resultMapper.toRoutineResult(replayed.get());
         }
         roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
                 season,

@@ -10,6 +10,7 @@ import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Season;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -66,16 +67,21 @@ final class WorkspaceRoleCoordinator {
                 seasonId,
                 ContentCreationOperation.ROLE,
                 idempotencyKey,
-                contentIdempotency.fingerprintRoleRequest(teamId, seasonId, role),
-                role.getId()
+                role.getId(),
+                role.getName(),
+                role.getPurpose(),
+                role.getCurrentMemberId(),
+                role.getNextMemberId(),
+                role.getAssignmentStartDate(),
+                role.getAssignmentEndDate(),
+                role.getResponsibilities(),
+                role.getRisk()
         );
-        if (attempt.replayResourceId() != null) {
-            Role existing = repository.findRoleById(attempt.replayResourceId())
-                    .filter(found -> found.getTeamId().equals(teamId))
-                    .filter(found -> found.getSeasonId().equals(seasonId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.ROLE));
-            return resultMapper.toRoleResult(existing);
+        Optional<Role> replayed = attempt.replay(id -> repository.findRoleById(id)
+                .filter(found -> found.getTeamId().equals(teamId))
+                .filter(found -> found.getSeasonId().equals(seasonId)));
+        if (replayed.isPresent()) {
+            return resultMapper.toRoleResult(replayed.get());
         }
         memberResolver.requireActiveMembersForNewReferences(
                 teamId,

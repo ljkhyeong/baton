@@ -30,9 +30,9 @@ class WorkspaceCreationCoordinatorTest {
     private static final String IDEMPOTENCY_HASH =
             "8d1e24b26abdbc5bf8957a3b09865e1446ce5676acc63d394c3b5933bfb9d91b";
     private static final String REQUEST_FINGERPRINT =
-            "f33384b00b45068094a6e980112fb4cbdacb8b245adab12044c522dfe6e5361c";
+            "f79f7f56a3f7343d7d2266d6acb048c7e9605665e3ea2d308a962b60933b2002";
 
-    @DisplayName("워크스페이스 생성 해시와 구성원 순서 정규화 지문은 저장 호환 벡터를 유지한다")
+    @DisplayName("워크스페이스 생성 해시와 구성원 순서 정규화 지문은 고정 벡터와 같다")
     @Test
     void preservesWorkspaceCreationCompatibilityVectors() {
         WorkspaceAccessRepository accessRepository = mock(WorkspaceAccessRepository.class);

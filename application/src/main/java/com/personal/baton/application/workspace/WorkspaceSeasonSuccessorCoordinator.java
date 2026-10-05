@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -103,22 +104,18 @@ final class WorkspaceSeasonSuccessorCoordinator {
                 sourceSeasonId,
                 ContentCreationOperation.SEASON,
                 idempotencyKey,
-                contentIdempotency.fingerprintNextSeasonRequest(
-                        teamId,
-                        sourceSeasonId,
-                        targetSeason,
-                        roleIds,
-                        routineIds
-                ),
-                targetSeasonId
+                targetSeasonId,
+                targetSeason.getName(),
+                targetSeason.getStartDate(),
+                targetSeason.getEndDate(),
+                roleIds,
+                routineIds
         );
-        if (attempt.replayResourceId() != null) {
-            Season existing = seasonRepository.findSeasonById(attempt.replayResourceId())
-                    .filter(found -> found.getTeamId().equals(teamId))
-                    .filter(found -> sourceSeasonId.equals(found.getPreviousSeasonId()))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.SEASON));
-            return toNextSeasonResult(sourceSeason, existing);
+        Optional<Season> replayed = attempt.replay(id -> seasonRepository.findSeasonById(id)
+                .filter(found -> found.getTeamId().equals(teamId))
+                .filter(found -> sourceSeasonId.equals(found.getPreviousSeasonId())));
+        if (replayed.isPresent()) {
+            return toNextSeasonResult(sourceSeason, replayed.get());
         }
 
         seasonRepository.findActiveSeasonByTeamId(teamId)

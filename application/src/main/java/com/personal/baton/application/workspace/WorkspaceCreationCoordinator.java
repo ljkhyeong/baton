@@ -143,7 +143,6 @@ final class WorkspaceCreationCoordinator {
         for (String memberName : normalizedMemberNames) {
             fingerprint.append(memberName);
         }
-        if (template != null) fingerprint.append("template").append(template.name());
-        return fingerprint.digestHex();
+        return fingerprint.appendNullable(template).digestHex();
     }
 }

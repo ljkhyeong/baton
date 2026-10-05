@@ -11,6 +11,7 @@ import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.Member;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -54,15 +55,13 @@ final class WorkspaceMemberCoordinator {
                 seasonId,
                 ContentCreationOperation.MEMBER,
                 idempotencyKey,
-                contentIdempotency.fingerprintMemberRequest(teamId, seasonId, member),
-                member.getId()
+                member.getId(),
+                member.getName()
         );
-        if (attempt.replayResourceId() != null) {
-            Member existing = repository.findMemberById(attempt.replayResourceId())
-                    .filter(found -> found.getTeamId().equals(teamId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.MEMBER));
-            return resultMapper.toMemberResult(existing);
+        Optional<Member> replayed = attempt.replay(id -> repository.findMemberById(id)
+                .filter(found -> found.getTeamId().equals(teamId)));
+        if (replayed.isPresent()) {
+            return resultMapper.toMemberResult(replayed.get());
         }
         contentIdempotency.reserve(attempt);
         return resultMapper.toMemberResult(repository.saveMember(member));

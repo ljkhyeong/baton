@@ -3,21 +3,14 @@ package com.personal.baton.application.workspace;
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
-import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
-import com.personal.baton.domain.workspace.Decision;
-import com.personal.baton.domain.workspace.DecisionTextFormat;
-import com.personal.baton.domain.workspace.HandoffItem;
-import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleResource;
-import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.SeasonRound;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Component
 final class WorkspaceContentIdempotency {
@@ -33,29 +26,29 @@ final class WorkspaceContentIdempotency {
         this.repository = repository;
     }
 
+    // requestValues는 생성 요청을 구분하는 정규화 값이다. 작업 종류마다 같은 순서로 넘기고, 목록은 개수와 원소를 함께 지문에 담는다.
     ContentCreationAttempt prepare(
             UUID teamId,
             UUID seasonId,
             ContentCreationOperation operation,
             String idempotencyKey,
-            String requestFingerprint,
-            UUID resourceId
+            UUID resourceId,
+            Object... requestValues
     ) {
-        String idempotencyHash = contentIdempotencyHash(
-                teamId,
-                seasonId,
-                operation,
-                idempotencyKey
+        String idempotencyHash = DomainSeparatedSha256.hashHex(
+                CONTENT_IDEMPOTENCY_HASH_DOMAIN + ":" + operation.name(),
+                List.of(teamId.toString(), seasonId.toString(), idempotencyKey)
         );
+        String requestFingerprint = fingerprint(operation, teamId, seasonId, requestValues);
         ContentCreationIdempotency existing = repository.findContentCreationIdempotency(
                 teamId,
                 idempotencyHash
         ).orElse(null);
         if (existing != null) {
             validateReplay(existing, teamId, seasonId, operation, requestFingerprint);
-            return ContentCreationAttempt.replay(existing.getResourceId());
+            return new ContentCreationAttempt(operation, null, existing.getResourceId());
         }
-        return ContentCreationAttempt.create(ContentCreationIdempotency.create(
+        return new ContentCreationAttempt(operation, ContentCreationIdempotency.create(
                 UUID.randomUUID(),
                 teamId,
                 seasonId,
@@ -63,176 +56,36 @@ final class WorkspaceContentIdempotency {
                 idempotencyHash,
                 requestFingerprint,
                 resourceId
-        ));
+        ), null);
     }
 
+    // 예약은 저장 직전 검증을 모두 통과한 뒤에 한다. 같은 키의 동시 요청은 이 시점의 유일 제약으로 갈린다.
     void reserve(ContentCreationAttempt attempt) {
         repository.saveContentCreationIdempotency(attempt.reservation());
     }
 
-    IllegalStateException missingResource(ContentCreationOperation operation) {
-        return new IllegalStateException(
-                "멱등 생성된 " + operation.name() + " 리소스를 찾을 수 없습니다"
-        );
-    }
-
-    String fingerprintRoleRequest(UUID teamId, UUID seasonId, Role role) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.ROLE,
-                teamId,
-                seasonId
-        );
-        digest.append(role.getName());
-        digest.append(role.getPurpose());
-        digest.appendNullable(role.getCurrentMemberId());
-        digest.appendNullable(role.getNextMemberId());
-        digest.appendNullable(role.getAssignmentStartDate());
-        digest.appendNullable(role.getAssignmentEndDate());
-        digest.append(Integer.toString(role.getResponsibilities().size()));
-        for (String responsibility : role.getResponsibilities()) {
-            digest.append(responsibility);
-        }
-        digest.appendNullable(role.getRisk());
-        return digest.digestHex();
-    }
-
-    String fingerprintNextSeasonRequest(
-            UUID teamId,
-            UUID sourceSeasonId,
-            Season targetSeason,
-            List<UUID> roleIds,
-            List<UUID> routineIds
-    ) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.SEASON,
-                teamId,
-                sourceSeasonId
-        );
-        digest.append(targetSeason.getName());
-        digest.append(targetSeason.getStartDate().toString());
-        digest.append(targetSeason.getEndDate().toString());
-        digest.append(Integer.toString(roleIds.size()));
-        for (UUID roleId : roleIds) {
-            digest.append(roleId.toString());
-        }
-        digest.append(Integer.toString(routineIds.size()));
-        for (UUID routineId : routineIds) {
-            digest.append(routineId.toString());
-        }
-        return digest.digestHex();
-    }
-
-    String fingerprintMemberRequest(UUID teamId, UUID seasonId, Member member) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.MEMBER,
-                teamId,
-                seasonId
-        );
-        digest.append(member.getName());
-        return digest.digestHex();
-    }
-
-    String fingerprintRoutineRequest(UUID teamId, UUID seasonId, Routine routine) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.ROUTINE,
-                teamId,
-                seasonId
-        );
-        digest.append(routine.getTitle());
-        digest.append(routine.getPhase().name());
-        digest.append(routine.getDueLabel());
-        digest.append(routine.getOwnerRoleId().toString());
-        digest.append(routine.getDetail());
-        if (routine.getDeadlineDayOffset() != null) {
-            digest.appendNullable(routine.getDeadlineDayOffset());
-            digest.appendNullable(routine.getDeadlineTime());
-        }
-        return digest.digestHex();
-    }
-
-    String fingerprintSeasonRoundRequest(UUID teamId, UUID seasonId, SeasonRound round) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.ROUND,
-                teamId,
-                seasonId
-        );
-        digest.append(round.getName());
-        digest.append(round.getMeetingDate().toString());
-        return digest.digestHex();
-    }
-
-    String fingerprintDecisionRequest(UUID teamId, UUID seasonId, Decision decision) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.DECISION,
-                teamId,
-                seasonId
-        );
-        digest.append(decision.getTitle());
-        digest.append(decision.getReason());
-        digest.append(decision.getAlternative());
-        digest.append(decision.getAuthorMemberId().toString());
-        digest.append(Integer.toString(decision.getRoleIds().size()));
-        for (UUID roleId : decision.getRoleIds()) {
-            digest.append(roleId.toString());
-        }
-        if (decision.getTextFormat() != DecisionTextFormat.PLAIN_TEXT) {
-            digest.append(decision.getTextFormat().name());
-        }
-        return digest.digestHex();
-    }
-
-    String fingerprintHandoffItemRequest(
+    private static String fingerprint(
+            ContentCreationOperation operation,
             UUID teamId,
             UUID seasonId,
-            HandoffItem item
+            Object... requestValues
     ) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.HANDOFF_ITEM,
-                teamId,
-                seasonId
-        );
-        digest.append(item.getRoleId().toString());
-        digest.append(item.getLabel());
-        digest.append(item.getCategory().name());
+        DomainSeparatedSha256 digest = DomainSeparatedSha256
+                .inDomain(CONTENT_REQUEST_FINGERPRINT_DOMAIN + ":" + operation.name())
+                .append(teamId.toString())
+                .append(seasonId.toString());
+        for (Object value : requestValues) {
+            if (value instanceof Collection<?> values) {
+                digest.append(Integer.toString(values.size()));
+                values.forEach(digest::appendNullable);
+            } else {
+                digest.appendNullable(value);
+            }
+        }
         return digest.digestHex();
     }
 
-    String fingerprintRoleResourceRequest(
-            UUID teamId,
-            UUID seasonId,
-            RoleResource resource
-    ) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.ROLE_RESOURCE,
-                teamId,
-                seasonId
-        );
-        digest.append(resource.getRoleId().toString());
-        digest.append(resource.getTitle());
-        digest.append(resource.getUrl());
-        digest.appendNullable(resource.getDescription());
-        return digest.digestHex();
-    }
-
-    String fingerprintRoleHandoffRequest(
-            UUID teamId,
-            UUID seasonId,
-            UUID roleId,
-            PrepareRoleHandoffCommand command
-    ) {
-        DomainSeparatedSha256 digest = contentRequestDigest(
-                ContentCreationOperation.ROLE_HANDOFF,
-                teamId,
-                seasonId
-        );
-        digest.append(roleId.toString());
-        digest.append(command.toMemberId().toString());
-        digest.append(command.incomingAssignmentStartDate().toString());
-        digest.appendNullable(command.incomingAssignmentEndDate());
-        return digest.digestHex();
-    }
-
-    private void validateReplay(
+    private static void validateReplay(
             ContentCreationIdempotency existing,
             UUID teamId,
             UUID seasonId,
@@ -251,40 +104,20 @@ final class WorkspaceContentIdempotency {
         }
     }
 
-    private String contentIdempotencyHash(
-            UUID teamId,
-            UUID seasonId,
-            ContentCreationOperation operation,
-            String idempotencyKey
-    ) {
-        return DomainSeparatedSha256.hashHex(
-                CONTENT_IDEMPOTENCY_HASH_DOMAIN + ":" + operation.name(),
-                List.of(teamId.toString(), seasonId.toString(), idempotencyKey)
-        );
-    }
-
-    private DomainSeparatedSha256 contentRequestDigest(
-            ContentCreationOperation operation,
-            UUID teamId,
-            UUID seasonId
-    ) {
-        return DomainSeparatedSha256
-                .inDomain(CONTENT_REQUEST_FINGERPRINT_DOMAIN + ":" + operation.name())
-                .append(teamId.toString())
-                .append(seasonId.toString());
-    }
-
     record ContentCreationAttempt(
+            ContentCreationOperation operation,
             ContentCreationIdempotency reservation,
             UUID replayResourceId
     ) {
 
-        private static ContentCreationAttempt create(ContentCreationIdempotency reservation) {
-            return new ContentCreationAttempt(reservation, null);
-        }
-
-        private static ContentCreationAttempt replay(UUID resourceId) {
-            return new ContentCreationAttempt(null, resourceId);
+        // 같은 키의 재요청이면 처음 만든 리소스를 요청 범위에서 찾아 돌려준다. 찾지 못하면 저장 상태가 어긋난 것이다.
+        <E> Optional<E> replay(Function<UUID, Optional<E>> findInScope) {
+            if (replayResourceId == null) {
+                return Optional.empty();
+            }
+            return Optional.of(findInScope.apply(replayResourceId).orElseThrow(() -> new IllegalStateException(
+                    "멱등 생성된 " + operation.name() + " 리소스를 찾을 수 없습니다"
+            )));
         }
     }
 }

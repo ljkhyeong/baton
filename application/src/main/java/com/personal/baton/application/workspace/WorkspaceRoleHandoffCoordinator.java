@@ -19,6 +19,7 @@ import com.personal.baton.domain.workspace.Season;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -71,23 +72,18 @@ final class WorkspaceRoleHandoffCoordinator {
                 seasonId,
                 ContentCreationOperation.ROLE_HANDOFF,
                 idempotencyKey,
-                contentIdempotency.fingerprintRoleHandoffRequest(
-                        teamId,
-                        seasonId,
-                        roleId,
-                        command
-                ),
-                handoffId
+                handoffId,
+                roleId,
+                command.toMemberId(),
+                command.incomingAssignmentStartDate(),
+                command.incomingAssignmentEndDate()
         );
-        if (attempt.replayResourceId() != null) {
-            RoleHandoff existing = peopleRepository.findRoleHandoffById(attempt.replayResourceId())
-                    .filter(handoff -> handoff.getTeamId().equals(teamId))
-                    .filter(handoff -> handoff.getSeasonId().equals(seasonId))
-                    .filter(handoff -> handoff.getRoleId().equals(roleId))
-                    .orElseThrow(() -> contentIdempotency.missingResource(
-                            ContentCreationOperation.ROLE_HANDOFF
-                    ));
-            return resultMapper.toRoleHandoffTransitionResult(role, existing);
+        Optional<RoleHandoff> replayed = attempt.replay(id -> peopleRepository.findRoleHandoffById(id)
+                .filter(handoff -> handoff.getTeamId().equals(teamId))
+                .filter(handoff -> handoff.getSeasonId().equals(seasonId))
+                .filter(handoff -> handoff.getRoleId().equals(roleId)));
+        if (replayed.isPresent()) {
+            return resultMapper.toRoleHandoffTransitionResult(role, replayed.get());
         }
         if (peopleRepository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId).isPresent()) {
             throw conflict("이 역할에는 이미 진행 중인 인수인계가 있습니다");

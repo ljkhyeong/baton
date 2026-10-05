@@ -13,6 +13,7 @@ import com.personal.baton.domain.workspace.ContentRecordKind;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -69,16 +70,16 @@ final class WorkspaceRoleResourceCoordinator {
                 seasonId,
                 ContentCreationOperation.ROLE_RESOURCE,
                 idempotencyKey,
-                contentIdempotency.fingerprintRoleResourceRequest(teamId, seasonId, resource),
-                resource.getId()
+                resource.getId(),
+                resource.getRoleId(),
+                resource.getTitle(),
+                resource.getUrl(),
+                resource.getDescription()
         );
-        if (attempt.replayResourceId() != null) {
-            RoleResource existing = recordsRepository.findRoleResourceById(attempt.replayResourceId())
-                    .orElseThrow(() -> contentIdempotency.missingResource(
-                            ContentCreationOperation.ROLE_RESOURCE
-                    ));
-            roleResolver.requireRole(teamId, seasonId, existing.getRoleId());
-            return resultMapper.toRoleResourceResult(existing);
+        Optional<RoleResource> replayed = attempt.replay(recordsRepository::findRoleResourceById);
+        if (replayed.isPresent()) {
+            roleResolver.requireRole(teamId, seasonId, replayed.get().getRoleId());
+            return resultMapper.toRoleResourceResult(replayed.get());
         }
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         contentIdempotency.reserve(attempt);

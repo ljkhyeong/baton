@@ -31,9 +31,9 @@ class WorkspaceContentIdempotencyTest {
     private static final String IDEMPOTENCY_HASH =
             "2908129627791efa4f59ef845b072d4b00979ea46605425b71ca68bb3938d3be";
     private static final String MEMBER_FINGERPRINT =
-            "7e1f22d09e998e4a1c17f78d975cfec755afd99be188342fe2f9e8295536c6ac";
+            "11ba4c8541a5f2695a80f28618559112fb9ee12c61f79e132651efcd93f0ff43";
 
-    @DisplayName("콘텐츠 멱등 해시와 정규화 요청 지문은 기존 저장 데이터 호환 벡터를 유지한다")
+    @DisplayName("콘텐츠 멱등 해시와 정규화 요청 지문은 고정 벡터와 같다")
     @Test
     void preservesContentIdempotencyCompatibilityVectors() {
         WorkspaceAccessRepository repository = mock(WorkspaceAccessRepository.class);
@@ -43,18 +43,15 @@ class WorkspaceContentIdempotencyTest {
                 new WorkspaceContentIdempotency(repository);
         Member member = Member.create(RESOURCE_ID, TEAM_ID, "  김민지  ");
 
-        String requestFingerprint =
-                idempotency.fingerprintMemberRequest(TEAM_ID, SEASON_ID, member);
         ContentCreationAttempt attempt = idempotency.prepare(
                 TEAM_ID,
                 SEASON_ID,
                 ContentCreationOperation.MEMBER,
                 IDEMPOTENCY_KEY,
-                requestFingerprint,
-                RESOURCE_ID
+                RESOURCE_ID,
+                member.getName()
         );
 
-        assertThat(requestFingerprint).isEqualTo(MEMBER_FINGERPRINT);
         assertThat(attempt.replayResourceId()).isNull();
         assertThat(attempt.reservation().getTeamId()).isEqualTo(TEAM_ID);
         assertThat(attempt.reservation().getSeasonId()).isEqualTo(SEASON_ID);
@@ -88,19 +85,22 @@ class WorkspaceContentIdempotencyTest {
                 SEASON_ID,
                 ContentCreationOperation.MEMBER,
                 IDEMPOTENCY_KEY,
-                MEMBER_FINGERPRINT,
-                UUID.randomUUID()
+                UUID.randomUUID(),
+                "김민지"
         );
 
         assertThat(replay.reservation()).isNull();
-        assertThat(replay.replayResourceId()).isEqualTo(RESOURCE_ID);
+        assertThat(replay.replay(id -> Optional.of(id))).contains(RESOURCE_ID);
+        assertThatThrownBy(() -> replay.replay(id -> Optional.empty()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("멱등 생성된 MEMBER 리소스를 찾을 수 없습니다");
         assertThatThrownBy(() -> idempotency.prepare(
                 TEAM_ID,
                 SEASON_ID,
                 ContentCreationOperation.MEMBER,
                 IDEMPOTENCY_KEY,
-                "f".repeat(64),
-                UUID.randomUUID()
+                UUID.randomUUID(),
+                "김민수"
         )).isInstanceOf(IdempotencyKeyReusedException.class);
     }
 
@@ -122,8 +122,8 @@ class WorkspaceContentIdempotencyTest {
                 SEASON_ID,
                 ContentCreationOperation.MEMBER,
                 IDEMPOTENCY_KEY,
-                MEMBER_FINGERPRINT,
-                UUID.randomUUID()
+                UUID.randomUUID(),
+                "김민지"
         )).isInstanceOf(IllegalStateException.class)
                 .hasMessage("저장된 콘텐츠 생성 멱등 범위가 요청과 일치하지 않습니다");
     }

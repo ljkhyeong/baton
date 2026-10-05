@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -70,17 +71,16 @@ final class WorkspaceRoundCoordinator {
                 seasonId,
                 ContentCreationOperation.ROUND,
                 idempotencyKey,
-                contentIdempotency.fingerprintSeasonRoundRequest(teamId, seasonId, round),
-                round.getId()
+                round.getId(),
+                round.getName(),
+                round.getMeetingDate()
         );
-        if (attempt.replayResourceId() != null) {
-            SeasonRound existing = repository.findSeasonRoundById(attempt.replayResourceId())
-                    .filter(found -> found.getSeasonId().equals(seasonId))
-                    .orElseThrow(() ->
-                            contentIdempotency.missingResource(ContentCreationOperation.ROUND));
+        Optional<SeasonRound> replayed = attempt.replay(id -> repository.findSeasonRoundById(id)
+                .filter(found -> found.getSeasonId().equals(seasonId)));
+        if (replayed.isPresent()) {
             return resultMapper.toSeasonRoundResult(
-                    existing,
-                    repository.findRoutineExecutionsBySeasonRoundIds(List.of(existing.getId())),
+                    replayed.get(),
+                    repository.findRoutineExecutionsBySeasonRoundIds(List.of(replayed.get().getId())),
                     season
             );
         }
