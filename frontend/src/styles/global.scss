@@ -363,13 +363,14 @@ a {
 
 .account-security-stack { display: flex; flex-direction: column; gap: 16px; margin-top: 30px; }
 .account-summary-card,
-.account-security-card { padding: 22px; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--paper); }
+.account-security-card { padding: 22px; border: 0; border-radius: var(--radius-lg); background: var(--paper); }
 .account-summary-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 14px; align-items: start; }
 .account-summary-card .auth-status-dot { margin: 6px 0 0; }
 .account-summary-card h3 { margin: 0; font-size: 18px; letter-spacing: -.025em; }
 .account-summary-card > div > p { margin: 6px 0 0; color: var(--faint); font-size: 12px; overflow-wrap: anywhere; }
 .account-identity-list { display: flex; grid-column: 1 / -1; flex-direction: column; gap: 0; margin: 20px 0 0; padding: 0; border-top: 1px solid var(--rule); list-style: none; }
 .account-identity-list li { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--rule); }
+.account-identity-list li:last-child { border-bottom: 0; padding-bottom: 0; }
 .account-identity-list strong { font-size: 12px; }
 .account-identity-list span { min-width: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .account-identity-list small { color: var(--success); font-size: 12px; white-space: nowrap; }
@@ -377,7 +378,7 @@ a {
 .account-security-card header h3 { margin: 6px 0 7px; font-size: 16px; }
 .account-security-card header p,
 .account-security-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; word-break: keep-all; }
-.account-session-card { border-color: var(--warning-border); background: var(--warning-soft); }
+.account-session-card { background: var(--warning-soft); }
 .account-session-card .danger-button { align-self: flex-start; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -1290,6 +1291,7 @@ a {
   background: transparent;
   transition: background 150ms ease;
 }
+.role-row:last-child { border-bottom: 0; }
 
 .role-row-open {
   min-width: 0;
@@ -1910,9 +1912,9 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 .inspector-handoff > div:first-child { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
 .inspector-handoff > div:first-child strong { font-size: 18px; }
 .inspector-handoff p { margin: 9px 0 13px; color: var(--muted); font-size: 12px; }
-.inspector-handoff button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 38px; padding: 0 12px; border: 1px solid var(--ink); color: var(--on-ink); background: var(--ink); font-size: 12px; font-weight: 650; cursor: pointer;
-  border-radius: var(--radius);
+.inspector-handoff button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 38px; padding: 0 12px; border: 1px solid var(--rule-strong); border-radius: var(--radius); color: var(--ink); background: var(--paper); font-size: 13px; font-weight: 650; cursor: pointer;
 }
+.inspector-handoff button:hover { border-color: var(--field-border-hover); background: var(--canvas); }
 
 .modal-backdrop {
   position: fixed;

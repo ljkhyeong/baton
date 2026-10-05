@@ -15,7 +15,7 @@
 .calendar-guide select { min-width: 0; }
 .calendar-panel [role="alert"] { color: var(--warning); }
 
-.calendar-subscription-list { margin-top: 26px; min-width: 0; color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-subscription-list { margin-top: 0; min-width: 0; color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .calendar-subscription-list [role="alert"] { color: var(--warning); }
 .calendar-subscription-rows { margin: 0; padding: 0; list-style: none; }
 .calendar-subscription-rows > li { border-top: 1px solid var(--rule); }
