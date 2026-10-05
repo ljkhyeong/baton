@@ -357,9 +357,7 @@ export function SeasonRoundModal({
   const submission = useSubmissionLock(pending)
   const [name, setName] = useState(round?.name ?? `${roundCount + 1}회차`)
   const [meetingDate, setMeetingDate] = useState(
-    round
-      ? round.meetingDate ?? ''
-      : clampToSeason(pilotCalendarDate(new Date(), season.timeZone), season),
+    round?.meetingDate ?? clampToSeason(pilotCalendarDate(new Date(), season.timeZone), season),
   )
   const submit = (event: FormEvent) => {
     event.preventDefault()

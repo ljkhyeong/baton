@@ -76,12 +76,6 @@ export function RecordSearchView({
       .map(result => ({ ...result, originSeason: source.season }))).sort(compareRecordSearchResults),
     [filters, sources],
   )
-  const matchingUnknownTimeCount = useMemo(() => {
-    if (!filters.fromDate && !filters.toDate) return 0
-    return sources.reduce((count, source) => count + searchWorkspaceRecords(
-      source, { ...filters, fromDate: '', toDate: '' }, source.season.timeZone,
-    ).filter(result => !result.createdAt).length, 0)
-  }, [filters, sources])
   const validDateRange = isRecordSearchDateRangeValid(filters)
   const activeFilterCount = [
     filters.type !== 'all',
@@ -214,10 +208,7 @@ export function RecordSearchView({
               <h2 id="record-search-result-title">{partial ? '불러온 시즌에서 ' : ''}{results.length}개의 기록을 찾았어요</h2>
             </div>
             <p aria-live="polite" aria-atomic="true">
-              검색 결과 {results.length}개.{' '}
-              {matchingUnknownTimeCount > 0
-                ? `작성일을 알 수 없는 이전 기록 ${matchingUnknownTimeCount}개는 날짜 검색에서 제외했습니다.`
-                : '최신 기록부터 표시합니다.'}
+              검색 결과 {results.length}개. 최신 기록부터 표시합니다.
             </p>
           </div>
 
@@ -229,8 +220,8 @@ export function RecordSearchView({
                     <div className="record-search-card-meta">
                       <span className="record-kind">{kindCopy[result.kind]}</span>
                       <span>{result.originSeason.name}</span>
-                      <time dateTime={result.createdAt ?? undefined}>
-                        {result.createdAt ? formatInstant(result.createdAt, result.originSeason.timeZone) : '작성일을 알 수 없음'}
+                      <time dateTime={result.createdAt}>
+                        {formatInstant(result.createdAt, result.originSeason.timeZone)}
                       </time>
                       {result.archivedAt && <span className="record-archived">보관됨</span>}
                     </div>

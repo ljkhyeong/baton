@@ -425,9 +425,9 @@ class WorkspaceRestDocsTest {
                 .andExpect(jsonPath("$.rounds[0].routineExecutions[0].status").value("WAITING"))
                 .andExpect(jsonPath("$.decisions[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.handoffItems[0].category").value("RESOURCE"))
-                .andExpect(jsonPath("$.handoffItems[0].createdAt").value(nullValue()))
+                .andExpect(jsonPath("$.handoffItems[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.resources[0].url").value("https://docs.example.com/question-guide"))
-                .andExpect(jsonPath("$.resources[0].createdAt").value(nullValue()))
+                .andExpect(jsonPath("$.resources[0].createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.continuitySignals[0].type")
                         .value("HANDOFF_INCOMPLETE"))
                 .andExpect(jsonPath("$.continuitySignals[0].recommendedAction")
@@ -3201,7 +3201,7 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
                                         "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
                                 optionalRequestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "description", "자료 자료 설명")
+                                        "description", "자료 설명")
                         ),
                         responseFields(roleResourceResponseFields())));
     }
@@ -3250,7 +3250,7 @@ class WorkspaceRestDocsTest {
                                 requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
                                         "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
                                 optionalRequestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "description", "자료 자료 설명")
+                                        "description", "자료 설명")
                         ),
                         responseFields(roleResourceResponseFields())));
     }
@@ -4107,8 +4107,8 @@ class WorkspaceRestDocsTest {
                 List.of(routineResult()),
                 List.of(seasonRoundResult(RoutineStatus.WAITING)),
                 List.of(decisionResult()),
-                List.of(legacyHandoffItemResult()),
-                List.of(legacyRoleResourceResult()),
+                List.of(handoffItemResult(false)),
+                List.of(roleResourceResult()),
                 List.of(roleHandoffResult(RoleHandoffStatus.TRANSFERRED)),
                 List.of(new ContinuitySignalResult(
                         ContinuitySignalType.HANDOFF_INCOMPLETE,
@@ -4564,18 +4564,6 @@ class WorkspaceRestDocsTest {
         );
     }
 
-    private HandoffItemResult legacyHandoffItemResult() {
-        return new HandoffItemResult(
-                HANDOFF_ITEM_ID,
-                ROLE_ID,
-                "질문 목록 문서 권한 넘기기",
-                HandoffCategory.RESOURCE,
-                false,
-                null,
-                null
-        );
-    }
-
     private RoleResourceResult roleResourceResult() {
         return roleResourceResult(null);
     }
@@ -4589,18 +4577,6 @@ class WorkspaceRestDocsTest {
                 "질문을 모으고 분류하는 기준",
                 Instant.parse("2026-07-20T03:04:05Z"),
                 archivedAt
-        );
-    }
-
-    private RoleResourceResult legacyRoleResourceResult() {
-        return new RoleResourceResult(
-                ROLE_RESOURCE_ID,
-                ROLE_ID,
-                "질문 정리 가이드",
-                "https://docs.example.com/question-guide",
-                "질문을 모으고 분류하는 기준",
-                null,
-                null
         );
     }
 
@@ -4873,7 +4849,7 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("rounds").type(JsonFieldType.ARRAY).description("시즌 회차 목록"),
                 fieldWithPath("rounds[].id").description("시즌 회차 UUID"),
                 fieldWithPath("rounds[].name").description("시즌 안에서 유일한 회차 이름"),
-                fieldWithPath("rounds[].meetingDate").optional().description("모임 날짜"),
+                fieldWithPath("rounds[].meetingDate").description("모임 날짜"),
                 fieldWithPath("rounds[].archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -4930,9 +4906,7 @@ class WorkspaceRestDocsTest {
                 enumField(HandoffCategory.class, "handoffItems[].category", "항목 분류"),
                 fieldWithPath("handoffItems[].completed").description("완료 여부"),
                 fieldWithPath("handoffItems[].createdAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
+                        .description("서버가 기록한 UTC 생성 시각"),
                 fieldWithPath("handoffItems[].archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -4942,11 +4916,9 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
                 fieldWithPath("resources[].title").description("자료 제목"),
                 fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
-                fieldWithPath("resources[].description").optional().description("자료 자료 설명"),
+                fieldWithPath("resources[].description").optional().description("자료 설명"),
                 fieldWithPath("resources[].createdAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
+                        .description("서버가 기록한 UTC 생성 시각"),
                 fieldWithPath("resources[].archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -5288,7 +5260,7 @@ class WorkspaceRestDocsTest {
         return new FieldDescriptor[]{
                 fieldWithPath("id").description("시즌 회차 UUID"),
                 fieldWithPath("name").description("시즌 안에서 유일한 회차 이름"),
-                fieldWithPath("meetingDate").optional().description("모임 날짜"),
+                fieldWithPath("meetingDate").description("모임 날짜"),
                 fieldWithPath("routineExecutions").type(JsonFieldType.ARRAY).description("회차 반복 업무 실행 목록"),
                 fieldWithPath("routineExecutions[].id").description("회차 반복 업무 실행 UUID"),
                 fieldWithPath("routineExecutions[].roundId").description("소속 회차 UUID"),
@@ -5372,9 +5344,7 @@ class WorkspaceRestDocsTest {
                 enumField(HandoffCategory.class, "category", "항목 분류"),
                 fieldWithPath("completed").description("완료 여부"),
                 fieldWithPath("createdAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
+                        .description("서버가 기록한 UTC 생성 시각"),
                 fieldWithPath("archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
@@ -5401,11 +5371,9 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("roleId").description("소유 역할 UUID"),
                 fieldWithPath("title").description("자료 제목"),
                 fieldWithPath("url").description("http 또는 https 외부 링크"),
-                fieldWithPath("description").optional().description("자료 자료 설명"),
+                fieldWithPath("description").optional().description("자료 설명"),
                 fieldWithPath("createdAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("서버가 기록한 UTC 생성 시각. V14 이전 기록은 null"),
+                        .description("서버가 기록한 UTC 생성 시각"),
                 fieldWithPath("archivedAt")
                         .type(JsonFieldType.STRING)
                         .optional()

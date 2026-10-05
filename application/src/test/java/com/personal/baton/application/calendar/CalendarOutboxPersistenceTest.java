@@ -66,9 +66,6 @@ class CalendarOutboxPersistenceTest {
     private static final UUID EXECUTION_ID = UUID.fromString(
             "60000000-0000-0000-0000-000000000001"
     );
-    private static final UUID LEGACY_ROUND_ID = UUID.fromString(
-            "70000000-0000-0000-0000-000000000001"
-    );
 
     @Container
     @ServiceConnection
@@ -294,7 +291,7 @@ class CalendarOutboxPersistenceTest {
         )).containsExactly("ACTIVE", "ACTIVE", "ACTIVE", "CANCELLED", "CANCELLED", "ACTIVE", "ACTIVE");
     }
 
-    @DisplayName("보정 대상은 날짜 없는 기록과 미전송 보관 회차를 제외하고 다음 페이지를 이어 조회한다")
+    @DisplayName("보정 대상은 미전송 보관 회차를 제외하고 다음 페이지를 이어 조회한다")
     @Test
     void pagesBackfillCandidatesWithoutRepeatingOrIncludingExcludedRounds() {
         insertRound();
@@ -303,10 +300,11 @@ class CalendarOutboxPersistenceTest {
         jdbcTemplate.update("""
                 INSERT INTO season_rounds (id, season_id, name, meeting_date, origin,
                         scheduled_occurrence_date, scheduled_at, archived_at)
-                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), '시각만 정한 회차', NULL, 'AUTOMATIC', ?, ?, NULL),
+                VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), '자동 생성 회차', ?, 'AUTOMATIC', ?, ?, NULL),
                        (UUID_TO_BIN(?), UUID_TO_BIN(?), '전송 전에 보관한 회차', ?, 'MANUAL', NULL, NULL, ?)
                 """,
-                scheduledRoundId.toString(), SEASON_ID.toString(), scheduledAt.toLocalDate(), scheduledAt,
+                scheduledRoundId.toString(), SEASON_ID.toString(), scheduledAt.toLocalDate(),
+                scheduledAt.toLocalDate(), scheduledAt,
                 "80000000-0000-0000-0000-000000000002", SEASON_ID.toString(),
                 LocalDate.of(2026, 8, 27), scheduledAt);
 
@@ -419,8 +417,8 @@ class CalendarOutboxPersistenceTest {
                 "a".repeat(64)
         );
         jdbcTemplate.update(
-                "INSERT INTO seasons (id, team_id, name, start_date, end_date) "
-                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?)",
+                "INSERT INTO seasons (id, team_id, name, start_date, end_date, time_zone) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, 'Asia/Seoul')",
                 SEASON_ID.toString(),
                 TEAM_ID.toString(),
                 "CAL 보정 시즌",
@@ -428,19 +426,12 @@ class CalendarOutboxPersistenceTest {
                 LocalDate.of(2026, 8, 31)
         );
         jdbcTemplate.update(
-                "INSERT INTO season_rounds (id, season_id, name, meeting_date) "
-                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?)",
+                "INSERT INTO season_rounds (id, season_id, name, meeting_date, origin) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, 'MANUAL')",
                 ROUND_ID.toString(),
                 SEASON_ID.toString(),
                 "기존 활성 회차",
                 LocalDate.of(2026, 8, 25)
-        );
-        jdbcTemplate.update(
-                "INSERT INTO season_rounds (id, season_id, name, meeting_date) "
-                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, NULL)",
-                LEGACY_ROUND_ID.toString(),
-                SEASON_ID.toString(),
-                "회차 도입 이전 기록"
         );
         jdbcTemplate.update(
                 "INSERT INTO roles (id, team_id, season_id, name, purpose) "

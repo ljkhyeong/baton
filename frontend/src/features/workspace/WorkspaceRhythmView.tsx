@@ -138,7 +138,7 @@ export function RhythmView({
                   <span>
                     <strong>{round.name}</strong>
                     <small>
-                      {round.meetingDate ? formatLocalDate(round.meetingDate) : '날짜 미정'}
+                      {formatLocalDate(round.meetingDate)}
                       {' · '}
                       {completed}/{round.routineExecutions.length} 완료
                       {round.archivedAt ? ` · ${formatInstant(round.archivedAt)} 보관` : ''}

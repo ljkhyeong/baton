@@ -35,7 +35,7 @@ export function ContentChangePanel({ scope, kind, recordId }: { scope: Workspace
   return <details className="content-history" onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>수정 이력</summary>
     {open && <div>
-      <p>최근 50건의 수정·보관·복원을 표시합니다. 이력 기능 도입 전의 수정은 포함하지 않습니다.</p>
+      <p>최근 50건의 수정·보관·복원을 표시합니다.</p>
       {history.isPending ? <p role="status">수정 이력을 불러오고 있습니다.</p>
         : history.isError ? <p role="alert">{history.error.message} <button className="secondary-button" type="button" onClick={() => void history.refetch()}>다시 불러오기</button></p>
           : history.data.changes.length === 0 ? <p>아직 남겨진 수정 이력이 없습니다.</p>

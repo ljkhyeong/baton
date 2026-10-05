@@ -15,15 +15,14 @@ export function MyRecentRecordsAcrossTeams({ workspaces, partial }: {
 }) {
   const records = workspaces.flatMap(workspace => searchWorkspaceRecords(workspace, {
     query: '', type: 'all', roleId: '', state: 'active', fromDate: '', toDate: '',
-  }, workspace.season.timeZone).flatMap(record => record.createdAt ? [{
+  }, workspace.season.timeZone).map(record => ({
     ...record,
-    createdAt: record.createdAt,
     teamId: workspace.team.id,
     teamName: workspace.team.name,
     seasonId: workspace.season.id,
     seasonName: workspace.season.name,
     timeZone: workspace.season.timeZone,
-  }] : [])).sort(compareRecordSearchResults).slice(0, 5)
+  }))).sort(compareRecordSearchResults).slice(0, 5)
 
   return <section className="my-teams-section my-recent-records" aria-labelledby="my-recent-records-title">
     <div className="my-teams-heading"><h2 id="my-recent-records-title">최근 추가된 기록</h2></div>

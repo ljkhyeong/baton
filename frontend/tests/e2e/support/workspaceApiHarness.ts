@@ -405,7 +405,7 @@ export function makeProjection(): WorkspaceProjection {
         label: '자주 생기는 문제와 대응법',
         category: 'ADVICE',
         completed: false,
-        createdAt: null,
+        createdAt: '2026-06-30T03:00:00Z',
         archivedAt: null,
       },
     ],

@@ -489,30 +489,21 @@ class BriefContinuitySignalPersistenceTest {
         }
     }
 
-    @DisplayName("수동 회차는 날짜가 바뀌거나 이관 기록에 처음 지정될 때만 BRIEF를 재조정한다")
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void reconcilesRoundDateChangeButNotNameEdit(boolean legacyRound) {
+    @DisplayName("수동 회차는 이름만 바뀌면 BRIEF를 재조정하지 않고 날짜가 바뀔 때 재조정한다")
+    @Test
+    void reconcilesRoundDateChangeButNotNameEdit() {
         SignalSources sources = signalSources();
         CreatedWorkspaceResult workspace = sources.workspace();
         UUID teamId = workspace.teamId();
         UUID seasonId = workspace.seasonId();
         String key = workspace.accessKey();
         try {
-            if (legacyRound) {
-                jdbcTemplate.update("UPDATE season_rounds SET meeting_date = NULL WHERE id = UUID_TO_BIN(?)",
-                        sources.roundId().toString());
-            }
             clearInvocations(recorder);
             var renamed = operationsUseCase.updateSeasonRound(
                     teamId, seasonId, sources.roundId(), key,
                     new UpdateSeasonRoundCommand("수정한 모임 이름", LocalDate.of(2026, 7, 20)));
             assertThat(renamed.name()).isEqualTo("수정한 모임 이름");
-            if (legacyRound) {
-                verify(recorder).reconcileSeason(teamId, seasonId);
-            } else {
-                verifyNoInteractions(recorder);
-            }
+            verifyNoInteractions(recorder);
 
             clearInvocations(recorder);
             var rescheduled = operationsUseCase.updateSeasonRound(

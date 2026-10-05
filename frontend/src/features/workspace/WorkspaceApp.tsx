@@ -144,7 +144,7 @@ type WorkspaceAppProps = Omit<WorkspaceScope, 'accountId'> & {
 }
 
 function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
-  const dateOrder = (left.meetingDate ?? '').localeCompare(right.meetingDate ?? '')
+  const dateOrder = left.meetingDate.localeCompare(right.meetingDate)
   if (dateOrder !== 0) return dateOrder
   const nameOrder = left.name.localeCompare(right.name, 'ko')
   return nameOrder !== 0 ? nameOrder : left.id.localeCompare(right.id)

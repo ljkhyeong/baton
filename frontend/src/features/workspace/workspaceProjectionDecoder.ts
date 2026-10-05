@@ -168,7 +168,7 @@ function isHandoffItem(value: unknown) {
   return hasStringFields(value, ['label'])
     && typeof value.completed === 'boolean'
     && isNullableInstant(value.archivedAt)
-    && isNullableInstant(value.createdAt)
+    && isInstant(value.createdAt)
     && hasUuidFields(value, ['id', 'roleId'])
     && isOneOf(value.category, ['RESPONSIBILITY', 'ROUTINE', 'RESOURCE', 'ADVICE'])
 }
@@ -186,7 +186,7 @@ function isRoleResource(value: unknown) {
 
   return hasStringFields(value, ['title', 'url'])
     && isNullableInstant(value.archivedAt)
-    && isNullableInstant(value.createdAt)
+    && isInstant(value.createdAt)
     && isNullableString(value.description)
     && hasUuidFields(value, ['id', 'roleId'])
 }
@@ -263,7 +263,7 @@ function isSeasonRound(value: unknown): value is SeasonRound {
 
   const hasValidShape = typeof value.name === 'string'
     && isNullableInstant(value.archivedAt)
-    && isNullableCalendarDate(value.meetingDate)
+    && isCalendarDate(value.meetingDate)
     && isNullableInstant(value.scheduledAt)
     && isNullableCalendarDate(value.scheduledOccurrenceDate)
     && isUuid(value.id)

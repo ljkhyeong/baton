@@ -47,10 +47,6 @@ public class JdbcCalendarBackfillAdapter implements CalendarBackfillPort {
                     BIN_TO_UUID(round_record.season_id) AS season_id
                 FROM season_rounds round_record
                 WHERE (
-                    round_record.meeting_date IS NOT NULL
-                    OR round_record.scheduled_at IS NOT NULL
-                )
-                AND (
                     round_record.archived_at IS NULL
                     OR EXISTS (
                         SELECT 1

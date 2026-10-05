@@ -29,7 +29,7 @@ export type RecordSearchResult = {
   primaryText: string
   secondaryLabel?: string
   secondaryText?: string
-  createdAt: string | null
+  createdAt: string
   archivedAt: string | null
   roleId: string
   roleIds: string[]
@@ -166,7 +166,6 @@ export function searchWorkspaceRecords(
     .filter((result) => tokens.every((token) => result.searchableText.includes(token)))
     .filter((result) => {
       if (!filters.fromDate && !filters.toDate) return true
-      if (!result.createdAt) return false
       const calendarDate = pilotCalendarDate(new Date(result.createdAt), timeZone)
       return (!filters.fromDate || calendarDate >= filters.fromDate)
         && (!filters.toDate || calendarDate <= filters.toDate)
@@ -174,14 +173,8 @@ export function searchWorkspaceRecords(
 }
 
 export function compareRecordSearchResults(left: RecordSearchResult, right: RecordSearchResult) {
-      if (left.createdAt && right.createdAt) {
-        const timeOrder = Date.parse(right.createdAt) - Date.parse(left.createdAt)
-        if (timeOrder !== 0) return timeOrder
-      } else if (left.createdAt) {
-        return -1
-      } else if (right.createdAt) {
-        return 1
-      }
+      const timeOrder = Date.parse(right.createdAt) - Date.parse(left.createdAt)
+      if (timeOrder !== 0) return timeOrder
       const kindOrder = left.kind.localeCompare(right.kind, 'en')
       if (kindOrder !== 0) return kindOrder
       const titleOrder = left.title.localeCompare(right.title, 'ko')
