@@ -7,7 +7,8 @@ import {
 } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { generatePath, useNavigate } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { createWorkspace } from '@/features/workspace/api'
 import { forgetWorkspaceDeviceState } from '@/features/workspace/deviceState'
 import {
@@ -224,7 +225,7 @@ export function useOnboardingWorkspaceFlow() {
   const attemptCreation = async (variables: CreateWorkspaceVariables) => {
     try {
       const { teamId, seasonId, accessKey } = await createMutation.mutateAsync(variables)
-      const workspacePath = `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}`
+      const workspacePath = generatePath(WORKSPACE_ROUTE, { teamId, seasonId })
       const saved = saveAccessKey(teamId, accessKey)
       const destination = saved
         ? workspacePath

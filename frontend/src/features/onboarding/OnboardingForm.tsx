@@ -1,6 +1,7 @@
 import { workspaceTemplates } from './workspaceTemplates'
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
-import { Link } from 'react-router-dom'
+import { generatePath, Link } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import ServiceStatusLink from '@/shared/ui/ServiceStatusLink'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
@@ -89,7 +90,7 @@ export default function OnboardingForm() {
             </div>
             <ul>
               {recentWorkspaces.map((workspace) => {
-                const path = `/teams/${encodeURIComponent(workspace.teamId)}/seasons/${encodeURIComponent(workspace.seasonId)}`
+                const path = generatePath(WORKSPACE_ROUTE, workspace)
                 return (
                   <li key={`${workspace.teamId}:${workspace.seasonId}`}>
                     <Link to={path}>

@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { generatePath, Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
@@ -107,7 +108,7 @@ export default function WorkspacePage() {
       ? ''
       : `#accessKey=${encodeURIComponent(currentAccessKey)}`
     void navigate(
-      `/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(nextSeasonId)}${fragment}`,
+      `${generatePath(WORKSPACE_ROUTE, { teamId, seasonId: nextSeasonId })}${fragment}`,
     )
   }, [navigate, teamId])
 

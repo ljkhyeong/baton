@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { generatePath, Link } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { compareRecordSearchResults, searchWorkspaceRecords, type RecordSearchResult } from '@/features/workspace/records/recordSearch'
 import type { WorkspaceProjection } from '@/features/workspace/types'
@@ -31,7 +32,7 @@ export function MyRecentRecordsAcrossTeams({ workspaces, partial }: {
       : <ul className="my-work-list">{records.map(record => {
         const query = new URLSearchParams({ recordKind: record.kind, recordId: record.id })
         return <li key={`${record.teamId}:${record.seasonId}:${record.key}`}>
-          <Link className="my-work-row" to={`/teams/${record.teamId}/seasons/${record.seasonId}?${query}`}>
+          <Link className="my-work-row" to={`${generatePath(WORKSPACE_ROUTE, { teamId: record.teamId, seasonId: record.seasonId })}?${query}`}>
             <span className="work-kind work-kind-record">{kindLabel[record.kind]}</span>
             <span className="my-work-copy"><strong>{record.title}</strong>
               <span>{record.teamName} · {record.seasonName} · {formatInstant(record.createdAt, record.timeZone)} ({record.timeZone})</span></span>

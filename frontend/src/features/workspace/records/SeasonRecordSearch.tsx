@@ -1,4 +1,6 @@
 import { useQueries } from '@tanstack/react-query'
+import { generatePath } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import type { WorkspaceScope } from '../api'
 import { workspaceQueryOptions } from '../queries'
 import type { WorkspaceProjection } from '../types'
@@ -29,7 +31,7 @@ export function SeasonRecordSearch({ scope, workspace, allSeasons, onAllSeasonsC
     onOpenOtherSeason={(result, seasonId) => {
       const query = new URLSearchParams({ recordKind: result.kind, recordId: result.id })
       const fragment = scope.accessKey ? `#accessKey=${encodeURIComponent(scope.accessKey)}` : ''
-      return `/teams/${scope.teamId}/seasons/${seasonId}?${query}${fragment}`
+      return `${generatePath(WORKSPACE_ROUTE, { teamId: scope.teamId, seasonId })}?${query}${fragment}`
     }}
     scopeControl={<div className="record-search-scope">
       <label>검색할 시즌<select value={allSeasons ? 'all' : 'current'} onChange={event => {

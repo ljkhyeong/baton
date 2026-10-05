@@ -1,6 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { generatePath, Link } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { getNotificationPreferences } from '@/features/notifications/api'
 import { isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
@@ -45,7 +46,7 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
   const dueSoonAt = preferences.data ? now + preferences.data.deadlineLeadHours * 60 * 60 * 1_000 : null
   const tasks = available.flatMap(({ workspace, memberId }) => {
     const { unfinished, awaiting } = personalWork(workspace, memberId)
-    const base = `/teams/${workspace.team.id}/seasons/${workspace.season.id}`
+    const base = generatePath(WORKSPACE_ROUTE, { teamId: workspace.team.id, seasonId: workspace.season.id })
     return [
       ...unfinished.map(({ round, execution }) => {
         const deadline = execution.deadlineAt ? Date.parse(execution.deadlineAt) : null

@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { queryClient } from '@/shared/api/queryClient'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import AppErrorBoundary from './AppErrorBoundary'
 
 const EmailVerificationPage = lazy(() => import('@/pages/EmailVerificationPage'))
@@ -39,7 +40,7 @@ export default function App() {
               <Route path="/my-teams" element={<MyTeamsPage />} />
               <Route path="/account" element={<AccountSecurityPage />} />
               <Route path="/join" element={<TeamInvitationPage />} />
-              <Route path="/teams/:teamId/seasons/:seasonId" element={<WorkspacePage />} />
+              <Route path={WORKSPACE_ROUTE} element={<WorkspacePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { generatePath, Link, useLocation, useNavigate } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { acceptTeamInvitation, previewTeamInvitation, permissionNames } from '@/features/team-access/api'
 import { clearTeamInvitationToken, readTeamInvitationToken, storeTeamInvitationToken } from '@/features/team-access/pendingTeamInvitation'
@@ -40,7 +41,7 @@ function InvitationContent({ accountId, token }: { accountId: string; token: str
   useEffect(() => { preview.mutate() }, [accountId, token])
   const accept = useMutation({ mutationFn: () => acceptTeamInvitation(accountId, token, preview.data!), onSuccess: value => {
     clearTeamInvitationToken()
-    void navigate(`/teams/${value.teamId}/seasons/${value.seasonId}`, { replace: true })
+    void navigate(generatePath(WORKSPACE_ROUTE, value), { replace: true })
   } })
   if (preview.isPending || preview.isIdle) return <p role="status">초대 내용을 확인하고 있습니다.</p>
   if (preview.isError) return <div><p role="alert">{preview.error.message} <button className="secondary-button" type="button" onClick={() => preview.mutate()}>다시 확인</button></p>

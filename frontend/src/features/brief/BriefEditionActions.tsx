@@ -1,4 +1,6 @@
 import { useContext, useState } from 'react'
+import { generatePath } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { createPortal } from 'react-dom'
 import { useWorkspacePrint } from '@/features/workspace/useWorkspacePrint'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
@@ -15,7 +17,7 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
   const [manualLink, setManualLink] = useState('')
   const [copying, setCopying] = useState(false)
   const [sharing, setSharing] = useState(false)
-  const link = new URL(`/teams/${scope.teamId}/seasons/${scope.seasonId}`, window.location.origin)
+  const link = new URL(generatePath(WORKSPACE_ROUTE, scope), window.location.origin)
   link.searchParams.set('brief', edition.editionId)
   const copyLink = async () => {
     setCopied(false); setManualLink(''); setCopying(true)

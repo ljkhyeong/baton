@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { generatePath, Link, useLocation } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { safeAuthReturnTo } from '@/features/auth/returnTo'
 import { readAccessKey } from './storage'
 
@@ -19,7 +20,7 @@ export default function WorkspaceLoginLink({
   children,
 }: WorkspaceLoginLinkProps) {
   const location = useLocation()
-  const workspacePath = `/teams/${teamId}/seasons/${seasonId}`
+  const workspacePath = generatePath(WORKSPACE_ROUTE, { teamId, seasonId })
   const returnTo = safeAuthReturnTo(`${workspacePath}${location.pathname === workspacePath ? location.search : ''}`) ?? workspacePath
   if (readAccessKey(teamId) !== accessKey) {
     return (

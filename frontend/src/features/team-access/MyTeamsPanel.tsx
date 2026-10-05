@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { generatePath, Link } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { Icon } from '@/shared/ui/Icon'
 import { MyWorkAcrossTeams } from './MyWorkAcrossTeams'
 import { getMyTeams, permissionNames } from './api'
@@ -22,7 +23,7 @@ export default function MyTeamsPanel({ accountId }: { accountId: string }) {
                 <p>{team.memberName} · {permissionNames[team.permission]}</p>
                 <p>{team.seasonName}{team.seasonEnded && ' · 종료된 시즌'}</p>
               </div>
-              <Link className="secondary-button my-team-open" to={`/teams/${team.teamId}/seasons/${team.seasonId}`}
+              <Link className="secondary-button my-team-open" to={generatePath(WORKSPACE_ROUTE, { teamId: team.teamId, seasonId: team.seasonId })}
                 aria-label={`${team.teamName} 열기`}>
                 열기 <Icon name="arrow" size={15} />
               </Link>

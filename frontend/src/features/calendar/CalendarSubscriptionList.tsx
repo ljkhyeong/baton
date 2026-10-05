@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { generatePath, Link } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { getCalendarSubscriptions } from './api'
 import CalendarBulkRevocation, { MAX_BULK_REVOCATIONS } from './CalendarBulkRevocation'
@@ -123,7 +124,7 @@ function SubscriptionRow({ accountId, row, listedAt, selecting, selected, select
     {open && <div className="calendar-subscription-management">
       <CalendarContent accountId={accountId} scope={{ accountId, teamId: row.teamId, seasonId: row.seasonId, accessKey: '' }}
         canIssue={false} ended={false} managementOnly onStatusChecked={setChecked} />
-      <Link className="auth-secondary-link" to={`/teams/${row.teamId}/seasons/${row.seasonId}`}>팀 화면으로 이동</Link>
+      <Link className="auth-secondary-link" to={generatePath(WORKSPACE_ROUTE, row)}>팀 화면으로 이동</Link>
       <p className="account-security-note">새 구독 주소가 필요하면 접근 가능한 팀 화면에서 발급해 주세요.</p>
     </div>}
   </details></li>

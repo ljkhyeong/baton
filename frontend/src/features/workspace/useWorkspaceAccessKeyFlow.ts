@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react'
+import { generatePath } from 'react-router-dom'
+import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { resolveIdempotencyJournalFailure } from '@/shared/api/idempotencyJournal'
 import { isJsonCleanupComplete } from '@/shared/lib/durableStorage'
 import { saveAccessKey } from './storage'
@@ -61,7 +63,7 @@ export function useWorkspaceAccessKeyFlow({
   const rotationRequestInFlightRef = useRef(false)
   const shareRequestInFlightRef = useRef(false)
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
-  const shareUrl = `${window.location.origin}/teams/${encodeURIComponent(teamId)}/seasons/${encodeURIComponent(seasonId)}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(currentAccessKey)}`}`
+  const shareUrl = `${window.location.origin}${generatePath(WORKSPACE_ROUTE, { teamId, seasonId })}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(currentAccessKey)}`}`
 
   const clearRotationJournal = (idempotencyKey: string) => {
     const cleanupResult = clearPendingAccessKeyRotation(teamId, idempotencyKey)
