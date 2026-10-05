@@ -1,6 +1,7 @@
 package com.personal.baton.bootstrap.scheduling;
 
 import com.personal.baton.application.calendar.port.in.DispatchCalendarOutboxUseCase;
+import com.personal.baton.application.delivery.DispatchResult;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -25,7 +26,7 @@ class CalendarOutboxScheduler {
             scheduler = "calendarTaskScheduler"
     )
     void dispatchPending() {
-        DispatchCalendarOutboxUseCase.DispatchResult result =
+        DispatchResult result =
                 dispatchCalendarOutbox.dispatchPending();
         if (result.hasFailures()) {
             log.warn("CAL outbox 전달에 실패가 있습니다. claimed="

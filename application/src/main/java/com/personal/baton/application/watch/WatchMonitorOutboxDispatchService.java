@@ -1,6 +1,7 @@
 package com.personal.baton.application.watch;
 
 import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.DispatchResult;
 import com.personal.baton.application.delivery.RetryBackoff;
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
@@ -45,16 +46,7 @@ public class WatchMonitorOutboxDispatchService implements DispatchWatchMonitorOu
                 claimedAt,
                 DEFAULT_LEASE_DURATION
         );
-        int deliveredCount = 0;
-        int failedCount = 0;
-        for (WatchMonitorDelivery delivery : deliveries) {
-            if (dispatchOne(delivery)) {
-                deliveredCount++;
-            } else {
-                failedCount++;
-            }
-        }
-        return new DispatchResult(deliveries.size(), deliveredCount, failedCount);
+        return DispatchResult.dispatchEach(deliveries, this::dispatchOne);
     }
 
     private boolean dispatchOne(WatchMonitorDelivery delivery) {

@@ -5,6 +5,7 @@ import com.personal.baton.application.brief.port.out.BriefContinuityClient;
 import com.personal.baton.application.brief.port.out.BriefContinuityClient.DeliveryResult;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
 import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.DispatchResult;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,16 +44,7 @@ public class BriefContinuityOutboxDispatchService
                 claimedAt,
                 LEASE_DURATION
         );
-        int deliveredCount = 0;
-        int failedCount = 0;
-        for (BriefContinuityDelivery delivery : deliveries) {
-            if (dispatchOne(delivery)) {
-                deliveredCount++;
-            } else {
-                failedCount++;
-            }
-        }
-        return new DispatchResult(deliveries.size(), deliveredCount, failedCount);
+        return DispatchResult.dispatchEach(deliveries, this::dispatchOne);
     }
 
     private boolean dispatchOne(BriefContinuityDelivery delivery) {

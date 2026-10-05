@@ -6,8 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.personal.baton.application.delivery.DispatchResult;
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
-import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase.DispatchResult;
 import com.personal.baton.application.watch.port.in.RecoverWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase.ReconciliationResult;

@@ -1,5 +1,6 @@
 package com.personal.baton.bootstrap.scheduling;
 
+import com.personal.baton.application.delivery.DispatchResult;
 import com.personal.baton.application.watch.port.in.DispatchWatchMonitorOutboxUseCase;
 import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCase;
 import org.apache.commons.logging.Log;
@@ -31,7 +32,7 @@ class WatchMonitorScheduler {
             scheduler = "watchTaskScheduler"
     )
     void dispatchPending() {
-        DispatchWatchMonitorOutboxUseCase.DispatchResult result =
+        DispatchResult result =
                 dispatchWatchMonitorOutbox.dispatchPending();
         if (result.hasFailures()) {
             log.warn("WATCH outbox 전달에 실패가 있습니다. claimed="

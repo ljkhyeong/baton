@@ -6,6 +6,7 @@ import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
 import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.DispatchResult;
 import com.personal.baton.application.delivery.RetryBackoff;
 import java.time.Clock;
 import java.time.Duration;
@@ -50,11 +51,7 @@ public class CalendarOutboxDispatchService implements DispatchCalendarOutboxUseC
             return schedules;
         }
         DispatchResult metadata = dispatchBatch(true);
-        return new DispatchResult(
-                schedules.claimedCount() + metadata.claimedCount(),
-                schedules.deliveredCount() + metadata.deliveredCount(),
-                schedules.failedCount() + metadata.failedCount()
-        );
+        return schedules.plus(metadata);
     }
 
     private DispatchResult dispatchBatch(boolean seasonMetadata) {
@@ -64,16 +61,7 @@ public class CalendarOutboxDispatchService implements DispatchCalendarOutboxUseC
                 LEASE_DURATION,
                 seasonMetadata
         );
-        int deliveredCount = 0;
-        int failedCount = 0;
-        for (CalendarDelivery delivery : deliveries) {
-            if (dispatchOne(delivery)) {
-                deliveredCount++;
-            } else {
-                failedCount++;
-            }
-        }
-        return new DispatchResult(deliveries.size(), deliveredCount, failedCount);
+        return DispatchResult.dispatchEach(deliveries, this::dispatchOne);
     }
 
     private boolean dispatchOne(CalendarDelivery delivery) {
