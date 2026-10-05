@@ -29,6 +29,7 @@ import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoleHandoffTransitionException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,29 +50,77 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    @ExceptionHandler(AccountDeactivationBlockedException.class)
-    public ResponseEntity<ErrorResponse> accountDeactivationBlocked(AccountDeactivationBlockedException exception, HttpServletRequest request) {
-        return error(HttpStatus.CONFLICT, "ACCOUNT_DEACTIVATION_BLOCKED", exception, request);
-    }
-
-    @ExceptionHandler(AccountDeactivatedException.class)
-    public ResponseEntity<ErrorResponse> accountDeactivated(AccountDeactivatedException exception, HttpServletRequest request) {
-        return error(HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED", exception, request);
-    }
-
-    @ExceptionHandler(AccountMembershipConflictException.class)
-    public ResponseEntity<ErrorResponse> handleAccountMembershipConflict(
-            AccountMembershipConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "ACCOUNT_MEMBERSHIP_CONFLICT", exception, request);
-    }
-
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final ErrorResponse INTERNAL_ERROR = new ErrorResponse(
             "INTERNAL_ERROR",
             "서버에서 요청을 처리하지 못했습니다"
     );
+
+    private record ErrorMapping(HttpStatus status, String code) {
+    }
+
+    // 상태와 오류 코드만 다른 애플리케이션 예외를 한곳에서 응답으로 바꾼다.
+    private static final Map<Class<? extends RuntimeException>, ErrorMapping> ERROR_MAPPINGS = Map.ofEntries(
+            mapping(AccountDeactivationBlockedException.class, HttpStatus.CONFLICT, "ACCOUNT_DEACTIVATION_BLOCKED"),
+            mapping(AccountDeactivatedException.class, HttpStatus.FORBIDDEN, "ACCOUNT_DEACTIVATED"),
+            mapping(AccountMembershipConflictException.class, HttpStatus.CONFLICT, "ACCOUNT_MEMBERSHIP_CONFLICT"),
+            mapping(WorkspaceCreationDeniedException.class, HttpStatus.FORBIDDEN, "WORKSPACE_CREATION_DENIED"),
+            mapping(WorkspaceRecoveryDeniedException.class, HttpStatus.FORBIDDEN, "WORKSPACE_RECOVERY_DENIED"),
+            mapping(WorkspaceAccessDeniedException.class, HttpStatus.FORBIDDEN, "WORKSPACE_ACCESS_DENIED"),
+            mapping(WorkspaceAccessKeyConflictException.class, HttpStatus.CONFLICT, "WORKSPACE_ACCESS_KEY_CONFLICT"),
+            mapping(WorkspaceContentConflictException.class, HttpStatus.CONFLICT, "WORKSPACE_CONTENT_CONFLICT"),
+            mapping(MemberNameConflictException.class, HttpStatus.CONFLICT, "MEMBER_NAME_CONFLICT"),
+            mapping(RoleNameConflictException.class, HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT"),
+            mapping(RoleHandoffStateConflictException.class, HttpStatus.CONFLICT, "ROLE_HANDOFF_STATE_CONFLICT"),
+            mapping(RoleHandoffTransitionException.class, HttpStatus.CONFLICT, "ROLE_HANDOFF_STATE_CONFLICT"),
+            mapping(RoleHandoffWarningConfirmationRequiredException.class, HttpStatus.CONFLICT,
+                    "ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED"),
+            mapping(SeasonNameConflictException.class, HttpStatus.CONFLICT, "SEASON_NAME_CONFLICT"),
+            mapping(SeasonEndedException.class, HttpStatus.CONFLICT, "SEASON_ENDED"),
+            mapping(SeasonSuccessorExistsException.class, HttpStatus.CONFLICT, "SEASON_SUCCESSOR_EXISTS"),
+            mapping(SeasonRoundNameConflictException.class, HttpStatus.CONFLICT, "ROUND_NAME_CONFLICT"),
+            mapping(IdempotencyKeyReusedException.class, HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED"),
+            mapping(IdempotencyKeyConflictException.class, HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_CONFLICT"),
+            mapping(IdempotencyReplayExpiredException.class, HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED"),
+            mapping(WatchHealthEventIdMismatchException.class, HttpStatus.BAD_REQUEST, "IDEMPOTENCY_KEY_MISMATCH"),
+            mapping(WatchHealthEventResourceReferenceException.class, HttpStatus.BAD_REQUEST,
+                    "WATCH_RESOURCE_REFERENCE_INVALID"),
+            mapping(WatchHealthEventChangedAtOutOfRangeException.class, HttpStatus.BAD_REQUEST, "INVALID_INPUT"),
+            mapping(WatchHealthEventConflictException.class, HttpStatus.CONFLICT, "WATCH_EVENT_ID_CONFLICT"),
+            mapping(DomainValidationException.class, HttpStatus.BAD_REQUEST, "INVALID_INPUT")
+    );
+
+    private static Map.Entry<Class<? extends RuntimeException>, ErrorMapping> mapping(
+            Class<? extends RuntimeException> type,
+            HttpStatus status,
+            String code
+    ) {
+        return Map.entry(type, new ErrorMapping(status, code));
+    }
+
+    // 처리기 하나가 모든 런타임 예외를 받고, 표에 없는 예외는 내부 오류로 숨긴다.
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Object> handleApplicationException(RuntimeException exception, WebRequest request) {
+        for (Class<?> type = exception.getClass(); type != RuntimeException.class; type = type.getSuperclass()) {
+            ErrorMapping mapping = ERROR_MAPPINGS.get(type);
+            if (mapping != null) {
+                HttpObservationErrors.mark(servletRequest(request), exception);
+                return ResponseEntity.status(mapping.status())
+                        .body(new ErrorResponse(mapping.code(), exception.getMessage()));
+            }
+        }
+        return handleUnexpected(exception, request);
+    }
+
+    @ExceptionHandler(WorkspaceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleWorkspaceNotFound(
+            WorkspaceNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        HttpObservationErrors.mark(request, exception);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
+    }
 
     @ExceptionHandler(ResourceCheckRequestException.class)
     public ResponseEntity<ErrorResponse> handleResourceCheckRequest(ResourceCheckRequestException exception, HttpServletRequest request) {
@@ -86,242 +135,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             response.header(HttpHeaders.RETRY_AFTER, exception.retryAfterSeconds().toString());
         }
         return response.body(new ErrorResponse("WATCH_CHECK_" + exception.reason().name(), exception.getMessage()));
-    }
-
-    @ExceptionHandler(WorkspaceCreationDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleWorkspaceCreationDenied(
-            WorkspaceCreationDeniedException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.FORBIDDEN,
-                "WORKSPACE_CREATION_DENIED",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WorkspaceRecoveryDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleWorkspaceRecoveryDenied(
-            WorkspaceRecoveryDeniedException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.FORBIDDEN,
-                "WORKSPACE_RECOVERY_DENIED",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WorkspaceAccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleWorkspaceAccessDenied(
-            WorkspaceAccessDeniedException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.FORBIDDEN,
-                "WORKSPACE_ACCESS_DENIED",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WorkspaceAccessKeyConflictException.class)
-    public ResponseEntity<ErrorResponse> handleWorkspaceAccessKeyConflict(
-            WorkspaceAccessKeyConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "WORKSPACE_ACCESS_KEY_CONFLICT",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WorkspaceContentConflictException.class)
-    public ResponseEntity<ErrorResponse> handleWorkspaceContentConflict(
-            WorkspaceContentConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "WORKSPACE_CONTENT_CONFLICT",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WorkspaceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleWorkspaceNotFound(
-            WorkspaceNotFoundException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.NOT_FOUND,
-                exception.getCode(),
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(MemberNameConflictException.class)
-    public ResponseEntity<ErrorResponse> handleMemberNameConflict(
-            MemberNameConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "MEMBER_NAME_CONFLICT",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(RoleNameConflictException.class)
-    public ResponseEntity<ErrorResponse> handleRoleNameConflict(
-            RoleNameConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "ROLE_NAME_CONFLICT", exception, request);
-    }
-
-    @ExceptionHandler({
-            RoleHandoffStateConflictException.class,
-            RoleHandoffTransitionException.class
-    })
-    public ResponseEntity<ErrorResponse> handleRoleHandoffStateConflict(
-            RuntimeException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "ROLE_HANDOFF_STATE_CONFLICT",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(RoleHandoffWarningConfirmationRequiredException.class)
-    public ResponseEntity<ErrorResponse> handleRoleHandoffWarningConfirmationRequired(
-            RoleHandoffWarningConfirmationRequiredException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(SeasonNameConflictException.class)
-    public ResponseEntity<ErrorResponse> handleSeasonNameConflict(
-            SeasonNameConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "SEASON_NAME_CONFLICT", exception, request);
-    }
-
-    @ExceptionHandler(SeasonEndedException.class)
-    public ResponseEntity<ErrorResponse> handleSeasonEnded(
-            SeasonEndedException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "SEASON_ENDED", exception, request);
-    }
-
-    @ExceptionHandler(SeasonSuccessorExistsException.class)
-    public ResponseEntity<ErrorResponse> handleSeasonSuccessorExists(
-            SeasonSuccessorExistsException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "SEASON_SUCCESSOR_EXISTS",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(SeasonRoundNameConflictException.class)
-    public ResponseEntity<ErrorResponse> handleSeasonRoundNameConflict(
-            SeasonRoundNameConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "ROUND_NAME_CONFLICT", exception, request);
-    }
-
-    @ExceptionHandler(IdempotencyKeyReusedException.class)
-    public ResponseEntity<ErrorResponse> handleIdempotencyKeyReused(
-            IdempotencyKeyReusedException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", exception, request);
-    }
-
-    @ExceptionHandler(IdempotencyKeyConflictException.class)
-    public ResponseEntity<ErrorResponse> handleIdempotencyKeyConflict(
-            IdempotencyKeyConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_CONFLICT", exception, request);
-    }
-
-    @ExceptionHandler(IdempotencyReplayExpiredException.class)
-    public ResponseEntity<ErrorResponse> handleIdempotencyReplayExpired(
-            IdempotencyReplayExpiredException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.CONFLICT, "IDEMPOTENCY_REPLAY_EXPIRED", exception, request);
-    }
-
-    @ExceptionHandler(WatchHealthEventIdMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleWatchHealthEventIdMismatch(
-            WatchHealthEventIdMismatchException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.BAD_REQUEST,
-                "IDEMPOTENCY_KEY_MISMATCH",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WatchHealthEventResourceReferenceException.class)
-    public ResponseEntity<ErrorResponse> handleWatchHealthEventResourceReference(
-            WatchHealthEventResourceReferenceException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.BAD_REQUEST,
-                "WATCH_RESOURCE_REFERENCE_INVALID",
-                exception,
-                request
-        );
-    }
-
-    @ExceptionHandler(WatchHealthEventChangedAtOutOfRangeException.class)
-    public ResponseEntity<ErrorResponse> handleWatchHealthEventChangedAtOutOfRange(
-            WatchHealthEventChangedAtOutOfRangeException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception, request);
-    }
-
-    @ExceptionHandler(WatchHealthEventConflictException.class)
-    public ResponseEntity<ErrorResponse> handleWatchHealthEventConflict(
-            WatchHealthEventConflictException exception,
-            HttpServletRequest request
-    ) {
-        return error(
-                HttpStatus.CONFLICT,
-                "WATCH_EVENT_ID_CONFLICT",
-                exception,
-                request
-        );
     }
 
     @Override
@@ -368,14 +181,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 status,
                 request
         );
-    }
-
-    @ExceptionHandler(DomainValidationException.class)
-    public ResponseEntity<ErrorResponse> handleDomainValidation(
-            DomainValidationException exception,
-            HttpServletRequest request
-    ) {
-        return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception, request);
     }
 
     @Override
@@ -429,16 +234,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 request
         );
-    }
-
-    private ResponseEntity<ErrorResponse> error(
-            HttpStatus status,
-            String code,
-            Exception exception,
-            HttpServletRequest request
-    ) {
-        HttpObservationErrors.mark(request, exception);
-        return ResponseEntity.status(status).body(new ErrorResponse(code, exception.getMessage()));
     }
 
     private ErrorResponse frameworkError(HttpStatusCode status) {
