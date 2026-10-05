@@ -956,7 +956,7 @@ test('@operations 시즌 시간대와 격주 일정을 저장해 자동 회차 �
   await dialog.getByLabel('회차 생성 시점').selectOption('14')
   await dialog.getByRole('button', { name: '설정 저장' }).click()
 
-  await expect(page.getByRole('heading', { name: '격주 20:30' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '격주 오후 8:30' })).toBeVisible()
   await expect(page.locator('.round-schedule-card')).toContainText(
     'Asia/Seoul · 자동 생성 켜짐 · 다음 예정일 2026. 8. 6.',
   )
