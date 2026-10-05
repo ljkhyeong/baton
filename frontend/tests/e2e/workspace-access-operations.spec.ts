@@ -818,7 +818,7 @@ test('@continuity 반복 업무 지연 항목은 해당 업무가 있는 일정 
     .getByRole('button')
     .click()
 
-  await expect(page.getByRole('heading', { level: 1, name: '반복 업무' }))
+  await expect(page.getByRole('heading', { level: 1, name: '일정' }))
     .toBeVisible()
   await expect(page.locator(`.routine-row[data-routine-id="${ROUTINE_ID}"] .routine-copy`))
     .toBeFocused()

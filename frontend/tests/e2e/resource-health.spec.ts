@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { ACCESS_KEY, CREATED_ROLE_RESOURCE_ID, ROLE_ID, SCOPE_PATH,
   ROLE_HANDOFF_ID, MEMBER_ONE_ID, MEMBER_TWO_ID, SECOND_ROLE_ID, SECOND_ROLE_RESOURCE_ID,
-  makeProjection, installApi, openSharedWorkspace, navigation } from './support/workspaceApiHarness'
+  makeProjection, installApi, openSharedWorkspace, navigation,
+  openRecordSearch,
+} from './support/workspaceApiHarness'
 
 function projectionWithResource() {
   const projection = makeProjection()
@@ -57,7 +59,7 @@ for (const mode of ['healthy', 'rate-limited', 'unavailable', 'wrong-resource'] 
       await route.fulfill({ status: 202, json: { resourceId: CREATED_ROLE_RESOURCE_ID, status: 'ALREADY_SCHEDULED' } })
     })
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
     const inspector = page.getByLabel(/선택한 역할 상세/)
     const health = inspector.getByRole('group', { name: '공유 운영 문서 연결 상태' })
@@ -154,7 +156,7 @@ for (const lock of ['handoff', 'conflict', 'ended-season'] as const) {
       await expect(dialog).toBeHidden()
       await expect(page.locator('.workspace-sync-status')).toContainText('다른 사람이 먼저 수정했습니다. 최신 내용을 확인한 뒤 다시 수정하세요.')
     }
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
     const inspector = page.getByLabel(/선택한 역할 상세/)
     const health = inspector.getByRole('group', { name: '공유 운영 문서 연결 상태' })
@@ -184,7 +186,7 @@ test('@operations @responsive 점검 실패 원인과 횟수를 최신 결과에
       lastConclusiveAt: '2026-09-05T01:00:00Z', lastCheckedAt: '2026-09-05T01:00:00Z', checkRequestAllowed: true, ...results[resultIndex] } })
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
   const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
   await expect(health).toContainText('도메인 주소를 찾지 못했습니다.')
@@ -222,7 +224,7 @@ test('@operations @responsive 오래된 연결 판정과 최근 시도를 구분
       lastOutcome: null, consecutiveFailures: null, monitoringReason: null } })
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
   const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
   await expect(health).toContainText('최근 점검 정보 없음')
@@ -258,7 +260,7 @@ for (const invalidField of ['lastOutcome', 'monitoringReason', 'lastConclusiveAt
         lastOutcome: 'SUCCESS', consecutiveFailures: 0, [invalidField]: 'UNSUPPORTED_VALUE' },
     }))
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
     const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
     await expect(health).toContainText('연결 상태 확인 불가')
@@ -282,7 +284,7 @@ for (const [reason, message] of [
         monitoringReason: reason, checkRequestAllowed: false },
     }))
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
     const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
     await expect(health).toContainText(reason === 'SYNC_PENDING' ? '자료 주소 반영 대기' : '자동 점검 대상 아님')
@@ -330,7 +332,7 @@ for (const response of ['accepted', 'rate-limited'] as const) {
       if (testInfo.project.name === 'mobile' && await inspector.isVisible()) {
         await inspector.getByRole('button', { name: '상세 닫기' }).click()
       }
-      await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+      await openRecordSearch(page, testInfo.project.name)
       await page.getByRole('button', { name: `${title} 역할에서 보기` }).click()
     }
     await showResource('공유 운영 문서')
@@ -390,13 +392,13 @@ for (const closeWhileWaiting of [false, true]) {
       active--
     })
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: '운영 자료 1 역할에서 보기' }).click()
     const inspector = page.getByLabel(/선택한 역할 상세/)
     await expect.poll(() => reads.length).toBe(2)
     if (closeWhileWaiting) {
       if (testInfo.project.name === 'mobile') await inspector.getByRole('button', { name: '상세 닫기' }).click()
-      await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+      await openRecordSearch(page, testInfo.project.name)
     }
     release()
     if (closeWhileWaiting) {
@@ -443,7 +445,7 @@ test('@operations @responsive 새 결과 확인 안내는 오프라인과 역할
     if (testInfo.project.name === 'mobile' && await inspector.isVisible()) {
       await inspector.getByRole('button', { name: '상세 닫기' }).click()
     }
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: `${title} 역할에서 보기` }).click()
   }
   await showResource('공유 운영 문서')
@@ -501,7 +503,7 @@ test('@operations @responsive 상태 조회 안내는 수동 재조회와 실제
       checkRequestAllowed: true } })
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
   const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
   const announcement = health.getByRole('status', { name: '공유 운영 문서 상태 조회 안내' })
@@ -546,7 +548,7 @@ test('@operations @responsive 오프라인에서는 이전 정상을 숨기고 �
       consecutiveFailures: broken ? 3 : 0, checkRequestAllowed: true } })
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
   const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
   const refresh = health.getByRole('button', { name: '공유 운영 문서 상태 새로고침' })
@@ -588,7 +590,7 @@ test('@operations @responsive 숨긴 탭의 조회 캐시가 만료되면 정상
       lastOutcome: 'SUCCESS', consecutiveFailures: 0, checkRequestAllowed: true } })
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
   const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
   await expect(health).toContainText('연결 정상')
@@ -637,7 +639,7 @@ for (const failure of ['unavailable', 'transport'] as const) {
         lastCheckedAt: reads < 3 ? null : '2026-09-05T01:00:00Z', checkRequestAllowed: reads >= 3 } })
     })
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+    await openRecordSearch(page, testInfo.project.name)
     await page.getByRole('button', { name: '공유 운영 문서 역할에서 보기' }).click()
     const health = page.getByRole('group', { name: '공유 운영 문서 연결 상태' })
     const refresh = health.getByRole('button', { name: '공유 운영 문서 상태 새로고침' })

@@ -1375,6 +1375,11 @@ export function navigation(page: Page, projectName: string) {
   return page.getByRole('navigation', { name: projectName === 'mobile' ? '모바일 주 메뉴' : '주 메뉴' })
 }
 
+export async function openRecordSearch(page: Page, projectName: string) {
+  await navigation(page, projectName).getByRole('button', { name: '기록' }).click()
+  await page.getByRole('navigation', { name: '기록 보기' }).getByRole('button', { name: '검색' }).click()
+}
+
 export async function blockBrowserStorage(page: Page) {
   await page.addInitScript(() => {
     const unavailable = () => { throw new DOMException('Storage disabled', 'SecurityError') }

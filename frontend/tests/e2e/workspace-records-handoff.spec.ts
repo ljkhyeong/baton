@@ -27,6 +27,7 @@ import {
   pendingContentCreationEntries,
   recordedCall,
   expectScopedCall,
+  openRecordSearch,
 } from './support/workspaceApiHarness'
 
 test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ page }, testInfo) => {
@@ -249,7 +250,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await installApi(page, initialProjection)
   await openSharedWorkspace(page)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   let search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeInViewport()
@@ -272,7 +273,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(decisionEntry).toBeVisible()
   await expect(decisionEntry).toBeFocused()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(search.getByLabel('무엇을 다시 찾고 있나요?'))
     .toHaveValue('풀이 비교 문제 큐레이터')
@@ -305,7 +306,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(handoffItem).toBeVisible()
   await expect(handoffItem).toBeFocused()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await expect(search.getByLabel('무엇을 다시 찾고 있나요?')).toHaveValue('역할의 한 줄 목적')
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
@@ -350,7 +351,7 @@ test('@records 보관한 역할 자료는 보관 기록으로만 탐색한다', 
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   const search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('보관한 문제 선정 기준')
   await search.locator('.record-search-advanced > summary').click()
@@ -1239,7 +1240,7 @@ test('@memory @records @responsive 결정 Markdown은 명시적으로 전환하�
   await expect(entry.locator('code', { hasText: '회의록' })).toBeVisible()
   await expect(entry.locator('img, iframe, a[href^="javascript:"]')).toHaveCount(0)
   await entry.screenshot({ path: testInfo.outputPath('decision-markdown.png') })
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '검색' }).click()
+  await openRecordSearch(page, testInfo.project.name)
   const search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('회고 준비 질문 수집')
   await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
