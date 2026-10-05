@@ -84,9 +84,6 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import com.personal.baton.domain.workspace.Team;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -94,8 +91,6 @@ import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -3631,8 +3626,8 @@ class WorkspaceUseCaseTest {
                 firstCommand
         );
         jdbcTemplate.update(
-                "INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at) "
-                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?)",
+                "INSERT INTO seasons (id, team_id, name, start_date, end_date, ended_at, time_zone) "
+                        + "VALUES (UUID_TO_BIN(?), UUID_TO_BIN(?), ?, ?, ?, ?, 'Asia/Seoul')",
                 "00000000-0000-0000-0000-000000000001",
                 first.teamId().toString(),
                 "추가 시즌",
@@ -6267,9 +6262,9 @@ class WorkspaceUseCaseTest {
                 .isEqualTo(LocalDate.of(2026, 8, 2));
     }
 
-    @DisplayName("접근 키 변경 재생은 시즌을 바꿔도 팀 범위를 유지하고 기존 시즌 기반 기록도 복원한다")
+    @DisplayName("접근 키 변경 재생은 시즌을 바꿔도 팀 범위를 유지한다")
     @Test
-    void replaysTeamScopedAndLegacySeasonScopedAccessKeyChanges() throws Exception {
+    void replaysTeamScopedAccessKeyChangesAcrossSeasons() {
         CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
                 "workspace-access-key-season-transition-01",
                 CREATION_KEY,
@@ -6310,46 +6305,6 @@ class WorkspaceUseCaseTest {
         );
 
         assertThat(replayedAcrossSeason).isEqualTo(rotated);
-
-        String legacyIdempotencyKey = "rotate-legacy-season-scope-replay-001";
-        String legacyHash = legacyAccessKeyChangeHash(
-                "baton:workspace-access-key-rotate-idempotency:v1",
-                created.teamId(),
-                next.season().id(),
-                legacyIdempotencyKey
-        );
-        String legacyAccessKey = legacyAccessKey(
-                "baton:workspace-access-key-rotate:v1",
-                created.teamId(),
-                next.season().id(),
-                legacyIdempotencyKey
-        );
-        jdbcTemplate.update(
-                "UPDATE teams SET access_key_hash = ?, "
-                        + "last_access_key_change_idempotency_hash = ?, version = version + 1 "
-                        + "WHERE id = UUID_TO_BIN(?)",
-                HexFormat.of().formatHex(
-                        MessageDigest.getInstance("SHA-256")
-                                .digest(legacyAccessKey.getBytes(StandardCharsets.UTF_8))
-                ),
-                legacyHash,
-                created.teamId().toString()
-        );
-        jdbcTemplate.update(
-                "INSERT INTO access_key_change_history (id, team_id, idempotency_hash) "
-                        + "VALUES (UUID_TO_BIN(UUID()), UUID_TO_BIN(?), ?)",
-                created.teamId().toString(),
-                legacyHash
-        );
-
-        WorkspaceContract.AccessKeyResult legacyReplay = lifecycleUseCase.rotateAccessKey(
-                created.teamId(),
-                next.season().id(),
-                legacyIdempotencyKey,
-                "기존 기록 재생에서는 현재 키를 사용하지 않습니다"
-        );
-
-        assertThat(legacyReplay.accessKey()).isEqualTo(legacyAccessKey);
     }
 
     }
@@ -6496,51 +6451,6 @@ class WorkspaceUseCaseTest {
                 .filter(member -> member.name().equals(name))
                 .findFirst()
                 .orElseThrow();
-    }
-
-    private String legacyAccessKeyChangeHash(
-            String domain,
-            UUID teamId,
-            UUID seasonId,
-            String idempotencyKey
-    ) throws Exception {
-        return HexFormat.of().formatHex(legacyAccessKeyChangeDigest(
-                domain,
-                teamId,
-                seasonId,
-                idempotencyKey
-        ));
-    }
-
-    private String legacyAccessKey(
-            String domain,
-            UUID teamId,
-            UUID seasonId,
-            String idempotencyKey
-    ) throws Exception {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(
-                legacyAccessKeyChangeDigest(domain, teamId, seasonId, idempotencyKey)
-        );
-    }
-
-    private byte[] legacyAccessKeyChangeDigest(
-            String domain,
-            UUID teamId,
-            UUID seasonId,
-            String idempotencyKey
-    ) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        updateLengthPrefixedDigest(digest, domain);
-        updateLengthPrefixedDigest(digest, teamId.toString());
-        updateLengthPrefixedDigest(digest, seasonId.toString());
-        updateLengthPrefixedDigest(digest, idempotencyKey);
-        return digest.digest();
-    }
-
-    private void updateLengthPrefixedDigest(MessageDigest digest, String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
-        digest.update(bytes);
     }
 
     private String contentIdempotencyKey(String suffix) {

@@ -93,19 +93,6 @@ final class WorkspaceAccessControl {
         );
     }
 
-    AccessKeyChange deriveLegacyAccessKeyChange(
-            AccessKeyChangeKind kind,
-            UUID teamId,
-            UUID seasonId,
-            String idempotencyKey
-    ) {
-        return deriveAccessKeyChange(
-                kind.idempotencyHashDomain,
-                kind.accessKeyDomain,
-                List.of(teamId.toString(), seasonId.toString(), idempotencyKey)
-        );
-    }
-
     private AccessKeyChange deriveAccessKeyChange(
             String idempotencyHashDomain,
             String accessKeyDomain,

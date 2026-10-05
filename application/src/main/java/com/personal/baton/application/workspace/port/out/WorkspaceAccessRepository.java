@@ -3,9 +3,7 @@ package com.personal.baton.application.workspace.port.out;
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Team;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 public interface WorkspaceAccessRepository {
@@ -30,9 +28,4 @@ public interface WorkspaceAccessRepository {
     );
 
     boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash);
-
-    Set<String> findAccessKeyChangeIdempotencyHashes(
-            UUID teamId,
-            List<String> idempotencyHashes
-    );
 }

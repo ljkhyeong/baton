@@ -9,9 +9,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceAccessReposito
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Team;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -113,17 +111,6 @@ public class WorkspaceAccessPersistenceAdapter implements WorkspaceAccessReposit
     @Override
     public boolean existsAccessKeyChangeHistory(UUID teamId, String idempotencyHash) {
         return accessKeyChangeHistoryRepository.existsByTeamIdAndIdempotencyHash(teamId, idempotencyHash);
-    }
-
-    @Override
-    public Set<String> findAccessKeyChangeIdempotencyHashes(
-            UUID teamId,
-            List<String> idempotencyHashes
-    ) {
-        return accessKeyChangeHistoryRepository.findIdempotencyHashes(
-                teamId,
-                idempotencyHashes
-        );
     }
 }
 

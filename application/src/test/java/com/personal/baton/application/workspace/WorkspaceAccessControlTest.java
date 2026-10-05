@@ -21,10 +21,9 @@ import static org.mockito.Mockito.when;
 class WorkspaceAccessControlTest {
 
     private static final UUID TEAM_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private static final UUID SEASON_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final String IDEMPOTENCY_KEY = "workspace-idempotency-primary-000001";
 
-    @DisplayName("공유 키 파생 결과는 기존 워크스페이스와 키 변경 호환 벡터를 유지한다")
+    @DisplayName("공유 키 파생 결과는 고정 입력에 대해 같은 값을 만든다")
     @Test
     void preservesAccessKeyDerivationCompatibilityVectors() {
         WorkspaceAccessControl accessControl = accessControl("", "");
@@ -41,17 +40,6 @@ class WorkspaceAccessControlTest {
                 .isEqualTo("e801538dda26ee9e32cd0e3c1e5044d2de604b1e0cf059a8b4d758e924681a80");
         assertThat(rotation.accessKey())
                 .isEqualTo("h-7Hg-KqBadBqZH1eOMKpOqkUGHAyB6NScbdLJz67V0");
-
-        AccessKeyChange legacyRecovery = accessControl.deriveLegacyAccessKeyChange(
-                AccessKeyChangeKind.RECOVER,
-                TEAM_ID,
-                SEASON_ID,
-                IDEMPOTENCY_KEY
-        );
-        assertThat(legacyRecovery.idempotencyHash())
-                .isEqualTo("ba0a6c3cc5776fa70418495e1e16f3190f1d9e126295e62f9f32421d484c4c21");
-        assertThat(legacyRecovery.accessKey())
-                .isEqualTo("EhqJSarevbQbHkPe0hhSlR07xE9mprbvtm3Oi_hsYhg");
     }
 
     @DisplayName("로컬 생성은 비밀값이 없으면 허용하지만 복구는 항상 거절한다")

@@ -59,7 +59,6 @@ final class WorkspaceServiceTestFactory {
         );
         WorkspaceAccessKeyCoordinator accessKeyCoordinator = new WorkspaceAccessKeyCoordinator(
                 accessRepository,
-                seasonRepository,
                 scopeAuthorizer,
                 accessControl
         );
