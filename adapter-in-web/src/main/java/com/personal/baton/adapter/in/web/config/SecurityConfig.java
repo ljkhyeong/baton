@@ -24,11 +24,16 @@ import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCas
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -40,9 +45,12 @@ import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizati
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
+import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.IpAddressAuthorizationManager;
-import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -69,6 +77,11 @@ public class SecurityConfig {
             "INVALID_CREDENTIALS",
             "이메일 또는 비밀번호가 올바르지 않습니다"
     );
+    private static final ErrorResponse UNAUTHORIZED = new ErrorResponse(
+            "UNAUTHORIZED",
+            "인증 정보가 올바르지 않습니다"
+    );
+
     @Bean
     LocalAccountUserDetailsService localAccountUserDetailsService(
             ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider
@@ -105,9 +118,47 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(
+    @Order(2)
+    SecurityFilterChain watchEventReceiverSecurityFilterChain(
             HttpSecurity http,
             ObjectProvider<WatchEventReceiverAuthentication> receiverAuthenticationProvider,
+            SecurityErrorResponseWriter errorResponseWriter
+    ) throws Exception {
+        WatchEventReceiverAuthentication receiverAuthentication = receiverAuthenticationProvider
+                .getIfAvailable(WatchEventReceiverAuthentication::disabled);
+        AuthenticationEntryPoint unauthorized = (request, response, exception) -> {
+            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+            errorResponseWriter.write(response, HttpServletResponse.SC_UNAUTHORIZED, UNAUTHORIZED);
+        };
+        DefaultBearerTokenResolver bearerTokenResolver = new DefaultBearerTokenResolver();
+        return http
+                .securityMatcher(PathPatternRequestMatcher.pathPattern(
+                        HttpMethod.POST,
+                        WatchHealthEventController.PATH + "/**"
+                ))
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .requestCache(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                .oauth2ResourceServer(resource -> resource
+                        .authenticationEntryPoint(unauthorized)
+                        // Authorization 헤더가 둘 이상이면 올바른 토큰이 섞여 있어도 인증하지 않는다.
+                        .bearerTokenResolver(request -> hasSingleAuthorizationHeader(request)
+                                ? bearerTokenResolver.resolve(request)
+                                : null)
+                        .opaqueToken(opaque -> opaque.introspector(token -> {
+                            if (!receiverAuthentication.authenticates(token)) {
+                                throw new BadOpaqueTokenException("인증 정보가 올바르지 않습니다");
+                            }
+                            return new DefaultOAuth2AuthenticatedPrincipal("watch", Map.of("sub", "watch"), List.of());
+                        })))
+                .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized))
+                .build();
+    }
+
+    @Bean
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
             ObjectProvider<SocialLoginProviderCatalog> socialLoginProviderCatalogProvider,
             ObjectProvider<ResolveExternalLoginUseCase> resolveExternalLoginUseCaseProvider,
             ObjectProvider<OidcUserService> oidcUserServiceProvider,
@@ -121,8 +172,6 @@ public class SecurityConfig {
             CsrfTokenRepository csrfTokenRepository,
             SecurityErrorResponseWriter errorResponseWriter
     ) throws Exception {
-        WatchEventReceiverAuthentication receiverAuthentication = receiverAuthenticationProvider
-                .getIfAvailable(WatchEventReceiverAuthentication::disabled);
         SocialLoginProviderCatalog socialLoginProviderCatalog =
                 socialLoginProviderCatalogProvider.getIfAvailable();
         ClientRegistrationRepository clientRegistrationRepository =
@@ -140,10 +189,7 @@ public class SecurityConfig {
                                         "/api/v1/workspaces"
                                 ),
                                 AccountSessionRequestMatchers
-                                        .workspaceCapabilityWithoutAccountSession(),
-                                PathPatternRequestMatcher.pathPattern(
-                                        WatchHealthEventController.PATH
-                                )
+                                        .workspaceCapabilityWithoutAccountSession()
                         ))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
@@ -218,10 +264,6 @@ public class SecurityConfig {
                                     "/api/v1/workspaces"
                             ).permitAll()
                             .requestMatchers(
-                                    HttpMethod.POST,
-                                    WatchHealthEventController.PATH
-                            ).permitAll()
-                            .requestMatchers(
                                     "/api/v1/teams/*/seasons/*/**"
                             ).permitAll();
                     if (clientRegistrationRepository != null) {
@@ -247,13 +289,6 @@ public class SecurityConfig {
                 .addFilterBefore(
                         new LocalLoginRateLimitFilter(authRateLimiter, errorResponseWriter),
                         UsernamePasswordAuthenticationFilter.class
-                )
-                .addFilterBefore(
-                        new WatchEventReceiverAuthenticationFilter(
-                                receiverAuthentication,
-                                errorResponseWriter
-                        ),
-                        AnonymousAuthenticationFilter.class
                 );
 
         http.authenticationProvider(localAccountAuthenticationProvider)
@@ -306,6 +341,15 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    private static boolean hasSingleAuthorizationHeader(HttpServletRequest request) {
+        Enumeration<String> values = request.getHeaders(HttpHeaders.AUTHORIZATION);
+        if (values == null || !values.hasMoreElements()) {
+            return false;
+        }
+        values.nextElement();
+        return !values.hasMoreElements();
     }
 
     @Bean

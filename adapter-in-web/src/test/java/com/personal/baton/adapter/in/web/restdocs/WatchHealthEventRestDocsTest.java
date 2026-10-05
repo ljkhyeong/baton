@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -14,6 +13,7 @@ import static org.springframework.restdocs.headers.HeaderDocumentation.responseH
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
@@ -21,16 +21,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
-import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WatchEventReceiverAuthentication;
-import com.personal.baton.adapter.in.web.config.WatchEventReceiverAuthenticationFilter;
-import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventRequest;
 import com.personal.baton.application.watch.WatchResourceHealth;
@@ -38,6 +35,7 @@ import com.personal.baton.application.watch.error.WatchHealthEventConflictExcept
 import com.personal.baton.application.watch.error.WatchHealthEventChangedAtOutOfRangeException;
 import com.personal.baton.application.watch.error.WatchHealthEventIdMismatchException;
 import com.personal.baton.application.watch.error.WatchHealthEventResourceReferenceException;
+import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.AcceptWatchHealthEventCommand;
 import com.personal.baton.application.watch.port.in.AcceptWatchHealthEventUseCase.WatchHealthEventReceipt;
@@ -50,19 +48,29 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.restdocs.payload.FieldDescriptor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultHandler;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 @Tag("restdocs")
 @ExtendWith(RestDocumentationExtension.class)
+@WebMvcTest(controllers = WatchHealthEventController.class)
+@Import({SecurityConfig.class, WatchHealthEventRestDocsTest.ReceiverConfig.class})
 class WatchHealthEventRestDocsTest {
 
     private static final UUID EVENT_ID =
@@ -77,21 +85,25 @@ class WatchHealthEventRestDocsTest {
                     + "서비스 간 콜백이며 일반 프런트엔드에서 호출하지 않는다.";
     private static final String SUMMARY = "WATCH 전용 역할 자료 상태 변경 이벤트 수신";
 
+    @MockitoBean
     private AcceptWatchHealthEventUseCase useCase;
+
+    @MockitoBean
+    private ValidateAccountSessionUseCase validateAccountSessionUseCase;
+
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private WebApplicationContext applicationContext;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider restDocumentation) {
-        useCase = mock(AcceptWatchHealthEventUseCase.class);
-        mockMvc = standaloneSetup(new WatchHealthEventController(useCase))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .addFilters(
-                        new RequestIdFilter(() -> REQUEST_ID),
-                        new WatchEventReceiverAuthenticationFilter(
-                                WatchEventReceiverAuthentication.enabled(TOKEN),
-                                new SecurityErrorResponseWriter(new ObjectMapper())
-                        )
-                )
+        mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext)
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
+                .apply(springSecurity())
                 .apply(documentationConfiguration(restDocumentation)
                         .operationPreprocessors()
                         .withRequestDefaults(prettyPrint())
@@ -416,5 +428,14 @@ class WatchHealthEventRestDocsTest {
                         fieldWithPath("message").description("안전한 오류 설명")
                 )
         );
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class ReceiverConfig {
+
+        @Bean
+        WatchEventReceiverAuthentication watchEventReceiverAuthentication() {
+            return WatchEventReceiverAuthentication.enabled(TOKEN);
+        }
     }
 }
