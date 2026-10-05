@@ -11,7 +11,7 @@
   button, select { padding: .55rem .7rem; border: 1px solid var(--rule-strong); border-radius: var(--radius); background-color: var(--paper); }
   select { padding-right: 34px; }
   button:not(:disabled) { cursor: pointer; }
-  button:not(:disabled):hover { border-color: var(--baton-dark); }
+  button:not(:disabled):hover { border-color: var(--field-border-hover); }
   [role="alert"] { color: var(--warning); }
   [role="alert"] button { margin-left: 8px; color: var(--ink); }
 }
@@ -26,7 +26,7 @@
 .brief-items small { color: var(--muted); }
 .brief-history, .brief-edition { border-top: 1px solid var(--rule); margin-top: 1rem; padding-top: 1rem; overflow-wrap: anywhere; }
 .brief-history h3, .brief-edition h3 { font-size: 16px; }
-.brief-transitions { list-style: none; padding: 0 0 0 .75rem; border-left: 2px solid var(--baton-dark); }
+.brief-transitions { list-style: none; padding: 0 0 0 .75rem; border-left: 2px solid var(--rule-strong); }
 .brief-transitions li { display: grid; gap: .35rem; margin: 1rem 0; }
 .brief-transitions span { font-size: 13px; color: var(--muted); }
 
