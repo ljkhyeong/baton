@@ -105,6 +105,7 @@ import {
   ContentCreationCleanupBanner,
   MobileNav,
   MobileTopbar,
+  RecordsSwitch,
   Sidebar,
   WorkspaceState,
   WorkspaceSyncStatus,
@@ -982,6 +983,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               busyRoutineIds={busyRoutineIds}
               changesDisabled={contentChangesDisabled}
             />
+          )}
+          {(view === 'memory' || view === 'records') && (
+            <RecordsSwitch view={view} onNavigate={openView} />
           )}
           {view === 'memory' && (
             <MemoryView

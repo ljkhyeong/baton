@@ -100,7 +100,6 @@ export function RecordSearchView({
     <>
       <header className="page-header">
         <div>
-          <span className="eyebrow">{season.name}</span>
           <h1>기록 검색</h1>
           <p>선택한 시즌의 결정·인수인계·자료를 검색합니다.</p>
         </div>

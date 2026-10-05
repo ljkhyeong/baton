@@ -17,8 +17,17 @@ const navItems: {
   { key: 'rhythm', label: '일정', icon: 'rhythm' },
   { key: 'memory', label: '기록', icon: 'memory' },
   { key: 'handoff', label: '인수인계', icon: 'handoff' },
-  { key: 'records', label: '검색', icon: 'search' },
 ]
+
+const recordViews: { key: ViewKey; label: string }[] = [
+  { key: 'memory', label: '결정' },
+  { key: 'records', label: '검색' },
+]
+
+// 기록 검색은 기록 메뉴 안의 보기로 둔다.
+function navKey(view: ViewKey): ViewKey {
+  return view === 'records' ? 'memory' : view
+}
 
 function formatSyncTime(value: number) {
   return new Intl.DateTimeFormat('ko-KR', {
@@ -89,9 +98,9 @@ export function Sidebar({
         {navItems.map((item) => (
           <button
             type="button"
-            className={view === item.key ? 'active' : ''}
+            className={navKey(view) === item.key ? 'active' : ''}
             key={item.key}
-            aria-current={view === item.key ? 'page' : undefined}
+            aria-current={navKey(view) === item.key ? 'page' : undefined}
             onClick={() => onNavigate(item.key)}
           >
             <Icon name={item.icon} /><span>{item.label}</span>
@@ -169,12 +178,36 @@ export function MobileNav({
       {navItems.map((item) => (
         <button
           type="button"
+          className={navKey(view) === item.key ? 'active' : ''}
+          key={item.key}
+          aria-current={navKey(view) === item.key ? 'page' : undefined}
+          onClick={() => onNavigate(item.key)}
+        >
+          <Icon name={item.icon} size={20} /><span>{item.label}</span>
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+export function RecordsSwitch({
+  view,
+  onNavigate,
+}: {
+  view: ViewKey
+  onNavigate: (key: ViewKey) => void
+}) {
+  return (
+    <nav className="records-switch" aria-label="기록 보기">
+      {recordViews.map((item) => (
+        <button
+          type="button"
           className={view === item.key ? 'active' : ''}
           key={item.key}
           aria-current={view === item.key ? 'page' : undefined}
           onClick={() => onNavigate(item.key)}
         >
-          <Icon name={item.icon} size={20} /><span>{item.label}</span>
+          {item.label}
         </button>
       ))}
     </nav>
