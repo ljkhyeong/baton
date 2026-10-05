@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
@@ -33,20 +34,20 @@ public class ResourceVerificationController {
 
     @GetMapping(DUE_PATH)
     public ResponseEntity<ResourceDueReviewsResponse> dueReviews(@PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ResourceDueReviewsResponse.from(useCase.getDueReviews(teamId, seasonId, accessKey)));
     }
 
     @GetMapping(SCHEDULE_PATH)
     public ResponseEntity<ResourceReviewScheduleResponse> schedule(@PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @PathVariable UUID resourceId, @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+            @PathVariable UUID resourceId, @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ResourceReviewScheduleResponse.from(useCase.getSchedule(teamId, seasonId, resourceId, accessKey)));
     }
     @PostMapping(SCHEDULE_PATH)
     public ResponseEntity<ResourceReviewScheduleResponse> configureSchedule(@PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @PathVariable UUID resourceId, @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @PathVariable UUID resourceId, @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @Valid @RequestBody ResourceReviewScheduleRequest request) {
         if (!principal.accountId().equals(request.expectedAccountId())) throw new AccountMembershipConflictException("로그인 계정이 변경되었습니다. 새로고침해 주세요.");
@@ -58,7 +59,7 @@ public class ResourceVerificationController {
     @GetMapping(PATH)
     public ResponseEntity<ResourceVerificationHistoryResponse> history(@PathVariable UUID teamId,
             @PathVariable UUID seasonId, @PathVariable UUID resourceId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ResourceVerificationHistoryResponse.from(useCase.getHistory(teamId, seasonId, resourceId, accessKey)));
     }
@@ -66,7 +67,7 @@ public class ResourceVerificationController {
     @PostMapping(PATH)
     public ResponseEntity<ResourceVerificationHistoryResponse> verify(@PathVariable UUID teamId,
             @PathVariable UUID seasonId, @PathVariable UUID resourceId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @Valid @RequestBody VerifyResourceRequest request) {
         if (!principal.accountId().equals(request.expectedAccountId())) {

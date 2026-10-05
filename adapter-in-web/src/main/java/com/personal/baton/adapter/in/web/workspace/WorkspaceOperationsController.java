@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
@@ -45,7 +46,7 @@ public class WorkspaceOperationsController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateRoutineRequest request
@@ -74,7 +75,7 @@ public class WorkspaceOperationsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID routineId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateRoutineRequest request
@@ -102,7 +103,7 @@ public class WorkspaceOperationsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID routineId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ArchiveRequest request
@@ -126,7 +127,7 @@ public class WorkspaceOperationsController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateSeasonRoundRequest request
@@ -147,7 +148,7 @@ public class WorkspaceOperationsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID roundId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateSeasonRoundRequest request
@@ -167,7 +168,7 @@ public class WorkspaceOperationsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID roundId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ArchiveRequest request
@@ -191,7 +192,7 @@ public class WorkspaceOperationsController {
             @PathVariable UUID roundId,
             @PathVariable UUID executionId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateRoutineExecutionCompletionRequest request

@@ -72,7 +72,7 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
                 || !authentication.isAuthenticated()
                 || !(authentication.getPrincipal()
                 instanceof AuthenticatedAccountPrincipal principal)) {
-            String roomId = roomId(request);
+            String roomId = refreshRoomId(request);
             if (roomId != null) {
                 response.addHeader(
                         HttpHeaders.SET_COOKIE,
@@ -86,7 +86,7 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
             );
             return;
         }
-        String roomId = roomId(request);
+        String roomId = refreshRoomId(request);
         if (roomId != null) {
             try {
                 rateLimiter.checkRoundGrant(
@@ -110,7 +110,8 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String roomId(HttpServletRequest request) {
+    // 참여 권한 갱신 요청이면 쿠키 경로로 쓸 수 있는 방 식별자를, 아니면 null을 돌려준다.
+    static String refreshRoomId(HttpServletRequest request) {
         String candidate = ROUND_GRANT_REFRESH.matcher(request)
                 .getVariables()
                 .get("roomId");

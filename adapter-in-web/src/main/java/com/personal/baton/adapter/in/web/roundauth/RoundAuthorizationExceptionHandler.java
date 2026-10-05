@@ -7,7 +7,6 @@ import com.personal.baton.application.roundauth.error.RoundParticipationDeniedEx
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.Map;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
@@ -18,7 +17,6 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.servlet.HandlerMapping;
 
 @RestControllerAdvice(assignableTypes = {
         ParticipationGrantController.class,
@@ -132,36 +130,11 @@ public class RoundAuthorizationExceptionHandler {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(status)
                 .cacheControl(CacheControl.noStore());
         if (expireGrant) {
-            String roomId = refreshRoomId(request);
+            String roomId = RoundGrantAdmissionFilter.refreshRoomId(request);
             if (roomId != null) {
                 builder.header(HttpHeaders.SET_COOKIE, RoundGrantCookie.expire(roomId).toString());
             }
         }
         return builder.body(new ErrorResponse(code, message));
-    }
-
-    private String refreshRoomId(HttpServletRequest request) {
-        Object matchingPattern = request.getAttribute(
-                HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE
-        );
-        if (matchingPattern == null
-                || !ParticipationGrantController.REFRESH_PATH_PATTERN.equals(
-                        matchingPattern.toString()
-                )) {
-            return null;
-        }
-        Object uriVariablesAttribute = request.getAttribute(
-                HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE
-        );
-        if (!(uriVariablesAttribute instanceof Map<?, ?> uriVariables)
-                || !(uriVariables.get("roomId") instanceof String roomId)) {
-            return null;
-        }
-        try {
-            RoundGrantCookie.path(roomId);
-            return roomId;
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
     }
 }

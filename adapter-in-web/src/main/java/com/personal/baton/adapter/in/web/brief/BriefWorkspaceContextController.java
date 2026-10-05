@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.brief;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefSourceContext;
@@ -42,7 +43,7 @@ public class BriefWorkspaceContextController {
     @PostMapping(SOURCES_PATH)
     public ResponseEntity<SourcesResponse> sources(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @Valid @RequestBody SourcesRequest request
     ) {
@@ -58,7 +59,7 @@ public class BriefWorkspaceContextController {
     @GetMapping(READINESS_PATH)
     public ResponseEntity<ReadinessResponse> readiness(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
     ) {
         var result = useCase.findGenerationReadiness(new Scope(principal.accountId(), teamId, seasonId, accessKey));

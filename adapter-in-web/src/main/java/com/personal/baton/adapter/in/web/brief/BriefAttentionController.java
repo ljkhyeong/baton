@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.brief;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.brief.BriefAttentionResponses.PageResponse;
 import com.personal.baton.adapter.in.web.brief.BriefAttentionResponses.SummaryResponse;
@@ -36,7 +37,7 @@ public class BriefAttentionController {
     @GetMapping(RESOLUTIONS_PATH)
     public ResponseEntity<BriefAttentionResponses.ResolutionsResponse> resolutions(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
             @Valid @ModelAttribute BriefAttentionCursorRequest cursor
@@ -50,7 +51,7 @@ public class BriefAttentionController {
     @GetMapping(SUMMARY_PATH)
     public ResponseEntity<SummaryResponse> summarize(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
     ) {
         var summary = useCase.summarizeAttention(new BriefAttentionUseCase.Scope(
@@ -61,7 +62,7 @@ public class BriefAttentionController {
     @GetMapping(LIST_PATH)
     public ResponseEntity<PageResponse> list(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @RequestParam(defaultValue = "ACTIVE") BriefAttentionPage.Status status,
             @RequestParam(required = false) BriefAttentionPage.Severity severity,
@@ -78,7 +79,7 @@ public class BriefAttentionController {
     @GetMapping(TRANSITIONS_PATH)
     public ResponseEntity<BriefAttentionResponses.TransitionsResponse> transitions(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @RequestParam BriefAttentionPage.EventType eventType,
             @RequestParam String sourceReference,

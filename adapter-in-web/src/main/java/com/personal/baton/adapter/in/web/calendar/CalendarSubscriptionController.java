@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.calendar;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase;
 import com.personal.baton.application.calendar.CalendarSubscriptionException;
@@ -52,7 +53,7 @@ public class CalendarSubscriptionController {
     @GetMapping(PATH)
     public ResponseEntity<SubscriptionResponse> find(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
@@ -64,7 +65,7 @@ public class CalendarSubscriptionController {
     @PostMapping(PATH)
     public ResponseEntity<CredentialResponse> create(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
@@ -75,7 +76,7 @@ public class CalendarSubscriptionController {
     @PostMapping(ROTATE_PATH)
     public ResponseEntity<CredentialResponse> rotate(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
@@ -86,7 +87,7 @@ public class CalendarSubscriptionController {
     @DeleteMapping(PATH)
     public ResponseEntity<Void> revoke(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", defaultValue = "") String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
             @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);

@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.application.workspace.port.in.ContentChangeUseCase;
 import com.personal.baton.domain.workspace.ContentRecordKind;
 import java.util.UUID;
@@ -18,12 +19,12 @@ public class ContentChangeController {
     public ContentChangeController(ContentChangeUseCase useCase) { this.useCase = useCase; }
     @GetMapping(DECISION_PATH)
     public ResponseEntity<ContentHistoryResponse> decisions(@PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @PathVariable UUID recordId, @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+            @PathVariable UUID recordId, @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey) {
         return history(teamId, seasonId, ContentRecordKind.DECISION, recordId, accessKey);
     }
     @GetMapping(RESOURCE_PATH)
     public ResponseEntity<ContentHistoryResponse> resources(@PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @PathVariable UUID recordId, @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey) {
+            @PathVariable UUID recordId, @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey) {
         return history(teamId, seasonId, ContentRecordKind.ROLE_RESOURCE, recordId, accessKey);
     }
     private ResponseEntity<ContentHistoryResponse> history(UUID teamId, UUID seasonId, ContentRecordKind kind, UUID recordId, String accessKey) {

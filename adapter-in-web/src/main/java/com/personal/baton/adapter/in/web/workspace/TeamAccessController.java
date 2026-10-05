@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
@@ -40,7 +41,7 @@ public class TeamAccessController {
     }
     @GetMapping(PATH)
     public ResponseEntity<TeamAccessResponse> get(@PathVariable UUID teamId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         return ok(TeamAccessResponse.from(useCase.getAccess(teamId, principal.accountId(), accessKey)));
     }

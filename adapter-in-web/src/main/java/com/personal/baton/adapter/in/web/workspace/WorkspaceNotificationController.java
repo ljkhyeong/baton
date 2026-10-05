@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
@@ -29,7 +30,7 @@ public class WorkspaceNotificationController {
 
     @GetMapping(PATH)
     public ResponseEntity<NotificationInboxResponse> inbox(@PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(NotificationInboxResponse.from(
                 useCase.getInbox(teamId, seasonId, accessKey, principal.accountId())));
@@ -38,7 +39,7 @@ public class WorkspaceNotificationController {
     @PostMapping(READ_PATH)
     public ResponseEntity<NotificationInboxResponse> read(@PathVariable UUID teamId, @PathVariable UUID seasonId,
             @PathVariable UUID notificationId,
-            @RequestHeader(value = "X-Baton-Access-Key", required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @Valid @RequestBody ReadNotificationRequest request) {
         if (!principal.accountId().equals(request.expectedAccountId())) {

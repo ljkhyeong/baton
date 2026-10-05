@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ConfirmRoleHandoffRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateMemberRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoleRequest;
@@ -50,7 +51,7 @@ public class WorkspacePeopleController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateMemberRequest request
@@ -71,7 +72,7 @@ public class WorkspacePeopleController {
             @PathVariable UUID seasonId,
             @PathVariable UUID memberId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateMemberRequest request
@@ -91,7 +92,7 @@ public class WorkspacePeopleController {
             @PathVariable UUID seasonId,
             @PathVariable UUID memberId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody MemberDeactivationRequest request
@@ -115,7 +116,7 @@ public class WorkspacePeopleController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateRoleRequest request
@@ -145,7 +146,7 @@ public class WorkspacePeopleController {
             @PathVariable UUID seasonId,
             @PathVariable UUID roleId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateRoleRequest request
@@ -178,7 +179,7 @@ public class WorkspacePeopleController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody PrepareRoleHandoffRequest request
@@ -210,7 +211,7 @@ public class WorkspacePeopleController {
             @PathVariable UUID roleId,
             @PathVariable UUID handoffId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody TransferRoleHandoffRequest request
@@ -238,7 +239,7 @@ public class WorkspacePeopleController {
             @PathVariable UUID roleId,
             @PathVariable UUID handoffId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ConfirmRoleHandoffRequest request
@@ -263,7 +264,7 @@ public class WorkspacePeopleController {
             @PathVariable UUID roleId,
             @PathVariable UUID handoffId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ConfirmRoleHandoffRequest request

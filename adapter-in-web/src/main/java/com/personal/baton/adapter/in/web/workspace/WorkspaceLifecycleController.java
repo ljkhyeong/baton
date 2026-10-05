@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CorrectSeasonNameRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateNextSeasonRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateWorkspaceRequest;
@@ -34,7 +35,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequestMapping("/api/v1")
 public class WorkspaceLifecycleController {
 
-    static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
     static final String CREATION_KEY_HEADER = "X-Baton-Creation-Key";
     static final String RECOVERY_KEY_HEADER = "X-Baton-Recovery-Key";
     static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
@@ -73,7 +73,7 @@ public class WorkspaceLifecycleController {
     public ResponseEntity<WorkspaceResponse> getWorkspace(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey
     ) {
         WorkspaceResponse response = WorkspaceResponse.from(
                 lifecycleUseCase.getWorkspace(teamId, seasonId, accessKey)
@@ -87,7 +87,7 @@ public class WorkspaceLifecycleController {
     public SeasonResponse updateSeason(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey,
             @Valid @RequestBody UpdateSeasonRequest request
     ) {
         return SeasonResponse.from(lifecycleUseCase.updateSeason(
@@ -106,7 +106,7 @@ public class WorkspaceLifecycleController {
     public SeasonResponse updateRoundSchedule(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey,
             @Valid @RequestBody UpdateRoundScheduleRequest request
     ) {
         return SeasonResponse.from(lifecycleUseCase.updateRoundSchedule(
@@ -140,7 +140,7 @@ public class WorkspaceLifecycleController {
     public SeasonResponse updateSeasonEnding(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey,
             @Valid @RequestBody UpdateSeasonEndingRequest request
     ) {
         return SeasonResponse.from(lifecycleUseCase.updateSeasonEnding(
@@ -156,7 +156,7 @@ public class WorkspaceLifecycleController {
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey,
             @Valid @RequestBody CreateNextSeasonRequest request
     ) {
         WorkspaceContract.NextSeasonResult result = lifecycleUseCase.createNextSeason(
@@ -181,7 +181,7 @@ public class WorkspaceLifecycleController {
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
-            @RequestHeader(name = ACCESS_KEY_HEADER, required = false) String accessKey
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey
     ) {
         WorkspaceContract.AccessKeyResult result = lifecycleUseCase.rotateAccessKey(
                 teamId,

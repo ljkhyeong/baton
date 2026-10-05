@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateDecisionRequest;
@@ -47,7 +48,7 @@ public class WorkspaceRecordsController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateDecisionRequest request
@@ -75,7 +76,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID decisionId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateDecisionRequest request
@@ -102,7 +103,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID decisionId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ArchiveRequest request
@@ -126,7 +127,7 @@ public class WorkspaceRecordsController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateHandoffItemRequest request
@@ -151,7 +152,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID itemId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateHandoffItemRequest request
@@ -175,7 +176,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID itemId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CompletionRequest request
@@ -191,7 +192,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID itemId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ArchiveRequest request
@@ -215,7 +216,7 @@ public class WorkspaceRecordsController {
                     required = false
             ) String idempotencyKey,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody CreateRoleResourceRequest request
@@ -241,7 +242,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID resourceId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody UpdateRoleResourceRequest request
@@ -266,7 +267,7 @@ public class WorkspaceRecordsController {
             @PathVariable UUID seasonId,
             @PathVariable UUID resourceId,
             @RequestHeader(
-                    name = WorkspaceLifecycleController.ACCESS_KEY_HEADER,
+                    name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
             @Valid @RequestBody ArchiveRequest request

@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.roundauth;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests.CreateRoomMappingRequest;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests.MembershipClaimRequest;
@@ -40,8 +41,6 @@ public class RoundAdministrationController {
     public static final String ROOM_MAPPING_PATH_PATTERN =
             "/api/v1/round-room-mappings/{roomId}";
 
-    private static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
-
     private final RoundAdministrationUseCase roundAdministrationUseCase;
 
     public RoundAdministrationController(RoundAdministrationUseCase roundAdministrationUseCase) {
@@ -51,7 +50,7 @@ public class RoundAdministrationController {
     @GetMapping(CURRENT_MEMBERSHIP_PATH)
     public ResponseEntity<CurrentMembershipResponse> getCurrentMembership(
             @RequestParam UUID teamId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -66,7 +65,7 @@ public class RoundAdministrationController {
     @PostMapping(MEMBERSHIP_CLAIMS_PATH)
     public ResponseEntity<MembershipClaimResponse> claimMembership(
             @Valid @RequestBody MembershipClaimRequest request,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -92,7 +91,7 @@ public class RoundAdministrationController {
     @PostMapping(ROOM_MAPPINGS_PATH)
     public ResponseEntity<RoomMappingResponse> createRoomMapping(
             @Valid @RequestBody CreateRoomMappingRequest request,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -114,7 +113,7 @@ public class RoundAdministrationController {
     public ResponseEntity<CurrentRoomMappingsResponse> getCurrentRoomMappings(
             @RequestParam UUID teamId,
             @RequestParam UUID seasonId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -134,7 +133,7 @@ public class RoundAdministrationController {
     @DeleteMapping(ROOM_MAPPING_PATH_PATTERN)
     public ResponseEntity<RoomMappingResponse> endRoomMapping(
             @PathVariable String roomId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {

@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.application.workspace.port.in.InspectResourceHealthUseCase;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -22,7 +23,7 @@ public class WorkspaceResourceHealthController {
     @GetMapping("/health")
     public ResponseEntity<ResourceHealthResponse> inspect(
             @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID resourceId,
-            @RequestHeader(name = WorkspaceLifecycleController.ACCESS_KEY_HEADER, required = false) String accessKey) {
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ResourceHealthResponse.from(useCase.inspect(teamId, seasonId, resourceId, accessKey)));
     }
@@ -30,7 +31,7 @@ public class WorkspaceResourceHealthController {
     @PostMapping("/check-requests")
     public ResponseEntity<ResourceCheckResponse> requestCheck(
             @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID resourceId,
-            @RequestHeader(name = WorkspaceLifecycleController.ACCESS_KEY_HEADER, required = false) String accessKey) {
+            @RequestHeader(name = AccessKeyHeader.NAME, required = false) String accessKey) {
         return ResponseEntity.status(HttpStatus.ACCEPTED).cacheControl(CacheControl.noStore())
                 .body(ResourceCheckResponse.from(useCase.requestCheck(teamId, seasonId, resourceId, accessKey)));
     }

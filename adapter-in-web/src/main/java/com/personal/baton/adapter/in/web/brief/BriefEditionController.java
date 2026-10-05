@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.brief;
 
+import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.brief.BriefEditionResponses.BriefEditionGenerationResponse;
 import com.personal.baton.adapter.in.web.brief.BriefEditionResponses.BriefEditionResponse;
@@ -34,8 +35,6 @@ public class BriefEditionController {
     public static final String PREVIOUS_WEEK_PATH = EDITION_PATH + "/previous-week";
     public static final String DELIVERY_STATUS_PATH = EDITION_PATH + "/delivery-status";
 
-    private static final String ACCESS_KEY_HEADER = "X-Baton-Access-Key";
-
     private final BriefEditionUseCase briefEditionUseCase;
 
     public BriefEditionController(BriefEditionUseCase briefEditionUseCase) {
@@ -46,7 +45,7 @@ public class BriefEditionController {
     public ResponseEntity<BriefEditionResponse> findLatestEdition(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
@@ -67,7 +66,7 @@ public class BriefEditionController {
     @GetMapping(PREVIOUS_WEEK_PATH)
     public ResponseEntity<BriefEditionResponse> previousWeek(
             @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
     ) {
         var result = briefEditionUseCase.findPreviousWeekEdition(
@@ -79,7 +78,7 @@ public class BriefEditionController {
     @GetMapping(DELIVERY_STATUS_PATH)
     public ResponseEntity<BriefEditionResponses.DeliveryStatusResponse> deliveryStatus(
             @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
     ) {
         var result = briefEditionUseCase.findEditionDeliveryStatus(
@@ -91,7 +90,7 @@ public class BriefEditionController {
     @GetMapping(GENERATION_PATH)
     public ResponseEntity<BriefEditionResponses.HistoryResponse> history(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @RequestParam(required = false) @Min(1) Long beforeGeneration,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit
@@ -105,7 +104,7 @@ public class BriefEditionController {
     @GetMapping(EDITION_PATH)
     public ResponseEntity<BriefEditionResponse> edition(
             @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal
     ) {
         var result = briefEditionUseCase.findEdition(new LatestEditionQuery(principal.accountId(), teamId, seasonId, accessKey), editionId);
@@ -116,7 +115,7 @@ public class BriefEditionController {
     @GetMapping(COMPARISON_PATH)
     public ResponseEntity<BriefEditionResponses.ComparisonResponse> compare(
             @PathVariable UUID teamId, @PathVariable UUID seasonId, @PathVariable UUID editionId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @RequestParam UUID fromEditionId
     ) {
@@ -129,7 +128,7 @@ public class BriefEditionController {
     public ResponseEntity<BriefEditionGenerationResponse> generateEdition(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
-            @RequestHeader(value = ACCESS_KEY_HEADER, required = false) String accessKey,
+            @RequestHeader(value = AccessKeyHeader.NAME, required = false) String accessKey,
             @AuthenticationPrincipal(errorOnInvalidType = true)
             AuthenticatedAccountPrincipal principal
     ) {
