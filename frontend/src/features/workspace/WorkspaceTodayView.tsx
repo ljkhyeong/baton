@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
 import { nearestRelayRole, RelayCard } from './WorkspaceRelayCard'
 import {
@@ -100,19 +100,27 @@ export function TodayView({
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
   const signalCount = workspace.continuitySignals.length
   const relay = nearestRelayRole(roles, calendarDate)
+  const roundComplete = executionCount > 0 && completedCount === executionCount
+  const signalSectionRef = useRef<HTMLElement>(null)
+  const openSignals = () => {
+    signalSectionRef.current?.scrollIntoView({ block: 'start' })
+    signalSectionRef.current?.focus({ preventScroll: true })
+  }
   return (
     <>
       <PageHeader
         eyebrow={`${calendarLabel} · ${season.name}`}
         title={`남은 업무 ${pendingCount}개`}
-        description="끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요."
+        description={roundComplete
+          ? '이번 회차 업무를 모두 끝냈어요. 다음 회차와 인수인계를 준비하세요.'
+          : '끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요.'}
         action={<PrimaryButton onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>{roles.length ? '업무 추가' : '역할 추가'}</PrimaryButton>}
       />
       {selectedRound && (
         <dl className="today-summary">
-          <div>
+          <div className={roundComplete ? 'is-complete' : undefined}>
             <dt>회차 완료율</dt>
-            <dd>{completionRate}%<small>{executionCount}개 중 {completedCount}개 완료</small></dd>
+            <dd>{completionRate}%<small>{roundComplete ? '모두 완료' : `${executionCount}개 중 ${completedCount}개 완료`}</small></dd>
           </div>
           <div>
             <dt>다음 마감</dt>
@@ -120,19 +128,14 @@ export function TodayView({
           </div>
           <div className={signalCount ? 'needs-attention' : undefined}>
             <dt>조치 필요</dt>
-            <dd>{signalCount ? `${signalCount}건` : '없음'}<small>역할·인수인계 점검</small></dd>
+            <dd>
+              {signalCount
+                ? <button type="button" className="summary-jump" aria-label={`조치할 항목 ${signalCount}건 보기`} onClick={openSignals}>{signalCount}건<Icon name="chevron" size={16} /></button>
+                : '없음'}
+              <small>역할·인수인계 점검</small>
+            </dd>
           </div>
         </dl>
-      )}
-      {relay && (
-        <RelayCard
-          role={relay.role}
-          days={relay.days}
-          members={members}
-          roleHandoffs={roleHandoffs}
-          progress={handoffProgress(relay.role.id)}
-          onOpenHandoff={onOpenRoleHandoff}
-        />
       )}
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="today-list-toolbar">
@@ -198,9 +201,19 @@ export function TodayView({
           />
         )}
       </section>
+      {relay && (
+        <RelayCard
+          role={relay.role}
+          days={relay.days}
+          members={members}
+          roleHandoffs={roleHandoffs}
+          progress={handoffProgress(relay.role.id)}
+          onOpenHandoff={onOpenRoleHandoff}
+        />
+      )}
       {workspace.continuitySignals.length > 0 && (
         <div className="today-lower">
-          <section className="plain-section" aria-labelledby="continuity-radar-title">
+          <section className="plain-section" aria-labelledby="continuity-radar-title" ref={signalSectionRef} tabIndex={-1}>
             <div className="section-heading compact">
               <h2 id="continuity-radar-title">조치할 항목</h2>
               <span className="continuity-count">

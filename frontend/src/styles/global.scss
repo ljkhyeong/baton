@@ -2789,6 +2789,10 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .today-summary dd { margin: 6px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -.03em; line-height: 1.25; font-variant-numeric: tabular-nums; }
   .today-summary dd small { display: block; margin-top: 4px; color: var(--faint); font-size: 12px; font-weight: 500; letter-spacing: 0; }
   .today-summary .needs-attention dd { color: var(--baton-dark); }
+  .today-summary .is-complete dd { color: var(--success); }
+  .summary-jump { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; letter-spacing: inherit; cursor: pointer; }
+  .summary-jump:hover { text-decoration: underline; text-underline-offset: 4px; }
+  .summary-jump svg { flex: 0 0 auto; }
 
   .relay-card { display: grid; gap: 10px; margin: 0 0 12px; padding: 16px 20px; border-radius: var(--radius-lg); background: var(--paper); }
   .relay-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -3163,6 +3167,15 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .relay-board { padding: 4px 16px 8px; }
   .relay-card { padding: 14px 16px; }
   .relay-open { min-height: 44px; }
+  .summary-jump { min-height: 44px; margin: -12px 0; }
+  .mobile-topbar { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand team actions"; gap: 8px; padding: 8px 15px; }
+  .mobile-topbar .brand { gap: 0; font-size: 0; }
+  .mobile-team { min-height: 44px; gap: 6px; padding: 4px 10px; }
+  .mobile-team strong { font-size: 13px; }
+  .mobile-team small { font-size: 11px; }
+  .mobile-workspace-actions { gap: 0; }
+  .mobile-share,
+  .mobile-workspace-actions .team-list-link { padding: 0 7px; }
   .today-secondary,
   .today-lower .plain-section,
   .rhythm-timeline,
@@ -3170,4 +3183,8 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .handoff-workspace,
   .record-search-panel,
   .record-search-results { padding-right: 16px; padding-left: 16px; }
+}
+
+@media (max-width: 360px) {
+  .mobile-team small { display: none; }
 }

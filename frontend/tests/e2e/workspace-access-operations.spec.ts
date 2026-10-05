@@ -1442,3 +1442,27 @@ test('다른 기기에서 접근 키가 바뀌면 자동 동기화가 편집 화
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toHaveCount(0)
 })
+
+test('@operations @continuity 오늘 요약은 조치할 항목으로 이동하고 회차를 모두 끝내면 완료로 표시한다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.continuitySignals = [{
+    type: 'ROLE_SUCCESSOR_MISSING',
+    severity: 'CRITICAL',
+    roleId: ROLE_ID,
+    routineId: null,
+    title: '문제 큐레이터 후임 공백',
+    reason: '담당 기간이 곧 끝나지만 다음 담당자가 확정되지 않았습니다.',
+    recommendedAction: '다음 담당자를 정하고 인수인계 준비를 시작하세요.',
+    relevantDate: '2026-07-20',
+  }]
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await page.getByRole('button', { name: '조치할 항목 1건 보기' }).click()
+  await expect(page.getByRole('region', { name: '조치할 항목' })).toBeFocused()
+
+  await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
+  await expect(page.getByText('이번 회차 업무를 모두 끝냈어요.', { exact: false })).toBeVisible()
+  await expect(page.locator('.today-summary .is-complete')).toContainText('모두 완료')
+})
