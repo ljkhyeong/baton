@@ -37,9 +37,9 @@ SeasonRound / RoutineExecution
 개정 번호를 비교하므로 다른 시즌이나 낮은 개정 번호의 `200`을 전달 완료로 처리하지 않는다.
 비활성 클라이언트도 두 포트를 제공하며 외부 요청을 보내지 않는다.
 
-시즌 생성·이름 수정·다음 시즌 생성은 같은 원본 트랜잭션에서 이름 기록기를 호출한다. V29는
-`calendar_season_metadata_outbox`를 별도로 추가하고 기존 일정 테이블의 필수 컬럼과 제약은
-변경하지 않는다. 이름 개정 번호는 새 테이블의 자동 증가 키다. 마지막 이름과 Java 문자열의
+시즌 생성·이름 수정·다음 시즌 생성은 같은 원본 트랜잭션에서 이름 기록기를 호출한다. 이름은
+일정 아웃박스와 분리된 `calendar_season_metadata_outbox`에 기록하며, 이름 개정 번호는 이 테이블의
+자동 증가 키다. 마지막 이름과 Java 문자열의
 정확한 동등성을 비교하므로 MySQL의 대소문자 무시 collation에 따라 변경이 누락되지 않는다.
 
 두 자료는 Java sealed interface `CalendarDeliveryPayload`로 구분한다. 같은 JDBC 임대·결과 기록과

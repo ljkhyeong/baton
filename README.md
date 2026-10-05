@@ -149,6 +149,8 @@ docker compose up -d mysql
 
 기본 로컬 포트는 MySQL `3306`이며 `127.0.0.1`에만 바인딩되므로 같은 네트워크의 다른 기기에 직접 공개되지 않는다.
 
+출시 전 Flyway 이력을 `V1__baseline_schema.sql` 하나로 합쳤다. 이전 V1~V40 이력으로 만든 로컬 DB는 Flyway 검증에 실패하므로 `docker compose down -v`로 볼륨을 지운 뒤 다시 실행한다.
+
 다른 프로젝트가 기본 포트를 사용 중이면 호스트 포트만 바꿔 함께 실행할 수 있다.
 
 ```bash
@@ -315,7 +317,7 @@ chmod 0600 \
 Google 리디렉션 URI는 `https://<BATON_HOST>/login/oauth2/code/google`, Naver 콜백은 `https://<BATON_HOST>/login/oauth2/code/naver`로 공급자 콘솔에 정확히 등록한다. 두 공급자를 모두 준비한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 바꾼다. 자체 이메일은 `delivery=smtp` 상태에서 시작 시 SMTP 연결을 먼저 검증하고 마지막에 `BATON_AUTH_LOCAL_REGISTRATION_ENABLED=true`로 연다. 공개 가입·재설정 요청에 Turnstile을 사용하려면 [무료 외부 연동](docs/runbooks/free-integrations.md#가입재설정-봇-방지-cloudflare-turnstile)의 사이트 키·비밀 키·허용 호스트와 CSP를 함께 준비한다. 서버의 인증 기능 응답과 화면은 이 게이트를 그대로 반영하므로, 게이트가 닫힌 동안 기존 이메일 로그인은 유지하면서 새 계정 만들기만 숨긴다. SMTP는 587/TCP, 인증, STARTTLS 필수, 서버 신원 검증과 2초 연결·읽기·쓰기 시간 초과로 고정된다. 실제 수신함에서 프래그먼트 토큰 링크와 비밀번호 설정까지 확인한다.
 
 비밀번호 재설정 메일 요청은 가입 게이트와 별개인 `BATON_AUTH_PASSWORD_RESET_ENABLED=false`가
-기본값이다. V30 마이그레이션과 실제 SMTP·공개 HTTPS 검증을 마친 뒤 별도로 켠다. 요청을 닫아도
+기본값이다. 실제 SMTP·공개 HTTPS 검증을 마친 뒤 별도로 켠다. 요청을 닫아도
 기존 유효한 링크는 제출할 수 있다. 계정 세션 버전은 DB에서 확인하므로 세션 확인 중 DB 장애에는
 세션을 지우지 않고 `503`을 반환한다. 자세한 계약은 PRD-0005를 따른다.
 
@@ -595,7 +597,7 @@ CAL 계약 검증은 `contracts/VERSION`이 `1.1.0-rc.2`인 `contracts-v1.1.0-rc
 
 `useCaseTest`는 MySQL 8 Testcontainers에서 워크스페이스 생성, 콘텐츠 변경·보관·복원, 역할 인수인계, 다음 시즌 전환, 수동·자동 회차, 접근 키 변경·복구와 동시 수정 충돌을 검증한다. 행 잠금 시간 초과가 대상별 충돌로 처리되고 트랜잭션 전체가 롤백되는지도 확인한다.
 
-Flyway 변경은 대상 이전 버전의 대표 데이터를 최신 스키마로 올린 뒤 기존 데이터·참조 보존과 새 제약·인덱스 같은 실제 사후조건을 전용 마이그레이션 테스트가 검증한다. 개별 버전별 기대값은 [제품 명세](docs/PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](docs/PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](docs/PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에서 관리하며 이 명령 색인에는 반복해 열거하지 않는다.
+스키마는 기준 마이그레이션 `V1__baseline_schema.sql`에서 시작하고 이후 변경은 `V2`부터 새 파일로 추가한다. `DatabaseConstraintTest`가 기준 스키마의 DB 제약을 이름으로 확인한다. 기능별 기대값은 [제품 명세](docs/PRD/0001_product-baseline/spec.md), [WATCH 연동 계약](docs/PRD/0004_watch-integration-contract/spec.md), [CAL 연동 계약](docs/PRD/0006_calendar-integration-contract/spec.md)과 관련 ADR에서 관리하며 이 명령 색인에는 반복해 열거하지 않는다.
 
 ### API 계약 생성
 
@@ -639,7 +641,7 @@ ROUND_REPOSITORY_ROOT=/absolute/path/to/round npm run e2e:round-edge
 - `e2e:operations`: 역할·반복 업무와 실제 마감 수정, 자동 일정 설정, 수동 회차 생성과 회차별 반복 업무 완료 흐름
 - `e2e:memory`: 결정과 이유 기록 흐름
 - `e2e:handoff`: 역할 자료 생성의 응답 유실 복구, 수정 충돌 최신화, 보관·복원, 새 창 열기·재조회, 인수인계 항목·인수인계 문서 미리보기와 역할 인수인계 준비·경고 확인·전달·수락·새로고침 보존 흐름
-- `e2e:records`: 결정·인수인계·자료 통합 검색, 역할·상태·기간 필터, 시각 미상 처리, 검색 조건 유지와 원본 화면 이동을 데스크톱·390px 모바일에서 확인
+- `e2e:records`: 결정·인수인계·자료 통합 검색, 역할·상태·기간 필터, 검색 조건 유지와 원본 화면 이동을 데스크톱·390px 모바일에서 확인
 - `e2e:responsive`: 390px 모바일 탐색
 - `e2e:focus`: Chromium·워커 2개로 실행하고 첫 실패에서 중단한다. 확인할 파일이나 `--grep`을 함께 지정한다.
 - `e2e:failed`: 직전 Playwright 실행에서 실패한 테스트만 다시 실행한다. 중간에 다른 실행을 하면 실패 목록이 바뀌므로 그때는 파일·제목을 직접 지정한다.
@@ -726,7 +728,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - 시즌 달력·모임·마감 기준: 시즌별 IANA `timeZone`
 - 자동 회차 폴링: 기본 `PT1M`, Spring 직접 실행 시 `BATON_ROUND_AUTOMATION_POLL_INTERVAL`로 재정의
 - CAL 시즌 이름: `BATON_CAL_SEASON_METADATA_ENABLED=false`가 기본값이다. 검증 환경에서 이름
-  설정과 기존 캡처·전달을 켜면 생성·이름 수정·다음 시즌 생성이 V29 전용 아웃박스를 거쳐 전달된다.
+  설정과 기존 캡처·전달을 켜면 생성·이름 수정·다음 시즌 생성이 시즌 이름 전용 아웃박스를 거쳐 전달된다.
   기존 일정 테이블은 바꾸지 않고 작업자·재시도 코드는 공유한다. `calendar_metadata` 지표로 이름
   적체와 실패를 확인한다. `BATON_CAL_SEASON_METADATA_MAINTENANCE`는 기본 `OFF`이며,
   `BACKFILL`은 기존 이름·캡처 누락을 보정하고 `REPLAY`는 보정 뒤 최신 행을 같은 개정 번호로

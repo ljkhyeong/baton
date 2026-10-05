@@ -91,7 +91,7 @@ Caddy의 `connect-src`는 Sentry의 `*.ingest.sentry.io`, `*.ingest.us.sentry.io
 Brevo [무료 플랜의 outbound webhook](https://help.brevo.com/hc/en-us/articles/208589409-About-Brevo-s-pricing-plans)을 사용한다.
 메일 발송은 기존 SMTP를 유지하며 상태 조회용 API 키·주기 작업을 추가하지 않는다.
 
-1. V40 마이그레이션과 새 SMTP 어댑터를 배포한다. 이후 발송 메일에는 `X-Mailin-custom: baton-delivery-id:<발송 ID>`가 붙는다. 이전 메일에는 결과 연결이 소급 적용되지 않는다.
+1. 웹훅 수신 기능이 포함된 버전을 배포한다. 이후 발송 메일에는 `X-Mailin-custom: baton-delivery-id:<발송 ID>`가 붙는다. 이전 메일에는 결과 연결이 소급 적용되지 않는다.
 2. `openssl rand -hex 32` 결과를 줄바꿈 없이 저장소 밖 0600 파일에 저장한다. 상위 디렉터리는 0700으로 두고 `BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE`에 절대 경로를 지정한다. 기존 SMTP·다른 연동의 비밀값을 재사용하지 않는다.
 3. [Webhook 생성 API](https://developers.brevo.com/reference/create-webhook)로 transactional 웹훅을 등록한다. URL은 `https://b4ton.com/api/v1/integrations/brevo/email-events`, 인증은 [Bearer 방식](https://developers.brevo.com/docs/secured-webhooks)의 `auth.type=bearer`, `auth.token=<전용 토큰>`이다. 등록용 Brevo API 키는 앱에 보관하지 않는다. 단일 이벤트 POST를 사용하며 batch 모드는 사용하지 않는다.
 4. 전달·일시 반송·영구 반송·차단·잘못된 주소·발송 오류·지연·스팸 신고 이벤트만 선택한다. 열람·클릭 추적은 연결하지 않는다. 이벤트 선택 이름은 등록 API의 열거형을 따르고, 수신 본문의 값은 아래 계약을 따른다.

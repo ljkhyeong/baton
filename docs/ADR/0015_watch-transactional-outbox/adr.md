@@ -48,7 +48,7 @@ JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재
 - `SOURCE_REVISION_CONFLICT`와 그 밖의 결정적 `4xx`: 영구 실패로 기록
 - `ACTIVE`의 `INVALID_TARGET_URL`: 실패 행과 더 높은 리비전의 `INACTIVE` 보상 행을 한 트랜잭션에서 기록
 
-V18 이후 생성되는 `INACTIVE` 보상 행은 `compensation_for_id`로 거절된 `ACTIVE` 리비전을 가리킨다. 이 자기 참조는 WATCH에 보내는 불변 `INACTIVE` 페이로드를 바꾸지 않으면서 어떤 원본 대상 URL의 결정적 거절을 보상했는지 아웃박스 안에서 추적한다. V16·V17 행에는 보상 여부를 확정할 표식이 없으므로 같은 시각과 인접 리비전만으로 기존 `INACTIVE`를 추측해 연결하지 않는다. 과거 보상은 같은 URL이 다시 거절되면 새 보상 표식을 남긴다.
+`INACTIVE` 보상 행은 `compensation_for_id`로 거절된 `ACTIVE` 리비전을 가리킨다. 이 자기 참조는 WATCH에 보내는 불변 `INACTIVE` 페이로드를 바꾸지 않으면서 어떤 원본 대상 URL의 결정적 거절을 보상했는지 아웃박스 안에서 추적한다.
 
 오류 본문과 URL을 저장하지 않고 안정적인 오류 코드만 남긴다.
 

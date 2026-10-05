@@ -73,12 +73,11 @@ BRIEF 출처를 명시한 환경에서만 켠다.
 보존한다. 신호 식별 기준은 신호 종류와 시즌·역할, 반복 업무 신호에서는 반복 업무를 포함하며 데이터베이스
 유일 제약으로 중복 스트림을 막는다.
 
-V24의 `brief_continuity_signal`은 신호 종류와 역할 또는 반복 업무 `subjectId`로 신호 식별 기준을
+`brief_continuity_signal`은 신호 종류와 역할 또는 반복 업무 `subjectId`로 신호 식별 기준을
 고정하고, 영속 `signalId`와 마지막 상태·심각도·리비전만 갱신한다.
 `brief_continuity_outbox`는 각 리비전의 이벤트 v2 필드를 불변 행으로 저장하며 원본 엔티티
-FK를 두지 않는다. V25는 기존 이벤트 필드를 바꾸지 않고 `PENDING`·`PROCESSING`·
-`DELIVERED`·`FAILED` 전달 상태, 시도 횟수, 실행 가능 시각, 처리 임대와 완료·결과 코드를
-추가한다. V24의 기존 행은 원래 `occurredAt`부터 전달 가능한 `PENDING`으로 이관한다.
+FK를 두지 않는다. 각 행은 이벤트 필드와 별도로 `PENDING`·`PROCESSING`·`DELIVERED`·`FAILED`
+전달 상태, 시도 횟수, 실행 가능 시각, 처리 임대와 완료·결과 코드를 가진다.
 
 `ReconcileBriefContinuitySignalsUseCase`는 후보를 조회하고 시즌별 작업자에게 맡긴다.
 신호에 영향을 주는 원본 변경과 시간 재조정은 원본을 읽기 전에 `Team` 공유 잠금과
@@ -185,7 +184,7 @@ BRIEF 장애는 BATON 원본 변경을 롤백하지 않는다. 외부 호출 동
 2. 완료: BRIEF `2.0.0-rc.4` 계약 팩을 고정하고 실제 BATON record 직렬화 결과를 검증했다.
 3. 완료: 신호 스트림·불변 아웃박스, 시즌별 트랜잭션 재조정, 설정형 시간 기준 재계산과 신호에
    영향을 주는 원본 변경·자동 회차 생성의 같은 트랜잭션 연결을 구현했다.
-4. 완료: V25 전달 상태·처리 임대·신호별 순서와 기본 비활성 HTTP 작업자·결과 분류를 구현했다.
+4. 완료: 전달 상태·처리 임대·신호별 순서와 기본 비활성 HTTP 작업자·결과 분류를 구현했다.
 5. 완료: 실제 BATON·BRIEF 실행 JAR과 MySQL·PostgreSQL에서 원본 API 변경,
    기존 상태 일괄 반영, BRIEF 장애 재시도, 같은 본문 재전달, 심각도 변경과
    `ACTIVE → RESOLVED` 전환을 검증했다. 역순 리비전 차단은 아웃박스 영속성 검증이 담당한다.
@@ -229,7 +228,7 @@ BRIEF 커밋 `1e9dd22`의 `2.0.0-rc.4` `VERSION`·JSON Schema·일곱 예시를 
 ./gradlew --no-daemon build
 ```
 
-V24와 명시적 재계산 경계에는 다음 검증을 추가했다.
+신호 스트림·아웃박스와 명시적 재계산 경계에는 다음 검증을 추가했다.
 
 ```bash
 ./gradlew --no-daemon :application:useCaseTest \
@@ -256,11 +255,11 @@ MySQL 8.4에서 신호에 영향을 주는 원본 변경이 수동 재계산 요
 선택 실행 교차 서비스 테스트에서 재기동 뒤 스케줄러가 기존 열린 시즌 원본을
 기존 상태 일괄 반영하는 경로를 확인했다.
 
-V25 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드와 실행 JAR 생성도 성공했다.
+전달 생명주기는 다음 대상 검증과 전체 빌드로 확인한다.
 
 ```bash
 ./gradlew --no-daemon :application:test \
-  --tests 'com.personal.baton.application.brief.BriefContinuityOutboxDeliveryMigrationTest' \
+  --tests 'com.personal.baton.application.DatabaseConstraintTest' \
   --tests 'com.personal.baton.application.brief.BriefContinuityOutboxPersistenceTest'
 ./gradlew --no-daemon :adapter-out-external:test \
   --tests 'com.personal.baton.adapter.out.external.brief.RestClientBriefContinuityClientTest'
@@ -270,9 +269,9 @@ V25 전달 생명주기에는 다음 대상 검증을 추가했고 전체 빌드
 ./gradlew --no-daemon build
 ```
 
-MySQL 8.4에서 기존 V24 이벤트가 V25의 전달 대기 행으로 보존되는지, 만료된 처리 임대 회수와
-오래된 작업 구분 토큰 거부, 같은 신호의 후속 리비전 차단·해제를 확인했다. 실제 이벤트 레코드의
-요청 JSON과 HTTP·네트워크 결과 분류, 기본 비활성 구성과 전용 스케줄러 격리도 확인했다.
+MySQL 8.4에서 처리 임대 없는 `PROCESSING` 상태 거부, 만료된 처리 임대 회수와
+오래된 작업 구분 토큰 거부, 같은 신호의 후속 리비전 차단·해제를 확인한다. 실제 이벤트 레코드의
+요청 JSON과 HTTP·네트워크 결과 분류, 기본 비활성 구성과 전용 스케줄러 격리도 확인한다.
 공통 운영 지표 테스트와 `ops/tests/integration-delivery-check-test.sh`는 BRIEF의 상태별 전달 수,
 조치 대상 실패, 가장 오래된 대기 시간, 마지막 성공 시각과 만료 임대 판정을 함께 검증한다.
 `d30be0d`의 선택 실행 테스트는 다음 명령으로 실제 BATON·BRIEF 실행 JAR과 MySQL 8.4·

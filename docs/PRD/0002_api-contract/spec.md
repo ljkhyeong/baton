@@ -208,8 +208,8 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 | `routines` | 현재 시즌의 반복 업무 정의, `null` 허용 실제 마감 규칙과 `null` 허용 `archivedAt` 목록. 완료 상태는 포함하지 않음 |
 | `rounds` | 생성 출처·시간 상태·`null` 허용 `archivedAt`을 가진 시즌 회차와 회차 생성 시 복사된 실제 마감·반복 업무 실행 목록 |
 | `decisions` | 결정, 서버 생성 시각, 작성자 식별자·이름, 관련 역할과 `null` 허용 `archivedAt` 목록 |
-| `handoffItems` | 역할별 인수인계 항목, 완료 여부, `null` 허용 `createdAt`과 `null` 허용 `archivedAt` 목록 |
-| `resources` | 역할별 자료의 제목, 외부 링크, `null` 허용 설명과 `null` 허용 `createdAt` 목록 |
+| `handoffItems` | 역할별 인수인계 항목, 완료 여부, `createdAt`과 `null` 허용 `archivedAt` 목록 |
+| `resources` | 역할별 자료의 제목, 외부 링크, `null` 허용 설명과 `createdAt` 목록 |
 | `roleHandoffs` | 역할별 인수인계 준비·전달·수락·취소 이력과 전달 시점 준비도 스냅샷 목록 |
 | `continuitySignals` | 현재 기록에서 계산한 담당자 공백·업무 지연의 유형·우선순위·이유와 다음 행동 목록 |
 
@@ -230,17 +230,17 @@ GET /api/v1/teams/{teamId}/seasons/{seasonId}/workspace
 }
 ```
 
-구성원의 `deactivatedAt`은 활동 중이면 `null`, 활동 종료 상태이면 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 기존 역할·결정 참조를 표시할 수 있도록 두 상태의 구성원을 모두 반환한다. 시즌의 `endedAt`은 운영 중이면 `null`, 운영자가 명시적으로 종료했으면 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. `endDate`가 지났다는 이유만으로 자동 종료하지 않는다. `previousSeasonId`는 최초 시즌이면 `null`, 다음 시즌이면 원본 시즌 UUID다. `timeZone`은 최대 64자의 유효한 IANA 식별자이고 기존·최초 시즌의 기본값은 `Asia/Seoul`이다. 시즌 목록은 시작일과 UUID 내림차순으로 정렬한다.
+구성원의 `deactivatedAt`은 활동 중이면 `null`, 활동 종료 상태이면 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 기존 역할·결정 참조를 표시할 수 있도록 두 상태의 구성원을 모두 반환한다. 시즌의 `endedAt`은 운영 중이면 `null`, 운영자가 명시적으로 종료했으면 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. `endDate`가 지났다는 이유만으로 자동 종료하지 않는다. `previousSeasonId`는 최초 시즌이면 `null`, 다음 시즌이면 원본 시즌 UUID다. `timeZone`은 최대 64자의 유효한 IANA 식별자이고 최초 시즌의 기본값은 `Asia/Seoul`이다. 시즌 목록은 시작일과 UUID 내림차순으로 정렬한다.
 
-역할의 `previousRoleId`는 서버가 보존한 원본 역할 UUID이며 새로 만든 역할은 `null`이다. 다음 시즌으로 복사한 역할은 `season.previousSeasonId`의 원본 역할을 가리킨다. 클라이언트는 이전 시즌 워크스페이스를 같은 팀·접근 키로 별도 조회하고 해당 UUID의 역할에 연결된 자료·결정·인수인계 항목을 읽는다. V11 이관 역할은 원본 역할 UUID가 있어도 `previousSeasonId`가 없을 수 있으므로 이 값만으로 이전 시즌을 추정하지 않는다. 선택한 자료를 이어받을 때는 현재 시즌의 기존 역할 자료 생성 API에 현재 역할 UUID와 제목·링크·설명을 제출한다. 원본 자료 식별자·보관 시각·생성 시각은 복사하지 않으며 이전 시즌 기록은 바꾸지 않는다.
+역할의 `previousRoleId`는 서버가 보존한 원본 역할 UUID이며 새로 만든 역할은 `null`이다. 다음 시즌으로 복사한 역할은 `season.previousSeasonId`의 원본 역할을 가리킨다. 클라이언트는 이전 시즌 워크스페이스를 같은 팀·접근 키로 별도 조회하고 해당 UUID의 역할에 연결된 자료·결정·인수인계 항목을 읽는다. `previousSeasonId`가 없으면 `previousRoleId`만으로 이전 시즌을 추정하지 않는다. 선택한 자료를 이어받을 때는 현재 시즌의 기존 역할 자료 생성 API에 현재 역할 UUID와 제목·링크·설명을 제출한다. 원본 자료 식별자·보관 시각·생성 시각은 복사하지 않으며 이전 시즌 기록은 바꾸지 않는다.
 
 `roundSchedule`이 설정되지 않았으면 `null`이다. 설정된 일정은 `firstMeetingDate`, 시즌 시간대 기준 `meetingTime`, `WEEKLY` 또는 `BIWEEKLY`인 `recurrence`, `0..30`의 `generationLeadDays`, `enabled`, 서버가 다음에 처리할 `nextOccurrenceDate`를 가진다.
 
 반복 업무 정의 응답의 `phase`는 `BEFORE`, `DURING`, `AFTER` 중 하나이고 완료 상태는 없다. `deadlineDayOffset`과 `deadlineTime`은 둘 다 `null`이거나 함께 값이 있으며, 날짜 오프셋은 모임 날짜 기준 `-30..30`일이다. `archivedAt`은 활성 정의이면 `null`, 보관 정의이면 최초 보관 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 두 상태를 모두 반환하고 프런트엔드는 활성 운영 목록과 복원 가능한 보관함으로 나눈다. `rounds[].routineExecutions[]`는 생성 당시 반복 업무의 `routineId`, `title`, `phase`, `dueLabel`, `ownerRoleId`, `detail`을 스냅샷으로 보존하고 `status`를 `WAITING` 또는 `DONE`으로 가진다. 실행의 `deadlineAt`은 실제 마감 규칙이 없으면 `null`, 있으면 모임 날짜·오프셋·시즌 시간대로 계산한 UTC ISO 8601 시각이다. `timingStatus`는 `UNSCHEDULED`, `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다.
 
-회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 새로 생성하거나 수정하는 회차의 `meetingDate`는 필수지만, V5 이전의 반복 업무 상태를 이관한 `회차 도입 이전 기록`은 실제 날짜를 알 수 없어 운영자가 수정할 때까지 응답에서 `null`이다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
+회차의 `origin`은 `MANUAL` 또는 `AUTOMATIC`이고 자동 회차만 원래 발생일 `scheduledOccurrenceDate`와 시즌 시간대의 모임 시각을 UTC로 변환한 `scheduledAt`을 가진다. 회차 `timingStatus`는 `PLANNED`, `IN_PROGRESS`, `OVERDUE`, `COMPLETED` 중 하나다. 회차의 `meetingDate`는 생성·수정 요청에서 필수이고 응답에서도 항상 ISO 8601 날짜로 존재한다. 회차의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 워크스페이스 프로젝션은 활성·보관 회차를 모두 반환하며 프런트엔드는 일반 운영 선택과 완료 계산에서는 활성 회차만 사용하고 보관 회차는 복원 가능한 보관함으로 나눈다.
 
-결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 인수인계 항목과 역할 자료도 새로 생성할 때 서버 `Clock`의 UTC 시각을 기록하지만, V14 이전 기록에는 실제 생성 시각이 없어 `createdAt`이 `null`이다. 서버는 마이그레이션 시각 등으로 이를 추정해 채우지 않는다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정, 인수인계 항목과 역할 자료의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 인수인계 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `null` 허용 `createdAt`, `null` 허용 `archivedAt`을 가진다.
+결정의 `createdAt`은 항상 서버 `Clock`으로 생성한 UTC ISO 8601 시각이다. 인수인계 항목과 역할 자료의 `createdAt`도 항상 생성 시 서버 `Clock`으로 기록한 UTC ISO 8601 시각이다. 수정·완료·보관·복원과 동일 멱등 요청의 동일 재처리는 최초 `createdAt`을 변경하지 않는다. 결정, 인수인계 항목과 역할 자료의 `archivedAt`은 활성 상태에서 `null`, 보관 상태에서 최초 보관 UTC 시각인 같은 표현을 사용한다. 인수인계 항목의 `category`는 `RESPONSIBILITY`, `ROUTINE`, `RESOURCE`, `ADVICE` 중 하나다. `resources[]`는 `id`, `roleId`, `title`, `url`, `null` 허용 `description`, `createdAt`, `null` 허용 `archivedAt`을 가진다.
 
 통합 탐색은 기존 시즌별 워크스페이스 프로젝션을 프런트에서 필터링하며 별도 검색 엔드포인트나 페이지네이션 계약을 추가하지 않는다. 기본은 현재 시즌이며 모든 시즌을 선택하면 팀의 서버에서 관리하는 시즌 목록에 있는 다른 시즌도 기존 접근 검증으로 조회한다. 결정은 제목·이유·대안·작성자·관련 역할, 인수인계 항목은 내용·분류·역할, 자료는 제목·설명·역할을 검색 대상으로 사용한다. 자료 URL 문자열과 외부 문서 본문은 검색하지 않는다.
 
@@ -409,7 +409,7 @@ X-Baton-Access-Key: <현재 접근 키>
 
 `Idempotency-Key`의 형식은 워크스페이스 생성과 같다. 서버가 키 변경을 커밋한 뒤 응답만 유실된 경우, 클라이언트는 이전 접근 키와 같은 멱등 키로 재시도할 수 있다. 서버는 현재 접근 키 검증보다 동일 작업 재처리를 먼저 확인해 같은 새 키를 반환한다. 따라서 완료 전 멱등 키는 접근 자격과 같은 수준으로 보호해야 하며, 브라우저 클라이언트는 이를 Web Storage에 기록해야 한다. `setItem`이 예외를 던지면 회전 요청을 시작하지 않는다.
 
-서버는 팀별로 이미 사용한 키 변경 멱등 해시를 보관한다. 신규 회전의 멱등 결과와 새 접근 키는 `teamId + Idempotency-Key`로 파생하므로 응답 유실 뒤 같은 팀의 다른 시즌 경로로 재시도해도 같은 결과를 반환한다. 이전 배포에서 시즌 범위로 시작한 변경도 저장된 원래 결과를 호환 동일 재처리할 수 있다. 같은 멱등 키로 만든 결과 뒤에 더 최신 키 변경이 완료됐다면 `409 IDEMPOTENCY_REPLAY_EXPIRED`를 반환하며, 폐기된 과거 접근 키를 다시 발급하지 않는다. 서로 다른 회전·복구 요청이 같은 팀에 동시에 반영되려 하면 하나는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`를 받으며, 클라이언트는 최신 접근 상태를 확인한 뒤 새 멱등 키로 명시적으로 다시 시도한다.
+서버는 팀별로 이미 사용한 키 변경 멱등 해시를 보관한다. 신규 회전의 멱등 결과와 새 접근 키는 `teamId + Idempotency-Key`로 파생하므로 응답 유실 뒤 같은 팀의 다른 시즌 경로로 재시도해도 같은 결과를 반환한다. 같은 멱등 키로 만든 결과 뒤에 더 최신 키 변경이 완료됐다면 `409 IDEMPOTENCY_REPLAY_EXPIRED`를 반환하며, 폐기된 과거 접근 키를 다시 발급하지 않는다. 서로 다른 회전·복구 요청이 같은 팀에 동시에 반영되려 하면 하나는 `409 WORKSPACE_ACCESS_KEY_CONFLICT`를 받으며, 클라이언트는 최신 접근 상태를 확인한 뒤 새 멱등 키로 명시적으로 다시 시도한다.
 
 ### 접근 키 운영자 복구
 
@@ -444,7 +444,7 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 요청 지문은 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
-브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 Web Lock으로 보호한 브라우저 영구 저장소에 저장해야 한다. `setItem`이 예외를 던지거나 브라우저 전체의 미완료 콘텐츠 생성 기록이 20개에 도달하면 새 생성을 전송하지 않는다. 성공 또는 같은 결과의 동일 재처리를 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
+브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 Web Lock으로 보호한 브라우저 영구 저장소에 저장해야 한다. `setItem`이 예외를 던지면 새 생성을 전송하지 않는다. 브라우저 전체에 결과를 확인하지 못한 콘텐츠 생성 기록이 있으면 가장 오래된 기록과 같은 팀·시즌·종류·입력의 재확인만 전송하고 다른 새 생성은 막는다. 성공 또는 같은 결과의 동일 재처리를 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
 
 ### 구성원
 
@@ -657,7 +657,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-`roleId`는 요청한 시즌의 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료와 서버가 기록한 `null` 허용 `createdAt`을 반환한다. 새 자료에서는 `createdAt`이 항상 존재하고, `null` 허용은 V14 이전 자료를 같은 응답 형태로 조회하기 위한 호환 계약이다.
+`roleId`는 요청한 시즌의 역할이어야 한다. `title`은 필수이며 최대 200자, `url`은 사용자 정보가 없는 절대 `http` 또는 `https` 주소이며 최대 2048자다. `description`은 선택이고 최대 1000자다. 성공 상태는 `201 Created`이며 생성된 자료와 서버가 기록한 `createdAt`을 반환한다.
 
 BATON 서버는 URL 대상을 요청하거나 내용·가용성·신뢰성을 확인하지 않는다. 프런트엔드는 링크를 새 탭에서 열고 `noopener noreferrer`를 적용한다. 링크 대상의 접근 권한과 안전성은 사용자가 확인해야 한다.
 
@@ -668,7 +668,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `null` 허용 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 인수인계가 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있다.
+요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 인수인계가 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있다.
 
 보관·복원:
 
@@ -770,7 +770,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-요청은 이름과 모임 날짜의 전체 표현이다. `name`의 정규화·길이·시즌 안 유일성, `meetingDate`의 ISO 8601 형식과 시즌 기간 규칙은 생성과 같다. 성공 상태는 `200 OK`이고 수정된 회차 전체를 반환한다. 회차 `id`와 기존 반복 업무 실행의 `id`, 원본 반복 업무 식별자, 마감 규칙을 포함한 스냅샷 필드와 `status`는 바뀌지 않는다. 모임 날짜를 바꾸면 복사된 마감 규칙과 시즌 시간대로 실행의 `deadlineAt`만 다시 계산한다. V5 이관 회차의 `null` 날짜는 서버가 임의로 채우지 않으며, 운영자가 이 API로 정정할 때 실제 시즌 내 날짜를 반드시 제공한다.
+요청은 이름과 모임 날짜의 전체 표현이다. `name`의 정규화·길이·시즌 안 유일성, `meetingDate`의 ISO 8601 형식과 시즌 기간 규칙은 생성과 같다. 성공 상태는 `200 OK`이고 수정된 회차 전체를 반환한다. 회차 `id`와 기존 반복 업무 실행의 `id`, 원본 반복 업무 식별자, 마감 규칙을 포함한 스냅샷 필드와 `status`는 바뀌지 않는다. 모임 날짜를 바꾸면 복사된 마감 규칙과 시즌 시간대로 실행의 `deadlineAt`만 다시 계산한다.
 
 보관된 회차는 수정할 수 없으며, 없거나 다른 시즌 소속인 회차와 같은 `404 SEASON_ROUND_NOT_FOUND`를 반환한다. 활성 자동 회차도 이름과 날짜를 수정할 수 있다. `scheduledOccurrenceDate`는 원래 발생일로 유지하며, 날짜 변경 때 기존 `scheduledAt`의 시즌 현지 모임 시각을 새 날짜에 적용해 `scheduledAt`을 갱신한다. 날짜가 같으면 기존 UTC 시각을 유지한다. 반복 설정과 발생 커서는 변경하지 않고, 다른 발생과 같은 날짜로 옮겨도 서로 다른 회차로 유지한다. 날짜 변경·보관·복원은 같은 CAL 원본 ID의 새 스냅샷으로 기록한다. 이름 유일성은 보관 여부와 무관하게 시즌 전체에 적용되므로 보관된 회차의 이름도 예약된다. 다른 회차와 이름이 겹치면 `409 ROUND_NAME_CONFLICT`, 같은 회차의 수정·보관이 겹쳐 늦은 저장이 발생하면 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
@@ -827,7 +827,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 작성자는 해당 팀의 활동 중 구성원이어야 하고 관련 역할은 요청한 시즌 소속이어야 하며 한 개 이상이고 중복될 수 없다. 성공 상태는 `201 Created`다. 응답의 `id`, `createdAt`, `authorName`은 서버가 결정하고, `authorMemberId`는 요청한 작성자 식별자를 반환한다. 새 결정의 `archivedAt`은 `null`이다.
 
-`textFormat`은 이유와 대안의 공통 형식으로 `PLAIN_TEXT` 또는 `MARKDOWN`이다. 생성에서 생략하거나 `null`이면 `PLAIN_TEXT`로 저장한다. 응답과 워크스페이스·이전 시즌 기록에는 항상 형식을 반환한다. 기존 기록은 V31에서 일반 텍스트로 이관하며 원문은 바꾸지 않는다. 제목은 항상 일반 텍스트이고 본문 길이 제한은 각 2,000자다. 같은 멱등 키로 본문 형식만 바꿔도 다른 요청으로 거부한다.
+`textFormat`은 이유와 대안의 공통 형식으로 `PLAIN_TEXT` 또는 `MARKDOWN`이다. 생성에서 생략하거나 `null`이면 `PLAIN_TEXT`로 저장한다. 응답과 워크스페이스·이전 시즌 기록에는 항상 형식을 반환한다. 제목은 항상 일반 텍스트이고 본문 길이 제한은 각 2,000자다. 같은 멱등 키로 본문 형식만 바꿔도 다른 요청으로 거부한다.
 
 수정:
 
@@ -866,7 +866,7 @@ Idempotency-Key: <32~200자의 고엔트로피 값>
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청 필드는 `roleId`, `label`, `category`다. `roleId`는 요청한 시즌의 역할이어야 한다. 새 항목은 서버에서 항상 미완료로 시작하고 `archivedAt`은 `null`이다. 성공 상태는 `201 Created`이며 서버가 기록한 `null` 허용 `createdAt`을 함께 반환한다. 새 항목에서는 `createdAt`이 항상 존재하고, `null` 허용은 V14 이전 항목을 같은 응답 형태로 조회하기 위한 호환 계약이다.
+요청 필드는 `roleId`, `label`, `category`다. `roleId`는 요청한 시즌의 역할이어야 한다. 새 항목은 서버에서 항상 미완료로 시작하고 `archivedAt`은 `null`이다. 성공 상태는 `201 Created`이며 서버가 기록한 `createdAt`을 함께 반환한다.
 
 수정:
 
@@ -875,7 +875,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `label`, `category` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 기존 `completed` 값과 최초 `null` 허용 `createdAt`을 유지한다. 대상 항목은 요청한 시즌의 역할에 연결된 활성 기록이어야 하고 새 `roleId`도 같은 시즌 역할이어야 한다. 대상이 없거나 다른 시즌 소유이거나 보관 상태이면 `404 HANDOFF_ITEM_NOT_FOUND`, 새 소유 역할이 없으면 `404 ROLE_NOT_FOUND`다. 같은 항목을 먼저 읽은 수정·완료·보관 트랜잭션과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
+요청은 생성과 같은 `roleId`, `label`, `category` 전체 표현을 사용한다. 성공 상태는 `200 OK`이고 기존 `completed` 값과 최초 `createdAt`을 유지한다. 대상 항목은 요청한 시즌의 역할에 연결된 활성 기록이어야 하고 새 `roleId`도 같은 시즌 역할이어야 한다. 대상이 없거나 다른 시즌 소유이거나 보관 상태이면 `404 HANDOFF_ITEM_NOT_FOUND`, 새 소유 역할이 없으면 `404 ROLE_NOT_FOUND`다. 같은 항목을 먼저 읽은 수정·완료·보관 트랜잭션과 커밋이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받는다.
 
 완료 상태 변경:
 
@@ -888,7 +888,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 { "completed": true }
 ```
 
-성공 상태는 `200 OK`이고 최초 `null` 허용 `createdAt`을 유지한 갱신 항목을 반환한다. 보관된 항목은 완료 상태를 바꿀 수 없으며 `404 HANDOFF_ITEM_NOT_FOUND`다. 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
+성공 상태는 `200 OK`이고 최초 `createdAt`을 유지한 갱신 항목을 반환한다. 보관된 항목은 완료 상태를 바꿀 수 없으며 `404 HANDOFF_ITEM_NOT_FOUND`다. 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
 보관·복원:
 
@@ -901,7 +901,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 { "archived": true }
 ```
 
-결정과 같은 규칙으로 `true`는 최초 보관 UTC 시각을 `archivedAt`에 기록하고 `false`는 `null`로 되돌린다. 성공 상태는 `200 OK`이고 기존 완료 여부와 최초 `null` 허용 `createdAt`을 포함한 항목 전체를 반환한다. 보관된 항목도 워크스페이스 프로젝션의 `handoffItems`에 남으며 프런트가 활성 인수인계와 보관함으로 나눈다. 대상이 없거나 다른 시즌 소유이면 `404 HANDOFF_ITEM_NOT_FOUND`, 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
+결정과 같은 규칙으로 `true`는 최초 보관 UTC 시각을 `archivedAt`에 기록하고 `false`는 `null`로 되돌린다. 성공 상태는 `200 OK`이고 기존 완료 여부와 최초 `createdAt`을 포함한 항목 전체를 반환한다. 보관된 항목도 워크스페이스 프로젝션의 `handoffItems`에 남으며 프런트가 활성 인수인계와 보관함으로 나눈다. 대상이 없거나 다른 시즌 소유이면 `404 HANDOFF_ITEM_NOT_FOUND`, 겹친 변경은 `409 WORKSPACE_CONTENT_CONFLICT`다.
 
 ## 5. WATCH 내부 상태 변경 이벤트 수신
 
@@ -1221,7 +1221,7 @@ CSRF 없이 조회한다.
 반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
-완료된 BRIEF outbox 최대 ID를 고정한 V27 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
+완료된 BRIEF outbox 최대 ID를 고정한 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
 조회 경로를 `Location`으로 반환한다. 모든 성공 응답은 `Cache-Control: no-store`다. 세부
 권한, 실행 상태와 BRIEF 서비스 결과 분류는 PRD-0008을 따른다.
 

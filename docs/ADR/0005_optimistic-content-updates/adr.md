@@ -9,7 +9,7 @@ BATON 파일럿은 공유 링크를 받은 여러 구성원이 같은 구성원 
 
 ## 결정
 
-- `Member`, `Season`, `Role`, `RoleHandoff`, `RoleResource`, 반복 업무 정의인 `Routine`, `SeasonRound`, 회차별 `RoutineExecution`, `Decision`과 `HandoffItem`에 JPA `@Version` 값을 둔다. Flyway는 기존 행의 버전을 `0`으로 초기화하고 새 행도 `0`에서 시작한다.
+- `Member`, `Season`, `Role`, `RoleHandoff`, `RoleResource`, 반복 업무 정의인 `Routine`, `SeasonRound`, 회차별 `RoutineExecution`, `Decision`과 `HandoffItem`에 JPA `@Version` 값을 둔다. 새 행의 버전은 `0`에서 시작한다.
 - 구성원·시즌·역할·역할 인수인계·역할 자료·반복 업무 정의·회차·반복 업무 실행·결정·인수인계 항목 저장은 트랜잭션 종료 전에 플러시해 낙관적 잠금 충돌을 영속성 어댑터 경계에서 확인한다.
 - 겹친 수정 중 늦게 커밋한 요청은 `409 WORKSPACE_CONTENT_CONFLICT`로 처리한다.
 - 프런트는 충돌 뒤 워크스페이스 프로젝션을 다시 조회하고, 사용자가 최신 상태를 확인한 뒤 수정 내용을 다시 제출하게 한다.
