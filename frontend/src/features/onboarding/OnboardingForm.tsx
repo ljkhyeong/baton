@@ -177,7 +177,7 @@ export default function OnboardingForm() {
               aria-describedby="member-names-help"
             />
             <small id="member-names-help">
-              줄바꿈 또는 쉼표로 구분해 주세요. 최대 {MAX_INITIAL_MEMBER_COUNT}명, 이름은 각각 {MAX_MEMBER_NAME_LENGTH}자까지 입력할 수 있어요.
+              줄바꿈 또는 쉼표로 구분해 주세요. 최대 {MAX_INITIAL_MEMBER_COUNT}명, 이름은 각각 {MAX_MEMBER_NAME_LENGTH}자까지 입력할 수 있습니다.
             </small>
           </label>
           <label>

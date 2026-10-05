@@ -77,7 +77,7 @@ export function HandoffView({
   const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
   const selected = roles[selectedIndex] ?? roles[0]
   if (!selected) {
-    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할을 만들면 담당 업무와 자료를 인수인계 문서로 정리할 수 있습니다." /><ActionableEmpty icon="handoff" title="넘겨줄 역할이 아직 없어요" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
+    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할을 만들면 담당 업무와 자료를 인수인계 문서로 정리할 수 있습니다." /><ActionableEmpty icon="handoff" title="넘겨줄 역할이 아직 없습니다" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
   }
   const panelId = `${tabSetId}-panel`
   const selectedTabId = `${tabSetId}-tab-${selected.id}`
@@ -120,7 +120,7 @@ export function HandoffView({
       : next
         ? isActiveMember(next)
           ? `${next.name}님에게 넘길 인수인계`
-          : `${next.name}님은 활동을 종료했어요`
+          : `${next.name}님은 활동을 종료했습니다`
         : '다음 담당자를 정해 주세요'
   const remainingDays = daysUntil(season.endDate, calendarDate)
   return (
@@ -192,7 +192,7 @@ export function HandoffView({
                   </span>
                   <strong>
                     {selectedHandoff?.status === 'ACCEPTED'
-                      ? `${next?.name ?? '다음 담당자'}님의 수락을 기록했어요`
+                      ? `${next?.name ?? '다음 담당자'}님의 수락을 기록했습니다`
                       : '다음 담당자와 담당 기간을 정하세요'}
                   </strong>
                   <p>
@@ -244,7 +244,7 @@ export function HandoffView({
               ) : (
                 <>
                   <span className="handoff-state-label">수락 대기</span>
-                  <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있어요</strong>
+                  <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있습니다</strong>
                   <p>전달한 인수인계 문서는 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
                   <dl className="handoff-transfer-snapshot" aria-label="전달 시점 체크리스트와 자료 현황">
                     <div><dt>체크리스트 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
@@ -308,7 +308,7 @@ export function HandoffView({
             )
           }) : (
             <ActionableEmpty icon="handoff"
-              title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 인수인계 항목이 없어요'}
+              title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있습니다' : '아직 인수인계 항목이 없습니다'}
               description={selectedArchivedItems.length
                 ? '아래 보관함에서 다시 필요한 항목을 복원하거나 새 항목을 추가해 주세요.'
                 : '다음 담당자가 알아야 할 업무, 자료, 주의사항을 추가하세요.'}

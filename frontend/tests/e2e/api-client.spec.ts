@@ -822,7 +822,7 @@ test('워크스페이스 성공 응답에 필수 필드가 없으면 복구 가�
     `/teams/${scope.teamId}/seasons/${scope.seasonId}#accessKey=${scope.accessKey}`,
   )
 
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await expect(page.getByText('서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.')).toBeVisible()
   await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
 })

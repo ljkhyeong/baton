@@ -475,7 +475,7 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
 
   expect(navigationResponse).toBeNull()
   expect((await deniedResponse).status()).toBe(403)
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   expect(await page.evaluate((key) =>
     localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ROTATED_ACCESS_KEY)
@@ -564,7 +564,7 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
 
   page.once('dialog', (dialog) => dialog.accept())
   await keyDialog.getByRole('button', { name: '공유 링크 재발급' }).click()
-  await expect(page.locator('.toast[role="status"]')).toContainText('공유 링크를 재발급했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('공유 링크를 재발급했습니다.')
   await expect.poll(() =>
     page.evaluate((key) => localStorage.getItem(key), PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY),
   ).toBeNull()
@@ -594,7 +594,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
   expect(firstAttempt.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   await page.getByRole('button', { name: '변경된 공유 링크 확인' })
     .evaluate((button: HTMLButtonElement) => {
@@ -632,7 +632,7 @@ test('충돌 임시 기록 복구가 403이면 반복을 멈추고 최신 공유
 
   api.rotateAccessKeyFromAnotherDevice()
   await page.reload()
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
 
   await expect(page.getByText('다른 기기에서 공유 링크를 변경한 것으로 보입니다.')).toBeVisible()
@@ -671,7 +671,7 @@ test('만료된 접근 키 임시 기록을 지우고 최신 공유 링크 확�
   api.expireAccessKeyRotationHistory()
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
 
   await expect(page.getByRole('alert')).toContainText('공유 링크가 다시 변경되어 이전 링크를 복구할 수 없습니다.')
@@ -704,7 +704,7 @@ test('손상된 회전 임시 기록 저장소를 무시하고 정상 멱등 키
     .getByRole('button', { name: '공유 링크 재발급' }).click()
   await expect(page.getByRole('alert')).toContainText('접근 키 변경 응답을 확인하지 못했습니다.')
   await page.reload()
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await page.getByRole('button', { name: '변경된 공유 링크 확인' }).click()
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
 
@@ -737,7 +737,7 @@ test('@smoke @responsive @continuity 조치할 항목은 이유와 다음 행동
     assignmentStartDate: '2026-07-02',
     assignmentEndDate: '2026-07-20',
     responsibilities: ['결정과 근거 정리'],
-    risk: '결정 근거가 채팅에만 남을 수 있어요.',
+    risk: '결정 근거가 채팅에만 남을 수 있습니다.',
   })
   projection.continuitySignals = [
     {
@@ -1226,7 +1226,7 @@ test('@operations 오늘 화면에서 선택한 회차의 반복 업무를 완�
   await expect(completeButton).toBeInViewport()
   await completeButton.click()
 
-  await expect(page.getByRole('status').filter({ hasText: '이 업무를 완료로 표시했어요.' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: '이 업무를 완료로 표시했습니다.' })).toBeVisible()
   await expect(checklist.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeEnabled()
   await expect(checklist.getByRole('progressbar', { name: '이번 회차 업무 완료율' })).toHaveAttribute('value', '2')
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
@@ -1315,7 +1315,7 @@ test('@operations 오늘 화면의 반복 업무 완료 저장 실패를 서버 
   api.failNextRoutineCompletion()
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
 
-  await expect(page.locator('.toast[role="status"]')).toHaveText(/완료 상태를 바꾸지 못했어요.*반복 업무 상태를 저장하지 못했습니다/)
+  await expect(page.locator('.toast[role="status"]')).toHaveText(/완료 상태를 바꾸지 못했습니다.*반복 업무 상태를 저장하지 못했습니다/)
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 1개' })).toBeVisible()
   const failureCall = await recordedCall(
@@ -1350,7 +1350,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(routineCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeRoutineConflict)
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔습니다.')
   await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toBeVisible()
   expect(api.projection().rounds
     .find((round) => round.id === ROUND_TWO_ID)?.routineExecutions
@@ -1367,7 +1367,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
 
   await expect.poll(() => completionPatchCount(handoffCompletionPath)).toBe(1)
   await expect.poll(workspaceGetCount).toBeGreaterThan(getsBeforeHandoffConflict)
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔습니다.')
   await expect(handoffCheckbox).not.toBeChecked()
   expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_TWO_ID)?.completed).toBe(false)
   expectScopedCall(await recordedCall(api, 'PATCH', handoffCompletionPath), { completed: true })
@@ -1416,7 +1416,7 @@ test('접근 거부 뒤에는 재시도와 창 활성화 및 네트워크 복구
   ).length
 
   await page.goto(`${WORKSPACE_PATH}#accessKey=invalid-access-key`)
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   const deniedGets = workspaceGetCount()
   expect(deniedGets).toBeGreaterThan(0)
@@ -1437,7 +1437,7 @@ test('다른 기기에서 접근 키가 바뀌면 자동 동기화가 편집 화
 
   api.rotateAccessKeyFromAnotherDevice()
 
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' }))
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' }))
     .toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toHaveCount(0)
@@ -1463,6 +1463,6 @@ test('@operations @continuity 오늘 요약은 조치할 항목으로 이동하�
 
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
-  await expect(page.getByText('이번 회차 업무를 모두 끝냈어요.', { exact: false })).toBeVisible()
+  await expect(page.getByText('이번 회차 업무를 모두 끝냈습니다.', { exact: false })).toBeVisible()
   await expect(page.locator('.today-summary .is-complete')).toContainText('모두 완료')
 })

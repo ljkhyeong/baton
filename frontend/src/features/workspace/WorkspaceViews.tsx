@@ -168,7 +168,7 @@ export function RoundControl({
         </button>
       </div>}
       {!hasRoutines && !compact && (
-        <p id="round-create-hint">반복 업무를 하나 이상 만든 뒤 회차를 만들 수 있어요.</p>
+        <p id="round-create-hint">반복 업무를 하나 이상 만든 뒤 회차를 만들 수 있습니다.</p>
       )}
     </section>
   )

@@ -72,7 +72,7 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
   await dialog.getByRole('button', { name: '구성원 추가하기' }).click()
   await expect(dialog).toHaveCount(0)
   await expect(page.locator('.toast[role="status"]')).toContainText(
-    '이서준(응답 복구)님을 팀 구성원으로 추가했어요.',
+    '이서준(응답 복구)님을 팀 구성원으로 추가했습니다.',
   )
 
   const replayCalls = api.calls.filter(
@@ -125,7 +125,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
   await deactivateButton.focus()
   await deactivateButton.press('Enter')
   await expect(page.locator('.toast[role="status"]')).toContainText(
-    '박민서(리드)님의 활동을 종료했어요.',
+    '박민서(리드)님의 활동을 종료했습니다.',
   )
   expectScopedCall(
     await recordedCall(
@@ -190,7 +190,7 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
   })
   await reactivateMemberButton.focus()
   await reactivateMemberButton.press('Enter')
-  await expect(page.locator('.toast[role="status"]')).toContainText('박민서(리드)님의 활동을 재개했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('박민서(리드)님의 활동을 재개했습니다.')
   await expect(managementDialog.getByRole('button', {
     name: '박민서(리드) 활동 종료',
   })).toBeFocused()
@@ -219,7 +219,7 @@ test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 �
     : page.locator('.sidebar').getByRole('button', { name: '공유' })
   await shareButton.focus()
   await shareButton.press('Enter')
-  await expect(page.locator('.toast[role="status"]')).toHaveText(/직접 복사할 링크를 열었어요/)
+  await expect(page.locator('.toast[role="status"]')).toHaveText(/직접 복사할 링크를 열었습니다/)
   const shareDialog = page.getByRole('dialog', { name: '공유 링크 직접 복사' })
   const shareLink = shareDialog.getByLabel('공유 링크')
   const expectedShareUrl = `${new URL(page.url()).origin}${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`
@@ -259,7 +259,7 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 새로고침 후에�
   await dialog.getByLabel('담당 시작일').fill('2026-07-20')
   await dialog.getByLabel('담당 종료일').fill('2026-09-17')
   await dialog.getByLabel('담당 업무').fill('질문 수집\n공통 막힘 정리')
-  await dialog.getByLabel('주의사항').fill('질문 목록이 개인 메모에만 남을 수 있어요.')
+  await dialog.getByLabel('주의사항').fill('질문 목록이 개인 메모에만 남을 수 있습니다.')
   await dialog.getByRole('button', { name: '역할 만들기' }).click()
 
   await expect(page.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })).toBeVisible()
@@ -272,7 +272,7 @@ test('@smoke 서버 작업 공간에서 역할을 만들고 새로고침 후에�
     assignmentStartDate: '2026-07-20',
     assignmentEndDate: '2026-09-17',
     responsibilities: ['질문 수집', '공통 막힘 정리'],
-    risk: '질문 목록이 개인 메모에만 남을 수 있어요.',
+    risk: '질문 목록이 개인 메모에만 남을 수 있습니다.',
   })
 
   await page.reload()
@@ -316,10 +316,10 @@ test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차�
   await roleDialog.getByLabel('담당 시작일').fill('2026-07-10')
   await roleDialog.getByLabel('담당 종료일').fill('2026-09-10')
   await roleDialog.getByLabel('담당 업무').fill('문제 6개 선정\n진행 순서 공유')
-  await roleDialog.getByLabel('주의사항').fill('선정 기준이 오래된 문서에 남아 있어요.')
+  await roleDialog.getByLabel('주의사항').fill('선정 기준이 오래된 문서에 남아 있습니다.')
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
-  await expect(page.locator('.toast[role="status"]')).toContainText('역할 정보를 수정했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('역할 정보를 수정했습니다.')
   await expect(page.locator('.role-row-open').filter({ hasText: '문제 운영 큐레이터' })).toBeVisible()
   const roleCall = await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)
   expectScopedCall(roleCall, {
@@ -330,7 +330,7 @@ test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차�
     assignmentStartDate: '2026-07-10',
     assignmentEndDate: '2026-09-10',
     responsibilities: ['문제 6개 선정', '진행 순서 공유'],
-    risk: '선정 기준이 오래된 문서에 남아 있어요.',
+    risk: '선정 기준이 오래된 문서에 남아 있습니다.',
   })
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
@@ -345,7 +345,7 @@ test('@operations 역할과 반복 업무 정의를 수정해도 기존 회차�
   await routineDialog.getByLabel('세부 설명').fill('난이도와 풀이 시간을 확인해 여섯 문제를 확정합니다.')
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
-  await expect(page.locator('.toast[role="status"]')).toContainText('반복 업무 정보를 수정했어요.')
+  await expect(page.locator('.toast[role="status"]')).toContainText('반복 업무 정보를 수정했습니다.')
   const beforePhase = page.locator('.rhythm-phase').filter({ has: page.getByRole('heading', { name: '모임 전' }) })
   const snapshottedRoutine = beforePhase.locator('.routine-row').filter({ hasText: '문제 5개 선정' })
   await expect(snapshottedRoutine).toContainText('그래프 2개 · DP 2개 · 구현 1개')
@@ -385,12 +385,12 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
     name: '다른 구성원이 갱신한 역할',
     purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
     responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
-    risk: '최신 기준이 구성원에게 아직 전파되지 않았어요.',
+    risk: '최신 기준이 구성원에게 아직 전파되지 않았습니다.',
   })
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(roleDialog).toBeHidden()
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔습니다')
   const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
   await expect(draft).toHaveValue(/내 화면의 낡은 역할 수정/)
   await expect(draft).toHaveValue(/담당 업무\n문제 5개 선정\n난이도 균형 확인/)
@@ -416,7 +416,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   await expect(reopenedRoleDialog.getByLabel('담당 업무'))
     .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
   await expect(reopenedRoleDialog.getByLabel('주의사항'))
-    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
+    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았습니다.')
   await reopenedRoleDialog.getByRole('button', { name: '닫기' }).click()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
@@ -434,7 +434,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   await routineDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(routineDialog).toBeHidden()
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔습니다')
   await expect(draft).toHaveValue(/내 화면의 낡은 반복 업무 수정/)
   await expect(draft).not.toHaveValue(/내 화면의 낡은 역할 수정/)
   await page.getByRole('button', { name: '다른 구성원이 갱신한 반복 업무 반복 업무 수정' }).click()
@@ -526,7 +526,7 @@ for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
     } else {
       api.rotateAccessKeyFromAnotherDevice()
       await page.getByRole('button', { name: '지금 새로고침' }).click()
-      await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
       await expect(draft).toHaveCount(0)
     }
   })
@@ -555,7 +555,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
     name: '다른 구성원이 갱신한 역할',
     purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
     responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
-    risk: '최신 기준이 구성원에게 아직 전파되지 않았어요.',
+    risk: '최신 기준이 구성원에게 아직 전파되지 않았습니다.',
   })
   api.makeWorkspaceGetsUnavailable()
   const getsBeforeConflict = workspaceGetCount()
@@ -595,7 +595,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await expect(reopenedRoleDialog.getByLabel('담당 업무'))
     .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
   await expect(reopenedRoleDialog.getByLabel('주의사항'))
-    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았어요.')
+    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았습니다.')
   await expect.poll(rolePutCount).toBe(1)
 })
 

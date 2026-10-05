@@ -18,7 +18,7 @@ export function ShareLinkFallback({
   return (
     <ModalShell
       title="공유 링크 직접 복사"
-      description="브라우저가 자동 복사를 허용하지 않았어요. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요."
+      description="브라우저가 자동 복사를 허용하지 않았습니다. 아래 링크를 선택해 복사한 뒤 구성원에게 전달해 주세요."
       onClose={onClose}
     >
       <div className="share-link-fallback">
@@ -33,7 +33,7 @@ export function ShareLinkFallback({
         />
         <p>{accountAccessEnabled
           ? '로그인한 팀 구성원만 부여된 권한으로 이용할 수 있습니다.'
-          : '이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있어요.'}</p>
+          : '이 링크를 가진 사람은 작업 공간을 읽고 수정할 수 있습니다.'}</p>
         <button type="button" className="primary-button full-button" onClick={onClose}>확인</button>
       </div>
     </ModalShell>

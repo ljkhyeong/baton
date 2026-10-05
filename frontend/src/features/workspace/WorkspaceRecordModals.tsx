@@ -143,7 +143,7 @@ export function DecisionModal({
                 placeholder="예: 세션 시간을 30분 연장하기" rows={3} />
             </label>
           </>}
-          {textFormat === 'MARKDOWN' && <small>굵게, 목록, 링크와 코드 서식을 쓸 수 있어요. HTML·이미지·외부 임베드는 표시하지 않습니다.</small>}
+          {textFormat === 'MARKDOWN' && <small>굵게, 목록, 링크와 코드 서식을 쓸 수 있습니다. HTML·이미지·외부 임베드는 표시하지 않습니다.</small>}
         </fieldset>
         <label>
           <span>작성자</span>
@@ -165,7 +165,7 @@ export function DecisionModal({
             ))}
           </select>
           {existingAuthor && !isActiveMember(existingAuthor) && (
-            <small>활동을 종료한 기존 작성자는 유지할 수 있지만 새로 선택할 수는 없어요.</small>
+            <small>활동을 종료한 기존 작성자는 유지할 수 있지만 새로 선택할 수는 없습니다.</small>
           )}
         </label>
         <fieldset className="modal-choice-group">
@@ -299,7 +299,7 @@ export function RoleResourceModal({
         </label>
         {lockedRoleIds.has(roleId) && (
           <p className="form-error" role="alert">
-            인수인계 전달 후에는 수락하거나 취소해야 자료를 수정할 수 있어요.
+            인수인계 전달 후에는 수락하거나 취소해야 자료를 수정할 수 있습니다.
           </p>
         )}
         <label>
@@ -442,7 +442,7 @@ export function HandoffItemModal({
         </label>
         {lockedRoleIds.has(roleId) && (
           <p className="form-error" role="alert">
-            인수인계 전달 후에는 수락하거나 취소해야 인수인계 문서를 수정할 수 있어요.
+            인수인계 전달 후에는 수락하거나 취소해야 인수인계 문서를 수정할 수 있습니다.
           </p>
         )}
         <label>

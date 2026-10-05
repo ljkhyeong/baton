@@ -395,7 +395,7 @@ test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 �
 
   await expect(editDialog).toHaveCount(0)
   await expect(page.locator('.toast[role="status"]')).toContainText(
-    '다른 사람이 수정한 내용을 불러왔어요.',
+    '다른 사람이 수정한 내용을 불러왔습니다.',
   )
   await seasonSwitcher(page).click()
   await expect(page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' }))
@@ -679,7 +679,7 @@ test('@operations 이전 시즌에서 늦게 도착한 종료 오류는 현재 �
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()))
   }))
   await expect(currentSeasonDialog).toBeVisible()
-  await expect(page.getByText('다른 구성원이 시즌을 종료했어요.')).toHaveCount(0)
+  await expect(page.getByText('다른 구성원이 시즌을 종료했습니다.')).toHaveCount(0)
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
 })
 
@@ -696,7 +696,7 @@ test('@operations 서버가 시즌 종료를 알리면 열려 있던 편집기�
 
   await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
-  await expect(page.getByText('다른 구성원이 시즌을 종료했어요.')).toBeVisible()
+  await expect(page.getByText('다른 구성원이 시즌을 종료했습니다.')).toBeVisible()
 })
 
 

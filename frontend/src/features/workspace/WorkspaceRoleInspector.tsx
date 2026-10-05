@@ -89,7 +89,7 @@ export function RoleInspector({
   const inspectorContent = (
     <>
       <button ref={closeButtonRef} type="button" className="inspector-close" onClick={onClose} aria-label="상세 닫기"><Icon name="close" /></button><div className="inspector-topline"><span>선택한 역할</span></div><h2>{role.name}</h2><p className="inspector-purpose">{role.purpose}</p>
-      <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았어요.</p>}</div>
+      <div className="owner-block"><span className="block-label">현재 담당자</span>{owner ? <div><span className="avatar avatar-large" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></div> : <p className="muted-copy">현재 담당자가 정해지지 않았습니다.</p>}</div>
       {role.risk && <div className="risk-note"><Icon name="alert" size={17} /><span><strong>주의사항</strong>{role.risk}</span></div>}
       <div className="inspector-section"><span className="block-label">담당 업무</span><ul>{role.responsibilities.length ? role.responsibilities.map((item) => <li key={item}><Icon name="check" size={13} />{item}</li>) : <li className="muted">등록된 담당 업무가 없습니다.</li>}</ul></div>
       <div className="inspector-section resource-section">
@@ -121,7 +121,7 @@ export function RoleInspector({
               </li>
             ))}
           </ul>
-        ) : <p className="muted-copy resource-empty">연결된 자료가 아직 없어요.</p>}
+        ) : <p className="muted-copy resource-empty">연결된 자료가 아직 없습니다.</p>}
         {archivedResources.length > 0 && (
           <details className="record-archived">
             <summary>자료 보관함 {archivedResources.length}개</summary>
@@ -159,7 +159,7 @@ export function RoleInspector({
           onCopyResource={onCopyPreviousResource}
         />
       )}
-      <div className="inspector-handoff"><div><span className="block-label">체크리스트 완료율</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 대기 중입니다. 수락 또는 취소 전까지 역할과 인수인계 문서를 수정할 수 없습니다.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았어요.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '인수인계 수락 확인하기' : '인수인계 보기'} <Icon name="arrow" size={15} /></button></div>
+      <div className="inspector-handoff"><div><span className="block-label">체크리스트 완료율</span><strong>{progress}%</strong></div><div className="thin-progress"><i style={{ width: `${progress}%` }} /></div><p>{handoff?.status === 'TRANSFERRED' ? '수락 대기 중입니다. 수락 또는 취소 전까지 역할과 인수인계 문서를 수정할 수 없습니다.' : next ? `다음 담당자 · ${memberDisplayName(next)}` : '다음 담당자가 아직 정해지지 않았습니다.'}</p><button type="button" onClick={onOpenHandoff}>{handoff?.status === 'TRANSFERRED' ? '인수인계 수락 확인하기' : '인수인계 보기'} <Icon name="arrow" size={15} /></button></div>
     </>
   )
 

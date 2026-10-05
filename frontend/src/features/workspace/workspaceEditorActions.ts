@@ -140,7 +140,7 @@ export function createWorkspaceEditorActions({
     if (isRoleHandoffLocked(roleHandoffs, role.id)) {
       setSelectedRoleId(role.id)
       setView('handoff')
-      notify('인수인계 전달 후에는 수락하거나 취소해야 수정할 수 있어요.', 'error')
+      notify('인수인계 전달 후에는 수락하거나 취소해야 수정할 수 있습니다.', 'error')
       return
     }
     mutations.roleUpdate.reset()
@@ -157,7 +157,7 @@ export function createWorkspaceEditorActions({
     }
     if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
       setView('handoff')
-      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 추가할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 추가할 수 있습니다.', 'error')
       return
     }
     setEditor(source ? { type: 'roleResourceCopy', value: source } : null)
@@ -173,7 +173,7 @@ export function createWorkspaceEditorActions({
     if (isRoleHandoffLocked(roleHandoffs, resource.roleId)) {
       setSelectedRoleId(resource.roleId)
       setView('handoff')
-      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 수정할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 자료를 수정할 수 있습니다.', 'error')
       return
     }
     mutations.roleResourceUpdate.reset()
@@ -228,7 +228,7 @@ export function createWorkspaceEditorActions({
       return
     }
     if (selectedRole && isRoleHandoffLocked(roleHandoffs, selectedRole.id)) {
-      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 추가할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 추가할 수 있습니다.', 'error')
       return
     }
     setEditor(null)
@@ -239,7 +239,7 @@ export function createWorkspaceEditorActions({
   const openHandoffItemEdit = (item: HandoffItem) => {
     if (!ensureFreshWorkspace()) return
     if (isRoleHandoffLocked(roleHandoffs, item.roleId)) {
-      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 수정할 수 있어요.', 'error')
+      notify('전달한 인수인계는 수락하거나 취소한 뒤 항목을 수정할 수 있습니다.', 'error')
       return
     }
     if (busyHandoffItemIds.has(item.id)) return

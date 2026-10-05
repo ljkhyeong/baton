@@ -191,7 +191,7 @@ export function RhythmView({
             )
           })}
         </div>
-      ) : <ActionableEmpty icon="rhythm" title={archivedRoutines.length ? '사용 중인 반복 업무가 없어요' : '아직 반복 업무가 없어요'} description={archivedRoutines.length ? '보관함에서 다시 필요한 반복 업무를 복원하거나 새 반복 업무를 추가해 주세요.' : '모임마다 반복할 업무와 담당 역할을 정하세요.'} actionLabel={roles.length ? '새 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
+      ) : <ActionableEmpty icon="rhythm" title={archivedRoutines.length ? '사용 중인 반복 업무가 없습니다' : '아직 반복 업무가 없습니다'} description={archivedRoutines.length ? '보관함에서 다시 필요한 반복 업무를 복원하거나 새 반복 업무를 추가해 주세요.' : '모임마다 반복할 업무와 담당 역할을 정하세요.'} actionLabel={roles.length ? '새 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />}
       {archivedRoutines.length > 0 && (
         <details className="archive-shelf routine-archive-shelf">
           <summary>보관한 반복 업무 {archivedRoutines.length}개</summary>

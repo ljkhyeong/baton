@@ -348,7 +348,7 @@ test('@smoke 일시적인 조회 오류에서 다시 시도할 수 있다', asyn
   const api = await installApi(page)
   api.makeWorkspaceGetsUnavailable()
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '다시 시도하기' }).click()
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()

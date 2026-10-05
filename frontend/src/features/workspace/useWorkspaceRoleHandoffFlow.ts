@@ -99,7 +99,7 @@ export function useWorkspaceRoleHandoffFlow({
       discard()
       onCloseModal()
       onOpenHandoffView()
-      notify('다음 담당자와 기간을 정하고 역할 인수인계 준비를 시작했어요.')
+      notify('다음 담당자와 기간을 정하고 역할 인수인계 준비를 시작했습니다.')
     })
   }
 
@@ -112,7 +112,7 @@ export function useWorkspaceRoleHandoffFlow({
     }, {
       onSuccess: () => {
         close()
-        notify('인수인계를 전달했어요. 다음 담당자의 수락을 기다립니다.')
+        notify('인수인계를 전달했습니다. 다음 담당자의 수락을 기다립니다.')
       },
     })
   }
@@ -126,7 +126,7 @@ export function useWorkspaceRoleHandoffFlow({
     }, {
       onSuccess: () => {
         close()
-        notify('인수인계를 수락해 다음 담당자로 교체했어요.')
+        notify('인수인계를 수락해 다음 담당자로 교체했습니다.')
       },
     })
   }
@@ -140,7 +140,7 @@ export function useWorkspaceRoleHandoffFlow({
     }, {
       onSuccess: () => {
         close()
-        notify('인수인계를 취소했어요. 다시 수정할 수 있습니다.')
+        notify('인수인계를 취소했습니다. 다시 수정할 수 있습니다.')
       },
     })
   }

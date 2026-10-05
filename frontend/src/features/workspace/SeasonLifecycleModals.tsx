@@ -132,7 +132,7 @@ export function SeasonSwitcherModal({
             onClick={onCreateNext}
           >
             <Icon name="arrow" size={15} />
-            {hasSuccessor ? '다음 시즌이 이미 있어요' : '다음 시즌 시작'}
+            {hasSuccessor ? '다음 시즌이 이미 있습니다' : '다음 시즌 시작'}
           </button>
         </div>
         <FormError error={endingError} />

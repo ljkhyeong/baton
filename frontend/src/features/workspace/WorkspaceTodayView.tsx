@@ -109,7 +109,7 @@ export function TodayView({
         eyebrow={calendarLabel}
         title={`남은 업무 ${pendingCount}개`}
         description={roundComplete
-          ? '이번 회차 업무를 모두 끝냈어요. 다음 회차와 인수인계를 준비하세요.'
+          ? '이번 회차 업무를 모두 끝냈습니다. 다음 회차와 인수인계를 준비하세요.'
           : '끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요.'}
         action={(
           <button type="button" className="secondary-button" onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>
@@ -156,7 +156,7 @@ export function TodayView({
           </div>
         </div>
         {!orderedRoutines.length ? (
-          <ActionableEmpty icon="rhythm" title="아직 반복 업무가 없어요" description="담당 역할을 정하고 반복할 업무를 등록하세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
+          <ActionableEmpty icon="rhythm" title="아직 반복 업무가 없습니다" description="담당 역할을 정하고 반복할 업무를 등록하세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
           <section className="today-round-checklist" aria-label={`${selectedRound.name} 반복 업무 완료하기`}>
             <progress
@@ -192,7 +192,7 @@ export function TodayView({
           <ActionableEmpty icon="rhythm"
             title={archivedRoundCount
               ? '모든 회차가 보관되어 있습니다.'
-              : '아직 만든 회차가 없어요'}
+              : '아직 만든 회차가 없습니다'}
             description={archivedRoundCount
               ? '일정 화면의 보관함에서 회차를 복원하거나 새 회차를 만들어 주세요.'
               : '회차를 만들면 등록한 반복 업무가 추가됩니다.'}

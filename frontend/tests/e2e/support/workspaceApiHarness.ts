@@ -269,7 +269,7 @@ export function makeProjection(): WorkspaceProjection {
         assignmentStartDate: '2026-07-02',
         assignmentEndDate: '2026-09-17',
         responsibilities: ['문제 5개 선정', '난이도 균형 확인'],
-        risk: '문제 선정 기준이 개인 메모에만 있어요.',
+        risk: '문제 선정 기준이 개인 메모에만 있습니다.',
       },
     ],
     routines: [

@@ -52,9 +52,9 @@ for (const [mode, title] of [
       expect(await page.evaluate(() => document.documentElement.dataset.shareAttempted)).toBe('true')
       expect(await page.evaluate(() => document.documentElement.dataset.copiedWorkspace)).toBeUndefined()
       await expect(page.getByRole('dialog', { name: '공유 링크 직접 복사' })).toHaveCount(0)
-      await expect(page.getByRole('status').filter({ hasText: '공유 링크를 복사했어요.' })).toHaveCount(0)
+      await expect(page.getByRole('status').filter({ hasText: '공유 링크를 복사했습니다.' })).toHaveCount(0)
     } else {
-      await expect(page.getByRole('status')).toContainText('공유 링크를 복사했어요.')
+      await expect(page.getByRole('status')).toContainText('공유 링크를 복사했습니다.')
       expect(await page.evaluate(() => document.documentElement.dataset.copiedWorkspace))
         .toBe(new URL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`, page.url()).href)
     }

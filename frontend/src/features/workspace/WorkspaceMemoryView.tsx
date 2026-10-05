@@ -83,7 +83,7 @@ export function MemoryView({
         </section>
       ) : (
         <ActionableEmpty
-          title={archivedDecisions.length ? '모든 결정이 보관되어 있습니다.' : '아직 결정 기록이 없어요'}
+          title={archivedDecisions.length ? '모든 결정이 보관되어 있습니다.' : '아직 결정 기록이 없습니다'}
           description={archivedDecisions.length
             ? '아래 보관함에서 다시 필요한 결정을 복원하거나 새 결정을 남겨 보세요.'
             : '무엇을 결정했고 왜 그렇게 정했는지 남겨 보세요.'}

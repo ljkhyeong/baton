@@ -146,7 +146,7 @@ test('열람자는 공유 키 없이 개인 캘린더 주소를 발급할 수 �
 
 test('팀 접근이 차단되어도 본인 구독을 해제할 수 있다 @smoke @responsive', async ({ page }) => {
   const { panel, calls } = await setup(page, { denied: true })
-  await expect(page.getByText('작업 공간을 불러오지 못했어요', { exact: true })).toBeVisible()
+  await expect(page.getByText('작업 공간을 불러오지 못했습니다', { exact: true })).toBeVisible()
   await panel.getByRole('button', { name: '구독 해제', exact: true }).click()
   await panel.getByRole('group', { name: '구독 해제 확인', exact: true }).getByRole('button', { name: '구독 해제', exact: true }).click()
   await expect(panel.getByText('구독을 해제했습니다.', { exact: true })).toBeVisible()

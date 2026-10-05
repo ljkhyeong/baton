@@ -198,7 +198,7 @@ export function RecordSearchView({
         <section className="record-search-results" aria-labelledby="record-search-result-title">
           <div className="record-search-summary">
             <div>
-              <h2 id="record-search-result-title">{partial ? '불러온 시즌에서 ' : ''}{results.length}개의 기록을 찾았어요</h2>
+              <h2 id="record-search-result-title">{partial ? '불러온 시즌에서 ' : ''}{results.length}개의 기록을 찾았습니다</h2>
             </div>
             <p aria-live="polite" aria-atomic="true">
               <span className="visually-hidden">검색 결과 {results.length}개. </span>최신 기록부터 표시합니다.
@@ -274,7 +274,7 @@ export function RecordSearchView({
           ) : (
             <div className="empty-state record-search-empty">
               <Icon name="search" size={28} />
-              <strong>조건에 맞는 기록이 없어요</strong>
+              <strong>조건에 맞는 기록이 없습니다</strong>
               <p>
                 단어를 줄이거나 역할·상태·기간 조건을 넓혀 보세요.
                 자료 링크 주소와 외부 문서 본문은 검색하지 않습니다.

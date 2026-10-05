@@ -252,12 +252,12 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
 
   await openRecordSearch(page, testInfo.project.name)
   let search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
-  await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '5개의 기록을 찾았어요' })).toBeInViewport()
+  await expect(page.getByRole('heading', { name: '5개의 기록을 찾았습니다' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '5개의 기록을 찾았습니다' })).toBeInViewport()
   expect(await search.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('풀이 비교 문제 큐레이터')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   const decisionResult = page.getByRole('article').filter({
     has: page.getByRole('heading', { name: '한 회차의 문제 수를 5개로 정한다' }),
   })
@@ -285,7 +285,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await search.getByLabel('관련 역할').selectOption(SECOND_ROLE_ID)
   await advancedFilters.locator('summary').click()
   await expect(advancedFilters.locator('summary')).toContainText('1개 적용')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '회고 질문 가이드' })).toBeVisible()
   await advancedFilters.locator('summary').click()
 
@@ -293,7 +293,7 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await search.getByLabel('기록 종류').selectOption('resource')
   await search.getByLabel('작성일(시작)').fill('2026-07-04')
   await search.getByLabel('작성일(종료)').fill('2026-07-04')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '회고 질문 가이드' })).toBeVisible()
 
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
@@ -311,21 +311,21 @@ test('@records 결정·인수인계·자료를 한 흐름에서 검색하고 원
   await expect(search.getByLabel('무엇을 다시 찾고 있나요?')).toHaveValue('역할의 한 줄 목적')
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
   await search.getByLabel('상태').selectOption('archived')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   const archivedResult = page.getByRole('article').filter({
     has: page.getByRole('heading', { name: '자주 생기는 문제와 대응법' }),
   })
   await expect(archivedResult.getByRole('button', { name: '인수인계 문서에서 보기' })).toHaveCount(0)
 
   await search.getByLabel('작성일(시작)').fill('2026-07-01')
-  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았습니다' })).toBeVisible()
 
   await search.getByRole('button', { name: '검색 조건 지우기' }).click()
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('docs.example.com')
-  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았습니다' })).toBeVisible()
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('운영 기준')
   await search.getByLabel('기록 종류').selectOption('resource')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   await expect(page.getByRole('link', { name: '문제 선정 운영 문서 자료 새 창에서 열기' }))
     .toHaveAttribute('href', 'https://docs.example.com/problem-selection')
   await page.getByRole('button', { name: '문제 선정 운영 문서 역할에서 보기' }).click()
@@ -355,10 +355,10 @@ test('@records 보관한 역할 자료는 보관 기록으로만 탐색한다', 
   await search.locator('.record-search-advanced > summary').click()
   await search.getByLabel('기록 종류').selectOption('resource')
   await search.getByLabel('상태').selectOption('active')
-  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '0개의 기록을 찾았습니다' })).toBeVisible()
 
   await search.getByLabel('상태').selectOption('archived')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   const result = page.getByRole('article').filter({
     has: page.getByRole('heading', { name: '보관한 문제 선정 기준' }),
   })
@@ -420,7 +420,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
       assignmentStartDate: '2026-07-02',
       assignmentEndDate: '2026-09-17',
       responsibilities: ['문제 5개 선정', '난이도 균형 확인'],
-      risk: '문제 선정 기준이 개인 메모에만 있어요.',
+      risk: '문제 선정 기준이 개인 메모에만 있습니다.',
     },
   )
 
@@ -463,7 +463,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
 
   await expect(acceptDialog).toBeHidden()
   await expect(page.getByText('최근 인수인계 수락 완료')).toBeVisible()
-  await expect(page.getByText('김준호님의 수락을 기록했어요')).toBeVisible()
+  await expect(page.getByText('김준호님의 수락을 기록했습니다')).toBeVisible()
   const acceptCall = await recordedCall(
     api,
     'PATCH',
@@ -769,7 +769,7 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(dialog).toBeHidden()
-  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔어요')
+  await expect(page.locator('.toast[role="status"]')).toContainText('다른 사람이 수정한 내용을 불러왔습니다')
   const latestLink = inspector.getByRole('link', {
     name: '다른 구성원이 갱신한 기준 새 창에서 열기',
   })
@@ -1090,7 +1090,7 @@ test('@handoff @webkit 인수인계 문서는 완료한 항목과 역할 맥락�
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   await expect(preview.getByText('문제 5개 선정', { exact: true })).toBeVisible()
   await expect(preview.getByText('난이도 균형 확인')).toBeVisible()
-  await expect(preview.getByText('문제 선정 기준이 개인 메모에만 있어요.')).toBeVisible()
+  await expect(preview.getByText('문제 선정 기준이 개인 메모에만 있습니다.')).toBeVisible()
   await expect(preview.getByText('자주 생기는 문제와 대응법')).toBeVisible()
   const completedItem = preview.getByRole('listitem').filter({ hasText: '문제 선정 기준 문서 링크' })
   await expect(completedItem).toContainText('자료 · 완료')
@@ -1240,7 +1240,7 @@ test('@memory @records @responsive 결정 Markdown은 명시적으로 전환하�
   await openRecordSearch(page, testInfo.project.name)
   const search = page.getByRole('search', { name: '결정, 인수인계와 자료 검색' })
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('회고 준비 질문 수집')
-  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '1개의 기록을 찾았습니다' })).toBeVisible()
   await search.getByLabel('무엇을 다시 찾고 있나요?').fill('hidden-link-destination')
   await expect(page.getByRole('article')).toHaveCount(0)
 })

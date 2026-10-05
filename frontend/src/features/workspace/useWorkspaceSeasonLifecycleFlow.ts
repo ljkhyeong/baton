@@ -54,7 +54,7 @@ export function useWorkspaceSeasonLifecycleFlow({
     if (!successorCommand.successResult) return
     const result = successorCommand.successResult
     successorCommand.resetSuccess()
-    notify('다음 시즌을 만들었어요.')
+    notify('다음 시즌을 만들었습니다.')
     onSeasonCreated(result.season.id, currentAccessKey)
   }, [successorCommand.successResult])
 
@@ -110,7 +110,7 @@ export function useWorkspaceSeasonLifecycleFlow({
     return preserveConflictDraft(updateSeasonMutation.mutateAsync(request, {
       onSuccess: () => {
         onCloseModal()
-        notify('시즌 이름과 기간을 수정했어요.')
+        notify('시즌 이름과 기간을 수정했습니다.')
       },
     }), '시즌 정보 수정', [
       ['시즌 이름', request.name], ['시작일', request.startDate], ['종료일', request.endDate],
@@ -143,8 +143,8 @@ export function useWorkspaceSeasonLifecycleFlow({
 
     updateSeasonEndingMutation.mutate({ ended: ending }, {
       onSuccess: () => notify(ending
-        ? '시즌을 종료했어요. 기록은 계속 볼 수 있지만 수정할 수 없습니다.'
-        : '시즌을 다시 열었어요.'),
+        ? '시즌을 종료했습니다. 기록은 계속 볼 수 있지만 수정할 수 없습니다.'
+        : '시즌을 다시 열었습니다.'),
     })
   }
 

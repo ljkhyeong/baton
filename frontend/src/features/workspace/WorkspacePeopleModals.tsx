@@ -128,7 +128,7 @@ export function MemberManagementModal({
                 {orderedMembers.map(memberRow)}
               </ul>
             )
-          : <p className="member-management-empty">등록된 구성원이 없어요. 새 구성원을 추가해 주세요.</p>}
+          : <p className="member-management-empty">등록된 구성원이 없습니다. 새 구성원을 추가해 주세요.</p>}
         <p className="member-management-note">
           활동을 종료한 구성원은 새 담당자와 새 결정 작성자 선택에서 제외됩니다.
         </p>
@@ -373,7 +373,7 @@ export function RoleModal({
         {role && (currentMemberOptions.some((member) => !isActiveMember(member))
           || nextMemberOptions.some((member) => !isActiveMember(member))) && (
           <small className="form-hint">
-            활동을 종료한 기존 담당자는 유지할 수 있지만 다른 역할에 새로 배정할 수는 없어요.
+            활동을 종료한 기존 담당자는 유지할 수 있지만 다른 역할에 새로 배정할 수는 없습니다.
           </small>
         )}
         <div className="form-grid">
@@ -417,7 +417,7 @@ export function RoleModal({
           <textarea
             value={risk}
             onChange={(event) => setRisk(event.target.value)}
-            placeholder="예: 자료가 개인 계정에만 저장되어 있어요"
+            placeholder="예: 자료가 개인 계정에만 저장되어 있습니다"
             rows={2}
           />
         </label>

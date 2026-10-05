@@ -20,7 +20,7 @@ type UseWorkspaceConflictRecoveryOptions = {
 }
 
 const refreshFailureMessage =
-  '최신 기록을 불러오지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.'
+  '최신 기록을 불러오지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.'
 
 export function useWorkspaceConflictRecovery({
   scopeKey,
@@ -78,7 +78,7 @@ export function useWorkspaceConflictRecovery({
   const ensureFreshWorkspace = () => {
     if (!recovery) return true
 
-    notify('최신 기록을 확인해야 다시 수정할 수 있어요.', 'error')
+    notify('최신 기록을 확인해야 다시 수정할 수 있습니다.', 'error')
     if (recovery.status === 'failed') retryRecovery()
     return false
   }

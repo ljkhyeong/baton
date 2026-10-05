@@ -349,15 +349,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     teamId,
     seasonId,
     onRoleHandoffConflict: () => beginContentConflictRecovery(
-      '다른 사람이 수정한 인수인계 내용을 불러왔어요.',
+      '다른 사람이 수정한 인수인계 내용을 불러왔습니다.',
     ),
     onWorkspaceContentConflict: () => beginContentConflictRecovery(
-      '다른 사람이 수정한 내용을 불러왔어요.',
+      '다른 사람이 수정한 내용을 불러왔습니다.',
     ),
     onSeasonEnded: () => {
       discardWorkspaceEditors()
       showToast(
-        '다른 구성원이 시즌을 종료했어요. 최신 기록을 읽기 전용으로 다시 불러옵니다.',
+        '다른 구성원이 시즌을 종료했습니다. 최신 기록을 읽기 전용으로 다시 불러옵니다.',
         'error',
       )
       void workspaceQuery.refetch()
@@ -396,7 +396,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
 
   if (workspaceQuery.isPending) {
-    return <WorkspaceState title="작업 공간을 불러오는 중이에요" description="이번 시즌의 업무와 기록을 불러오고 있습니다." busy />
+    return <WorkspaceState title="작업 공간을 불러오는 중입니다" description="이번 시즌의 업무와 기록을 불러오고 있습니다." busy />
   }
 
   if (!workspaceQuery.data || workspaceAccessDenied) {
@@ -419,7 +419,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       : undefined
     return (
       <WorkspaceState
-        title="작업 공간을 불러오지 못했어요"
+        title="작업 공간을 불러오지 못했습니다"
         description={mutationError(workspaceQuery.error)}
         action={<>
           {accessKeyRecovery ?? (isAccessDenied && accessDeniedAction

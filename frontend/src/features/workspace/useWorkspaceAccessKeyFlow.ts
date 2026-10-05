@@ -131,7 +131,7 @@ export function useWorkspaceAccessKeyFlow({
     if (saved) {
       if (pendingCleared) {
         onCloseModal()
-        notify('공유 링크를 재발급했어요. 이제 새 링크만 사용할 수 있습니다.')
+        notify('공유 링크를 재발급했습니다. 이제 새 링크만 사용할 수 있습니다.')
       } else {
         notify(rotationCleanupErrorMessage, 'error')
       }
@@ -198,10 +198,10 @@ export function useWorkspaceAccessKeyFlow({
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
       await navigator.clipboard.writeText(shareUrl)
-      notify('공유 링크를 복사했어요.')
+      notify('공유 링크를 복사했습니다.')
     } catch {
       onOpenShareLink()
-      notify('자동 복사가 차단되어 직접 복사할 링크를 열었어요.', 'error')
+      notify('자동 복사가 차단되어 직접 복사할 링크를 열었습니다.', 'error')
     }
   }
 

@@ -1118,7 +1118,7 @@ test('@smoke 잘못된 URL 접근 키가 저장된 정상 키를 덮지 않고 �
   }, { storageKey: `baton-access-key:${TEAM_ID}`, accessKey: ACCESS_KEY })
   await page.goto(`${WORKSPACE_PATH}#accessKey=wrong-access-key`)
 
-  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했어요' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   const call = await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)
   expect(call.headers['x-baton-access-key']).toBe('wrong-access-key')
