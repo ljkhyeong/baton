@@ -6,7 +6,6 @@ import com.personal.baton.application.brief.port.in.DispatchBriefContinuityOutbo
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
 import java.time.Clock;
-import java.time.Duration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,14 +21,12 @@ public class BriefIntegrationConfig {
             BriefIntegrationProperties properties,
             BriefRestClientFactory clientFactory
     ) {
-        Duration connectTimeout = properties.requiredConnectTimeout();
-        Duration readTimeout = properties.requiredReadTimeout();
-        properties.validateRequestTimeoutBudget(connectTimeout, readTimeout);
+        properties.validateTimeouts();
         return clientFactory.createContinuityClient(
                 properties.requiredBaseUri(),
                 properties.configuredBearerToken(),
-                connectTimeout,
-                readTimeout
+                properties.connectTimeout(),
+                properties.readTimeout()
         );
     }
 

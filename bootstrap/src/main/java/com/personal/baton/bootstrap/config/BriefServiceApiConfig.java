@@ -11,7 +11,6 @@ import com.personal.baton.application.workspace.port.out.WorkspacePeopleReposito
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import java.time.Clock;
-import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,14 +28,12 @@ public class BriefServiceApiConfig {
             return DisabledBriefServiceClient.INSTANCE;
         }
 
-        Duration connectTimeout = properties.requiredConnectTimeout();
-        Duration readTimeout = properties.requiredReadTimeout();
-        properties.validateRequestTimeoutBudget(connectTimeout, readTimeout);
+        properties.validateTimeouts();
         return clientFactory.createEditionServiceClient(
                 properties.requiredBaseUri(),
                 properties.requiredBearerToken(),
-                connectTimeout,
-                readTimeout
+                properties.connectTimeout(),
+                properties.readTimeout()
         );
     }
 

@@ -19,10 +19,6 @@ public record BriefIntegrationProperties(
         return ExternalHttpOrigin.requireHttpsOrLoopbackHttp("BRIEF 기본 URL", baseUrl);
     }
 
-    Duration requiredConnectTimeout() {
-        return requiredPositiveTimeout(connectTimeout, "연결 시간 제한");
-    }
-
     String configuredBearerToken() {
         if (bearerToken.isBlank()) {
             return null;
@@ -30,16 +26,8 @@ public record BriefIntegrationProperties(
         return OutboundHttpSettings.requireBearerToken("BRIEF", bearerToken);
     }
 
-    Duration requiredReadTimeout() {
-        return requiredPositiveTimeout(readTimeout, "읽기 시간 제한");
-    }
-
-    void validateRequestTimeoutBudget(Duration connect, Duration read) {
-        OutboundHttpSettings.validateRequestTimeoutBudget("BRIEF", connect, read);
-    }
-
-    private Duration requiredPositiveTimeout(Duration timeout, String name) {
-        return OutboundHttpSettings.requirePositiveTimeout("BRIEF", name, timeout);
+    void validateTimeouts() {
+        OutboundHttpSettings.validateTimeouts("BRIEF", connectTimeout, readTimeout);
     }
 
     @Override

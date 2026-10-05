@@ -75,24 +75,8 @@ public record CalendarIntegrationProperties(
         return OutboundHttpSettings.requireBearerToken("CAL", bearerToken);
     }
 
-    Duration requiredConnectTimeout() {
-        return OutboundHttpSettings.requirePositiveTimeout(
-                "CAL",
-                "연결 시간 제한",
-                connectTimeout
-        );
-    }
-
-    Duration requiredReadTimeout() {
-        return OutboundHttpSettings.requirePositiveTimeout(
-                "CAL",
-                "읽기 시간 제한",
-                readTimeout
-        );
-    }
-
-    void validateRequestTimeoutBudget(Duration connect, Duration read) {
-        OutboundHttpSettings.validateRequestTimeoutBudget("CAL", connect, read);
+    void validateTimeouts() {
+        OutboundHttpSettings.validateTimeouts("CAL", connectTimeout, readTimeout);
     }
 
     @Override

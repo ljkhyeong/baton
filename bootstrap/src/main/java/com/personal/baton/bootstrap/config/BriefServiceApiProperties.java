@@ -23,28 +23,8 @@ public record BriefServiceApiProperties(
         return OutboundHttpSettings.requireBearerToken("BRIEF service API", bearerToken);
     }
 
-    Duration requiredConnectTimeout() {
-        return OutboundHttpSettings.requirePositiveTimeout(
-                "BRIEF service API",
-                "연결 시간 제한",
-                connectTimeout
-        );
-    }
-
-    Duration requiredReadTimeout() {
-        return OutboundHttpSettings.requirePositiveTimeout(
-                "BRIEF service API",
-                "읽기 시간 제한",
-                readTimeout
-        );
-    }
-
-    void validateRequestTimeoutBudget(Duration connect, Duration read) {
-        OutboundHttpSettings.validateRequestTimeoutBudget(
-                "BRIEF service API",
-                connect,
-                read
-        );
+    void validateTimeouts() {
+        OutboundHttpSettings.validateTimeouts("BRIEF service API", connectTimeout, readTimeout);
     }
 
     @Override

@@ -22,27 +22,21 @@ final class OutboundHttpSettings {
         return value;
     }
 
-    static Duration requirePositiveTimeout(
-            String service,
-            String name,
-            Duration timeout
-    ) {
-        if (timeout.isZero() || timeout.isNegative()) {
-            throw new IllegalStateException(service + " " + name + "은 0보다 커야 합니다");
-        }
-        return timeout;
-    }
-
-    static void validateRequestTimeoutBudget(
-            String service,
-            Duration connect,
-            Duration read
-    ) {
+    // 연결·읽기 시간 제한은 각각 양수이고 합이 45초를 넘지 않아야 한다.
+    static void validateTimeouts(String service, Duration connect, Duration read) {
+        requirePositive(service, "연결 시간 제한", connect);
+        requirePositive(service, "읽기 시간 제한", read);
         if (connect.compareTo(MAX_REQUEST_TIMEOUT_BUDGET) >= 0
                 || read.compareTo(MAX_REQUEST_TIMEOUT_BUDGET.minus(connect)) > 0) {
             throw new IllegalStateException(
                     service + " 연결 시간 제한과 읽기 시간 제한의 합은 45초 이하여야 합니다"
             );
+        }
+    }
+
+    private static void requirePositive(String service, String name, Duration timeout) {
+        if (!timeout.isPositive()) {
+            throw new IllegalStateException(service + " " + name + "은 0보다 커야 합니다");
         }
     }
 }

@@ -6,7 +6,6 @@ import com.personal.baton.application.watch.port.out.WatchMonitorInspectionPort;
 import com.personal.baton.adapter.out.external.watch.RestClientWatchMonitorClient;
 import com.personal.baton.application.watch.WatchMonitorSource;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
-import java.time.Duration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -45,14 +44,12 @@ public class WatchIntegrationConfig {
             WatchIntegrationProperties properties,
             RestClientWatchMonitorClient.Factory clientFactory
     ) {
-        Duration connectTimeout = properties.requiredConnectTimeout();
-        Duration readTimeout = properties.requiredReadTimeout();
-        properties.validateRequestTimeoutBudget(connectTimeout, readTimeout);
+        properties.validateTimeouts();
         return clientFactory.create(
                 properties.requiredBaseUri(),
                 properties.requiredBearerToken(),
-                connectTimeout,
-                readTimeout
+                properties.connectTimeout(),
+                properties.readTimeout()
         );
     }
 

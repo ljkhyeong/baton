@@ -37,24 +37,8 @@ public record WatchIntegrationProperties(
         return OutboundHttpSettings.requireBearerToken("WATCH", bearerToken);
     }
 
-    Duration requiredConnectTimeout() {
-        return OutboundHttpSettings.requirePositiveTimeout(
-                "WATCH",
-                "연결 시간 제한",
-                connectTimeout
-        );
-    }
-
-    Duration requiredReadTimeout() {
-        return OutboundHttpSettings.requirePositiveTimeout(
-                "WATCH",
-                "읽기 시간 제한",
-                readTimeout
-        );
-    }
-
-    void validateRequestTimeoutBudget(Duration connect, Duration read) {
-        OutboundHttpSettings.validateRequestTimeoutBudget("WATCH", connect, read);
+    void validateTimeouts() {
+        OutboundHttpSettings.validateTimeouts("WATCH", connectTimeout, readTimeout);
     }
 
     @Override

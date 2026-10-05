@@ -54,8 +54,8 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                                 metrics -> metrics.snapshot.delivery(integration).count(status)
                         )
                         .description("BATON 외부 연동 전달 상태별 아웃박스 항목 수")
-                        .tag("integration", integration.tag())
-                        .tag("status", status.tag())
+                        .tag("integration", integration.tag)
+                        .tag("status", status.tag)
                         .register(registry);
             }
             Gauge.builder(
@@ -66,7 +66,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                                     .actionableFailedItems()
                     )
                     .description("운영자 조치가 필요한 BATON 외부 연동 영구 실패 항목 수")
-                    .tag("integration", integration.tag())
+                    .tag("integration", integration.tag)
                     .register(registry);
             Gauge.builder(
                             "baton.integration.delivery.oldest.pending.age",
@@ -75,7 +75,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     )
                     .description("BATON 외부 연동에서 가장 오래된 대기 항목의 경과 시간")
                     .baseUnit("seconds")
-                    .tag("integration", integration.tag())
+                    .tag("integration", integration.tag)
                     .register(registry);
             Gauge.builder(
                             "baton.integration.delivery.last.success.time",
@@ -86,7 +86,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                     )
                     .description("BATON 외부 연동의 마지막 전달 성공 시각")
                     .baseUnit("seconds")
-                    .tag("integration", integration.tag())
+                    .tag("integration", integration.tag)
                     .register(registry);
             Gauge.builder(
                             "baton.integration.delivery.expired.processing.items",
@@ -96,7 +96,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                                     .expiredProcessingItems()
                     )
                     .description("BATON 외부 연동에서 임대가 만료된 처리 중 항목 수")
-                    .tag("integration", integration.tag())
+                    .tag("integration", integration.tag)
                     .register(registry);
         }
 
@@ -203,12 +203,12 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                         delivery_status = 'PROCESSING' AND lease_expires_at <= ?
                     ), 0) AS expired_processing_count
                 FROM %s delivery
-                """.formatted(unresolvedFailure, integration.pendingSinceColumn(), integration.tableName());
+                """.formatted(unresolvedFailure, integration.pendingSinceColumn, integration.tableName);
         return jdbcTemplate.queryForObject(
                 sql,
                 this::deliverySnapshot,
-                integration.nonActionableFailureCode(),
-                integration.nonActionableFailureCode(),
+                integration.nonActionableFailureCode,
+                integration.nonActionableFailureCode,
                 LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
         );
     }
@@ -290,21 +290,6 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
             this.nonActionableFailureCode = nonActionableFailureCode;
         }
 
-        private String tag() {
-            return tag;
-        }
-
-        private String tableName() {
-            return tableName;
-        }
-
-        private String pendingSinceColumn() {
-            return pendingSinceColumn;
-        }
-
-        private String nonActionableFailureCode() {
-            return nonActionableFailureCode;
-        }
     }
 
     private enum DeliveryStatus {
@@ -318,9 +303,6 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
             this.tag = tag;
         }
 
-        private String tag() {
-            return tag;
-        }
     }
 
     private record DeliverySnapshot(
