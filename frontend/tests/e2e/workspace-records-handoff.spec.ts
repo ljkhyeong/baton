@@ -995,7 +995,6 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임
         normalizedPayload,
         idempotencyKey,
         createdAt,
-        requestGuard: true,
       }))
     })
   }, {
@@ -1018,7 +1017,7 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임
   expect(call.headers['idempotency-key']).toBe(firstKey)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(1)
   expect(await pendingContentCreationEntries(page)).toEqual([
-    expect.objectContaining({ idempotencyKey: secondKey, requestGuard: true }),
+    expect.objectContaining({ idempotencyKey: secondKey }),
   ])
 })
 

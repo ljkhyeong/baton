@@ -92,7 +92,6 @@ export const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-cr
 const CONTENT_CREATION_CLEANUP_MARKER_STORAGE_KEY =
   'baton-content-creation-cleanup-required:v1'
 export const PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY = `baton-pending-access-key-change:v1:${TEAM_ID}`
-export const LEGACY_PENDING_CREATION_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
 
 function parseCssColor(value: string): [number, number, number] {
   const normalized = value.trim()
@@ -1567,7 +1566,6 @@ export async function pendingContentCreationEntries(page: Page) {
       normalizedPayload: string
       idempotencyKey: string
       createdAt: number
-      requestGuard?: true
       cleanupRequired?: true
     }[] = []
     for (let index = 0; index < localStorage.length; index += 1) {

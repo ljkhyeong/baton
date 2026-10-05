@@ -9,7 +9,6 @@ import {
   WORKSPACE_PATH,
   SCOPE_PATH,
   PENDING_CREATION_STORAGE_PREFIX,
-  LEGACY_PENDING_CREATION_STORAGE_KEY,
   makeProjection,
   installApi,
   openSharedWorkspace,
@@ -678,9 +677,9 @@ test('서로 다른 탭의 생성 임시 기록을 순서대로 보존하고 응
 
 test('손상된 온보딩 임시 기록 저장소를 무시하고 정상 멱등 키로 재시도한다', async ({ page }) => {
   const malformedIdempotencyKey = 'invalid key'
-  await page.addInitScript(({ storageKey, invalidKey }) => {
-    localStorage.setItem(storageKey, JSON.stringify({ normalizedPayload: '{}', idempotencyKey: invalidKey }))
-  }, { storageKey: LEGACY_PENDING_CREATION_STORAGE_KEY, invalidKey: malformedIdempotencyKey })
+  await page.addInitScript(({ prefix, invalidKey }) => {
+    localStorage.setItem(`${prefix}${invalidKey}`, JSON.stringify({ normalizedPayload: '{}', idempotencyKey: invalidKey }))
+  }, { prefix: PENDING_CREATION_STORAGE_PREFIX, invalidKey: malformedIdempotencyKey })
 
   const api = await installApi(page)
   api.failNextWorkspaceCreation()

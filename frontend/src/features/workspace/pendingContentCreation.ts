@@ -24,7 +24,6 @@ import type {
 
 const STORAGE_PREFIX = 'baton-pending-content-creation:v1:'
 const CLEANUP_MARKER_STORAGE_KEY = 'baton-content-creation-cleanup-required:v1'
-const MAX_PENDING_CREATIONS = 20
 const CONTENT_CREATION_LOCK_NAME = 'baton-content-creation'
 
 export type ContentCreationRequestByOperation = {
@@ -44,7 +43,6 @@ type ContentCreationPreparation =
       status: 'blocked'
       reason:
         | 'storageUnavailable'
-        | 'pendingLimitReached'
         | 'cleanupRequired'
         | 'guardedRequestPending'
     }
@@ -58,7 +56,6 @@ type PendingContentCreation = {
   normalizedPayload: string
   idempotencyKey: string
   createdAt: number
-  requestGuard?: true
   cleanupRequired?: true
 }
 
@@ -235,7 +232,6 @@ function isPendingContentCreation(value: unknown): value is PendingContentCreati
     && typeof candidate.createdAt === 'number'
     && Number.isFinite(candidate.createdAt)
     && candidate.createdAt >= 0
-    && (candidate.requestGuard === undefined || candidate.requestGuard === true)
     && (candidate.cleanupRequired === undefined || candidate.cleanupRequired === true)
 }
 
@@ -317,7 +313,6 @@ export function markPendingContentCreationCleanupRequired<
   const markedPending: PendingContentCreation = {
     ...retry,
     createdAt: matchingPending?.createdAt ?? Date.now(),
-    requestGuard: true,
     cleanupRequired: true,
   }
   const pendingMarked = Boolean(matchingPending
@@ -373,23 +368,11 @@ function matches(
     && (normalizedPayload === undefined || pending.normalizedPayload === normalizedPayload)
 }
 
-function earliestMatch(
-  entries: LocatedPendingContentCreation[],
-  scope: WorkspaceIdentity,
-  operation: ContentCreationOperation,
-  normalizedPayload: string,
-) {
-  return entries
-    .filter(({ pending }) => matches(pending, scope, operation, normalizedPayload))
-    .sort((left, right) => left.pending.createdAt - right.pending.createdAt
-      || left.storageKey.localeCompare(right.storageKey))[0]
-}
-
-function earliestGuarded(
+// 확인되지 않은 요청이 남아 있으면 같은 요청의 재전송만 허용한다.
+function earliestPending(
   entries: LocatedPendingContentCreation[],
 ) {
-  return entries
-    .filter(({ pending }) => pending.requestGuard === true)
+  return [...entries]
     .sort((left, right) => left.pending.createdAt - right.pending.createdAt
       || left.storageKey.localeCompare(right.storageKey))[0]
 }
@@ -406,22 +389,11 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
   const pendingCreations = readPendingContentCreations()
   if (pendingCreations === null) return { status: 'blocked', reason: 'storageUnavailable' }
 
-  const guarded = earliestGuarded(pendingCreations)
-  if (guarded) {
-    return matches(guarded.pending, scope, operation, normalizedPayload)
-      ? { status: 'ready', idempotencyKey: guarded.pending.idempotencyKey }
+  const pending = earliestPending(pendingCreations)
+  if (pending) {
+    return matches(pending.pending, scope, operation, normalizedPayload)
+      ? { status: 'ready', idempotencyKey: pending.pending.idempotencyKey }
       : { status: 'blocked', reason: 'guardedRequestPending' }
-  }
-
-  const existing = earliestMatch(pendingCreations, scope, operation, normalizedPayload)
-  if (existing) {
-    const upgraded = { ...existing.pending, requestGuard: true as const }
-    return writeJson(existing.storageKey, upgraded)
-      ? { status: 'ready', idempotencyKey: existing.pending.idempotencyKey }
-      : { status: 'blocked', reason: 'storageUnavailable' }
-  }
-  if (pendingCreations.length >= MAX_PENDING_CREATIONS) {
-    return { status: 'blocked', reason: 'pendingLimitReached' }
   }
 
   const next: PendingContentCreation = {
@@ -431,7 +403,6 @@ export function prepareContentCreation<Operation extends ContentCreationOperatio
     normalizedPayload,
     idempotencyKey: crypto.randomUUID(),
     createdAt: Date.now(),
-    requestGuard: true,
   }
   if (!writePendingContentCreation(next)) return { status: 'blocked', reason: 'storageUnavailable' }
   return { status: 'ready', idempotencyKey: next.idempotencyKey }

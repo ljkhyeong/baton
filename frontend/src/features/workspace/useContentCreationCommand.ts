@@ -77,7 +77,6 @@ const contentCreationJournalPolicy = {
 }
 
 export const pendingStorageRequiredMessage = '입력을 저장하지 못해 새 항목을 추가하지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
-const pendingCreationLimitMessage = '저장 여부를 확인하지 못한 항목이 20개 있습니다. 이전과 같은 내용을 다시 제출해 저장됐는지 확인한 뒤 새 항목을 추가하세요.'
 const contentCreationBusyMessage = '다른 탭에서 새 항목을 추가하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도하세요.'
 const contentCreationLockUnsupportedMessage = '이 브라우저에서는 새 항목을 만들 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const contentCreationLockFailedMessage = '새 항목을 만들 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
@@ -92,15 +91,12 @@ export function isTerminalContentCreationError(error: unknown) {
 function preparationError(
   reason:
     | 'storageUnavailable'
-    | 'pendingLimitReached'
     | 'cleanupRequired'
     | 'guardedRequestPending',
 ) {
   if (reason === 'cleanupRequired') return contentCreationCleanupRequiredMessage
   if (reason === 'guardedRequestPending') return guardedContentCreationMessage
-  return reason === 'pendingLimitReached'
-    ? pendingCreationLimitMessage
-    : pendingStorageRequiredMessage
+  return pendingStorageRequiredMessage
 }
 
 function useContentCreationCommand<Operation extends ContentCreationOperation>(

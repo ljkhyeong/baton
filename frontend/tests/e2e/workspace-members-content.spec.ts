@@ -816,59 +816,6 @@ test('생성 재시도 정보를 안전하게 저장할 수 없으면 콘텐츠 
   expect(api.calls.filter((call) => call.method === 'POST' && contentPaths.has(call.path))).toHaveLength(0)
 })
 
-test('기존 형식의 콘텐츠 임시 기록에서 요청 잠금을 저장하지 못하면 재요청을 보내지 않는다', async ({ page }, testInfo) => {
-  const legacyKey = 'legacy-content-guard-key-000000000001'
-  await page.addInitScript(({ prefix, idempotencyKey, teamId, seasonId, roleId }) => {
-    const storageKey = `${prefix}${idempotencyKey}`
-    localStorage.setItem(storageKey, JSON.stringify({
-      teamId,
-      seasonId,
-      operation: 'handoffItem',
-      normalizedPayload: JSON.stringify({
-        roleId,
-        label: 'legacy guard upgrade 확인',
-        category: 'RESPONSIBILITY',
-      }),
-      idempotencyKey,
-      createdAt: 1,
-    }))
-
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key === storageKey && value.includes('"requestGuard":true')) {
-        throw new DOMException('Storage guard upgrade disabled', 'SecurityError')
-      }
-      originalSetItem.call(this, key, value)
-    }
-  }, {
-    prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX,
-    idempotencyKey: legacyKey,
-    teamId: TEAM_ID,
-    seasonId: SEASON_ID,
-    roleId: ROLE_ID,
-  })
-  const api = await installApi(page)
-  await openSharedWorkspace(page)
-
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
-  await page.getByRole('button', { name: '항목 추가' }).click()
-  const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
-  await dialog.getByLabel('역할').selectOption(ROLE_ID)
-  await dialog.getByLabel('남길 내용').fill('legacy guard upgrade 확인')
-  await dialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
-  await dialog.getByRole('button', { name: '항목 추가하기' }).click()
-
-  await expect(dialog.getByRole('alert')).toContainText(
-    '일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
-  )
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-  )).toHaveLength(0)
-  const pending = await pendingContentCreationEntries(page)
-  expect(pending).toEqual([expect.objectContaining({ idempotencyKey: legacyKey })])
-  expect(pending[0]?.requestGuard).toBeUndefined()
-})
-
 test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음 요청 전에 기록부터 삭제한다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
@@ -1018,7 +965,6 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
     expect.objectContaining({
       operation: 'handoffItem',
       idempotencyKey: firstAttempt.headers['idempotency-key'],
-      requestGuard: true,
     }),
   ])
   expect(pendingAfterFailure[0]?.cleanupRequired).toBeUndefined()
@@ -1050,7 +996,6 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
       idempotencyKey: firstAttempt.headers['idempotency-key'],
-      requestGuard: true,
     }),
   ])
 
@@ -1094,7 +1039,6 @@ test('콘텐츠 생성 성공 응답이 손상되면 임시 기록을 유지하�
       seasonId: SEASON_ID,
       operation: 'role',
       idempotencyKey: firstAttempt.headers['idempotency-key'],
-      requestGuard: true,
     }),
   ])
   expect(api.projection().roles.filter((role) => role.name === '손상 응답 복구 역할'))
@@ -1151,7 +1095,6 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
   expect(attempts).toHaveLength(1)
   const pendingAfterChangedRequest = await pendingContentCreationEntries(page)
   expect(pendingAfterChangedRequest).toHaveLength(1)
-  expect(pendingAfterChangedRequest[0]?.requestGuard).toBe(true)
   expect(JSON.parse(pendingAfterChangedRequest[0]!.normalizedPayload)).toMatchObject({
     deadlineDayOffset: -3,
     deadlineTime: '19:00',
@@ -1183,37 +1126,4 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
     (routine) => routine.title === '마감 journal 경계 확인',
   )).toHaveLength(2)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
-})
-
-test('확인되지 않은 생성 요청이 한도에 이르면 기존 요청 정리를 안내한다', async ({ page }, testInfo) => {
-  await page.addInitScript(({ prefix, count }) => {
-    for (let index = 0; index < count; index += 1) {
-      const idempotencyKey = `pending-content-${String(index).padStart(32, '0')}`
-      localStorage.setItem(`${prefix}${idempotencyKey}`, JSON.stringify({
-        teamId: 'another-team',
-        seasonId: 'another-season',
-        operation: 'handoffItem',
-        normalizedPayload: JSON.stringify({
-          roleId: `another-role-${index}`,
-          label: `미확인 인수인계 ${index}`,
-          category: 'ADVICE',
-        }),
-        idempotencyKey,
-        createdAt: index,
-      }))
-    }
-  }, { prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX, count: 20 })
-  const api = await installApi(page)
-  await openSharedWorkspace(page)
-
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '역할 추가' }).click()
-  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
-  await dialog.getByLabel('역할 이름').fill('스물한 번째 역할')
-  await dialog.getByLabel('역할 목적').fill('한도 안내를 확인합니다.')
-  await dialog.getByRole('button', { name: '역할 만들기' }).click()
-
-  await expect(dialog.getByRole('alert')).toContainText('저장 여부를 확인하지 못한 항목이 20개 있습니다.')
-  await expect(dialog.getByRole('alert')).toContainText('이전과 같은 내용을 다시 제출해 저장됐는지 확인한 뒤 새 항목을 추가하세요.')
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`)).toHaveLength(0)
 })

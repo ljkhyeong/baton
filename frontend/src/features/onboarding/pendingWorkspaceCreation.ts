@@ -16,9 +16,6 @@ import {
 } from './workspaceCreationConstraints'
 
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
-const LEGACY_SINGLE_STORAGE_KEY = 'baton-pending-workspace-creation:v1'
-const LEGACY_COLLECTION_STORAGE_KEY = 'baton-pending-workspace-creations:v2'
-const LEGACY_COLLECTION_VERSION = 2
 const MAX_PENDING_CREATIONS = 5
 const WORKSPACE_CREATION_LOCK_NAME = 'baton-workspace-creation'
 
@@ -111,17 +108,12 @@ function isNormalizedPayload(value: unknown): value is string {
   }
 }
 
-function isLegacyPendingCreation(value: unknown): value is Omit<PendingWorkspaceCreation, 'createdAt'> {
+function isPendingWorkspaceCreation(value: unknown): value is PendingWorkspaceCreation {
   if (!isJsonObject(value)) return false
   const candidate = value as Partial<PendingWorkspaceCreation>
   return isNormalizedPayload(candidate.normalizedPayload)
     && isValidIdempotencyKey(candidate.idempotencyKey)
-}
-
-function isPendingWorkspaceCreation(value: unknown): value is PendingWorkspaceCreation {
-  if (!isLegacyPendingCreation(value)) return false
-  const candidate = value as Partial<PendingWorkspaceCreation>
-  return typeof candidate.createdAt === 'number'
+    && typeof candidate.createdAt === 'number'
     && Number.isFinite(candidate.createdAt)
     && candidate.createdAt >= 0
 }
@@ -173,64 +165,6 @@ function readPendingItem(
   }
 }
 
-function legacyPendingCreations() {
-  const pendingByPayload = new Map<string, Omit<PendingWorkspaceCreation, 'createdAt'>>()
-  try {
-    const legacySingleValue = window.localStorage.getItem(LEGACY_SINGLE_STORAGE_KEY)
-    if (legacySingleValue !== null) {
-      try {
-        const parsed: unknown = JSON.parse(legacySingleValue)
-        if (isLegacyPendingCreation(parsed)) pendingByPayload.set(parsed.normalizedPayload, parsed)
-      } catch {
-        // 형식이 잘못된 사전 출시 데이터는 무시한다.
-      }
-    }
-
-    const legacyCollectionValue = window.localStorage.getItem(LEGACY_COLLECTION_STORAGE_KEY)
-    if (legacyCollectionValue !== null) {
-      try {
-        const parsed = JSON.parse(legacyCollectionValue) as { version?: unknown; entries?: unknown }
-        if (parsed?.version === LEGACY_COLLECTION_VERSION && Array.isArray(parsed.entries)) {
-          parsed.entries.filter(isLegacyPendingCreation).forEach((pending) => {
-            pendingByPayload.set(pending.normalizedPayload, pending)
-          })
-        }
-      } catch {
-        // 형식이 잘못된 사전 출시 데이터는 무시한다.
-      }
-    }
-    return [...pendingByPayload.values()]
-  } catch {
-    return null
-  }
-}
-
-function migrateLegacyPendingCreations(existing: LocatedPendingCreation[]) {
-  const legacy = legacyPendingCreations()
-  if (legacy === null) return false
-  if (!legacy.length) return true
-
-  const existingPayloads = new Set(existing.map(({ pending }) => pending.normalizedPayload))
-  const availableSlots = Math.max(0, MAX_PENDING_CREATIONS - existing.length)
-  const toMigrate = legacy.filter((pending) => !existingPayloads.has(pending.normalizedPayload)).slice(0, availableSlots)
-  const migrationStartedAt = Date.now()
-  const migrated = toMigrate.every((pending, index) => writePendingCreation({
-    ...pending,
-    createdAt: migrationStartedAt + index,
-  }))
-  if (!migrated || toMigrate.length !== legacy.filter((pending) => !existingPayloads.has(pending.normalizedPayload)).length) {
-    return migrated
-  }
-
-  try {
-    window.localStorage.removeItem(LEGACY_SINGLE_STORAGE_KEY)
-    window.localStorage.removeItem(LEGACY_COLLECTION_STORAGE_KEY)
-  } catch {
-    // 이전 기록을 정리하지 못해도 V3 기록을 기준으로 삼는다.
-  }
-  return true
-}
-
 function earliestForPayload(entries: LocatedPendingCreation[], normalizedPayload: string) {
   return entries
     .filter(({ pending }) => pending.normalizedPayload === normalizedPayload)
@@ -239,10 +173,7 @@ function earliestForPayload(entries: LocatedPendingCreation[], normalizedPayload
 }
 
 export function listPendingWorkspaceCreations(): PendingWorkspaceCreationListResult {
-  let pendingCreations = readPendingCreations()
-  if (pendingCreations === null) return { status: 'unavailable' }
-  if (!migrateLegacyPendingCreations(pendingCreations)) return { status: 'unavailable' }
-  pendingCreations = readPendingCreations()
+  const pendingCreations = readPendingCreations()
   if (pendingCreations === null) return { status: 'unavailable' }
 
   const items = pendingCreations
@@ -258,12 +189,7 @@ export function listPendingWorkspaceCreations(): PendingWorkspaceCreationListRes
 
 export function subscribePendingWorkspaceCreations(onChange: () => void) {
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === null
-      || event.key.startsWith(PENDING_CREATION_STORAGE_PREFIX)
-      || event.key === LEGACY_SINGLE_STORAGE_KEY
-      || event.key === LEGACY_COLLECTION_STORAGE_KEY) {
-      onChange()
-    }
+    if (event.key === null || event.key.startsWith(PENDING_CREATION_STORAGE_PREFIX)) onChange()
   }
   window.addEventListener('storage', handleStorage)
   return () => window.removeEventListener('storage', handleStorage)
@@ -289,19 +215,11 @@ export function prepareWorkspaceCreation(
   request: CreateWorkspaceRequest,
 ): WorkspaceCreationPreparation {
   const normalizedPayload = normalizePayload(request)
-  let pendingCreations = readPendingCreations()
+  const pendingCreations = readPendingCreations()
   if (pendingCreations === null) return { status: 'blocked', reason: 'storageUnavailable' }
 
   const existing = earliestForPayload(pendingCreations, normalizedPayload)
   if (existing) return { status: 'ready', idempotencyKey: existing.pending.idempotencyKey }
-
-  if (!migrateLegacyPendingCreations(pendingCreations)) {
-    return { status: 'blocked', reason: 'storageUnavailable' }
-  }
-  pendingCreations = readPendingCreations()
-  if (pendingCreations === null) return { status: 'blocked', reason: 'storageUnavailable' }
-  const migrated = earliestForPayload(pendingCreations, normalizedPayload)
-  if (migrated) return { status: 'ready', idempotencyKey: migrated.pending.idempotencyKey }
   if (pendingCreations.length >= MAX_PENDING_CREATIONS) {
     return { status: 'blocked', reason: 'pendingLimitReached' }
   }
