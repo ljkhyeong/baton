@@ -157,7 +157,7 @@ class IdentityPolicyTest {
     void replacesPasswordHashWithMonotonicUpdateTime() {
         LocalCredential credential = LocalCredential.create(
                 UUID.randomUUID(),
-                "{bcrypt}$2a$10$opaque-encoded-password-value",
+                "{pbkdf2@SpringSecurity_v5_8}opaque-encoded-password-value",
                 NOW
         );
 
@@ -167,7 +167,7 @@ class IdentityPolicyTest {
         );
 
         assertThatThrownBy(() -> credential.replacePasswordHash(
-                "{bcrypt}$2a$10$stale-opaque-password-value",
+                "{pbkdf2@SpringSecurity_v5_8}stale-opaque-password-value",
                 NOW
         )).isInstanceOf(IdentityValidationException.class);
         assertThat(credential.getPasswordHash())

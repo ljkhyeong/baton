@@ -9,7 +9,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.keygen.Base64StringKeyGenerator;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
@@ -25,12 +24,7 @@ public class IdentityInfrastructureConfig {
         String currentId = "pbkdf2@SpringSecurity_v5_8";
         return new DelegatingPasswordEncoder(
                 currentId,
-                Map.of(
-                        currentId,
-                        Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8(),
-                        "bcrypt",
-                        new BCryptPasswordEncoder()
-                )
+                Map.of(currentId, Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8())
         );
     }
 

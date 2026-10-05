@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
@@ -676,8 +676,8 @@ class BriefEditionHttpsEndToEndTest {
         UUID accountId = UUID.randomUUID();
         UUID identityId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-        String passwordHash = "{bcrypt}" + new BCryptPasswordEncoder(4)
-                .encode(ACCOUNT_PASSWORD);
+        String passwordHash = "{pbkdf2@SpringSecurity_v5_8}"
+                + Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8().encode(ACCOUNT_PASSWORD);
         jdbcTemplate.update(
                 "INSERT INTO accounts "
                         + "(id, display_name, created_at, updated_at, version) "

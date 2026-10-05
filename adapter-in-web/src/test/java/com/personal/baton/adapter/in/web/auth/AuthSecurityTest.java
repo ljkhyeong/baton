@@ -18,8 +18,6 @@ import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase;
 import java.util.Optional;
 import java.util.List;
@@ -27,7 +25,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -42,7 +39,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
@@ -119,9 +115,6 @@ class AuthSecurityTest {
 
     @MockitoBean
     private LoadLocalCredentialUseCase loadLocalCredentialUseCase;
-
-    @MockitoBean
-    private UpdateLocalCredentialPasswordUseCase updateLocalCredentialPasswordUseCase;
 
     @MockitoBean
     private AccountSecurityUseCase accountSecurityUseCase;
@@ -496,34 +489,6 @@ class AuthSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()));
-    }
-
-    @DisplayName("낮은 cost의 legacy bcrypt 로그인은 성공과 같은 흐름에서 현재 encoder hash로 갱신한다")
-    @Test
-    void upgradesLegacyPasswordHashAfterSuccessfulLogin() throws Exception {
-        String legacyHash = "{bcrypt}" + new BCryptPasswordEncoder(4).encode(PASSWORD);
-        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
-                .thenReturn(Optional.of(new LocalCredentialResult(
-                        ACCOUNT_ID,
-                        legacyHash,
-                        true, 0
-                )));
-
-        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("email", EMAIL)
-                        .param("password", PASSWORD))
-                .andExpect(status().isNoContent());
-
-        ArgumentCaptor<UpdateLocalCredentialPasswordCommand> command =
-                ArgumentCaptor.forClass(UpdateLocalCredentialPasswordCommand.class);
-        verify(updateLocalCredentialPasswordUseCase)
-                .updateLocalCredentialPassword(command.capture());
-        assertThat(command.getValue().accountId()).isEqualTo(ACCOUNT_ID);
-        String encodedPassword = command.getValue().encodedPassword();
-        assertThat(encodedPassword).startsWith("{bcrypt}$2");
-        assertThat(command.getValue().toString()).doesNotContain(encodedPassword);
     }
 
     @DisplayName("미검증 계정과 잘못된 비밀번호는 동일한 local 로그인 오류를 반환한다")

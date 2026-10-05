@@ -10,8 +10,6 @@ import com.personal.baton.application.identity.port.in.AccountSecurityUseCase.Ch
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase.ResetPasswordCommand;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.domain.identity.EmailChallengePurpose;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.DispatchEmailVerificationOutboxUseCase;
@@ -115,9 +113,6 @@ class IdentityPersistenceUseCaseTest {
 
     @Autowired
     private ValidateAccountSessionUseCase validateAccountSessionUseCase;
-
-    @Autowired
-    private UpdateLocalCredentialPasswordUseCase updateLocalCredentialPasswordUseCase;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -623,11 +618,6 @@ class IdentityPersistenceUseCaseTest {
                 current.accountId(), current.sessionVersion())).isTrue();
         assertThatThrownBy(() -> passwordResetUseCase.resetPassword(new ResetPasswordCommand(token, RAW_PASSWORD)))
                 .isInstanceOf(PasswordResetException.class);
-
-        updateLocalCredentialPasswordUseCase.updateLocalCredentialPassword(new UpdateLocalCredentialPasswordCommand(
-                oldCredential.accountId(), oldCredential.passwordHash(), passwordEncoder.encode(RAW_PASSWORD)));
-        assertThat(loadLocalCredentialUseCase.loadLocalCredential("reset@example.com").orElseThrow().passwordHash())
-                .isEqualTo(current.passwordHash());
 
         passwordResetUseCase.requestPasswordReset("reset@example.com");
         passwordResetUseCase.resetPassword(new ResetPasswordCommand(pendingPlainPayload().verificationToken(), RAW_PASSWORD));

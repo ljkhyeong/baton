@@ -6,7 +6,6 @@ import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase.RegisterLocalAccountCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase.LocalCredentialResult;
 import com.personal.baton.application.identity.port.in.VerifyLocalEmailUseCase.VerifyLocalEmailCommand;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
@@ -47,7 +46,7 @@ class IdentityServicesTest {
 
     private static final Instant NOW = Instant.parse("2026-08-08T01:02:03Z");
     private static final String RAW_PASSWORD = "correct horse battery staple";
-    private static final String PASSWORD_HASH = "{bcrypt}$2a$10$opaque-encoded-password-value";
+    private static final String PASSWORD_HASH = "{pbkdf2@SpringSecurity_v5_8}opaque-encoded-password-value";
     private static final String VERIFICATION_TOKEN = "secure-email-verification-token-000000000001";
     private static final String VERIFICATION_TOKEN_HASH =
             "92accb91c1c58b9d231995fe4cea2aefe133a20464448de556b4c767643f9357";
@@ -191,7 +190,7 @@ class IdentityServicesTest {
         );
         LocalCredential existingCredential = LocalCredential.create(
                 identity.getId(),
-                "{bcrypt}existing-opaque-value",
+                "{pbkdf2@SpringSecurity_v5_8}existing-opaque-value",
                 NOW.minusSeconds(60)
         );
         EmailVerificationChallenge challenge = EmailVerificationChallenge.create(
@@ -414,7 +413,7 @@ class IdentityServicesTest {
         );
         LocalCredential existingCredential = LocalCredential.create(
                 identity.getId(),
-                "{bcrypt}existing-opaque-value",
+                "{pbkdf2@SpringSecurity_v5_8}existing-opaque-value",
                 NOW.minusSeconds(30)
         );
         EmailVerificationChallenge challenge = EmailVerificationChallenge.create(
@@ -443,7 +442,7 @@ class IdentityServicesTest {
 
         assertThat(challenge.getConsumedAt()).isNull();
         assertThat(identity.isEmailVerified()).isFalse();
-        assertThat(existingCredential.getPasswordHash()).isEqualTo("{bcrypt}existing-opaque-value");
+        assertThat(existingCredential.getPasswordHash()).isEqualTo("{pbkdf2@SpringSecurity_v5_8}existing-opaque-value");
         verify(passwordEncoder, never()).encode(any());
         verify(repository, never()).saveIdentity(any());
         verify(repository, never()).saveLocalCredential(any());
@@ -517,38 +516,6 @@ class IdentityServicesTest {
         assertThat(result.emailVerified()).isTrue();
         assertThat(result.sessionVersion()).isEqualTo(3);
         assertThat(result.toString()).doesNotContain(PASSWORD_HASH);
-    }
-
-    @DisplayName("로그인 후 인코더 업그레이드는 로컬 자격 증명을 잠그고 새 불투명 해시로 교체한다")
-    @Test
-    void upgradesLocalCredentialPasswordHash() {
-        IdentityRepository repository = mock(IdentityRepository.class);
-        UUID accountId = UUID.randomUUID();
-        AccountIdentity identity = AccountIdentity.createLocal(
-                UUID.randomUUID(),
-                accountId,
-                "local@example.com",
-                NOW.minusSeconds(60)
-        );
-        identity.verifyLocalEmail();
-        LocalCredential credential = LocalCredential.create(
-                identity.getId(),
-                PASSWORD_HASH,
-                NOW.minusSeconds(60)
-        );
-        String upgradedHash = "{pbkdf2@SpringSecurity_v5_8}upgraded-opaque-password-value";
-        when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
-        when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
-                .thenReturn(Optional.of(credential));
-        AccountSecurityService service = securityService(repository);
-
-        service.updateLocalCredentialPassword(
-                new UpdateLocalCredentialPasswordCommand(accountId, PASSWORD_HASH, upgradedHash)
-        );
-
-        assertThat(credential.getPasswordHash()).isEqualTo(upgradedHash);
-        assertThat(credential.getUpdatedAt()).isEqualTo(NOW);
-        verify(repository).saveLocalCredential(credential);
     }
 
     private LocalAccountRegistrationService service(IdentityRepository repository) {

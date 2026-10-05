@@ -60,9 +60,8 @@ AES-256-GCM으로 암호화해 전달 아웃박스에 보관한다. 메시지별
 암호문·논스·해시 스냅샷을 제거한다. 암호화 키는 DB 밖의 프로덕션 비밀값 파일로
 주입하며 DB·백업 읽기 권한도 자격 증명 수준으로 제한한다.
 정규화 이메일과 검증 여부는 `AccountIdentity`가 소유한다. 비밀번호는 Spring Security
-`DelegatingPasswordEncoder`의 `{id}encoded` 형식으로 저장한다. 신규 자격 증명은 128자
-Unicode 계약에 72바이트 제한을 만들지 않는 PBKDF2로 인코딩하고, 기존 `{bcrypt}` 해시는 검증
-뒤 점진적으로 업그레이드할 수 있게 유지한다.
+`DelegatingPasswordEncoder`의 `{id}encoded` 형식으로 저장한다. 자격 증명은 128자 Unicode
+계약에 72바이트 제한을 만들지 않는 PBKDF2(`pbkdf2@SpringSecurity_v5_8`)로만 인코딩·검증한다.
 
 ## 4. 브라우저 인증
 

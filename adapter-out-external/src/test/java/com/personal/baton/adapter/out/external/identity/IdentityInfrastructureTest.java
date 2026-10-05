@@ -17,7 +17,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mail.javamail.JavaMailSender;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.Session;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -33,18 +32,6 @@ class IdentityInfrastructureTest {
         String encoded = encoder.encode("correct horse battery staple");
 
         assertThat(encoded).startsWith("{pbkdf2@SpringSecurity_v5_8}");
-    }
-
-    @Test
-    @DisplayName("새 PBKDF2 인코더는 기존 bcrypt 위임 해시도 계속 검증한다")
-    void verifiesLegacyBcryptHashes() {
-        var encoder = new IdentityInfrastructureConfig().passwordEncoder();
-        var bcrypt = new BCryptPasswordEncoder();
-        String rawPassword = "correct horse battery staple";
-        String legacyHash = "{bcrypt}" + bcrypt.encode(rawPassword);
-
-        assertThat(encoder.matches(rawPassword, legacyHash)).isTrue();
-        assertThat(encoder.upgradeEncoding(legacyHash)).isTrue();
     }
 
     @Test

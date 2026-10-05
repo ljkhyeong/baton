@@ -23,7 +23,6 @@ import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;
@@ -72,14 +71,9 @@ public class SecurityConfig {
     );
     @Bean
     LocalAccountUserDetailsService localAccountUserDetailsService(
-            ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider,
-            ObjectProvider<UpdateLocalCredentialPasswordUseCase>
-                    updateLocalCredentialPasswordUseCaseProvider
+            ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider
     ) {
-        return new LocalAccountUserDetailsService(
-                loadLocalCredentialUseCaseProvider,
-                updateLocalCredentialPasswordUseCaseProvider
-        );
+        return new LocalAccountUserDetailsService(loadLocalCredentialUseCaseProvider);
     }
 
     @Bean
@@ -89,7 +83,6 @@ public class SecurityConfig {
     ) {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
-        provider.setUserDetailsPasswordService(userDetailsService);
         return provider;
     }
 

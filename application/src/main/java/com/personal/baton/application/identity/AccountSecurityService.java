@@ -10,8 +10,6 @@ import com.personal.baton.application.identity.error.PasswordResetException;
 import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
 import com.personal.baton.application.identity.port.in.AccountSecurityUseCase.ChangeLocalPasswordCommand;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase;
-import com.personal.baton.application.identity.port.in.UpdateLocalCredentialPasswordUseCase.UpdateLocalCredentialPasswordCommand;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPort;
 import com.personal.baton.application.identity.port.out.IdentityRepository;
 import com.personal.baton.domain.identity.Account;
@@ -33,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class AccountSecurityService implements
         PasswordResetUseCase,
-        UpdateLocalCredentialPasswordUseCase,
         AccountSecurityUseCase {
 
     private final IdentityRepository repository;
@@ -191,29 +188,6 @@ public class AccountSecurityService implements
         repository.saveAccount(account);
         repository.saveEmailVerificationChallenge(challenge);
         outboxPort.supersedePending(identity.getId(), now);
-    }
-
-    @Override
-    @Transactional
-    public void updateLocalCredentialPassword(UpdateLocalCredentialPasswordCommand command) {
-        if (command == null || command.accountId() == null) {
-            throw new IdentityValidationException("로컬 자격 증명 갱신 요청은 필수입니다");
-        }
-        AccountIdentity localIdentity = repository.findIdentitiesByAccountId(command.accountId())
-                .stream()
-                .filter(identity -> identity.getProvider() == IdentityProvider.LOCAL_EMAIL)
-                .findFirst()
-                .orElseThrow(AccountNotFoundException::new);
-        LocalCredential credential = repository
-                .findLocalCredentialByIdentityIdForUpdate(localIdentity.getId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "검증된 로컬 신원의 자격 증명을 찾을 수 없습니다"
-                ));
-        if (!credential.getPasswordHash().equals(command.expectedPasswordHash())) {
-            return;
-        }
-        credential.replacePasswordHash(command.encodedPassword(), clock.instant());
-        repository.saveLocalCredential(credential);
     }
 
     private Account findAccount(UUID accountId) {
