@@ -27,5 +27,5 @@
 .due-resource-reviews li button { width: 100%; display: grid; gap: 6px; text-align: left; padding: 12px; border: 1px solid var(--rule); border-radius: var(--radius); color: var(--ink); background: var(--paper); overflow-wrap: anywhere; cursor: pointer; }
 .due-resource-reviews p { color: var(--muted); overflow-wrap: anywhere; }
 
-.due-reviews-heading > button { padding: 4px 0; border: 0; color: var(--muted); background: transparent; font-size: 11px; cursor: pointer; }
+.due-reviews-heading > button { padding: 4px 0; border: 0; color: var(--muted); background: transparent; font-size: 12px; cursor: pointer; }
 @media (max-width: 720px) { .due-reviews-heading > button { min-height: 44px; } }

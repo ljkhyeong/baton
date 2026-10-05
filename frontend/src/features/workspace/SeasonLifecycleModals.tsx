@@ -125,7 +125,7 @@ export function SeasonSwitcherModal({
           </button>
           <button
             type="button"
-            className={currentSeason.endedAt ? 'secondary-button' : 'danger-button'}
+            className={currentSeason.endedAt ? 'secondary-button' : 'secondary-button danger-text'}
             disabled={endingPending}
             onClick={onToggleEnding}
           >
