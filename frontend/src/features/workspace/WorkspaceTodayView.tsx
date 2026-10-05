@@ -152,7 +152,7 @@ export function TodayView({
           </div>
         </div>
         {!orderedRoutines.length ? (
-          <ActionableEmpty title="아직 반복 업무가 없어요" description="담당 역할을 정하고 반복할 업무를 등록하세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
+          <ActionableEmpty icon="rhythm" title="아직 반복 업무가 없어요" description="담당 역할을 정하고 반복할 업무를 등록하세요." actionLabel={roles.length ? '첫 반복 업무 만들기' : '첫 역할 만들기'} onAction={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled} />
         ) : selectedRound ? (
           <section className="today-round-checklist" aria-label={`${selectedRound.name} 반복 업무 완료하기`}>
             <progress
@@ -185,7 +185,7 @@ export function TodayView({
             </div>
           </section>
         ) : (
-          <ActionableEmpty
+          <ActionableEmpty icon="rhythm"
             title={archivedRoundCount
               ? '모든 회차가 보관되어 있습니다.'
               : '아직 만든 회차가 없어요'}

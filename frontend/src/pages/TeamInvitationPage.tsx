@@ -22,7 +22,7 @@ function InvitationPageContent() {
     }
   }, [token])
   return <main className="remote-state-page"><title>팀 초대 — BATON</title><section className="remote-state">
-    <span className="section-kicker">팀 초대</span><h1>팀 초대 확인</h1>
+    <h1>팀 초대 확인</h1>
     {!token ? <p>초대 링크를 다시 열어 주세요. 링크에는 유효 기간이 있습니다.</p>
       : session.isPending ? <p role="status">로그인 상태를 확인하고 있습니다.</p>
         : session.isError ? <p role="alert">{session.error.message} <button className="secondary-button" type="button" onClick={() => void session.refetch()}>다시 확인</button></p>
@@ -31,7 +31,7 @@ function InvitationPageContent() {
             {stored ? <Link to="/login?returnTo=%2Fjoin" className="primary-button">로그인하고 초대 확인</Link>
               : <p>이 브라우저에 초대 링크를 저장하지 못했습니다. 로그인한 뒤 받은 링크를 다시 여세요. <Link to="/login">로그인</Link></p>}
           </> : <InvitationContent key={`${session.data.accountId}:${token}`} accountId={session.data.accountId} token={token} />}
-    <Link to="/">처음 화면으로 이동</Link>
+    <div className="remote-state-actions"><Link to="/" className="secondary-button">처음 화면으로 이동</Link></div>
   </section></main>
 }
 function InvitationContent({ accountId, token }: { accountId: string; token: string }) {

@@ -133,10 +133,12 @@ export default function WorkspacePage() {
         <main className="remote-state-page">
           <section className="remote-state" role="alert">
             <span className="section-kicker">로그인 또는 공유 링크 필요</span>
-            <strong>이 작업 공간을 열 수 없어요.</strong>
+            <h1>이 작업 공간을 열 수 없어요.</h1>
             <p>{session.isPending ? '로그인 상태를 확인하고 있습니다.' : '팀의 초대를 수락한 계정으로 로그인하거나 공유 링크로 다시 접속해 주세요.'}</p>
-            <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="primary-button">로그인</Link>
-            <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
+            <div className="remote-state-actions">
+              <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="primary-button">로그인</Link>
+              <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
+            </div>
             <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />
           </section>
         </main>

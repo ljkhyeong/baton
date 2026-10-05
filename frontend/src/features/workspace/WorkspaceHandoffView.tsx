@@ -78,7 +78,7 @@ export function HandoffView({
   const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
   const selected = roles[selectedIndex] ?? roles[0]
   if (!selected) {
-    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할을 만들면 담당 업무와 자료를 인수인계 문서로 정리할 수 있습니다." /><ActionableEmpty title="넘겨줄 역할이 아직 없어요" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
+    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할을 만들면 담당 업무와 자료를 인수인계 문서로 정리할 수 있습니다." /><ActionableEmpty icon="handoff" title="넘겨줄 역할이 아직 없어요" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
   }
   const panelId = `${tabSetId}-panel`
   const selectedTabId = `${tabSetId}-tab-${selected.id}`
@@ -308,7 +308,7 @@ export function HandoffView({
               </div>
             )
           }) : (
-            <ActionableEmpty
+            <ActionableEmpty icon="handoff"
               title={selectedArchivedItems.length ? '현재 체크리스트가 비어 있어요' : '아직 인수인계 항목이 없어요'}
               description={selectedArchivedItems.length
                 ? '아래 보관함에서 다시 필요한 항목을 복원하거나 새 항목을 추가해 주세요.'

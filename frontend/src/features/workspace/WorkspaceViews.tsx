@@ -91,10 +91,10 @@ export function PrimaryButton({ children, onClick, icon = true, disabled = false
   return <button type="button" className="primary-button" onClick={onClick} disabled={disabled}>{icon && <Icon name="plus" size={16} />}{children}</button>
 }
 
-export function ActionableEmpty({ title, description, actionLabel, onAction, disabled = false }: { title: string; description: string; actionLabel: string; onAction: () => void; disabled?: boolean }) {
+export function ActionableEmpty({ title, description, actionLabel, onAction, disabled = false, icon = 'memory' }: { title: string; description: string; actionLabel: string; onAction: () => void; disabled?: boolean; icon?: Parameters<typeof Icon>[0]['name'] }) {
   return (
     <div className="empty-state actionable-empty">
-      <Icon name="memory" size={24} /><strong>{title}</strong><p>{description}</p>
+      <Icon name={icon} size={24} /><strong>{title}</strong><p>{description}</p>
       <button type="button" className="secondary-button" disabled={disabled} onClick={onAction}>{actionLabel}</button>
     </div>
   )

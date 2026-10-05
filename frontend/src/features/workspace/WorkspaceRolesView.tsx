@@ -88,7 +88,7 @@ export function RolesView({
             )
           })}
         </section>
-      ) : <ActionableEmpty title="아직 역할이 없어요" description="담당 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
+      ) : <ActionableEmpty icon="roles" title="아직 역할이 없어요" description="담당 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} />}
     </>
   )
 }
