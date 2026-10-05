@@ -1,5 +1,8 @@
 package com.personal.baton.adapter.out.persistence.watch;
 
+import static com.personal.baton.adapter.out.persistence.LeasedOutboxTable.utc;
+
+import com.personal.baton.adapter.out.persistence.LeasedOutboxTable;
 import com.personal.baton.application.watch.WatchMonitorCandidate;
 import com.personal.baton.application.watch.WatchMonitorChange;
 import com.personal.baton.application.watch.WatchMonitorDelivery;
@@ -9,8 +12,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -39,9 +40,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             """;
 
     private final JdbcTemplate jdbcTemplate;
+    private final LeasedOutboxTable outbox;
 
     public JdbcWatchMonitorOutboxAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.outbox = new LeasedOutboxTable(jdbcTemplate, "watch_monitor_outbox");
     }
 
     @Override
@@ -141,26 +144,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 batchSize
         );
 
-        LocalDateTime leaseExpiresAt = utc(claimedAt.plus(leaseDuration));
+        Instant leaseExpiresAt = claimedAt.plus(leaseDuration);
         List<WatchMonitorDelivery> deliveries = new ArrayList<>(candidates.size());
         for (ClaimCandidate candidate : candidates) {
             UUID leaseToken = UUID.randomUUID();
-            int updated = jdbcTemplate.update(
-                    """
-                    UPDATE watch_monitor_outbox
-                    SET delivery_status = 'PROCESSING',
-                        attempt_count = attempt_count + 1,
-                        lease_token = UUID_TO_BIN(?),
-                        lease_expires_at = ?,
-                        completed_at = NULL,
-                        result_code = NULL
-                    WHERE id = ?
-                    """,
-                    leaseToken.toString(),
-                    leaseExpiresAt,
-                    candidate.sourceRevision()
-            );
-            if (updated == 1) {
+            if (outbox.lease(candidate.sourceRevision(), leaseToken, leaseExpiresAt)) {
                 deliveries.add(candidate.toDelivery(leaseToken));
             }
         }
@@ -175,24 +163,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             Instant deliveredAt,
             String resultCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE watch_monitor_outbox
-                SET delivery_status = 'DELIVERED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = ?,
-                    last_error_code = NULL
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(Objects.requireNonNull(deliveredAt, "WATCH 전달 완료 시각은 필수입니다")),
-                boundedCode(resultCode, "WATCH 전달 결과 코드"),
-                sourceRevision,
-                requiredLeaseToken(leaseToken).toString()
-        ) == 1;
+        return outbox.markDelivered(sourceRevision, leaseToken, deliveredAt, resultCode);
     }
 
     @Override
@@ -203,25 +174,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             Instant availableAt,
             String errorCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE watch_monitor_outbox
-                SET delivery_status = 'PENDING',
-                    available_at = ?,
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = NULL,
-                    result_code = NULL,
-                    last_error_code = ?
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(Objects.requireNonNull(availableAt, "WATCH 재시도 가능 시각은 필수입니다")),
-                boundedCode(errorCode, "WATCH 재시도 오류 코드"),
-                sourceRevision,
-                requiredLeaseToken(leaseToken).toString()
-        ) == 1;
+        return outbox.markRetry(sourceRevision, leaseToken, availableAt, errorCode);
     }
 
     @Override
@@ -232,24 +185,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             Instant failedAt,
             String errorCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE watch_monitor_outbox
-                SET delivery_status = 'FAILED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = NULL,
-                    last_error_code = ?
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(Objects.requireNonNull(failedAt, "WATCH 전달 실패 시각은 필수입니다")),
-                boundedCode(errorCode, "WATCH 전달 오류 코드"),
-                sourceRevision,
-                requiredLeaseToken(leaseToken).toString()
-        ) == 1;
+        return outbox.markFailed(sourceRevision, leaseToken, failedAt, errorCode);
     }
 
     @Override
@@ -526,17 +462,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
     private static UUID requiredLeaseToken(UUID leaseToken) {
         return Objects.requireNonNull(leaseToken, "WATCH lease token은 필수입니다");
-    }
-
-    private static String boundedCode(String code, String fieldName) {
-        if (code != null && code.length() > 64) {
-            throw new IllegalArgumentException(fieldName + "는 64자 이하여야 합니다");
-        }
-        return code;
-    }
-
-    private static LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     private static UUID uuidOrNull(String value) {

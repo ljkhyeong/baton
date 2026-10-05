@@ -1,5 +1,8 @@
 package com.personal.baton.adapter.out.persistence.brief;
 
+import static com.personal.baton.adapter.out.persistence.LeasedOutboxTable.utc;
+
+import com.personal.baton.adapter.out.persistence.LeasedOutboxTable;
 import com.personal.baton.application.brief.BriefContinuityDelivery;
 import com.personal.baton.application.brief.BriefContinuityEvent;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
@@ -22,9 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPort {
 
     private final JdbcTemplate jdbcTemplate;
+    private final LeasedOutboxTable outbox;
 
     public JdbcBriefContinuityOutboxAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.outbox = new LeasedOutboxTable(jdbcTemplate, "brief_continuity_outbox");
     }
 
     @Override
@@ -103,26 +108,11 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
                 batchSize
         );
 
-        LocalDateTime leaseExpiresAt = utc(claimedAt.plus(leaseDuration));
+        Instant leaseExpiresAt = claimedAt.plus(leaseDuration);
         List<BriefContinuityDelivery> deliveries = new ArrayList<>(candidates.size());
         for (ClaimCandidate candidate : candidates) {
             UUID leaseToken = UUID.randomUUID();
-            int updated = jdbcTemplate.update(
-                    """
-                    UPDATE brief_continuity_outbox
-                    SET delivery_status = 'PROCESSING',
-                        attempt_count = attempt_count + 1,
-                        lease_token = UUID_TO_BIN(?),
-                        lease_expires_at = ?,
-                        completed_at = NULL,
-                        result_code = NULL
-                    WHERE id = ?
-                    """,
-                    leaseToken.toString(),
-                    leaseExpiresAt,
-                    candidate.outboxId()
-            );
-            if (updated == 1) {
+            if (outbox.lease(candidate.outboxId(), leaseToken, leaseExpiresAt)) {
                 deliveries.add(candidate.toDelivery(leaseToken));
             }
         }
@@ -137,24 +127,7 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
             Instant deliveredAt,
             String resultCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE brief_continuity_outbox
-                SET delivery_status = 'DELIVERED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = ?,
-                    last_error_code = NULL
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(Objects.requireNonNull(deliveredAt, "BRIEF 전달 완료 시각은 필수입니다")),
-                requiredCode(resultCode, "BRIEF 전달 결과 코드"),
-                requiredOutboxId(outboxId),
-                requiredLeaseToken(leaseToken).toString()
-        ) == 1;
+        return outbox.markDelivered(outboxId, leaseToken, deliveredAt, resultCode);
     }
 
     @Override
@@ -165,25 +138,7 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
             Instant availableAt,
             String errorCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE brief_continuity_outbox
-                SET delivery_status = 'PENDING',
-                    available_at = ?,
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = NULL,
-                    result_code = NULL,
-                    last_error_code = ?
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(Objects.requireNonNull(availableAt, "BRIEF 재시도 가능 시각은 필수입니다")),
-                requiredCode(errorCode, "BRIEF 재시도 오류 코드"),
-                requiredOutboxId(outboxId),
-                requiredLeaseToken(leaseToken).toString()
-        ) == 1;
+        return outbox.markRetry(outboxId, leaseToken, availableAt, errorCode);
     }
 
     @Override
@@ -194,47 +149,7 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
             Instant failedAt,
             String errorCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE brief_continuity_outbox
-                SET delivery_status = 'FAILED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = NULL,
-                    last_error_code = ?
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(Objects.requireNonNull(failedAt, "BRIEF 전달 실패 시각은 필수입니다")),
-                requiredCode(errorCode, "BRIEF 전달 오류 코드"),
-                requiredOutboxId(outboxId),
-                requiredLeaseToken(leaseToken).toString()
-        ) == 1;
-    }
-
-    private static long requiredOutboxId(long outboxId) {
-        if (outboxId < 1) {
-            throw new IllegalArgumentException("BRIEF outbox ID는 양수여야 합니다");
-        }
-        return outboxId;
-    }
-
-    private static UUID requiredLeaseToken(UUID leaseToken) {
-        return Objects.requireNonNull(leaseToken, "BRIEF lease token은 필수입니다");
-    }
-
-    private static String requiredCode(String code, String name) {
-        Objects.requireNonNull(code, name + "는 필수입니다");
-        if (code.isBlank() || code.length() > 64) {
-            throw new IllegalArgumentException(name + "는 공백이 아닌 64자 이하여야 합니다");
-        }
-        return code;
-    }
-
-    private static LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+        return outbox.markFailed(outboxId, leaseToken, failedAt, errorCode);
     }
 
     private record ClaimCandidate(

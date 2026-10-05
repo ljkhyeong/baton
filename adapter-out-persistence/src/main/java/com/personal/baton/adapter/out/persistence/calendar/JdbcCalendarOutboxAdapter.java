@@ -1,5 +1,8 @@
 package com.personal.baton.adapter.out.persistence.calendar;
 
+import static com.personal.baton.adapter.out.persistence.LeasedOutboxTable.utc;
+
+import com.personal.baton.adapter.out.persistence.LeasedOutboxTable;
 import com.personal.baton.application.calendar.CalendarDelivery;
 import com.personal.baton.application.calendar.CalendarDeliveryPayload;
 import com.personal.baton.application.calendar.CalendarSeasonMetadata;
@@ -289,26 +292,11 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
                 batchSize
         );
 
-        LocalDateTime leaseExpiresAt = utc(claimedAt.plus(leaseDuration));
+        Instant leaseExpiresAt = claimedAt.plus(leaseDuration);
         List<CalendarDelivery> deliveries = new ArrayList<>(candidates.size());
         for (ClaimCandidate candidate : candidates) {
             UUID leaseToken = UUID.randomUUID();
-            int updated = jdbcTemplate.update(
-                    """
-                    UPDATE %s
-                    SET delivery_status = 'PROCESSING',
-                        attempt_count = attempt_count + 1,
-                        lease_token = UUID_TO_BIN(?),
-                        lease_expires_at = ?,
-                        completed_at = NULL,
-                        result_code = NULL
-                    WHERE id = ?
-                    """.formatted(table),
-                    leaseToken.toString(),
-                    leaseExpiresAt,
-                    candidate.payload().revision()
-            );
-            if (updated == 1) {
+            if (new LeasedOutboxTable(jdbcTemplate, table).lease(candidate.payload().revision(), leaseToken, leaseExpiresAt)) {
                 deliveries.add(new CalendarDelivery(candidate.payload(), candidate.attemptCount() + 1, leaseToken));
             }
         }
@@ -323,24 +311,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
             Instant deliveredAt,
             String resultCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE %s
-                SET delivery_status = 'DELIVERED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = ?,
-                    last_error_code = NULL
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """.formatted(table(payload)),
-                utc(deliveredAt),
-                resultCode,
-                payload.revision(),
-                leaseToken.toString()
-        ) == 1;
+        return outbox(payload).markDelivered(payload.revision(), leaseToken, deliveredAt, resultCode);
     }
 
     @Override
@@ -351,25 +322,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
             Instant availableAt,
             String errorCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE %s
-                SET delivery_status = 'PENDING',
-                    available_at = ?,
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = NULL,
-                    result_code = NULL,
-                    last_error_code = ?
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """.formatted(table(payload)),
-                utc(availableAt),
-                errorCode,
-                payload.revision(),
-                leaseToken.toString()
-        ) == 1;
+        return outbox(payload).markRetry(payload.revision(), leaseToken, availableAt, errorCode);
     }
 
     @Override
@@ -380,24 +333,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
             Instant failedAt,
             String errorCode
     ) {
-        return jdbcTemplate.update(
-                """
-                UPDATE %s
-                SET delivery_status = 'FAILED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = NULL,
-                    last_error_code = ?
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """.formatted(table(payload)),
-                utc(failedAt),
-                errorCode,
-                payload.revision(),
-                leaseToken.toString()
-        ) == 1;
+        return outbox(payload).markFailed(payload.revision(), leaseToken, failedAt, errorCode);
     }
 
     private LocalDateTime monotonicSourceUpdatedAt(
@@ -504,15 +440,11 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
                 .array();
     }
 
-    private LocalDateTime utc(Instant instant) {
-        return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
-    }
-
-    private String table(CalendarDeliveryPayload payload) {
-        return switch (payload) {
+    private LeasedOutboxTable outbox(CalendarDeliveryPayload payload) {
+        return new LeasedOutboxTable(jdbcTemplate, switch (payload) {
             case CalendarSnapshot ignored -> "calendar_snapshot_outbox";
             case CalendarSeasonMetadata ignored -> "calendar_season_metadata_outbox";
-        };
+        });
     }
 
     private CalendarSnapshot snapshot(ResultSet row) throws SQLException {
