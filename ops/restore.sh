@@ -214,16 +214,7 @@ fi
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
   export MYSQL_PWD
   exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
-    SET @baton_account_access_check = IF(
-      EXISTS(SELECT 1 FROM information_schema.columns
-        WHERE table_schema = DATABASE() AND table_name = '\''teams'\''
-          AND column_name = '\''account_access_enabled'\''),
-      '\''SELECT COUNT(*) FROM teams WHERE account_access_enabled = TRUE'\'',
-      '\''SELECT 0'\''
-    );
-    PREPARE baton_account_access_check FROM @baton_account_access_check;
-    EXECUTE baton_account_access_check;
-    DEALLOCATE PREPARE baton_account_access_check;
+    SELECT COUNT(*) FROM teams WHERE account_access_enabled = TRUE
   "
 ' > "$compose_output_path"
 account_access_team_count="$(< "$compose_output_path")"
@@ -235,73 +226,9 @@ fi
 "${compose[@]}" exec -T mysql sh -ec '
   MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
   export MYSQL_PWD
-  exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
-    SELECT COUNT(*)
-    FROM information_schema.columns
-    WHERE table_schema = DATABASE()
-      AND table_name = '\''teams'\''
-      AND column_name IN (
-        '\''last_access_key_change_idempotency_hash'\'',
-        '\''version'\''
-      )
-  "
-' > "$compose_output_path"
-team_revision_column_count="$(< "$compose_output_path")"
-case "$team_revision_column_count" in
-  0)
-    "${compose[@]}" exec -T mysql sh -ec '
-      MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
-      export MYSQL_PWD
-      exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
-    ' > "$compose_output_path" <<'SQL'
-START TRANSACTION;
-
-UPDATE teams
-SET access_key_hash = LOWER(HEX(RANDOM_BYTES(32)));
-
-SELECT
-    ROW_COUNT(),
-    (SELECT COUNT(*) FROM teams),
-    (
-        SELECT COUNT(*)
-        FROM teams
-        WHERE access_key_hash NOT REGEXP '^[0-9a-f]{64}$'
-    ),
-    0;
-
-COMMIT;
-SQL
-    access_key_revocation_result="$(< "$compose_output_path")"
-    ;;
-  2)
-    "${compose[@]}" exec -T mysql sh -ec '
-      MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
-      export MYSQL_PWD
-      exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE" --execute="
-        SELECT COUNT(*)
-        FROM information_schema.tables
-        WHERE table_schema = DATABASE()
-          AND table_name = '\''access_key_change_history'\''
-      "
-    ' > "$compose_output_path"
-    access_key_history_table_count="$(< "$compose_output_path")"
-    if [[ "$access_key_history_table_count" != "1" ]]; then
-      printf 'Restore found access-key revision columns without their history table.\n' >&2
-      exit 1
-    fi
-    "${compose[@]}" exec -T mysql sh -ec '
-      MYSQL_PWD="$MYSQL_ROOT_PASSWORD"
-      export MYSQL_PWD
-      exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
-    ' < "$access_key_revocation_sql" > "$compose_output_path"
-    access_key_revocation_result="$(< "$compose_output_path")"
-    ;;
-  *)
-    printf 'Restore found an incomplete teams access-key revision schema: columns=%s.\n' \
-      "$team_revision_column_count" >&2
-    exit 1
-    ;;
-esac
+  exec mysql --user=root --batch --skip-column-names "$MYSQL_DATABASE"
+' < "$access_key_revocation_sql" > "$compose_output_path"
+access_key_revocation_result="$(< "$compose_output_path")"
 
 access_key_revocation_result="${access_key_revocation_result//$'\r'/}"
 if [[ "$access_key_revocation_result" == *$'\n'* ]]; then

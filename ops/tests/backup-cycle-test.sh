@@ -140,21 +140,12 @@ if [[ "${FAKE_DOCKER_MODE:-valid}" == "restore" ]]; then
     fi
     exit 0
   fi
-  if [[ "$docker_arguments" == *"information_schema.tables"* \
-    && "$docker_arguments" == *"access_key_change_history"* ]]; then
-    printf '%s\n' '1'
-    exit 0
-  fi
   if [[ "$docker_arguments" == *"information_schema.tables"* ]]; then
     printf '%s\n' '3'
     exit 0
   fi
-  if [[ "$docker_arguments" == *"baton_account_access_check"* ]]; then
+  if [[ "$docker_arguments" == *"account_access_enabled = TRUE"* ]]; then
     printf '%s\n' "${FAKE_RESTORE_ACCOUNT_TEAMS:-0}"
-    exit 0
-  fi
-  if [[ "$docker_arguments" == *"information_schema.columns"* ]]; then
-    printf '%s\n' "${FAKE_RESTORE_TEAM_REVISION_COLUMNS:-2}"
     exit 0
   fi
   if [[ "$docker_arguments" == *"BIN_TO_UUID"* ]]; then
@@ -541,25 +532,6 @@ if PATH="$fake_bin:$PATH" \
   fail 'restore with incomplete access-key invalidation unexpectedly succeeded'
 fi
 assert_no_file "$restore_count_mismatch_root/state/last-restore-recovery-targets.tsv"
-
-legacy_restore_root="$test_root/legacy-restore-security"
-mkdir -p -- "$legacy_restore_root"
-write_valid_production_env "$legacy_restore_root/production.env"
-legacy_restore_backup="$legacy_restore_root/baton-20200101T000000Z-legacy.sql.gz"
-write_valid_backup "$legacy_restore_backup"
-PATH="$fake_bin:$PATH" \
-BATON_PRODUCTION_ENV_FILE="$legacy_restore_root/production.env" \
-BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
-BATON_BACKUP_STATE_DIR="$legacy_restore_root/state" \
-FAKE_DOCKER_MODE=restore \
-FAKE_RESTORE_TEAM_REVISION_COLUMNS=0 \
-FAKE_RESTORE_SQL_LOG="$legacy_restore_root/revocation.sql" \
-"$fixture_restore_script" "$legacy_restore_backup" >/dev/null
-grep -Fq 'RANDOM_BYTES(32)' "$legacy_restore_root/revocation.sql" \
-  || fail 'legacy restore did not invalidate existing access keys'
-if grep -Fq 'last_access_key_change_idempotency_hash' "$legacy_restore_root/revocation.sql"; then
-  fail 'legacy restore referenced access-key revision columns before migration'
-fi
 
 stale_retry_root="$test_root/stale-retry"
 mkdir -p -- "$stale_retry_root/backups" "$stale_retry_root/remote"
