@@ -3,10 +3,12 @@ package com.personal.baton.adapter.out.external.holiday;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Ticker;
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import com.personal.baton.application.holiday.PublicHolidayCalendar;
 import com.personal.baton.application.holiday.PublicHolidayCalendar.Holiday;
 import com.personal.baton.application.holiday.PublicHolidayCalendar.Status;
 import com.personal.baton.application.holiday.port.out.PublicHolidayClient;
+import java.net.URI;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Duration;
@@ -16,9 +18,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import javax.xml.transform.dom.DOMSource;
 import org.springframework.http.MediaType;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.converter.xml.SourceHttpMessageConverter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -95,23 +94,17 @@ public final class KasiPublicHolidayClient implements PublicHolidayClient {
 
     @Component
     public static class Factory {
-        private final RestClient.Builder builder;
-        private final ClientHttpRequestFactoryBuilder<?> factoryBuilder;
-        private final HttpClientSettings settings;
+        private static final URI BASE_URI =
+                URI.create("https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService");
 
-        public Factory(RestClient.Builder builder, ClientHttpRequestFactoryBuilder<?> factoryBuilder,
-                HttpClientSettings settings) {
-            this.builder = builder;
-            this.factoryBuilder = factoryBuilder;
-            this.settings = settings;
+        private final OutboundRestClients restClients;
+
+        public Factory(OutboundRestClients restClients) {
+            this.restClients = restClients;
         }
 
         public KasiPublicHolidayClient create(String serviceKey, Clock clock) {
-            var client = builder.clone()
-                    .baseUrl("https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService")
-                    .requestFactory(factoryBuilder.build(settings
-                            .withTimeouts(Duration.ofSeconds(2), Duration.ofSeconds(3))
-                            .withRedirects(HttpRedirects.DONT_FOLLOW)))
+            var client = restClients.builder(BASE_URI, Duration.ofSeconds(2), Duration.ofSeconds(3))
                     .configureMessageConverters(converters -> converters.addCustomConverter(new SourceHttpMessageConverter<>()))
                     .build();
             return new KasiPublicHolidayClient(client, serviceKey, clock);

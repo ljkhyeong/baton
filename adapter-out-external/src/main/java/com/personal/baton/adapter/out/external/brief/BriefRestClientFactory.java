@@ -1,30 +1,19 @@
 package com.personal.baton.adapter.out.external.brief;
 
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Objects;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
-import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
 public class BriefRestClientFactory {
 
-    private final RestClient.Builder restClientBuilder;
-    private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
-    private final HttpClientSettings managedHttpClientSettings;
+    private final OutboundRestClients restClients;
 
-    public BriefRestClientFactory(
-            RestClient.Builder restClientBuilder,
-            ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-            HttpClientSettings managedHttpClientSettings
-    ) {
-        this.restClientBuilder = restClientBuilder;
-        this.requestFactoryBuilder = requestFactoryBuilder;
-        this.managedHttpClientSettings = managedHttpClientSettings;
+    public BriefRestClientFactory(OutboundRestClients restClients) {
+        this.restClients = restClients;
     }
 
     public RestClientBriefContinuityClient createContinuityClient(
@@ -33,12 +22,7 @@ public class BriefRestClientFactory {
             Duration connectTimeout,
             Duration readTimeout
     ) {
-        return new RestClientBriefContinuityClient(createRestClient(
-                baseUri,
-                bearerToken,
-                connectTimeout,
-                readTimeout
-        ));
+        return new RestClientBriefContinuityClient(createRestClient(baseUri, bearerToken, connectTimeout, readTimeout));
     }
 
     public RestClientBriefServiceClient createEditionServiceClient(
@@ -47,30 +31,13 @@ public class BriefRestClientFactory {
             Duration connectTimeout,
             Duration readTimeout
     ) {
-        return new RestClientBriefServiceClient(createRestClient(
-                baseUri,
-                bearerToken,
-                connectTimeout,
-                readTimeout
-        ));
+        return new RestClientBriefServiceClient(createRestClient(baseUri, bearerToken, connectTimeout, readTimeout));
     }
 
-    private RestClient createRestClient(
-            URI baseUri,
-            String bearerToken,
-            Duration connectTimeout,
-            Duration readTimeout
-    ) {
-        HttpClientSettings settings = managedHttpClientSettings
-                .withTimeouts(connectTimeout, readTimeout)
-                .withRedirects(HttpRedirects.DONT_FOLLOW);
-        ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-        RestClient.Builder builder = restClientBuilder.clone()
-                .baseUrl(Objects.requireNonNull(baseUri, "BRIEF base URI는 필수입니다"))
-                .requestFactory(requestFactory);
-        if (bearerToken != null) {
-            builder.defaultHeaders(headers -> headers.setBearerAuth(bearerToken));
-        }
-        return builder.build();
+    private RestClient createRestClient(URI baseUri, String bearerToken, Duration connectTimeout, Duration readTimeout) {
+        URI requiredBaseUri = Objects.requireNonNull(baseUri, "BRIEF base URI는 필수입니다");
+        return bearerToken == null
+                ? restClients.builder(requiredBaseUri, connectTimeout, readTimeout).build()
+                : restClients.withBearer(requiredBaseUri, bearerToken, connectTimeout, readTimeout);
     }
 }

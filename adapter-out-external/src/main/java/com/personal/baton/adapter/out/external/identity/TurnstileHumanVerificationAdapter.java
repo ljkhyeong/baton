@@ -1,17 +1,14 @@
 package com.personal.baton.adapter.out.external.identity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import com.personal.baton.application.identity.port.out.HumanVerificationPort;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -122,30 +119,17 @@ public final class TurnstileHumanVerificationAdapter implements HumanVerificatio
     @Component
     public static final class Factory {
 
-        private final RestClient.Builder restClientBuilder;
-        private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
-        private final HttpClientSettings managedHttpClientSettings;
+        private final OutboundRestClients restClients;
 
-        Factory(
-                RestClient.Builder restClientBuilder,
-                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-                HttpClientSettings managedHttpClientSettings
-        ) {
-            this.restClientBuilder = restClientBuilder;
-            this.requestFactoryBuilder = requestFactoryBuilder;
-            this.managedHttpClientSettings = managedHttpClientSettings;
+        Factory(OutboundRestClients restClients) {
+            this.restClients = restClients;
         }
 
         public TurnstileHumanVerificationAdapter create(TurnstileProperties properties) {
             Objects.requireNonNull(properties, "Turnstile 설정은 필수입니다");
             properties.validateEnabled();
-            HttpClientSettings settings = managedHttpClientSettings
-                    .withTimeouts(properties.connectTimeout(), properties.readTimeout())
-                    .withRedirects(HttpRedirects.DONT_FOLLOW);
-            ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-            RestClient restClient = restClientBuilder.clone()
-                    .baseUrl(BASE_URI)
-                    .requestFactory(requestFactory)
+            RestClient restClient = restClients
+                    .builder(BASE_URI, properties.connectTimeout(), properties.readTimeout())
                     .build();
             return new TurnstileHumanVerificationAdapter(
                     restClient,

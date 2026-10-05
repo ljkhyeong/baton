@@ -1,17 +1,14 @@
 package com.personal.baton.adapter.out.external.watch;
 
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient;
 import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -109,18 +106,10 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
     @Component
     public static final class Factory {
 
-        private final RestClient.Builder restClientBuilder;
-        private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
-        private final HttpClientSettings managedHttpClientSettings;
+        private final OutboundRestClients restClients;
 
-        Factory(
-                RestClient.Builder restClientBuilder,
-                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-                HttpClientSettings managedHttpClientSettings
-        ) {
-            this.restClientBuilder = restClientBuilder;
-            this.requestFactoryBuilder = requestFactoryBuilder;
-            this.managedHttpClientSettings = managedHttpClientSettings;
+        Factory(OutboundRestClients restClients) {
+            this.restClients = restClients;
         }
 
         public RestClientWatchMonitorClient create(
@@ -129,28 +118,15 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
                 Duration connectTimeout,
                 Duration readTimeout
         ) {
-            return new RestClientWatchMonitorClient(buildRestClient(baseUri, bearerToken, connectTimeout, readTimeout));
+            return new RestClientWatchMonitorClient(
+                    restClients.withBearer(baseUri, bearerToken, connectTimeout, readTimeout)
+            );
         }
 
         public RestClientWatchInspectionClient createInspection(URI baseUri, String bearerToken) {
-            return new RestClientWatchInspectionClient(buildRestClient(baseUri, bearerToken,
-                    Duration.ofSeconds(1), Duration.ofSeconds(2)));
-        }
-
-        private RestClient buildRestClient(URI baseUri, String bearerToken,
-                                           Duration connectTimeout, Duration readTimeout) {
-            HttpClientSettings settings = managedHttpClientSettings
-                    .withTimeouts(
-                            connectTimeout,
-                            readTimeout
-                    )
-                    .withRedirects(HttpRedirects.DONT_FOLLOW);
-            ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-            return restClientBuilder.clone()
-                    .baseUrl(baseUri)
-                    .requestFactory(requestFactory)
-                    .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
-                    .build();
+            return new RestClientWatchInspectionClient(
+                    restClients.withBearer(baseUri, bearerToken, Duration.ofSeconds(1), Duration.ofSeconds(2))
+            );
         }
     }
 }

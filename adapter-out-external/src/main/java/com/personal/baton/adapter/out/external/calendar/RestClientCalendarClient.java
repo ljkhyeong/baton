@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.external.calendar;
 
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarRecoveryManifest;
@@ -15,13 +16,9 @@ import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
-import org.springframework.boot.http.client.HttpRedirects;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -342,18 +339,10 @@ public final class RestClientCalendarClient implements
     @Component
     public static final class Factory {
 
-        private final RestClient.Builder restClientBuilder;
-        private final ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder;
-        private final HttpClientSettings managedHttpClientSettings;
+        private final OutboundRestClients restClients;
 
-        Factory(
-                RestClient.Builder restClientBuilder,
-                ClientHttpRequestFactoryBuilder<?> requestFactoryBuilder,
-                HttpClientSettings managedHttpClientSettings
-        ) {
-            this.restClientBuilder = restClientBuilder;
-            this.requestFactoryBuilder = requestFactoryBuilder;
-            this.managedHttpClientSettings = managedHttpClientSettings;
+        Factory(OutboundRestClients restClients) {
+            this.restClients = restClients;
         }
 
         public RestClientCalendarClient create(
@@ -362,16 +351,9 @@ public final class RestClientCalendarClient implements
                 Duration connectTimeout,
                 Duration readTimeout
         ) {
-            HttpClientSettings settings = managedHttpClientSettings
-                    .withTimeouts(connectTimeout, readTimeout)
-                    .withRedirects(HttpRedirects.DONT_FOLLOW);
-            ClientHttpRequestFactory requestFactory = requestFactoryBuilder.build(settings);
-            RestClient restClient = restClientBuilder.clone()
-                    .baseUrl(baseUri)
-                    .requestFactory(requestFactory)
-                    .defaultHeaders(headers -> headers.setBearerAuth(bearerToken))
-                    .build();
-            return new RestClientCalendarClient(restClient);
+            return new RestClientCalendarClient(
+                    restClients.withBearer(baseUri, bearerToken, connectTimeout, readTimeout)
+            );
         }
     }
 }

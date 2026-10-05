@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.identity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import com.personal.baton.application.identity.port.out.HumanVerificationPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class HumanVerificationInfrastructureConfigTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(HumanVerificationInfrastructureConfig.class,
-                    TurnstileHumanVerificationAdapter.Factory.class)
+                    TurnstileHumanVerificationAdapter.Factory.class, OutboundRestClients.class)
             .withConfiguration(AutoConfigurations.of(HttpClientAutoConfiguration.class,
                     ImperativeHttpClientAutoConfiguration.class, RestClientAutoConfiguration.class));
 

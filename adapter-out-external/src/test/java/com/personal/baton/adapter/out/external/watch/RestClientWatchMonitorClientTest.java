@@ -11,6 +11,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.personal.baton.adapter.out.external.http.OutboundRestClients;
 import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient.Outcome;
@@ -109,7 +110,7 @@ class RestClientWatchMonitorClientTest {
                             response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
                             return response;
                         }))
-                .withUserConfiguration(RestClientWatchMonitorClient.Factory.class);
+                .withUserConfiguration(OutboundRestClients.class, RestClientWatchMonitorClient.Factory.class);
 
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
@@ -149,9 +150,7 @@ class RestClientWatchMonitorClientTest {
                 sslBundle
         );
         RestClientWatchMonitorClient.Factory factory = new RestClientWatchMonitorClient.Factory(
-                RestClient.builder(),
-                requestFactoryBuilder,
-                managedSettings
+                new OutboundRestClients(RestClient.builder(), requestFactoryBuilder, managedSettings)
         );
 
         factory.create(
