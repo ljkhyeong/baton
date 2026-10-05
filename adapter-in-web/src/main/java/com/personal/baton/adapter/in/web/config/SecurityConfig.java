@@ -27,8 +27,6 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Enumeration;
-import java.util.List;
-import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -45,10 +43,7 @@ import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizati
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
-import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
-import org.springframework.security.oauth2.server.resource.introspection.BadOpaqueTokenException;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
-import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.IpAddressAuthorizationManager;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -76,10 +71,6 @@ public class SecurityConfig {
     private static final ErrorResponse INVALID_CREDENTIALS = new ErrorResponse(
             "INVALID_CREDENTIALS",
             "이메일 또는 비밀번호가 올바르지 않습니다"
-    );
-    private static final ErrorResponse UNAUTHORIZED = new ErrorResponse(
-            "UNAUTHORIZED",
-            "인증 정보가 올바르지 않습니다"
     );
 
     @Bean
@@ -126,34 +117,16 @@ public class SecurityConfig {
     ) throws Exception {
         WatchEventReceiverAuthentication receiverAuthentication = receiverAuthenticationProvider
                 .getIfAvailable(WatchEventReceiverAuthentication::disabled);
-        AuthenticationEntryPoint unauthorized = (request, response, exception) -> {
-            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
-            errorResponseWriter.write(response, HttpServletResponse.SC_UNAUTHORIZED, UNAUTHORIZED);
-        };
         DefaultBearerTokenResolver bearerTokenResolver = new DefaultBearerTokenResolver();
-        return http
-                .securityMatcher(PathPatternRequestMatcher.pathPattern(
-                        HttpMethod.POST,
-                        WatchHealthEventController.PATH + "/**"
-                ))
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .requestCache(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
-                .oauth2ResourceServer(resource -> resource
-                        .authenticationEntryPoint(unauthorized)
-                        // Authorization 헤더가 둘 이상이면 올바른 토큰이 섞여 있어도 인증하지 않는다.
-                        .bearerTokenResolver(request -> hasSingleAuthorizationHeader(request)
-                                ? bearerTokenResolver.resolve(request)
-                                : null)
-                        .opaqueToken(opaque -> opaque.introspector(token -> {
-                            if (!receiverAuthentication.authenticates(token)) {
-                                throw new BadOpaqueTokenException("인증 정보가 올바르지 않습니다");
-                            }
-                            return new DefaultOAuth2AuthenticatedPrincipal("watch", Map.of("sub", "watch"), List.of());
-                        })))
-                .exceptionHandling(errors -> errors.authenticationEntryPoint(unauthorized))
-                .build();
+        return StaticBearerTokenChains.build(
+                http,
+                PathPatternRequestMatcher.pathPattern(HttpMethod.POST, WatchHealthEventController.PATH + "/**"),
+                // Authorization 헤더가 둘 이상이면 올바른 토큰이 섞여 있어도 인증하지 않는다.
+                request -> hasSingleAuthorizationHeader(request) ? bearerTokenResolver.resolve(request) : null,
+                receiverAuthentication::authenticates,
+                "watch",
+                errorResponseWriter
+        );
     }
 
     @Bean

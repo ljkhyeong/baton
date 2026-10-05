@@ -7,10 +7,7 @@ import com.personal.baton.adapter.in.web.workspace.ResourceVerificationControlle
 import com.personal.baton.adapter.in.web.workspace.NotificationPreferencesController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
-import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionController;
-import com.personal.baton.adapter.in.web.brief.BriefAttentionController;
-import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import org.springframework.http.HttpMethod;
@@ -36,109 +33,41 @@ public final class AccountSessionRequestMatchers {
             HttpMethod.POST,
             "/api/v1/auth/**"
     );
-    private static final RequestMatcher ROUND_MEMBERSHIP_READ = pathPattern(
-            HttpMethod.GET,
-            RoundAdministrationController.CURRENT_MEMBERSHIP_PATH
-    );
-    private static final RequestMatcher ROUND_MEMBERSHIP_CLAIM = pathPattern(
-            HttpMethod.POST,
-            RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH
-    );
-    private static final RequestMatcher ROUND_ROOM_MAPPING_CREATE = pathPattern(
-            HttpMethod.POST,
-            RoundAdministrationController.ROOM_MAPPINGS_PATH
-    );
-    private static final RequestMatcher ROUND_ROOM_MAPPING_READ = pathPattern(
-            HttpMethod.GET,
-            RoundAdministrationController.ROOM_MAPPINGS_PATH
-    );
-    private static final RequestMatcher ROUND_ROOM_MAPPING_DELETE = pathPattern(
-            HttpMethod.DELETE,
-            RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN
-    );
-    private static final RequestMatcher BRIEF_EDITION_READ = pathPattern(
-            HttpMethod.GET,
-            BriefEditionController.LATEST_PATH
-    );
-    private static final RequestMatcher BRIEF_EDITION_GENERATION = pathPattern(
-            HttpMethod.POST,
-            BriefEditionController.GENERATION_PATH
-    );
-    private static final RequestMatcher CALENDAR_READ = new OrRequestMatcher(
-            pathPattern(HttpMethod.GET, CalendarSubscriptionController.PATH),
-            pathPattern(HttpMethod.GET, CalendarSubscriptionController.LIST_PATH));
-    private static final RequestMatcher CALENDAR_MUTATION = new OrRequestMatcher(
-            pathPattern(HttpMethod.POST, CalendarSubscriptionController.PATH),
-            pathPattern(HttpMethod.POST, CalendarSubscriptionController.ROTATE_PATH),
-            pathPattern(HttpMethod.DELETE, CalendarSubscriptionController.PATH)
-    );
-    private static final RequestMatcher ACCOUNT_SECURITY_READ = pathPattern(
-            HttpMethod.GET,
-            AccountSecurityController.ACCOUNT_PATH
-    );
-    private static final RequestMatcher ACCOUNT_PASSWORD_CHANGE = pathPattern(
-            HttpMethod.POST,
-            AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH
-    );
-    private static final RequestMatcher ACCOUNT_SESSION_REVOCATION = pathPattern(
-            HttpMethod.POST,
-            AccountSecurityController.SESSION_REVOCATIONS_PATH
-    );
     private static final RequestMatcher NOTIFICATION_PREFERENCES = pathPattern(NotificationPreferencesController.PATH);
     private static final RequestMatcher TEAM_ACCESS = new OrRequestMatcher(pathPattern("/api/v1/team-access/**"), pathPattern("/api/v1/team-invitations/**"));
     private static final RequestMatcher HAS_ACCOUNT_SESSION = request -> CurrentAuthenticatedAccount.accountId().isPresent();
     private static final RequestMatcher WORKSPACE_ACCOUNT_MUTATION = new AndRequestMatcher(
             pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**"), HAS_ACCOUNT_SESSION, DEFAULT_CSRF_MATCHER);
-    private static final RequestMatcher NOTIFICATION_READ = pathPattern(HttpMethod.POST, WorkspaceNotificationController.READ_PATH);
-    private static final RequestMatcher NOTIFICATION_INBOX = pathPattern(HttpMethod.GET, WorkspaceNotificationController.PATH);
+    // 같은 경로의 조회는 공유 키로도 허용하므로 자료 재확인은 기록 요청만 계정 세션을 요구한다.
     private static final RequestMatcher RESOURCE_VERIFICATION = new OrRequestMatcher(
             pathPattern(HttpMethod.POST, ResourceVerificationController.PATH),
             pathPattern(HttpMethod.POST, ResourceVerificationController.SCHEDULE_PATH));
-    private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
-            AUTH_MUTATION,
-            new AndRequestMatcher(NOTIFICATION_PREFERENCES, DEFAULT_CSRF_MATCHER),
-            WORKSPACE_ACCOUNT_MUTATION,
-            new AndRequestMatcher(TEAM_ACCESS, DEFAULT_CSRF_MATCHER),
-            NOTIFICATION_READ,
-            RESOURCE_VERIFICATION,
-            ROUND_MEMBERSHIP_CLAIM,
-            ROUND_ROOM_MAPPING_CREATE,
-            ROUND_ROOM_MAPPING_DELETE,
-            BRIEF_EDITION_GENERATION,
-            CALENDAR_MUTATION,
-            pathPattern(HttpMethod.POST, BriefWorkspaceContextController.SOURCES_PATH)
-    );
+    // 나머지 계정 전용 경로는 메서드와 관계없이 묶어 HEAD 같은 다른 메서드도 계정 세션을 요구한다.
     private static final RequestMatcher ACCOUNT_SESSION_REQUIRED = new OrRequestMatcher(
-            pathPattern(HttpMethod.POST, AccountDeactivationController.PATH),
-            ACCOUNT_SECURITY_READ,
+            pathPattern(AccountDeactivationController.PATH),
+            pathPattern(AccountSecurityController.ACCOUNT_PATH),
+            pathPattern(AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH),
+            pathPattern(AccountSecurityController.SESSION_REVOCATIONS_PATH),
             NOTIFICATION_PREFERENCES,
             TEAM_ACCESS,
-            NOTIFICATION_READ,
-            NOTIFICATION_INBOX,
+            pathPattern(WorkspaceNotificationController.PATH),
+            pathPattern(WorkspaceNotificationController.READ_PATH),
             RESOURCE_VERIFICATION,
-            ACCOUNT_PASSWORD_CHANGE,
-            ACCOUNT_SESSION_REVOCATION,
             ROUND_GRANT_REFRESH,
-            ROUND_MEMBERSHIP_READ,
-            ROUND_MEMBERSHIP_CLAIM,
-            ROUND_ROOM_MAPPING_READ,
-            ROUND_ROOM_MAPPING_CREATE,
-            ROUND_ROOM_MAPPING_DELETE,
-            BRIEF_EDITION_READ,
-            pathPattern(HttpMethod.GET, BriefWorkspaceContextController.READINESS_PATH),
-            pathPattern(HttpMethod.GET, BriefEditionController.GENERATION_PATH),
-            pathPattern(HttpMethod.GET, BriefEditionController.EDITION_PATH),
-            pathPattern(HttpMethod.GET, BriefEditionController.COMPARISON_PATH),
-            pathPattern(HttpMethod.GET, BriefEditionController.DELIVERY_STATUS_PATH),
-            pathPattern(HttpMethod.GET, BriefEditionController.PREVIOUS_WEEK_PATH),
-            pathPattern(HttpMethod.GET, BriefAttentionController.LIST_PATH),
-            pathPattern(HttpMethod.GET, BriefAttentionController.SUMMARY_PATH),
-            pathPattern(HttpMethod.GET, BriefAttentionController.RESOLUTIONS_PATH),
-            pathPattern(HttpMethod.GET, BriefAttentionController.TRANSITIONS_PATH),
-            BRIEF_EDITION_GENERATION,
-            pathPattern(HttpMethod.POST, BriefWorkspaceContextController.SOURCES_PATH),
-            CALENDAR_READ,
-            CALENDAR_MUTATION
+            pathPattern(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH),
+            pathPattern(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH),
+            pathPattern(RoundAdministrationController.ROOM_MAPPINGS_PATH),
+            pathPattern(RoundAdministrationController.ROOM_MAPPING_PATH_PATTERN),
+            pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/brief/**"),
+            pathPattern(CalendarSubscriptionController.LIST_PATH),
+            pathPattern(CalendarSubscriptionController.PATH),
+            pathPattern(CalendarSubscriptionController.ROTATE_PATH)
+    );
+    // ROUND 참여권 갱신은 RoundGrantAdmissionFilter가 같은 출처와 인증을 함께 확인한다.
+    private static final RequestMatcher SAME_ORIGIN_SESSION_MUTATION = new OrRequestMatcher(
+            AUTH_MUTATION,
+            WORKSPACE_ACCOUNT_MUTATION,
+            new AndRequestMatcher(ACCOUNT_SESSION_REQUIRED, DEFAULT_CSRF_MATCHER, new NegatedRequestMatcher(ROUND_GRANT_REFRESH))
     );
     private static final RequestMatcher WORKSPACE_ACCOUNT_HEADER_REQUIRED = new AndRequestMatcher(
             WORKSPACE_ACCOUNT_MUTATION, new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED));

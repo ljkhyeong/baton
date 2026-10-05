@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -144,6 +145,14 @@ class BriefEditionSecurityTest {
                         .header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @DisplayName("BRIEF 조회 경로는 HEAD 요청에도 계정 세션을 요구한다")
+    @Test
+    void requiresAccountSessionForHeadRequests() throws Exception {
+        mockMvc.perform(head(BriefEditionController.LATEST_PATH, TEAM_ID, SEASON_ID)
+                        .header("X-Baton-Access-Key", ACCESS_KEY))
+                .andExpect(status().isUnauthorized());
     }
 
     @DisplayName("BRIEF 최신 조회는 인증 뒤 CSRF 없이 ETag 조건부 응답을 사용한다")
