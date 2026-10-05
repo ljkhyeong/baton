@@ -4,7 +4,7 @@ import { getResourceHealth, requestResourceCheck } from './api'
 import type { ResourceCheck, ResourceHealthScope } from './api'
 import { outcomeLabels } from './outcomeLabels'
 import { monitoringReasonLabels } from './monitoringReasonLabels'
-import { formatInstant } from '@/features/workspace/WorkspaceViews'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { ApiError } from '@/shared/api/ApiError'
 import './resource-health.scss'
 

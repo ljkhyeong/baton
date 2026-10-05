@@ -7,7 +7,8 @@ import { ContentChangePanel } from '@/features/content-history/ContentChangePane
 import { ResourceVerificationPanel } from '@/features/resource-verification/ResourceVerificationPanel'
 import { PreviousRoleRecords } from './PreviousRoleRecords'
 import type { WorkspaceScope } from './api'
-import { formatDateRange, formatInstant } from './WorkspaceViews'
+import { formatDateRange } from './WorkspaceViews'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { getMember, memberDisplayName } from './workspacePresentation'
 import type {
   Decision,

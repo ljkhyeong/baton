@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useWorkspacePrint } from '@/features/workspace/useWorkspacePrint'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { BriefSourceContext } from './BriefSources'
 import { attentionReasons, editionSections } from './types'
 import type { AttentionItem, BriefEdition, BriefScope } from './types'
@@ -14,7 +15,6 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
   const [manualLink, setManualLink] = useState('')
   const [copying, setCopying] = useState(false)
   const [sharing, setSharing] = useState(false)
-  const time = new Intl.DateTimeFormat('ko-KR', { timeZone: edition.zoneId, dateStyle: 'medium', timeStyle: 'short' })
   const link = new URL(`/teams/${scope.teamId}/seasons/${scope.seasonId}`, window.location.origin)
   link.searchParams.set('brief', edition.editionId)
   const copyLink = async () => {
@@ -54,8 +54,8 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
         <p>{workspaceName}</p>
         <dl>
           <div><dt>요약 버전</dt><dd>{edition.generation}</dd></div>
-          <div><dt>생성 시각</dt><dd>{time.format(new Date(edition.generatedAt))} ({edition.zoneId})</dd></div>
-          <div><dt>집계 구간</dt><dd>{time.format(new Date(edition.windowStart))} 이상 ~ {time.format(new Date(edition.windowEnd))} 미만</dd></div>
+          <div><dt>생성 시각</dt><dd>{formatInstant(edition.generatedAt, edition.zoneId)} ({edition.zoneId})</dd></div>
+          <div><dt>집계 구간</dt><dd>{formatInstant(edition.windowStart, edition.zoneId)} 이상 ~ {formatInstant(edition.windowEnd, edition.zoneId)} 미만</dd></div>
           <div><dt>선정 항목</dt><dd>{edition.items.length}건</dd></div>
         </dl>
       </header>
@@ -70,7 +70,7 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
             return <li key={`${item.reasonCode}:${item.sourceReference}`}>
               <h3>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</h3>
               <p>현재 업무명: {source?.target?.title ?? '확인할 수 없음'}</p>
-              <p>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'} · 상태 기록 {time.format(new Date(item.observedAt))}</p>
+              <p>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'} · 상태 기록 {formatInstant(item.observedAt, edition.zoneId)}</p>
               <p className="brief-print-evidence">원본 항목 ID: {item.sourceReference}<br />
                 {item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
                   : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`}</p>

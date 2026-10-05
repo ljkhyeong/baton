@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import type { WorkspaceScope } from '@/features/workspace/api'
-import { formatInstant } from '@/features/workspace/WorkspaceViews'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { activateTeamAccess, changeTeamPermission, createTeamInvitation, getTeamAccess,
   permissionNames, revokeTeamInvitation, type AccessScope, type Permission } from './api'
 import './team-access.scss'

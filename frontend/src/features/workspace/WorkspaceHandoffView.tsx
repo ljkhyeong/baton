@@ -1,10 +1,10 @@
 import { useId, useRef } from 'react'
 import type { KeyboardEvent } from 'react'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import {
   ActionableEmpty,
   formatDateRange,
-  formatInstant,
   PageHeader,
   PrimaryButton,
 } from './WorkspaceViews'

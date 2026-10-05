@@ -6,6 +6,7 @@ import type { WorkspaceProjection } from '@/features/workspace/types'
 import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
 import { ApiError } from '@/shared/api/ApiError'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { isSameUuid } from '@/shared/api/responseValidation'
 import { getAttentionPage, getAttentionSummary, getAttentionTransitions, getWeeklyResolutions } from './api'
 import { BriefEditionSection } from './BriefEditionSection'
@@ -68,14 +69,10 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
     setCursor(null); setSelected(null); setBefore(null); refreshResolutions()
     void summary.refetch(); if (cursor === null) void page.refetch()
   }
-  const formatTime = new Intl.DateTimeFormat('ko-KR', { timeZone, dateStyle: 'short', timeStyle: 'short' })
   const summaryData = summary.isError ? undefined : summary.data
   const resolutionData = resolutions.isError ? undefined : resolutions.data
   const resolutionWeekChanged = Boolean(resolutionPage && resolutionData
     && (resolutionPage.weekStart !== resolutionData.weekStart || resolutionPage.zoneId !== resolutionData.zoneId))
-  const resolutionTime = resolutionData ? new Intl.DateTimeFormat('ko-KR', {
-    timeZone: resolutionData.zoneId, dateStyle: 'short', timeStyle: 'short',
-  }) : null
   const pageData = page.isError ? undefined : page.data
   const accessError = [summary.error, page.error, history.error, resolutions.error].find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
   if (accessError) return <p role="alert">{accessError.message}{' '}
@@ -95,9 +92,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
         onClick={() => navigation.update({ resolutionsOpen: !resolutionsOpen })}>
         이번 주 해결 {resolutionData ? `${resolutionData.resolvedCount}건` : resolutions.isError ? '확인 실패' : '확인 중…'}
       </button>
-      {resolutionData && <small>{resolutionData.weekStart} 시작 주 ({resolutionData.zoneId}) · 확인 {new Intl.DateTimeFormat('ko-KR', {
-        timeZone: resolutionData.zoneId, dateStyle: 'short', timeStyle: 'short',
-      }).format(new Date(resolutionData.evaluatedAt))}</small>}
+      {resolutionData && <small>{resolutionData.weekStart} 시작 주 ({resolutionData.zoneId}) · 확인 {formatInstant(resolutionData.evaluatedAt, resolutionData.zoneId)}</small>}
       {resolutions.isError && <p role="alert">해결 요약을 불러오지 못했습니다. <button type="button" onClick={refreshResolutions}>해결 요약 다시 조회</button></p>}
       <p className="brief-note">이번 주에 해결됐고 현재도 해결 상태인 항목입니다. 재발했거나 해결 시점을 확인할 수 없으면 제외합니다.</p>
       {resolutionsOpen && <div id={resolutionsId}>
@@ -108,7 +103,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
             : <ul className="brief-items">{resolutionData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
               <strong>{attentionReasons[item.reasonCode]}</strong>
               <BriefSourceLink item={{ ...item, status: 'RESOLVED' }} readOnly={readOnly} />
-              <small>해결 {resolutionTime!.format(new Date(item.resolvedAt))} ({resolutionData.zoneId})</small>
+              <small>해결 {formatInstant(item.resolvedAt, resolutionData.zoneId)} ({resolutionData.zoneId})</small>
             </li>)}</ul>}
           {resolutionData.items.length > 0 && <details key={resolutionData.items[0]?.sourceReference} className="brief-evidence" aria-label="해결 항목 연동 상세"><summary>연동 상세</summary>
             <ul className="brief-evidence-list">{resolutionData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
@@ -145,7 +140,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
         {pageData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
           <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}{item.revisionGap && ' · 누락 있음'}</span></div>
           <BriefSourceLink item={item} readOnly={readOnly} />
-          <small>상태 기록 {formatTime.format(new Date(item.observedAt))} ({timeZone})</small>
+          <small>상태 기록 {formatInstant(item.observedAt, timeZone)} ({timeZone})</small>
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
             onClick={() => { setSelected({ eventType: item.reasonCode, sourceReference: item.sourceReference }); setBefore(null) }}>
@@ -179,7 +174,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
         ? <p role="status">이 항목의 변경 이력이 없습니다.</p>
         : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
           <strong>{entry.state === 'ACTIVE' ? '미해결' : '해결'}</strong>
-          <span>{formatTime.format(new Date(entry.observedAt))} ({timeZone})</span>
+          <span>{formatInstant(entry.observedAt, timeZone)} ({timeZone})</span>
           <span>원본 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
           <details className="brief-evidence"><summary>변경 근거 보기</summary>
             <span>원본 변경 번호 {entry.aggregateRevision}</span>

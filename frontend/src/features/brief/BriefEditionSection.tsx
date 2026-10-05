@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
 import { attentionReasons, editionSections } from './types'
 import { BriefEditionActions } from './BriefEditionActions'
@@ -69,8 +70,6 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
   const entries = history.isError ? [] : history.data?.pages.flatMap((page) => page.editions) ?? []
   const ready = readiness.isError ? undefined : readiness.data
   const missing = shown.error instanceof ApiError && shown.error.code === 'BRIEF_EDITION_NOT_FOUND'
-  const time = edition ? new Intl.DateTimeFormat('ko-KR', { timeZone: edition.zoneId, dateStyle: 'short', timeStyle: 'short' }) : null
-  const readinessTime = new Intl.DateTimeFormat('ko-KR', { timeZone, dateStyle: 'short', timeStyle: 'short' })
   const deliveryData = delivery.isError ? undefined : delivery.data
   const comparisonData = comparison.isError ? undefined : comparison.data
   return <section aria-label="저장된 주간 요약">
@@ -79,8 +78,8 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
       <strong>{ready ? readinessText[ready.status] : readiness.isError ? '생성 준비 상태를 확인하지 못했습니다.' : '생성 준비 상태 확인 중…'}</strong>
       {ready && <>
         <p>전달 대기 {ready.pendingCount}건 · 전달 실패 {ready.failedCount}건</p>
-        <small>{ready.lastDeliveredAt ? `마지막 전달 성공: ${readinessTime.format(new Date(ready.lastDeliveredAt))}` : '전달 성공 기록 없음'}
-          {' '}· 확인 {readinessTime.format(new Date(ready.checkedAt))} ({timeZone})</small>
+        <small>{ready.lastDeliveredAt ? `마지막 전달 성공: ${formatInstant(ready.lastDeliveredAt, timeZone)}` : '전달 성공 기록 없음'}
+          {' '}· 확인 {formatInstant(ready.checkedAt, timeZone)} ({timeZone})</small>
       </>}
       <button type="button" disabled={readiness.isFetching} onClick={() => void readiness.refetch()}>전달 상태 새로고침</button>
       <p className="brief-note">기록된 변경사항의 전달 상태입니다. 새 변경이나 연결 상황은 생성 요청 시 다시 확인합니다.</p>
@@ -124,13 +123,13 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
     {shown.isPending && <p role="status">저장된 주간 요약을 불러오고 있습니다.</p>}
     {missing && <p role="status">{selectedId ? '선택한 주간 요약을 찾을 수 없습니다.' : '아직 저장된 주간 요약이 없습니다.'}</p>}
     {shown.isError && !missing && <p role="alert">저장된 주간 요약을 불러오지 못했습니다. {shown.error.message}</p>}
-    {edition && time && <>
+    {edition && <>
       <h3>{edition.weekStart} 시작 주 · 요약 버전 {edition.generation}</h3>
-      <p>생성 {time.format(new Date(edition.generatedAt))} ({edition.zoneId})</p>
+      <p>생성 {formatInstant(edition.generatedAt, edition.zoneId)} ({edition.zoneId})</p>
       <section className="brief-delivery-status" aria-label="저장 이후 변경 확인">
         <strong>{deliveryData ? deliveryStatusText[deliveryData.status] : delivery.isError
           ? '추가 전달 기록을 불러오지 못했습니다.' : '추가 전달 기록 확인 중…'}</strong>
-        {deliveryData && <small>확인 {readinessTime.format(new Date(deliveryData.checkedAt))} ({timeZone})</small>}
+        {deliveryData && <small>확인 {formatInstant(deliveryData.checkedAt, timeZone)} ({timeZone})</small>}
         {deliveryData?.status === 'ADDITIONAL_DELIVERIES' && <p>{readOnly
           ? '종료된 시즌은 현재 점검 항목에서 이후 상태를 확인해 주세요.'
           : '현재 점검 항목을 확인하고, 생성 준비가 끝나면 이번 주 요약을 요청할 수 있습니다.'}</p>}
@@ -178,7 +177,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
               </section>
             })}
         <details key={`evidence:${edition.editionId}`} className="brief-evidence" aria-label="저장된 요약 연동 상세"><summary>연동 상세</summary>
-          <p className="brief-note">집계 구간: {time.format(new Date(edition.windowStart))} 이상 ~ {time.format(new Date(edition.windowEnd))} 미만
+          <p className="brief-note">집계 구간: {formatInstant(edition.windowStart, edition.zoneId)} 이상 ~ {formatInstant(edition.windowEnd, edition.zoneId)} 미만
             {' '}· 수신 커서 {edition.sourceCursor} · 선정 규칙 {edition.ruleVersion}</p>
           <EditionEvidence items={edition.items} />
         </details>
@@ -188,12 +187,11 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
 }
 
 function EditionItems({ items, zoneId, readOnly }: { items: BriefEdition['items']; zoneId: string; readOnly: boolean }) {
-  const time = new Intl.DateTimeFormat('ko-KR', { timeZone: zoneId, dateStyle: 'short', timeStyle: 'short' })
   return <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
       <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}</span></div>
     <BriefSourceLink item={item} readOnly={readOnly} />
-    <small>상태 기록 {time.format(new Date(item.observedAt))} ({zoneId})</small>
+    <small>상태 기록 {formatInstant(item.observedAt, zoneId)} ({zoneId})</small>
   </li>)}</ul>
 }
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { formatInstant } from '@/features/workspace/WorkspaceViews'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { compareRecordSearchResults, searchWorkspaceRecords, type RecordSearchResult } from '@/features/workspace/records/recordSearch'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { addCalendarDays } from '@/shared/lib/calendarDate'
+import { formatInstantDate } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError, ModalShell } from './WorkspaceModalPrimitives'
 import { formatLocalDate } from './workspacePresentation'
@@ -26,15 +27,6 @@ function seasonStatus(season: SeasonSummary, calendarDate: string): SeasonStatus
   if (season.startDate > calendarDate) return 'upcoming'
   if (season.endDate < calendarDate) return 'date-passed'
   return 'active'
-}
-
-function formatEndedAt(endedAt: string) {
-  const parsed = new Date(endedAt)
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(parsed)
 }
 
 export function SeasonSwitcherModal({
@@ -110,7 +102,7 @@ export function SeasonSwitcherModal({
           <strong>{currentSeason.name}</strong>
           <small>
             {currentSeason.endedAt
-              ? `${formatEndedAt(currentSeason.endedAt)}에 종료`
+              ? `${formatInstantDate(currentSeason.endedAt)}에 종료`
               : '시즌을 종료하면 기록을 수정할 수 없습니다.'}
           </small>
         </div>
@@ -487,7 +479,7 @@ export function SeasonEndedBanner({
         <Icon name="check" size={18} />
         <span>
           <strong>이 시즌은 읽기 전용입니다.</strong>
-          <small>{formatEndedAt(season.endedAt)}에 종료되어 기록을 바꿀 수 없습니다.</small>
+          <small>{formatInstantDate(season.endedAt)}에 종료되어 기록을 바꿀 수 없습니다.</small>
         </span>
       </div>
       <div>

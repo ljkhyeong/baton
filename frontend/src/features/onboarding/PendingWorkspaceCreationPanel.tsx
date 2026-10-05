@@ -1,5 +1,7 @@
 import { workspaceTemplates } from './workspaceTemplates'
 import { useEffect, useId, useRef, useState } from 'react'
+import { formatLocalDate } from '@/features/workspace/workspacePresentation'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import {
   discardPendingWorkspaceCreation,
   isSamePendingWorkspaceCreationItem,
@@ -20,16 +22,7 @@ type PendingWorkspaceCreationPanelProps = {
 function formatCreatedAt(value: number) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '저장 시각 없음'
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-function formatLocalDate(value: string) {
-  return value.replaceAll('-', '.')
+  return formatInstant(value)
 }
 
 const loadedNoticeMessage = '저장된 입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘생성 결과 다시 확인’을 누르세요.'

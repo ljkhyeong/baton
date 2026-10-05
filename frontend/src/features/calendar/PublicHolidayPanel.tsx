@@ -4,6 +4,7 @@ import type { operations } from '@/generated/api'
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isNonEmptyString } from '@/shared/api/responseValidation'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { formatLocalDate } from '@/features/workspace/workspacePresentation'
 import './calendar.scss'
 
@@ -56,7 +57,7 @@ export function PublicHolidayPanel({ date, meetingDate }: { date: string; meetin
         </ul> : <p>이 달에는 등록된 공휴일이 없습니다.</p>}
         <p>공휴일에도 회차는 예정대로 생성됩니다. 쉬는 회차는 직접 건너뛰어 주세요.</p>
         <small>자료: <a href="https://www.data.go.kr/data/15012690/openapi.do" target="_blank" rel="noreferrer">한국천문연구원</a>
-          {query.data.checkedAt && ` · 확인 ${new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(query.data.checkedAt))} (한국 시각)`}
+          {query.data.checkedAt && ` · 확인 ${formatInstant(query.data.checkedAt, 'Asia/Seoul')} (한국 시각)`}
         </small>
       </>}
     </div>}

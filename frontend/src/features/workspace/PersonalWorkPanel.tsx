@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { personalWork } from './personalWork'
 import { NotificationInbox } from '@/features/notifications/NotificationInbox'
 import { useAuthSession } from '@/features/auth/useAuthSession'
@@ -45,9 +46,6 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
       content = <p>연결한 구성원의 활동이 종료되었거나 현재 목록에 없습니다. 팀 전체 기록은 이 화면에서 확인할 수 있습니다.</p>
     } else {
       const { unfinished, awaiting } = personalWork(workspace, member.id)
-      const deadlineFormatter = new Intl.DateTimeFormat('ko-KR', {
-        timeZone: workspace.season.timeZone, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
-      })
       content = <>
         <p>{member.name}님의 남은 업무 {unfinished.length}건 · 수락할 인수인계 {awaiting.length}건</p>
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
@@ -62,7 +60,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
                 <button type="button" onClick={() => onOpenRound(round.id, execution.id)}>
                   <strong>{execution.title}</strong>
                   <span>{round.name} · {workspace.roles.find((role) => role.id === execution.ownerRoleId)?.name}</span>
-                  <small>{execution.timingStatus === 'OVERDUE' ? '기한 지남 · ' : ''}{execution.deadlineAt ? `${deadlineFormatter.format(new Date(execution.deadlineAt))} 마감` : '마감 미정'}</small>
+                  <small>{execution.timingStatus === 'OVERDUE' ? '기한 지남 · ' : ''}{execution.deadlineAt ? `${formatInstant(execution.deadlineAt, workspace.season.timeZone)} 마감` : '마감 미정'}</small>
                 </button>
               </li>)}
             </ul>}

@@ -8,7 +8,7 @@ import type {
   Season,
   WorkspaceProjection,
 } from '../types'
-import { formatInstant } from '../WorkspaceViews'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import {
   compareRecordSearchResults,
   isRecordSearchDateRangeValid,

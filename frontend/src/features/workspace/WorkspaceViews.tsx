@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import {
   formatLocalDate,
@@ -36,22 +37,6 @@ export function roundOriginLabel(round: SeasonRound) {
 export function formatDateRange(startDate?: string | null, endDate?: string | null) {
   if (!startDate && !endDate) return '담당 기간 미정'
   return `${formatLocalDate(startDate)} — ${formatLocalDate(endDate)}`
-}
-
-export function formatInstant(value: string, timeZone?: string) {
-  const date = new Date(value)
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    ...(timeZone ? { timeZone } : {}),
-  }).format(date)
-}
-
-export function formatLocalTime(value: string) {
-  return value.slice(0, 5)
 }
 
 type RoutineTimelineItem = {

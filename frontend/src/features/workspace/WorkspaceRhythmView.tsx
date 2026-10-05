@@ -1,10 +1,9 @@
+import { formatInstant, formatLocalTime } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import { PublicHolidayPanel } from '@/features/calendar/PublicHolidayPanel'
 import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
 import {
   ActionableEmpty,
-  formatInstant,
-  formatLocalTime,
   PageHeader,
   PrimaryButton,
   RoundControl,

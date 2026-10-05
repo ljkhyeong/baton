@@ -1,9 +1,9 @@
 import { ContentChangePanel } from '@/features/content-history/ContentChangePanel'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import type { WorkspaceScope } from './api'
 import { DecisionText } from './records/DecisionText'
 import {
   ActionableEmpty,
-  formatInstant,
   PageHeader,
   PrimaryButton,
 } from './WorkspaceViews'

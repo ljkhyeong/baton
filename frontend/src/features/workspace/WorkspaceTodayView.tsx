@@ -1,4 +1,5 @@
 import { useRef, type ReactNode } from 'react'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import { nearestRelayRole, RelayCard } from './WorkspaceRelayCard'
 import {
@@ -86,9 +87,6 @@ export function TodayView({
     UNSCHEDULED: 3,
     COMPLETED: 4,
   }
-  const summaryDeadline = new Intl.DateTimeFormat('ko-KR', {
-    month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: season.timeZone,
-  })
   const orderedRoutines = routineTimelineItems(routines, selectedRound).sort((left, right) => {
     return timingPriority[left.execution?.timingStatus ?? 'UNSCHEDULED']
       - timingPriority[right.execution?.timingStatus ?? 'UNSCHEDULED']
@@ -124,7 +122,7 @@ export function TodayView({
           </div>
           <div>
             <dt>다음 마감</dt>
-            <dd>{nextDeadline ? summaryDeadline.format(new Date(nextDeadline)) : '없음'}<small>남은 업무 기준</small></dd>
+            <dd>{nextDeadline ? formatInstant(nextDeadline, season.timeZone) : '없음'}<small>남은 업무 기준</small></dd>
           </div>
           <div className={signalCount ? 'needs-attention' : undefined}>
             <dt>조치 필요</dt>

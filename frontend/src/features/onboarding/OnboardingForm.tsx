@@ -1,6 +1,7 @@
 import { workspaceTemplates } from './workspaceTemplates'
 import type { CreateWorkspaceRequest } from '@/features/workspace/types'
 import { Link } from 'react-router-dom'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import ServiceStatusLink from '@/shared/ui/ServiceStatusLink'
 import PendingWorkspaceCreationPanel from './PendingWorkspaceCreationPanel'
 import { useOnboardingWorkspaceFlow } from './useOnboardingWorkspaceFlow'
@@ -9,15 +10,6 @@ import {
   MAX_MEMBER_NAME_LENGTH,
   MAX_WORKSPACE_NAME_LENGTH,
 } from './workspaceCreationConstraints'
-
-function formatLastOpenedAt(value: string) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
 
 export default function OnboardingForm() {
   const {
@@ -103,7 +95,7 @@ export default function OnboardingForm() {
                     <Link to={path}>
                       <span><strong>{workspace.teamName}</strong><small>{workspace.seasonName}</small></span>
                       <time dateTime={workspace.lastOpenedAt}>
-                        {formatLastOpenedAt(workspace.lastOpenedAt)}
+                        {formatInstant(workspace.lastOpenedAt)}
                       </time>
                     </Link>
                     <button

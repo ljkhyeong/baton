@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { NotificationPreferencesPanel } from './NotificationPreferencesPanel'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 import { getNotifications, readNotification, type NotificationScope } from './api'
@@ -31,8 +32,6 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
   const notifications = inbox.data?.notifications ?? []
   const unread = notifications.filter(item => !item.read).length
   const visible = unreadOnly ? notifications.filter(item => !item.read) : notifications
-  const date = new Intl.DateTimeFormat('ko-KR', { timeZone: workspace.season.timeZone,
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
   return <details className="notification-inbox" open={open} onToggle={event => {
     const expanded = event.currentTarget.open
     setOpen(expanded)
@@ -56,7 +55,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
               }}>
                 <span>{item.kind === 'HANDOFF_REQUEST' ? '인수인계 수락 요청' : item.kind === 'OVERDUE' ? '기한 지남' : '마감 임박'} · {item.read ? '읽음' : '안 읽음'}</span>
                 <strong>{item.title}</strong>
-                <small>{date.format(new Date(item.occurredAt))}{item.kind === 'HANDOFF_REQUEST' ? ' 전달' : ' 마감'} · 관련 항목 보기</small>
+                <small>{formatInstant(item.occurredAt, workspace.season.timeZone)}{item.kind === 'HANDOFF_REQUEST' ? ' 전달' : ' 마감'} · 관련 항목 보기</small>
               </button>
               {!item.read && <button type="button" className="text-button" disabled={read.isPending || inbox.isError}
                 aria-label={`${item.title} 알림 읽음 처리`} onClick={() => read.mutate(item.id)}>읽음 처리</button>}

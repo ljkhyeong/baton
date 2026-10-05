@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getNotificationPreferences } from '@/features/notifications/api'
 import { ApiError } from '@/shared/api/ApiError'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { getWorkspace, type WorkspaceScope } from '@/features/workspace/api'
 import { workspaceKeys } from '@/features/workspace/queries'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
@@ -95,7 +96,7 @@ export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; tea
         <Link className="my-work-row" to={task.href}>
           <span className={`work-kind work-kind-${task.kind}`}>{task.label}</span>
           <span className="my-work-copy"><strong>{task.title}</strong><span>{task.context}</span></span>
-          {task.deadline && <small className="my-work-deadline">{new Intl.DateTimeFormat('ko-KR', { timeZone: task.timeZone, dateStyle: 'short', timeStyle: 'short' }).format(new Date(task.deadline))} ({task.timeZone}) 마감</small>}
+          {task.deadline && <small className="my-work-deadline">{formatInstant(task.deadline, task.timeZone)} ({task.timeZone}) 마감</small>}
         </Link>
       </li>)}</ul>}
   </section>

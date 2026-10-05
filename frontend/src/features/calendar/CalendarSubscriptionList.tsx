@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { getCalendarSubscriptions } from './api'
 import CalendarBulkRevocation, { MAX_BULK_REVOCATIONS } from './CalendarBulkRevocation'
 import { CalendarContent } from './CalendarSubscriptionPanel'
@@ -97,7 +98,6 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
   </section>
 }
 
-const checkedTime = new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 function SubscriptionRow({ accountId, row, listedAt, selecting, selected, selectionDisabled, onSelect }: {
   accountId: string; row: CalendarSubscriptionSummary; listedAt: number; selecting: boolean
   selected: boolean; selectionDisabled: boolean; onSelect: (checked: boolean) => void
@@ -110,7 +110,7 @@ function SubscriptionRow({ accountId, row, listedAt, selecting, selected, select
     <span className="calendar-subscription-name"><strong>{row.teamName}</strong><span>{row.seasonName}</span></span>
     <span className="calendar-subscription-status">
       <span>{labels[latest?.status ?? row.managementStatus]}</span>
-      {latest && <time dateTime={new Date(latest.checkedAt).toISOString()}>{checkedTime.format(latest.checkedAt)} 확인</time>}
+      {latest && <time dateTime={new Date(latest.checkedAt).toISOString()}>{formatInstant(latest.checkedAt)} 확인</time>}
     </span>
   </>
   if (selecting) return <li><label className="calendar-selection-row">
