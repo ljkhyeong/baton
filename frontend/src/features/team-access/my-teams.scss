@@ -16,9 +16,12 @@
 .account-topbar .brand { padding: 0; color: var(--ink); text-decoration: none; }
 .account-topbar nav { display: flex; gap: 4px; }
 .account-topbar nav a { display: inline-flex; min-height: 36px; align-items: center; padding: 0 10px; border-radius: var(--radius); color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; }
-.account-topbar nav a:hover { color: var(--ink); background: var(--nav); }
+.account-topbar nav a:hover { color: var(--ink); background: var(--rule); }
+.account-topbar nav a[aria-current="page"] { color: var(--ink); background: var(--paper); }
 
 .my-teams-content { width: min(100%, 960px); margin: 0 auto; padding: 40px 32px 72px; }
+.account-content { width: min(100%, 720px); }
+.account-content .account-security-stack { margin-top: 0; }
 .my-teams-intro { margin-bottom: 32px; }
 .my-teams-intro h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -.045em; }
 .my-teams-intro p { margin: 0; color: var(--muted); font-size: 14px; }

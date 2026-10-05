@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuthSession } from '@/features/auth/useAuthSession'
+import AccountTopbar from '@/features/team-access/AccountTopbar'
 import MyTeamsPanel from '@/features/team-access/MyTeamsPanel'
 import { readStoredTeamInvitationToken } from '@/features/team-access/pendingTeamInvitation'
 import '@/features/team-access/my-teams.scss'
@@ -11,10 +12,7 @@ export default function MyTeamsPage() {
   if (session.data && !session.data.authenticated) return <Navigate to="/login?returnTo=%2Fmy-teams" replace />
   return <main className="my-teams-page">
     <title>내 팀 — BATON</title>
-    <header className="account-topbar">
-      <Link className="brand" to="/"><span className="brand-mark" aria-hidden="true" />BATON</Link>
-      <nav aria-label="계정 메뉴"><Link to="/">시작 화면</Link><Link to="/account">계정 보안</Link></nav>
-    </header>
+    <AccountTopbar />
     <div className="my-teams-content">
       <div className="my-teams-intro"><h1>내 팀</h1><p>참여한 팀을 선택하고 이어서 작업하세요.</p></div>
       {session.isPending ? <p className="my-teams-state" role="status">로그인 상태를 확인하고 있습니다.</p>

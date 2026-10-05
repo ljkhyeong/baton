@@ -332,7 +332,6 @@ a {
 .account-security-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; word-break: keep-all; }
 .account-session-card { border-color: var(--warning-border); background: var(--warning-soft); }
 .account-session-card .danger-button { align-self: flex-start; }
-.account-back-link { align-self: center; }
 
 @media (prefers-reduced-motion: no-preference) {
   .social-login { transition: transform 140ms ease, box-shadow 140ms ease; }

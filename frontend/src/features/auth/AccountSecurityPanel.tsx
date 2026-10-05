@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   changeLocalPassword,
@@ -20,7 +20,8 @@ function errorMessage(error: unknown) {
     : '계정 보안 요청을 처리하지 못했습니다.'
 }
 
-export default function AccountSecurityPanel({ accountId }: { accountId: string }) {
+// children은 비밀번호 변경 뒤, 로그아웃·비활성화 같은 위험 동작 앞에 둔다.
+export default function AccountSecurityPanel({ accountId, children }: { accountId: string; children?: ReactNode }) {
   const accountQuery = useAccountSecurity(accountId)
   const [deactivationConfirmed, setDeactivationConfirmed] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -88,7 +89,6 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
         <span className="auth-status-dot" aria-hidden="true" />
         <div>
           <h3 id="account-summary-title">{accountQuery.data.displayName}</h3>
-          <p>계정 ID {accountQuery.data.accountId}</p>
         </div>
         <ul className="account-identity-list" aria-label="연결된 로그인 방법">
           {accountQuery.data.identities.map((identity) => (
@@ -176,6 +176,8 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
         </section>
       )}
 
+      {children}
+
       <section className="account-security-card account-session-card" aria-labelledby="session-revocation-title">
         <header>
           <h3 id="session-revocation-title">모든 기기에서 로그아웃</h3>
@@ -222,8 +224,6 @@ export default function AccountSecurityPanel({ accountId }: { accountId: string 
           </button>
         </form>
       </section>
-
-      <Link className="auth-secondary-link account-back-link" to="/">시작 화면으로 돌아가기</Link>
     </div>
   )
 }
