@@ -14,9 +14,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -43,7 +42,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     public Member saveMember(Member member) {
         try {
             return memberRepository.saveAndFlush(member);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+        } catch (ConcurrencyFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_members_team_name")) {
@@ -69,7 +68,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     public Role saveRole(Role role) {
         try {
             return roleRepository.saveAndFlush(role);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+        } catch (ConcurrencyFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_season_name")) {
@@ -83,7 +82,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     public List<Role> saveRoles(List<Role> roles) {
         try {
             return roleRepository.saveAllAndFlush(roles);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+        } catch (ConcurrencyFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_season_name")) {
@@ -97,7 +96,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     public RoleHandoff saveRoleHandoff(RoleHandoff roleHandoff) {
         try {
             return roleHandoffRepository.saveAndFlush(roleHandoff);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+        } catch (ConcurrencyFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_role_handoffs_active_role")) {
@@ -117,14 +116,10 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
             UUID teamId,
         List<UUID> memberIds
     ) {
-        try {
-            return memberRepository.findAllWithSharedLockByTeamIdAndIdInOrderByIdAsc(
-                    teamId,
-                    memberIds
-            );
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> memberRepository.findAllWithSharedLockByTeamIdAndIdInOrderByIdAsc(
+                teamId,
+                memberIds
+        ));
     }
 
     @Override
@@ -138,15 +133,11 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
             UUID seasonId,
             UUID roleId
     ) {
-        try {
-            return roleRepository.findForUpdateByTeamIdAndSeasonIdAndId(
-                    teamId,
-                    seasonId,
-                    roleId
-            );
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> roleRepository.findForUpdateByTeamIdAndSeasonIdAndId(
+                teamId,
+                seasonId,
+                roleId
+        ));
     }
 
     @Override
@@ -155,15 +146,11 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
             UUID seasonId,
         List<UUID> roleIds
     ) {
-        try {
-            return roleRepository.findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
-                    teamId,
-                    seasonId,
-                    roleIds
-            );
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> roleRepository.findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
+                teamId,
+                seasonId,
+                roleIds
+        ));
     }
 
     @Override
@@ -173,23 +160,15 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
 
     @Override
     public Optional<RoleHandoff> findRoleHandoffByIdForUpdate(UUID handoffId) {
-        try {
-            return roleHandoffRepository.findForUpdateById(handoffId);
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> roleHandoffRepository.findForUpdateById(handoffId));
     }
 
     @Override
     public Optional<RoleHandoff> findOpenRoleHandoffByRoleIdWithSharedLock(UUID roleId) {
-        try {
-            return roleHandoffRepository.findOpenWithSharedLockByRoleIdAndStatusIn(
-                    roleId,
-                    OPEN_ROLE_HANDOFF_STATUSES
-            );
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> roleHandoffRepository.findOpenWithSharedLockByRoleIdAndStatusIn(
+                roleId,
+                OPEN_ROLE_HANDOFF_STATUSES
+        ));
     }
 
     @Override

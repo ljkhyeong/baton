@@ -1,6 +1,5 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
-import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
@@ -8,8 +7,6 @@ import com.personal.baton.domain.workspace.RoleResource;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -31,29 +28,17 @@ public class WorkspaceRecordsPersistenceAdapter implements WorkspaceRecordsRepos
 
     @Override
     public Decision saveDecision(Decision decision) {
-        try {
-            return decisionRepository.saveAndFlush(decision);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> decisionRepository.saveAndFlush(decision));
     }
 
     @Override
     public HandoffItem saveHandoffItem(HandoffItem handoffItem) {
-        try {
-            return handoffItemRepository.saveAndFlush(handoffItem);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> handoffItemRepository.saveAndFlush(handoffItem));
     }
 
     @Override
     public RoleResource saveRoleResource(RoleResource roleResource) {
-        try {
-            return roleResourceRepository.saveAndFlush(roleResource);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> roleResourceRepository.saveAndFlush(roleResource));
     }
 
     @Override

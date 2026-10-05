@@ -11,9 +11,8 @@ import com.personal.baton.domain.workspace.Season;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -29,7 +28,7 @@ public class WorkspaceSeasonPersistenceAdapter implements WorkspaceSeasonReposit
     public Season saveSeason(Season season) {
         try {
             return seasonRepository.saveAndFlush(season);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+        } catch (ConcurrencyFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_seasons_team_name")) {
@@ -52,20 +51,12 @@ public class WorkspaceSeasonPersistenceAdapter implements WorkspaceSeasonReposit
 
     @Override
     public Optional<Season> findSeasonByTeamIdAndIdWithSharedLock(UUID teamId, UUID seasonId) {
-        try {
-            return seasonRepository.findWithSharedLockByTeamIdAndId(teamId, seasonId);
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> seasonRepository.findWithSharedLockByTeamIdAndId(teamId, seasonId));
     }
 
     @Override
     public Optional<Season> findSeasonByTeamIdAndIdForUpdate(UUID teamId, UUID seasonId) {
-        try {
-            return seasonRepository.findForUpdateByTeamIdAndId(teamId, seasonId);
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> seasonRepository.findForUpdateByTeamIdAndId(teamId, seasonId));
     }
 
     @Override

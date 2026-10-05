@@ -12,9 +12,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -36,27 +35,19 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
 
     @Override
     public Routine saveRoutine(Routine routine) {
-        try {
-            return routineRepository.saveAndFlush(routine);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> routineRepository.saveAndFlush(routine));
     }
 
     @Override
     public List<Routine> saveRoutines(List<Routine> routines) {
-        try {
-            return routineRepository.saveAllAndFlush(routines);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> routineRepository.saveAllAndFlush(routines));
     }
 
     @Override
     public SeasonRound saveSeasonRound(SeasonRound seasonRound) {
         try {
             return seasonRoundRepository.saveAndFlush(seasonRound);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
+        } catch (ConcurrencyFailureException exception) {
             throw new WorkspaceContentConflictException(exception);
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_season_rounds_season_name")) {
@@ -68,20 +59,12 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
 
     @Override
     public List<RoutineExecution> saveRoutineExecutions(List<RoutineExecution> routineExecutions) {
-        try {
-            return routineExecutionRepository.saveAllAndFlush(routineExecutions);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> routineExecutionRepository.saveAllAndFlush(routineExecutions));
     }
 
     @Override
     public RoutineExecution saveRoutineExecution(RoutineExecution routineExecution) {
-        try {
-            return routineExecutionRepository.saveAndFlush(routineExecution);
-        } catch (OptimisticLockingFailureException | PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> routineExecutionRepository.saveAndFlush(routineExecution));
     }
 
     @Override
@@ -99,11 +82,7 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
             UUID seasonId,
             UUID seasonRoundId
     ) {
-        try {
-            return seasonRoundRepository.findForUpdateBySeasonIdAndId(seasonId, seasonRoundId);
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> seasonRoundRepository.findForUpdateBySeasonIdAndId(seasonId, seasonRoundId));
     }
 
     @Override
@@ -111,14 +90,10 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
             UUID seasonId,
             UUID seasonRoundId
     ) {
-        try {
-            return seasonRoundRepository.findWithSharedLockBySeasonIdAndId(
-                    seasonId,
-                    seasonRoundId
-            );
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> seasonRoundRepository.findWithSharedLockBySeasonIdAndId(
+                seasonId,
+                seasonRoundId
+        ));
     }
 
     @Override
@@ -167,12 +142,8 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     public List<RoutineExecution> findRoutineExecutionsBySeasonRoundIdWithSharedLock(
             UUID seasonRoundId
     ) {
-        try {
-            return routineExecutionRepository
-                    .findAllWithSharedLockBySeasonRoundIdOrderByIdAsc(seasonRoundId);
-        } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
-        }
+        return WorkspaceConflicts.translate(() -> routineExecutionRepository
+                .findAllWithSharedLockBySeasonRoundIdOrderByIdAsc(seasonRoundId));
     }
 
     @Override
