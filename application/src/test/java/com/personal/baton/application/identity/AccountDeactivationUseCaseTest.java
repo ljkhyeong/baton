@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,6 +61,7 @@ class AccountDeactivationUseCaseTest {
     @Container @ServiceConnection static final MySQLContainer MYSQL = new MySQLContainer("mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb")
             .withDatabaseName("account_deactivation_test").withUsername("baton").withPassword("password");
     @Autowired IdentityRepository identities;
+    @Autowired JdbcTemplate jdbcTemplate;
     @Autowired DeactivateAccountUseCase deactivate;
     @Autowired ValidateAccountSessionUseCase sessions;
     @Autowired LoadLocalCredentialUseCase credentials;
@@ -117,7 +119,11 @@ class AccountDeactivationUseCaseTest {
         assertThat(sessions.isAccountSessionCurrent(account.getId(), account.getSessionVersion())).isFalse();
         assertThat(sessions.isAccountSessionCurrent(account.getId(), disabled.getSessionVersion())).isFalse();
         assertThat(credentials.loadLocalCredential(email)).isEmpty();
-        assertThat(identities.findLocalCredentialByIdentityId(identity.getId())).isPresent();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM local_credentials WHERE identity_id = UUID_TO_BIN(?)",
+                Integer.class,
+                identity.getId().toString()
+        )).isOne();
         assertThatThrownBy(() -> external.resolveExternalLogin(new ResolveExternalLoginUseCase.ExternalLoginCommand(
                 IdentityProvider.GOOGLE, subject, email, true, "기존 사용자"))).isInstanceOf(AccountDeactivatedException.class);
         assertThatThrownBy(() -> passwords.resetPassword(new PasswordResetUseCase.ResetPasswordCommand(resetToken, "new-password-12345")))

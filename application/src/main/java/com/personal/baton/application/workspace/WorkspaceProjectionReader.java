@@ -57,7 +57,7 @@ final class WorkspaceProjectionReader {
         return new WorkspaceResult(
                 new TeamResult(scope.team().getId(), scope.team().getName(), scope.team().isAccountAccessEnabled(), scope.permission()),
                 resultMapper.toSeasonResult(scope.season()),
-                seasons.stream().map(resultMapper::toSeasonSummaryResult).toList(),
+                seasons.stream().map(resultMapper::toSeasonResult).toList(),
                 snapshot.members().stream().map(resultMapper::toMemberResult).toList(),
                 snapshot.roles().stream().map(resultMapper::toRoleResult).toList(),
                 snapshot.routines().stream().map(resultMapper::toRoutineResult).toList(),

@@ -185,14 +185,6 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     }
 
     @Override
-    public Optional<LocalCredential> findLocalCredentialByIdentityId(UUID identityId) {
-        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
-                "로컬 자격 증명을 일시적으로 조회할 수 없습니다",
-                () -> credentialRepository.findById(identityId)
-        );
-    }
-
-    @Override
     public Optional<LocalCredential> findLocalCredentialByIdentityIdForUpdate(UUID identityId) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "로컬 자격 증명을 일시적으로 잠글 수 없습니다",

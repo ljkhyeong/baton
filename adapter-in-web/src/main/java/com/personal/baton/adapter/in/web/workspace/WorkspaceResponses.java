@@ -121,18 +121,6 @@ public final class WorkspaceResponses {
             );
         }
 
-        static SeasonResponse from(WorkspaceContract.SeasonSummaryResult result) {
-            return new SeasonResponse(
-                    result.id(),
-                    result.name(),
-                    result.startDate(),
-                    result.endDate(),
-                    result.endedAt(),
-                    result.previousSeasonId(),
-                    result.timeZone(),
-                    RoundScheduleResponse.from(result.roundSchedule())
-            );
-        }
     }
 
     public record RoundScheduleResponse(

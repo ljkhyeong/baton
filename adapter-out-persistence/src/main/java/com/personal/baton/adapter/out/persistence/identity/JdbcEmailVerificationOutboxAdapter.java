@@ -110,7 +110,6 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
             throw new IllegalArgumentException("이메일 인증 lease 기간은 양수여야 합니다");
         }
 
-        expireUndeliverable(claimedAt);
         List<ClaimCandidate> candidates = jdbcTemplate.query(
                 """
                 SELECT

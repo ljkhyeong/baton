@@ -30,7 +30,7 @@ public final class WorkspaceContract {
     public record WorkspaceResult(
             TeamResult team,
             SeasonResult season,
-            List<SeasonSummaryResult> seasons,
+            List<SeasonResult> seasons,
             List<MemberResult> members,
             List<RoleResult> roles,
             List<RoutineResult> routines,
@@ -48,18 +48,6 @@ public final class WorkspaceContract {
     }
 
     public record SeasonResult(
-            UUID id,
-            String name,
-            LocalDate startDate,
-            LocalDate endDate,
-            Instant endedAt,
-            UUID previousSeasonId,
-            String timeZone,
-            RoundScheduleResult roundSchedule
-    ) {
-    }
-
-    public record SeasonSummaryResult(
             UUID id,
             String name,
             LocalDate startDate,

@@ -41,8 +41,6 @@ public interface IdentityRepository {
 
     List<AccountIdentity> findIdentitiesByAccountId(UUID accountId);
 
-    Optional<LocalCredential> findLocalCredentialByIdentityId(UUID identityId);
-
     Optional<LocalCredential> findLocalCredentialByIdentityIdForUpdate(UUID identityId);
 
     Optional<EmailVerificationChallenge> findEmailVerificationChallengeByIdentityIdForUpdate(

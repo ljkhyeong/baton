@@ -13,7 +13,6 @@ import com.personal.baton.application.workspace.port.in.WorkspaceContract.Routin
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
-import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonSummaryResult;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.HandoffItem;
 import com.personal.baton.domain.workspace.Member;
@@ -49,19 +48,6 @@ final class WorkspaceResultMapper {
 
     SeasonResult toSeasonResult(Season season) {
         return new SeasonResult(
-                season.getId(),
-                season.getName(),
-                season.getStartDate(),
-                season.getEndDate(),
-                season.getEndedAt(),
-                season.getPreviousSeasonId(),
-                season.getTimeZone(),
-                toRoundScheduleResult(season)
-        );
-    }
-
-    SeasonSummaryResult toSeasonSummaryResult(Season season) {
-        return new SeasonSummaryResult(
                 season.getId(),
                 season.getName(),
                 season.getStartDate(),

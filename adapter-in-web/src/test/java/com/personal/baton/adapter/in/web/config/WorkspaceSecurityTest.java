@@ -238,7 +238,7 @@ class WorkspaceSecurityTest {
         return new WorkspaceContract.WorkspaceResult(
                 new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
                 seasonResult(),
-                List.of(new WorkspaceContract.SeasonSummaryResult(
+                List.of(new WorkspaceContract.SeasonResult(
                         SEASON_ID,
                         "2026 여름 시즌",
                         LocalDate.of(2026, 7, 2),
