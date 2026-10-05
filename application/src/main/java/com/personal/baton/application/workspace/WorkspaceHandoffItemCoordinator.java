@@ -109,8 +109,7 @@ final class WorkspaceHandoffItemCoordinator {
     ) {
         HandoffItem item = requireActiveHandoffItem(teamId, seasonId, itemId);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
-        boolean changed = item.isCompleted() != completed;
-        item.updateCompletion(completed);
+        boolean changed = item.updateCompletion(completed);
         HandoffItem saved = recordsRepository.saveHandoffItem(item);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
@@ -126,8 +125,7 @@ final class WorkspaceHandoffItemCoordinator {
     ) {
         HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, item.getRoleId());
-        boolean changed = (item.getArchivedAt() != null) != archived;
-        item.updateArchive(archived, Instant.now(clock));
+        boolean changed = item.updateArchive(archived, Instant.now(clock));
         HandoffItem saved = recordsRepository.saveHandoffItem(item);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
@@ -149,7 +147,7 @@ final class WorkspaceHandoffItemCoordinator {
 
     private HandoffItem requireActiveHandoffItem(UUID teamId, UUID seasonId, UUID itemId) {
         HandoffItem item = requireHandoffItem(teamId, seasonId, itemId);
-        if (item.getArchivedAt() != null) {
+        if (item.isArchived()) {
             throw handoffItemNotFound();
         }
         return item;

@@ -47,7 +47,7 @@ final class WorkspaceSeasonRoundResolver {
     }
 
     private void requireActive(SeasonRound round) {
-        if (round.getArchivedAt() != null) {
+        if (round.isArchived()) {
             throw roundNotFound();
         }
     }

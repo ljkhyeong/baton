@@ -13,8 +13,8 @@ import java.util.Optional;
 @Embeddable
 public class RoundSchedule {
 
-    public static final int MIN_GENERATION_LEAD_DAYS = 0;
-    public static final int MAX_GENERATION_LEAD_DAYS = 30;
+    private static final int MIN_GENERATION_LEAD_DAYS = 0;
+    private static final int MAX_GENERATION_LEAD_DAYS = 30;
 
     @Column(name = "round_schedule_first_meeting_date")
     private LocalDate firstMeetingDate;

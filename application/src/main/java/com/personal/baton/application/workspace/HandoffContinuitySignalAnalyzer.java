@@ -38,7 +38,7 @@ final class HandoffContinuitySignalAnalyzer {
         Map<UUID, Role> rolesById = roles.stream()
                 .collect(toMap(Role::getId, identity(), (previous, current) -> current));
         Map<UUID, List<HandoffItem>> activeItemsByRole = handoffItems.stream()
-                .filter(item -> item.getArchivedAt() == null).collect(groupingBy(HandoffItem::getRoleId));
+                .filter(item -> !item.isArchived()).collect(groupingBy(HandoffItem::getRoleId));
         Map<UUID, Member> membersById = members.stream()
                 .collect(toMap(Member::getId, identity(), (previous, current) -> current));
         Set<UUID> activeMemberIds = members.stream()

@@ -26,7 +26,6 @@ public class ScheduledRoundGenerationWorker {
     private final WorkspaceAccessRepository accessRepository;
     private final WorkspaceSeasonRepository seasonRepository;
     private final WorkspaceOperationsRepository operationsRepository;
-    private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
     private final CalendarChangeRecorder calendarChangeRecorder;
 
@@ -34,14 +33,12 @@ public class ScheduledRoundGenerationWorker {
             WorkspaceAccessRepository accessRepository,
             WorkspaceSeasonRepository seasonRepository,
             WorkspaceOperationsRepository operationsRepository,
-            RoutineExecutionSnapshotFactory snapshotFactory,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder,
             CalendarChangeRecorder calendarChangeRecorder
     ) {
         this.accessRepository = accessRepository;
         this.seasonRepository = seasonRepository;
         this.operationsRepository = operationsRepository;
-        this.snapshotFactory = snapshotFactory;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
         this.calendarChangeRecorder = calendarChangeRecorder;
     }
@@ -126,7 +123,7 @@ public class ScheduledRoundGenerationWorker {
                 occurrenceDate,
                 scheduledAt
         );
-        List<RoutineExecution> executions = snapshotFactory.snapshotAll(
+        List<RoutineExecution> executions = RoutineExecution.snapshotAll(
                 round.getId(),
                 routines,
                 occurrenceDate,

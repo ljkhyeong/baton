@@ -21,14 +21,7 @@ final class DomainAssertions {
     }
 
     static String optionalText(String value, String field, int maxLength) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String normalized = value.strip();
-        if (normalized.length() > maxLength) {
-            throw new DomainValidationException(field + "은(는) " + maxLength + "자를 초과할 수 없습니다");
-        }
-        return normalized;
+        return value == null || value.isBlank() ? null : requiredText(value, field, maxLength);
     }
 
     static String requiredSha256Hex(String value, String field) {

@@ -363,7 +363,6 @@ class RoundAutomationApplicationTest {
                 accessRepository,
                 seasonRepository,
                 operationsRepository,
-                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 calendarRecorder
         );
@@ -411,7 +410,6 @@ class RoundAutomationApplicationTest {
                 accessRepository,
                 seasonRepository,
                 operationsRepository,
-                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 mock(CalendarChangeRecorder.class)
         );
@@ -456,7 +454,6 @@ class RoundAutomationApplicationTest {
                 accessRepository,
                 seasonRepository,
                 operationsRepository,
-                new RoutineExecutionSnapshotFactory(),
                 briefRecorder,
                 mock(CalendarChangeRecorder.class)
         ).generateNextOccurrence(

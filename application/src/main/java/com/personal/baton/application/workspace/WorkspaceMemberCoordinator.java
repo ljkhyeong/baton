@@ -84,8 +84,7 @@ final class WorkspaceMemberCoordinator {
             boolean deactivated
     ) {
         Member member = memberResolver.requireMember(teamId, memberId);
-        boolean changed = member.isActive() == deactivated;
-        member.updateDeactivation(deactivated, Instant.now(clock));
+        boolean changed = member.updateDeactivation(deactivated, Instant.now(clock));
         Member saved = repository.saveMember(member);
         if (deactivated) {
             calendarSubscriptions.requestMemberRevocation(teamId, memberId);

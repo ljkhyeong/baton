@@ -3,15 +3,7 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.ContinuitySignalResult;
-import com.personal.baton.domain.workspace.HandoffItem;
-import com.personal.baton.domain.workspace.Member;
-import com.personal.baton.domain.workspace.Role;
-import com.personal.baton.domain.workspace.RoleHandoff;
-import com.personal.baton.domain.workspace.RoleResource;
-import com.personal.baton.domain.workspace.Routine;
-import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
-import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -31,18 +23,7 @@ final class ContinuitySignalAnalyzer {
     private final RoutineContinuitySignalAnalyzer routineAnalyzer =
             new RoutineContinuitySignalAnalyzer();
 
-    List<ContinuitySignalResult> analyze(
-            Clock clock,
-            Season season,
-            List<Member> members,
-            List<Role> roles,
-            List<Routine> routines,
-            List<SeasonRound> rounds,
-            List<RoutineExecution> executions,
-            List<HandoffItem> handoffItems,
-            List<RoleResource> resources,
-            List<RoleHandoff> roleHandoffs
-    ) {
+    List<ContinuitySignalResult> analyze(Clock clock, Season season, WorkspaceContinuitySnapshot snapshot) {
         if (season.isEnded()) {
             return List.of();
         }
@@ -52,27 +33,27 @@ final class ContinuitySignalAnalyzer {
         ZoneId zoneId = season.getZoneId();
         LocalDate today = now.atZone(zoneId).toLocalDate();
         HandoffContinuitySignalAnalyzer.Analysis handoffAnalysis = handoffAnalyzer.analyze(
-                roles,
-                handoffItems,
-                roleHandoffs,
-                members,
+                snapshot.roles(),
+                snapshot.handoffItems(),
+                snapshot.roleHandoffs(),
+                snapshot.members(),
                 today
         );
 
         List<ContinuitySignalResult> signals = new ArrayList<>(handoffAnalysis.signals());
         signals.addAll(roleAnalyzer.analyze(
                 season.getStartDate(),
-                members,
-                roles,
-                handoffItems,
-                resources,
+                snapshot.members(),
+                snapshot.roles(),
+                snapshot.handoffItems(),
+                snapshot.resources(),
                 handoffAnalysis.signaledRoleIds(),
                 today
         ));
         signals.addAll(routineAnalyzer.analyze(
-                routines,
-                rounds,
-                executions,
+                snapshot.routines(),
+                snapshot.rounds(),
+                snapshot.executions(),
                 snapshotClock,
                 zoneId
         ));

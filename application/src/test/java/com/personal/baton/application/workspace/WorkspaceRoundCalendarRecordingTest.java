@@ -169,7 +169,6 @@ class WorkspaceRoundCalendarRecordingTest {
                 new WorkspaceContentIdempotency(mock(WorkspaceAccessRepository.class)),
                 new WorkspaceResultMapper(CLOCK),
                 resolver,
-                new RoutineExecutionSnapshotFactory(),
                 recorder,
                 briefRecorder
         );

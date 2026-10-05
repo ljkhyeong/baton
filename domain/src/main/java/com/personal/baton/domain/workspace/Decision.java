@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "decisions")
-public class Decision {
+public class Decision extends ArchivableRecord {
 
     @Id
     @Column(nullable = false, columnDefinition = "binary(16)")
@@ -51,9 +51,6 @@ public class Decision {
 
     @Column(name = "author_member_id", nullable = false, columnDefinition = "binary(16)")
     private UUID authorMemberId;
-
-    @Column(name = "archived_at")
-    private Instant archivedAt;
 
     @Version
     @Column(nullable = false)
@@ -128,7 +125,7 @@ public class Decision {
             UUID authorMemberId,
             List<UUID> roleIds
     ) {
-        requireActive();
+        requireActive("보관된 결정은 수정할 수 없습니다");
         String normalizedTitle = DomainAssertions.requiredText(title, "결정 제목", 200);
         String normalizedReason = DomainAssertions.requiredText(reason, "결정 이유", 2000);
         String normalizedAlternative = Objects.requireNonNullElse(
@@ -149,16 +146,6 @@ public class Decision {
         this.roleIds = normalizedRoleIds;
     }
 
-    public void updateArchive(boolean archived, Instant archivedAt) {
-        if (archived) {
-            if (this.archivedAt == null) {
-                this.archivedAt = Objects.requireNonNull(archivedAt, "결정 보관 시각은 필수입니다");
-            }
-            return;
-        }
-        this.archivedAt = null;
-    }
-
     private static List<UUID> normalizeRoleIds(List<UUID> roleIds) {
         if (roleIds == null || roleIds.isEmpty()) {
             throw new DomainValidationException("관련 역할은 한 개 이상이어야 합니다");
@@ -176,12 +163,6 @@ public class Decision {
             normalized.add(normalizedRoleId);
         }
         return normalized;
-    }
-
-    private void requireActive() {
-        if (archivedAt != null) {
-            throw new DomainValidationException("보관된 결정은 수정할 수 없습니다");
-        }
     }
 
     public UUID getId() {
@@ -214,10 +195,6 @@ public class Decision {
 
     public UUID getAuthorMemberId() {
         return authorMemberId;
-    }
-
-    public Instant getArchivedAt() {
-        return archivedAt;
     }
 
     public List<UUID> getRoleIds() {

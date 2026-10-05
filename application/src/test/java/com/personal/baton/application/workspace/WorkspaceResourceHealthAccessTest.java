@@ -9,12 +9,10 @@ import com.personal.baton.application.watch.WatchMonitorSource;
 import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.port.out.WatchMonitorSnapshotPort;
 import com.personal.baton.application.workspace.port.in.InspectResourceHealthUseCase.MonitoringReason;
-import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.TeamPermission;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -29,13 +27,12 @@ class WorkspaceResourceHealthAccessTest {
     void appliesTeamPermission(TeamPermission permission) {
         UUID team = UUID.randomUUID(), season = UUID.randomUUID(), resourceId = UUID.randomUUID();
         var authorizer = mock(WorkspaceScopeAuthorizer.class);
-        var records = mock(WorkspaceRecordsRepository.class);
-        var resource = mock(RoleResource.class);
+        var resolver = mock(WorkspaceRoleResolver.class);
         when(authorizer.authorizeRead(team, season, null))
                 .thenReturn(new WorkspaceScope(null, mock(Season.class), permission));
-        when(records.findRoleResourceById(resourceId)).thenReturn(Optional.of(resource));
-        var access = new WorkspaceResourceHealthAccess(authorizer, mock(WorkspaceRoleResolver.class),
-                records, mock(WatchMonitorSnapshotPort.class), new WatchMonitorSource("test", false, false));
+        when(resolver.requireRoleResource(team, season, resourceId)).thenReturn(mock(RoleResource.class));
+        var access = new WorkspaceResourceHealthAccess(authorizer, resolver,
+                mock(WatchMonitorSnapshotPort.class), new WatchMonitorSource("test", false, false));
         assertThat(access.authorize(team, season, resourceId, null).reason())
                 .isEqualTo(MonitoringReason.INTEGRATION_DISABLED);
         if (permission == TeamPermission.VIEWER) {
@@ -62,19 +59,17 @@ class WorkspaceResourceHealthAccessTest {
     })
     @DisplayName("현재 자료의 제외 사유와 등록 대기를 구분하고 일치하는 활성 스냅샷만 조회 대상으로 반환한다")
     void classifiesMonitoring(String scenario, MonitoringReason expected) {
-        UUID teamId = UUID.randomUUID(), seasonId = UUID.randomUUID(), resourceId = UUID.randomUUID(), roleId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID(), seasonId = UUID.randomUUID(), resourceId = UUID.randomUUID();
         var authorizer = mock(WorkspaceScopeAuthorizer.class);
         var resolver = mock(WorkspaceRoleResolver.class);
-        var records = mock(WorkspaceRecordsRepository.class);
         var snapshots = mock(WatchMonitorSnapshotPort.class);
         var season = mock(Season.class);
         var resource = mock(RoleResource.class);
         var source = new WatchMonitorSource("test", !scenario.equals("integration"), !scenario.equals("paused"));
         when(authorizer.authorizeRead(teamId, seasonId, "key")).thenReturn(new WorkspaceScope(null, season));
-        when(records.findRoleResourceById(resourceId)).thenReturn(Optional.of(resource));
-        when(resource.getRoleId()).thenReturn(roleId);
+        when(resolver.requireRoleResource(teamId, seasonId, resourceId)).thenReturn(resource);
         when(resource.getUrl()).thenReturn(scenario.equals("url") ? "https://docs.example.com/guide?token=value" : "https://docs.example.com/guide");
-        when(resource.getArchivedAt()).thenReturn(scenario.equals("archived") ? Instant.parse("2026-09-05T00:00:00Z") : null);
+        when(resource.isArchived()).thenReturn(scenario.equals("archived"));
         when(season.isEnded()).thenReturn(scenario.equals("ended"));
         var snapshot = new WatchMonitorSnapshot(7,
                 scenario.equals("namespace") ? "other" : source.resourceReference(resourceId),
@@ -82,13 +77,13 @@ class WorkspaceResourceHealthAccessTest {
                 scenario.equals("inactive") ? null : scenario.equals("changed")
                         ? "https://docs.example.com/previous" : "https://docs.example.com/guide");
         when(snapshots.findLatestMonitor(resourceId)).thenReturn(scenario.equals("missing") ? Optional.empty() : Optional.of(snapshot));
-        var access = new WorkspaceResourceHealthAccess(authorizer, resolver, records, snapshots, source);
+        var access = new WorkspaceResourceHealthAccess(authorizer, resolver, snapshots, source);
 
         var result = access.authorize(teamId, seasonId, resourceId, "key");
 
         assertThat(result.reason()).isEqualTo(expected);
         assertThat(result.snapshot()).isEqualTo(expected == null ? snapshot : null);
         verify(authorizer).authorizeRead(teamId, seasonId, "key");
-        verify(resolver).requireRole(eq(teamId), eq(seasonId), eq(roleId), any());
+        verify(resolver).requireRoleResource(teamId, seasonId, resourceId);
     }
 }

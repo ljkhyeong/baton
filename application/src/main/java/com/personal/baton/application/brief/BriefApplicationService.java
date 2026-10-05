@@ -105,7 +105,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
                         var found = routine.get();
                         var role = roles.computeIfAbsent(found.getOwnerRoleId(), peopleRepository::findRoleById)
                                 .filter(candidate -> scope.teamId().equals(candidate.getTeamId()) && scope.seasonId().equals(candidate.getSeasonId()));
-                        if (role.isPresent()) target = new BriefSourceContext.Target(found.getTitle(), found.getOwnerRoleId(), found.getId(), found.getArchivedAt() != null);
+                        if (role.isPresent()) target = new BriefSourceContext.Target(found.getTitle(), found.getOwnerRoleId(), found.getId(), found.isArchived());
                     }
                 } else {
                     var role = roles.computeIfAbsent(signal.subjectId(), peopleRepository::findRoleById)

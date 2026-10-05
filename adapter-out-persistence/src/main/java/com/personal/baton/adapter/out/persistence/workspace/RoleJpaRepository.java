@@ -10,7 +10,6 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
 
@@ -29,19 +28,6 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
             """)
     boolean existsAssignmentOutsideRange(UUID teamId, UUID seasonId, LocalDate startDate, LocalDate endDate);
 
-    @Query("""
-            select role.id
-            from Role role
-            where role.teamId = :teamId
-              and role.seasonId = :seasonId
-              and role.id in :roleIds
-            """)
-    List<UUID> findExistingIds(
-            @Param("teamId") UUID teamId,
-            @Param("seasonId") UUID seasonId,
-            @Param("roleIds") List<UUID> roleIds
-    );
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Role> findForUpdateByTeamIdAndSeasonIdAndId(
             UUID teamId,
@@ -49,20 +35,10 @@ public interface RoleJpaRepository extends JpaRepository<Role, UUID> {
             UUID roleId
     );
 
-    @Query("""
-            select role.name
-            from Role role
-            where role.teamId = :teamId
-              and role.seasonId = :seasonId
-              and role.id in :roleIds
-            """)
-    List<String> findNamesByTeamIdAndSeasonIdAndIdIn(UUID teamId, UUID seasonId, List<UUID> roleIds);
-
     @Lock(LockModeType.PESSIMISTIC_READ)
     List<Role> findAllWithSharedLockByTeamIdAndSeasonIdAndIdInOrderByIdAsc(
             UUID teamId,
             UUID seasonId,
             List<UUID> roleIds
     );
-
 }

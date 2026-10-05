@@ -23,20 +23,17 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
     private final WorkspaceMemberCoordinator memberCoordinator;
     private final WorkspaceRoleCoordinator roleCoordinator;
     private final WorkspaceRoleHandoffCoordinator roleHandoffCoordinator;
-    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     public WorkspacePeopleService(
             WorkspaceScopeAuthorizer scopeAuthorizer,
             WorkspaceMemberCoordinator memberCoordinator,
             WorkspaceRoleCoordinator roleCoordinator,
-            WorkspaceRoleHandoffCoordinator roleHandoffCoordinator,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder
+            WorkspaceRoleHandoffCoordinator roleHandoffCoordinator
     ) {
         this.scopeAuthorizer = scopeAuthorizer;
         this.memberCoordinator = memberCoordinator;
         this.roleCoordinator = roleCoordinator;
         this.roleHandoffCoordinator = roleHandoffCoordinator;
-        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     @Override
@@ -104,9 +101,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             UpdateRoleCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        RoleResult result = roleCoordinator.update(teamId, scope.season(), roleId, command);
-        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
-        return result;
+        return roleCoordinator.update(teamId, scope.season(), roleId, command);
     }
 
     @Override

@@ -24,6 +24,7 @@ final class WorkspaceSeasonSettingsCoordinator {
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceRoundSchedulePolicy roundSchedulePolicy;
     private final CalendarChangeRecorder calendarChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceSeasonSettingsCoordinator(
             WorkspaceSeasonRepository seasonRepository,
@@ -31,7 +32,8 @@ final class WorkspaceSeasonSettingsCoordinator {
             WorkspacePeopleRepository peopleRepository,
             WorkspaceResultMapper resultMapper,
             WorkspaceRoundSchedulePolicy roundSchedulePolicy,
-            CalendarChangeRecorder calendarChangeRecorder
+            CalendarChangeRecorder calendarChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.seasonRepository = seasonRepository;
         this.operationsRepository = operationsRepository;
@@ -39,6 +41,7 @@ final class WorkspaceSeasonSettingsCoordinator {
         this.resultMapper = resultMapper;
         this.roundSchedulePolicy = roundSchedulePolicy;
         this.calendarChangeRecorder = calendarChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     SeasonResult updateSeason(
@@ -46,8 +49,9 @@ final class WorkspaceSeasonSettingsCoordinator {
             Season season,
             UpdateSeasonCommand command
     ) {
-        if (!Objects.equals(season.getStartDate(), command.startDate())
-                || !Objects.equals(season.getEndDate(), command.endDate())) {
+        boolean periodChanged = !Objects.equals(season.getStartDate(), command.startDate())
+                || !Objects.equals(season.getEndDate(), command.endDate());
+        if (periodChanged) {
             validateSeasonRangeAgainstExistingContent(
                     teamId,
                     season.getId(),
@@ -58,6 +62,9 @@ final class WorkspaceSeasonSettingsCoordinator {
         season.update(command.name(), command.startDate(), command.endDate());
         Season savedSeason = seasonRepository.saveSeason(season);
         calendarChangeRecorder.recordSeason(savedSeason);
+        if (periodChanged) {
+            briefContinuitySignalRecorder.reconcileSeason(teamId, savedSeason.getId());
+        }
         return resultMapper.toSeasonResult(savedSeason);
     }
 
@@ -67,8 +74,8 @@ final class WorkspaceSeasonSettingsCoordinator {
     ) {
         UUID seasonId = season.getId();
         String normalizedTimeZone = Season.normalizeTimeZone(command.timeZone());
-        if (!Objects.equals(season.getTimeZone(), normalizedTimeZone)
-                && operationsRepository.existsSeasonRoundBySeasonId(seasonId)) {
+        boolean timeZoneChanged = !Objects.equals(season.getTimeZone(), normalizedTimeZone);
+        if (timeZoneChanged && operationsRepository.existsSeasonRoundBySeasonId(seasonId)) {
             throw new DomainValidationException("회차가 생성된 뒤에는 시즌 시간대를 변경할 수 없습니다");
         }
         RoundSchedule currentSchedule = season.getRoundSchedule();
@@ -84,7 +91,11 @@ final class WorkspaceSeasonSettingsCoordinator {
                 command.enabled()
         );
         season.updateTimeZone(normalizedTimeZone);
-        return resultMapper.toSeasonResult(seasonRepository.saveSeason(season));
+        Season savedSeason = seasonRepository.saveSeason(season);
+        if (timeZoneChanged) {
+            briefContinuitySignalRecorder.reconcileSeason(savedSeason.getTeamId(), seasonId);
+        }
+        return resultMapper.toSeasonResult(savedSeason);
     }
 
     private void validateSeasonRangeAgainstExistingContent(

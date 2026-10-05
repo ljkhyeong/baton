@@ -58,17 +58,15 @@ public class Member {
         this.name = normalizeName(name);
     }
 
-    public void updateDeactivation(boolean deactivated, Instant deactivatedAt) {
-        if (deactivated) {
-            if (this.deactivatedAt == null) {
-                this.deactivatedAt = Objects.requireNonNull(
-                        deactivatedAt,
-                        "구성원 비활성 시각은 필수입니다"
-                );
-            }
-            return;
+    // 활성 상태가 바뀌었으면 true를 돌려준다. 이미 비활성인 구성원은 처음 비활성 시각을 유지한다.
+    public boolean updateDeactivation(boolean deactivated, Instant deactivatedAt) {
+        if (deactivated != isActive()) {
+            return false;
         }
-        this.deactivatedAt = null;
+        this.deactivatedAt = deactivated
+                ? Objects.requireNonNull(deactivatedAt, "구성원 비활성 시각은 필수입니다")
+                : null;
+        return true;
     }
 
     public boolean isActive() {

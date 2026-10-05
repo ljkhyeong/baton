@@ -12,6 +12,7 @@ import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.ContentRecordKind;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.Member;
+import com.personal.baton.domain.workspace.Role;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -161,31 +162,24 @@ final class WorkspaceDecisionCoordinator {
     private Decision requireDecision(UUID seasonId, UUID decisionId) {
         return recordsRepository.findDecisionById(decisionId)
                 .filter(decision -> decision.getSeasonId().equals(seasonId))
-                .orElseThrow(() -> new WorkspaceNotFoundException(
-                        "DECISION_NOT_FOUND",
-                        "결정 기록을 찾을 수 없습니다"
-                ));
+                .orElseThrow(WorkspaceNotFoundException::decision);
     }
 
     private Decision requireActiveDecision(UUID seasonId, UUID decisionId) {
         Decision decision = requireDecision(seasonId, decisionId);
-        if (decision.getArchivedAt() != null) {
-            throw new WorkspaceNotFoundException(
-                    "DECISION_NOT_FOUND",
-                    "결정 기록을 찾을 수 없습니다"
-            );
+        if (decision.isArchived()) {
+            throw WorkspaceNotFoundException.decision();
         }
         return decision;
     }
 
     private String roleNames(UUID teamId, UUID seasonId, List<UUID> roleIds) {
-        return peopleRepository.findRoleNames(teamId, seasonId, roleIds).stream()
-                .sorted().collect(Collectors.joining(", "));
+        return peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, roleIds).stream()
+                .map(Role::getName).sorted().collect(Collectors.joining(", "));
     }
 
     private void validateRoleOwnership(UUID teamId, UUID seasonId, List<UUID> roleIds) {
-        List<UUID> found = peopleRepository.findExistingRoleIds(teamId, seasonId, roleIds);
-        if (found.size() != roleIds.size()) {
+        if (peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, roleIds).size() != roleIds.size()) {
             throw new WorkspaceNotFoundException(
                     "ROLE_NOT_FOUND",
                     "관련 역할을 찾을 수 없습니다"

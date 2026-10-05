@@ -27,7 +27,6 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
     private final WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator;
     private final WorkspaceSeasonEndingCoordinator seasonEndingCoordinator;
     private final WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator;
-    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     public WorkspaceLifecycleService(
             WorkspaceProjectionReader projectionReader,
@@ -37,8 +36,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             WorkspaceAccessKeyCoordinator accessKeyCoordinator,
             WorkspaceSeasonSettingsCoordinator seasonSettingsCoordinator,
             WorkspaceSeasonEndingCoordinator seasonEndingCoordinator,
-            WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder
+            WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator
     ) {
         this.projectionReader = projectionReader;
         this.accessControl = accessControl;
@@ -48,7 +46,6 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
         this.seasonSettingsCoordinator = seasonSettingsCoordinator;
         this.seasonEndingCoordinator = seasonEndingCoordinator;
         this.seasonSuccessorCoordinator = seasonSuccessorCoordinator;
-        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     @Override
@@ -102,11 +99,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             UpdateSeasonCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
-        Season season = scope.season();
-        boolean periodChanged = !season.getStartDate().equals(command.startDate())
-                || !season.getEndDate().equals(command.endDate());
-        SeasonResult result = seasonSettingsCoordinator.updateSeason(teamId, season, command);
-        return periodChanged ? reconcileContinuitySignals(teamId, seasonId, result) : result;
+        return seasonSettingsCoordinator.updateSeason(teamId, scope.season(), command);
     }
 
     @Override
@@ -131,11 +124,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             UpdateRoundScheduleCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
-        String previousTimeZone = scope.season().getTimeZone();
-        SeasonResult result = seasonSettingsCoordinator.updateRoundSchedule(scope.season(), command);
-        return previousTimeZone.equals(result.timeZone())
-                ? result
-                : reconcileContinuitySignals(teamId, seasonId, result);
+        return seasonSettingsCoordinator.updateRoundSchedule(scope.season(), command);
     }
 
     @Override
@@ -147,9 +136,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             boolean ended
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonLifecycle(teamId, seasonId, accessKey);
-        boolean changed = scope.season().isEnded() != ended;
-        SeasonResult result = seasonEndingCoordinator.update(teamId, scope.season(), ended);
-        return changed ? reconcileContinuitySignals(teamId, seasonId, result) : result;
+        return seasonEndingCoordinator.update(teamId, scope.season(), ended);
     }
 
     @Override
@@ -173,10 +160,5 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
                 idempotencyKey,
                 command
         );
-    }
-
-    private <T> T reconcileContinuitySignals(UUID teamId, UUID seasonId, T result) {
-        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
-        return result;
     }
 }

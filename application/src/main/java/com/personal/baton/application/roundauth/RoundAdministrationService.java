@@ -220,7 +220,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
                 .orElseThrow(() -> new RoundRoomConflictException(
                         "ROUND 방에 연결할 자료를 찾을 수 없습니다"
                 ));
-        if (resource.getArchivedAt() != null) {
+        if (resource.isArchived()) {
             throw new RoundRoomConflictException("보관한 역할 자료에는 ROUND 방을 연결할 수 없습니다");
         }
         peopleRepository.findRoleById(resource.getRoleId())

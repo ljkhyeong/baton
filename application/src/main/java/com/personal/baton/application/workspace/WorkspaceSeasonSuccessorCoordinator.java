@@ -133,8 +133,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
             }
         }
 
-        boolean sourceSeasonEndingChanged = !sourceSeason.isEnded();
-        sourceSeason.updateEnding(true, Instant.now(clock));
+        boolean sourceSeasonEndingChanged = sourceSeason.updateEnding(true, Instant.now(clock));
         Season savedSourceSeason = seasonRepository.saveSeason(sourceSeason);
         if (sourceSeasonEndingChanged) {
             watchMonitorChangeRecorder.recordSeasonState(
@@ -228,7 +227,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
                 .stream()
                 .filter(role -> role.getPreviousRoleId() != null)
                 .map(role -> new CopiedRoleResult(role.getPreviousRoleId(), role.getId()))
-                .sorted((left, right) -> left.sourceRoleId().compareTo(right.sourceRoleId()))
+                .sorted(Comparator.comparing(CopiedRoleResult::sourceRoleId))
                 .toList();
         List<CopiedRoutineResult> copiedRoutines = operationsRepository
                 .findRoutinesBySeasonId(targetSeason.getId())
@@ -238,8 +237,7 @@ final class WorkspaceSeasonSuccessorCoordinator {
                         routine.getPreviousRoutineId(),
                         routine.getId()
                 ))
-                .sorted((left, right) ->
-                        left.sourceRoutineId().compareTo(right.sourceRoutineId()))
+                .sorted(Comparator.comparing(CopiedRoutineResult::sourceRoutineId))
                 .toList();
         return new NextSeasonResult(
                 resultMapper.toSeasonResult(sourceSeason),

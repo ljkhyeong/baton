@@ -42,7 +42,8 @@ class WorkspaceSeasonSettingsCoordinatorTest {
                 peopleRepository,
                 new WorkspaceResultMapper(Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)),
                 new WorkspaceRoundSchedulePolicy(operationsRepository),
-                mock(CalendarChangeRecorder.class)
+                mock(CalendarChangeRecorder.class),
+                mock(BriefContinuitySignalRecorder.class)
         );
 
         var result = coordinator.updateSeason(

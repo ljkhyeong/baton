@@ -32,7 +32,7 @@ public class WatchMonitorChangeRecorder {
         Objects.requireNonNull(resource, "역할 자료는 필수입니다");
         if (source.enabled()
                 && source.monitoringEnabled()
-                && resource.getArchivedAt() == null
+                && !resource.isArchived()
                 && eligibilityPolicy.isEligible(resource.getUrl())) {
             appendActive(resource.getId(), resource.getUrl());
         }
@@ -45,7 +45,7 @@ public class WatchMonitorChangeRecorder {
         }
         boolean previouslyEligible = eligibilityPolicy.isEligible(previousUrl);
         boolean currentlyEligible = source.monitoringEnabled()
-                && resource.getArchivedAt() == null
+                && !resource.isArchived()
                 && eligibilityPolicy.isEligible(resource.getUrl());
         if (currentlyEligible) {
             appendActive(resource.getId(), resource.getUrl());
@@ -62,7 +62,7 @@ public class WatchMonitorChangeRecorder {
         int appendedCount = 0;
         for (RoleResource resource : resources) {
             boolean appended = ended
-                    || resource.getArchivedAt() != null
+                    || resource.isArchived()
                     || !source.monitoringEnabled()
                     || !eligibilityPolicy.isEligible(resource.getUrl())
                     ? appendInactive(resource.getId())

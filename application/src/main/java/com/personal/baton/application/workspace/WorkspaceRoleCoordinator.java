@@ -138,6 +138,8 @@ final class WorkspaceRoleCoordinator {
                 command.responsibilities(),
                 command.risk()
         );
-        return resultMapper.toRoleResult(repository.saveRole(role));
+        Role saved = repository.saveRole(role);
+        briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
+        return resultMapper.toRoleResult(saved);
     }
 }

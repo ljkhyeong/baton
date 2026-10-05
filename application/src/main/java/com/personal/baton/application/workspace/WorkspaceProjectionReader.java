@@ -75,18 +75,7 @@ final class WorkspaceProjectionReader {
                 snapshot.handoffItems().stream().map(resultMapper::toHandoffItemResult).toList(),
                 snapshot.resources().stream().map(resultMapper::toRoleResourceResult).toList(),
                 snapshot.roleHandoffs().stream().map(resultMapper::toRoleHandoffResult).toList(),
-                continuitySignalAnalyzer.analyze(
-                        projectionClock,
-                        scope.season(),
-                        snapshot.members(),
-                        snapshot.roles(),
-                        snapshot.routines(),
-                        snapshot.rounds(),
-                        snapshot.executions(),
-                        snapshot.handoffItems(),
-                        snapshot.resources(),
-                        snapshot.roleHandoffs()
-                )
+                continuitySignalAnalyzer.analyze(projectionClock, scope.season(), snapshot)
         );
     }
 

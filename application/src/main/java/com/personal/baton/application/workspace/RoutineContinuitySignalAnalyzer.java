@@ -31,7 +31,7 @@ final class RoutineContinuitySignalAnalyzer {
             ZoneId zoneId
     ) {
         Set<UUID> activeRoundIds = rounds.stream()
-                .filter(round -> round.getArchivedAt() == null).map(SeasonRound::getId).collect(toSet());
+                .filter(round -> !round.isArchived()).map(SeasonRound::getId).collect(toSet());
         Map<UUID, Set<UUID>> overdueRoundIdsByRoutine = executions.stream()
                 .filter(execution -> activeRoundIds.contains(execution.getSeasonRoundId())
                         && execution.timingStatus(clock, zoneId) == RoutineTimingStatus.OVERDUE)
@@ -40,7 +40,7 @@ final class RoutineContinuitySignalAnalyzer {
 
         List<ContinuitySignalResult> signals = new ArrayList<>();
         for (Routine routine : routines) {
-            if (routine.getArchivedAt() != null) {
+            if (routine.isArchived()) {
                 continue;
             }
             int overdueRoundCount = overdueRoundIdsByRoutine

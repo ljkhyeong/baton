@@ -94,7 +94,7 @@ public class RoundParticipationService implements RoundParticipationUseCase {
 
     private void requireActiveMappedResource(UUID resourceId) {
         recordsRepository.findRoleResourceById(resourceId)
-                .filter(resource -> resource.getArchivedAt() == null)
+                .filter(resource -> !resource.isArchived())
                 .orElseThrow(RoundRoomNotFoundException::new);
     }
 

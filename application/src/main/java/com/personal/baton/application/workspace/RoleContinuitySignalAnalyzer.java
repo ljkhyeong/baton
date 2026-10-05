@@ -41,9 +41,9 @@ final class RoleContinuitySignalAnalyzer {
         Set<UUID> activeMemberIds = members.stream()
                 .filter(Member::isActive).map(Member::getId).collect(toSet());
         Map<UUID, List<HandoffItem>> activeItemsByRole = handoffItems.stream()
-                .filter(item -> item.getArchivedAt() == null).collect(groupingBy(HandoffItem::getRoleId));
+                .filter(item -> !item.isArchived()).collect(groupingBy(HandoffItem::getRoleId));
         Map<UUID, Integer> resourceCountsByRole = resources.stream()
-                .filter(resource -> resource.getArchivedAt() == null)
+                .filter(resource -> !resource.isArchived())
                 .collect(groupingBy(RoleResource::getRoleId, summingInt(resource -> 1)));
         List<ContinuitySignalResult> signals = new ArrayList<>();
 

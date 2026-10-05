@@ -8,6 +8,7 @@ import com.personal.baton.domain.workspace.ContentChange;
 import com.personal.baton.domain.workspace.ContentFieldChange;
 import com.personal.baton.domain.workspace.ContentRecordKind;
 import com.personal.baton.domain.workspace.Decision;
+import com.personal.baton.domain.workspace.DecisionTextFormat;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.Clock;
 import java.util.LinkedHashMap;
@@ -30,17 +31,17 @@ class ContentChangeRecorder {
     Map<String, String> snapshot(Decision value, String authorName, String roleNames) {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("제목", value.getTitle()); fields.put("이유", value.getReason()); fields.put("대안", value.getAlternative());
-        fields.put("서식", value.getTextFormat().name().equals("MARKDOWN") ? "Markdown" : "일반 텍스트");
+        fields.put("서식", value.getTextFormat() == DecisionTextFormat.MARKDOWN ? "Markdown" : "일반 텍스트");
         fields.put("작성자", authorName);
         fields.put("관련 역할", roleNames);
-        fields.put("보관 상태", value.getArchivedAt() == null ? "사용 중" : "보관");
+        fields.put("보관 상태", value.isArchived() ? "보관" : "사용 중");
         return fields;
     }
     Map<String, String> snapshot(RoleResource value) {
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("제목", value.getTitle()); fields.put("주소", value.getUrl()); fields.put("설명", value.getDescription());
         fields.put("역할", people.findRoleById(value.getRoleId()).orElseThrow().getName());
-        fields.put("보관 상태", value.getArchivedAt() == null ? "사용 중" : "보관");
+        fields.put("보관 상태", value.isArchived() ? "보관" : "사용 중");
         return fields;
     }
     void record(UUID teamId, UUID seasonId, ContentRecordKind kind, UUID recordId,

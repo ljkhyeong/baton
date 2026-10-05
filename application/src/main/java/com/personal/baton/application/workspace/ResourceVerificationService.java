@@ -3,11 +3,9 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
-import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
 import com.personal.baton.application.workspace.port.out.ResourceVerificationRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
-import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.ResourceVerification;
 import com.personal.baton.domain.workspace.RoleResource;
@@ -27,18 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResourceVerificationService implements ResourceVerificationUseCase {
     private final WorkspaceScopeAuthorizer authorizer;
     private final WorkspaceRoleResolver roleResolver;
-    private final WorkspaceRecordsRepository records;
     private final WorkspacePeopleRepository people;
     private final RoundAuthorizationRepository memberships;
     private final ResourceVerificationRepository verifications;
     private final Clock clock;
 
     public ResourceVerificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceRoleResolver roleResolver,
-            WorkspaceRecordsRepository records, WorkspacePeopleRepository people,
+            WorkspacePeopleRepository people,
             RoundAuthorizationRepository memberships, ResourceVerificationRepository verifications, Clock clock) {
         this.authorizer = authorizer;
         this.roleResolver = roleResolver;
-        this.records = records;
         this.people = people;
         this.memberships = memberships;
         this.verifications = verifications;
@@ -63,7 +59,7 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     @Override
     public ReviewScheduleResult getSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
         var scope = authorizer.authorizeRead(teamId, seasonId, accessKey);
-        requireResource(teamId, seasonId, resourceId);
+        roleResolver.requireRoleResource(teamId, seasonId, resourceId);
         return scheduleResult(teamId, seasonId, resourceId, verifications.findSchedule(resourceId),
                 LocalDate.ofInstant(clock.instant(), scope.season().getZoneId()));
     }
@@ -73,7 +69,7 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     public ReviewScheduleResult configureSchedule(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
             UUID accountId, ConfigureReviewScheduleCommand command) {
         var scope = authorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        if (requireResource(teamId, seasonId, resourceId).getArchivedAt() != null) throw new WorkspaceContentConflictException();
+        if (roleResolver.requireRoleResource(teamId, seasonId, resourceId).isArchived()) throw new WorkspaceContentConflictException();
         requireMember(teamId, accountId);
         var existing = verifications.findSchedule(resourceId);
         if (existing.map(ResourceReviewSchedule::getVersion).orElse(-1L) != command.expectedVersion()) throw new WorkspaceContentConflictException();
@@ -94,7 +90,7 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     @Override
     public VerificationHistoryResult getHistory(UUID teamId, UUID seasonId, UUID resourceId, String accessKey) {
         authorizer.authorizeRead(teamId, seasonId, accessKey);
-        return history(teamId, seasonId, requireResource(teamId, seasonId, resourceId));
+        return history(teamId, seasonId, roleResolver.requireRoleResource(teamId, seasonId, resourceId));
     }
 
     @Override
@@ -102,8 +98,8 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     public VerificationHistoryResult verify(UUID teamId, UUID seasonId, UUID resourceId, String accessKey,
             UUID accountId, VerifyResourceCommand command) {
         var scope = authorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        RoleResource resource = requireResource(teamId, seasonId, resourceId);
-        if (resource.getArchivedAt() != null || resource.getVersion() != command.resourceVersion()) {
+        RoleResource resource = roleResolver.requireRoleResource(teamId, seasonId, resourceId);
+        if (resource.isArchived() || resource.getVersion() != command.resourceVersion()) {
             throw new WorkspaceContentConflictException();
         }
         Member member = requireMember(teamId, accountId);
@@ -124,13 +120,6 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
                 .flatMap(membership -> people.findMemberById(membership.getMemberId()))
                 .filter(found -> found.getTeamId().equals(teamId)).filter(Member::isActive)
                 .orElseThrow(WorkspaceAccessDeniedException::new);
-    }
-
-    private RoleResource requireResource(UUID teamId, UUID seasonId, UUID resourceId) {
-        RoleResource resource = records.findRoleResourceById(resourceId)
-                .orElseThrow(() -> new WorkspaceNotFoundException("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다"));
-        roleResolver.requireRole(teamId, seasonId, resource.getRoleId());
-        return resource;
     }
 
     private VerificationHistoryResult history(UUID teamId, UUID seasonId, RoleResource resource) {

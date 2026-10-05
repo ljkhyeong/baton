@@ -2,7 +2,6 @@ package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
-import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
@@ -95,7 +94,7 @@ final class WorkspaceRoleResourceCoordinator {
             UUID resourceId,
             UpdateRoleResourceCommand command
     ) {
-        RoleResource resource = requireRoleResource(teamId, seasonId, resourceId);
+        RoleResource resource = roleResolver.requireRoleResource(teamId, seasonId, resourceId);
         var before = changes.snapshot(resource);
         rolePolicy.requireEditableHandoffRoles(
                 teamId,
@@ -121,12 +120,11 @@ final class WorkspaceRoleResourceCoordinator {
             UUID resourceId,
             boolean archived
     ) {
-        RoleResource resource = requireRoleResource(teamId, seasonId, resourceId);
+        RoleResource resource = roleResolver.requireRoleResource(teamId, seasonId, resourceId);
         var before = changes.snapshot(resource);
         rolePolicy.requireEditableHandoffRoles(teamId, seasonId, resource.getRoleId());
         String previousUrl = resource.getUrl();
-        boolean changed = (resource.getArchivedAt() != null) != archived;
-        resource.updateArchive(archived, Instant.now(clock));
+        boolean changed = resource.updateArchive(archived, Instant.now(clock));
         changes.record(teamId, seasonId, ContentRecordKind.ROLE_RESOURCE, resourceId, before, changes.snapshot(resource));
         RoleResource savedResource = recordsRepository.saveRoleResource(resource);
         watchMonitorChangeRecorder.recordUpdated(previousUrl, savedResource);
@@ -136,22 +134,4 @@ final class WorkspaceRoleResourceCoordinator {
         return resultMapper.toRoleResourceResult(savedResource);
     }
 
-    private RoleResource requireRoleResource(UUID teamId, UUID seasonId, UUID resourceId) {
-        RoleResource resource = recordsRepository.findRoleResourceById(resourceId)
-                .orElseThrow(this::roleResourceNotFound);
-        roleResolver.requireRole(
-                teamId,
-                seasonId,
-                resource.getRoleId(),
-                this::roleResourceNotFound
-        );
-        return resource;
-    }
-
-    private WorkspaceNotFoundException roleResourceNotFound() {
-        return new WorkspaceNotFoundException(
-                "ROLE_RESOURCE_NOT_FOUND",
-                "자료를 찾을 수 없습니다"
-        );
-    }
 }

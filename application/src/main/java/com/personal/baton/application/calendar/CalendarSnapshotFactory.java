@@ -31,7 +31,7 @@ public final class CalendarSnapshotFactory {
                 occurredAt,
                 round.getId(),
                 round.getSeasonId(),
-                round.getArchivedAt() == null,
+                !round.isArchived(),
                 round.getName(),
                 null,
                 time
@@ -52,7 +52,7 @@ public final class CalendarSnapshotFactory {
                 occurredAt,
                 execution.getId(),
                 round.getSeasonId(),
-                round.getArchivedAt() == null,
+                !round.isArchived(),
                 execution.getTitle(),
                 execution.getDetail(),
                 new CalendarSnapshot.UtcPoint(execution.getDeadlineAt())

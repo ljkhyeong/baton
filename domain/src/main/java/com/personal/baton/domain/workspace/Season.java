@@ -137,14 +137,13 @@ public class Season {
         this.endDate = validatedEndDate;
     }
 
-    public void updateEnding(boolean ended, Instant now) {
-        if (!ended) {
-            endedAt = null;
-            return;
+    // 종료 상태가 바뀌었으면 true를 돌려준다. 이미 종료된 시즌은 처음 종료 시각을 유지한다.
+    public boolean updateEnding(boolean ended, Instant now) {
+        if (ended == isEnded()) {
+            return false;
         }
-        if (endedAt == null) {
-            endedAt = Objects.requireNonNull(now, "시즌 종료 시각은 필수입니다");
-        }
+        endedAt = ended ? Objects.requireNonNull(now, "시즌 종료 시각은 필수입니다") : null;
+        return true;
     }
 
     public void updateTimeZone(String timeZone) {

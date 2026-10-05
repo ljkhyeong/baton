@@ -127,8 +127,7 @@ final class WorkspaceRoutineCoordinator {
                     routine.getDeadlineTime()
             );
         }
-        boolean changed = (routine.getArchivedAt() != null) != archived;
-        routine.updateArchive(archived, Instant.now(clock));
+        boolean changed = routine.updateArchive(archived, Instant.now(clock));
         Routine saved = repository.saveRoutine(routine);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());
@@ -144,7 +143,7 @@ final class WorkspaceRoutineCoordinator {
 
     private Routine requireActiveRoutine(UUID seasonId, UUID routineId) {
         Routine routine = requireRoutine(seasonId, routineId);
-        if (routine.getArchivedAt() != null) {
+        if (routine.isArchived()) {
             throw routineNotFound();
         }
         return routine;

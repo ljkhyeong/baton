@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
-import java.time.Instant;
 import java.time.LocalTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -21,7 +20,9 @@ import java.util.UUID;
                 columnNames = {"season_id", "previous_routine_id"}
         )
 )
-public class Routine {
+public class Routine extends ArchivableRecord {
+
+    private static final String ARCHIVED_MESSAGE = "보관된 반복 업무는 수정하거나 복사할 수 없습니다";
 
     @Id
     @Column(nullable = false, columnDefinition = "binary(16)")
@@ -54,9 +55,6 @@ public class Routine {
 
     @Column(nullable = false, length = 1000)
     private String detail;
-
-    @Column(name = "archived_at")
-    private Instant archivedAt;
 
     @Version
     @Column(nullable = false)
@@ -109,7 +107,7 @@ public class Routine {
     }
 
     public Routine copyToSeason(UUID id, UUID targetSeasonId, UUID targetOwnerRoleId) {
-        requireActive();
+        requireActive(ARCHIVED_MESSAGE);
         return new Routine(
                 id,
                 targetSeasonId,
@@ -133,7 +131,7 @@ public class Routine {
             Integer deadlineDayOffset,
             LocalTime deadlineTime
     ) {
-        requireActive();
+        requireActive(ARCHIVED_MESSAGE);
         String normalizedTitle = DomainAssertions.requiredText(title, "반복 업무 제목", 200);
         RoutinePhase validatedPhase = Objects.requireNonNull(phase, "반복 업무 단계는 필수입니다");
         String normalizedDueLabel = DomainAssertions.requiredText(dueLabel, "반복 업무 기한 문구", 100);
@@ -148,22 +146,6 @@ public class Routine {
         this.detail = normalizedDetail;
         this.deadlineDayOffset = deadlineDayOffset;
         this.deadlineTime = deadlineTime;
-    }
-
-    public void updateArchive(boolean archived, Instant archivedAt) {
-        if (archived) {
-            if (this.archivedAt == null) {
-                this.archivedAt = Objects.requireNonNull(archivedAt, "반복 업무 보관 시각은 필수입니다");
-            }
-            return;
-        }
-        this.archivedAt = null;
-    }
-
-    private void requireActive() {
-        if (archivedAt != null) {
-            throw new DomainValidationException("보관된 반복 업무는 수정하거나 복사할 수 없습니다");
-        }
     }
 
     private static void validateDeadlineRule(Integer deadlineDayOffset, LocalTime deadlineTime) {
@@ -213,9 +195,5 @@ public class Routine {
 
     public String getDetail() {
         return detail;
-    }
-
-    public Instant getArchivedAt() {
-        return archivedAt;
     }
 }

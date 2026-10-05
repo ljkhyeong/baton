@@ -74,7 +74,7 @@ public class TeamAccessService implements TeamAccessUseCase {
     @Override
     public TeamAccessResult getAccess(UUID teamId, UUID accountId, String accessKey) {
         requireActor(accountId);
-        Team team = teams.findTeamById(teamId).orElseThrow(this::teamNotFound);
+        Team team = teams.findTeamById(teamId).orElseThrow(WorkspaceNotFoundException::team);
         if (team.isAccountAccessEnabled()) policy.requireRead(team);
         else secrets.verifyAccessKey(team, accessKey);
         return result(team, accountId);
@@ -156,7 +156,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         TeamInvitation invitation = access.findInvitationByTokenHash(tokenHash(token)).orElseThrow(this::invitationNotFound);
         boolean acceptedByMe = accountId.equals(invitation.getAcceptedBy());
         if (!invitation.isPending(clock.instant()) && !acceptedByMe) throw invitationNotFound();
-        Team team = teams.findTeamById(invitation.getTeamId()).orElseThrow(this::teamNotFound);
+        Team team = teams.findTeamById(invitation.getTeamId()).orElseThrow(WorkspaceNotFoundException::team);
         if (!team.isAccountAccessEnabled()) throw invitationNotFound();
         Member member = requireActiveMember(team.getId(), invitation.getMemberId());
         TeamPermission permission = invitation.getPermission();
@@ -202,7 +202,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         return accepted(team, membership);
     }
     private InvitationAcceptedResult accepted(Team team, AccountTeamMembership membership) {
-        var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(this::teamNotFound);
+        var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(WorkspaceNotFoundException::team);
         return new InvitationAcceptedResult(membership.getAccountId(), team.getId(), season.getId(),
                 membership.getMemberId(), membership.getPermission());
     }
@@ -211,7 +211,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         if (!team.isAccountAccessEnabled()) throw new DomainValidationException("운영자가 먼저 관리자와 계정 권한을 설정해야 합니다");
         policy.requireAdministrator(team); return team;
     }
-    private Team lockTeam(UUID teamId) { return teams.findTeamByIdForUpdate(teamId).orElseThrow(this::teamNotFound); }
+    private Team lockTeam(UUID teamId) { return teams.findTeamByIdForUpdate(teamId).orElseThrow(WorkspaceNotFoundException::team); }
     private void requireActiveAccount(UUID accountId) {
         identities.findAccountByIdForUpdate(accountId).filter(Account::isActive).orElseThrow(AccountDeactivatedException::new);
     }
@@ -260,5 +260,4 @@ public class TeamAccessService implements TeamAccessUseCase {
         return DomainSeparatedSha256.hashHex("baton:team-invitation:v1", List.of(token));
     }
     private WorkspaceNotFoundException invitationNotFound() { return new WorkspaceNotFoundException("TEAM_INVITATION_NOT_FOUND", "사용할 수 있는 초대가 없습니다"); }
-    private WorkspaceNotFoundException teamNotFound() { return new WorkspaceNotFoundException("TEAM_NOT_FOUND", "팀을 찾을 수 없습니다"); }
 }

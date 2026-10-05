@@ -5,10 +5,8 @@ import com.personal.baton.application.watch.WatchMonitorSource;
 import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.WatchMonitorEligibilityPolicy;
 import com.personal.baton.application.watch.port.out.WatchMonitorSnapshotPort;
-import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.domain.workspace.TeamPermission;
-import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.in.InspectResourceHealthUseCase.MonitoringReason;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -18,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceResourceHealthAccess {
     private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final WorkspaceRoleResolver roleResolver;
-    private final WorkspaceRecordsRepository recordsRepository;
     private final WatchMonitorSnapshotPort snapshots;
     private final WatchMonitorSource source;
     private final WatchMonitorEligibilityPolicy eligibility = new WatchMonitorEligibilityPolicy();
@@ -27,11 +24,9 @@ public class WorkspaceResourceHealthAccess {
 
     WorkspaceResourceHealthAccess(WorkspaceScopeAuthorizer scopeAuthorizer,
                                   WorkspaceRoleResolver roleResolver,
-                                  WorkspaceRecordsRepository recordsRepository,
                                   WatchMonitorSnapshotPort snapshots, WatchMonitorSource source) {
         this.scopeAuthorizer = scopeAuthorizer;
         this.roleResolver = roleResolver;
-        this.recordsRepository = recordsRepository;
         this.snapshots = snapshots;
         this.source = source;
     }
@@ -53,13 +48,11 @@ public class WorkspaceResourceHealthAccess {
         if (requestCheck && scope.permission() == TeamPermission.VIEWER) {
             throw new WorkspaceAccessDeniedException();
         }
-        var resource = recordsRepository.findRoleResourceById(resourceId)
-                .orElseThrow(this::notFound);
-        roleResolver.requireRole(teamId, seasonId, resource.getRoleId(), this::notFound);
+        var resource = roleResolver.requireRoleResource(teamId, seasonId, resourceId);
         if (!source.enabled()) return new Authorization(null, MonitoringReason.INTEGRATION_DISABLED);
         if (!source.monitoringEnabled()) return new Authorization(null, MonitoringReason.MONITORING_PAUSED);
         if (scope.season().isEnded()) return new Authorization(null, MonitoringReason.SEASON_ENDED);
-        if (resource.getArchivedAt() != null) return new Authorization(null, MonitoringReason.RESOURCE_ARCHIVED);
+        if (resource.isArchived()) return new Authorization(null, MonitoringReason.RESOURCE_ARCHIVED);
         if (!eligibility.isEligible(resource.getUrl())) return new Authorization(null, MonitoringReason.URL_NOT_ELIGIBLE);
         var snapshot = snapshots.findLatestMonitor(resourceId).orElse(null);
         if (snapshot == null || !snapshot.resourceReference().equals(source.resourceReference(resourceId))) {
@@ -72,9 +65,5 @@ public class WorkspaceResourceHealthAccess {
             return new Authorization(null, MonitoringReason.SYNC_PENDING);
         }
         return new Authorization(snapshot, null);
-    }
-
-    private WorkspaceNotFoundException notFound() {
-        return new WorkspaceNotFoundException("ROLE_RESOURCE_NOT_FOUND", "자료를 찾을 수 없습니다");
     }
 }

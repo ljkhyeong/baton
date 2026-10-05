@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceAccessReposito
 import com.personal.baton.domain.workspace.AccessKeyChangeHistory;
 import com.personal.baton.domain.workspace.Team;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 @Component
 final class WorkspaceAccessKeyCoordinator {
@@ -33,36 +34,35 @@ final class WorkspaceAccessKeyCoordinator {
             String idempotencyKey,
             String currentAccessKey
     ) {
-        WorkspaceScope scope = scopeAuthorizer.requireScope(teamId, seasonId);
-        AccessKeyChange change = accessControl.deriveAccessKeyChange(
-                AccessKeyChangeKind.ROTATE,
-                teamId,
-                idempotencyKey
-        );
-        AccessKeyResult replay = replay(scope.team(), change);
-        if (replay != null) {
-            return replay;
-        }
-        accessControl.verifyAccessKey(scope.team(), currentAccessKey);
-        return replace(scope.team(), change);
+        return change(AccessKeyChangeKind.ROTATE, teamId, seasonId, idempotencyKey,
+                team -> accessControl.verifyAccessKey(team, currentAccessKey));
     }
 
+    // 복구 권한은 서비스가 복구 키로 먼저 확인한다.
     AccessKeyResult recover(
             UUID teamId,
             UUID seasonId,
             String idempotencyKey
     ) {
-        WorkspaceScope scope = scopeAuthorizer.requireScope(teamId, seasonId);
-        AccessKeyChange change = accessControl.deriveAccessKeyChange(
-                AccessKeyChangeKind.RECOVER,
-                teamId,
-                idempotencyKey
-        );
-        AccessKeyResult replay = replay(scope.team(), change);
+        return change(AccessKeyChangeKind.RECOVER, teamId, seasonId, idempotencyKey, team -> { });
+    }
+
+    // 같은 멱등 키의 재요청은 현재 키 확인 없이 처음 발급한 키를 다시 돌려준다.
+    private AccessKeyResult change(
+            AccessKeyChangeKind kind,
+            UUID teamId,
+            UUID seasonId,
+            String idempotencyKey,
+            Consumer<Team> verifyBeforeChange
+    ) {
+        Team team = scopeAuthorizer.requireScope(teamId, seasonId).team();
+        AccessKeyChange change = accessControl.deriveAccessKeyChange(kind, teamId, idempotencyKey);
+        AccessKeyResult replay = replay(team, change);
         if (replay != null) {
             return replay;
         }
-        return replace(scope.team(), change);
+        verifyBeforeChange.accept(team);
+        return replace(team, change);
     }
 
     private AccessKeyResult replay(Team team, AccessKeyChange change) {

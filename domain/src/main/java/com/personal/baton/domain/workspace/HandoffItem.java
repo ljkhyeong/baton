@@ -13,7 +13,9 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "handoff_items")
-public class HandoffItem {
+public class HandoffItem extends ArchivableRecord {
+
+    private static final String ARCHIVED_MESSAGE = "보관된 인수인계 항목은 수정할 수 없습니다";
 
     @Id
     @Column(nullable = false, columnDefinition = "binary(16)")
@@ -34,9 +36,6 @@ public class HandoffItem {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    @Column(name = "archived_at")
-    private Instant archivedAt;
 
     @Version
     @Column(nullable = false)
@@ -71,7 +70,7 @@ public class HandoffItem {
     }
 
     public void update(UUID roleId, String label, HandoffCategory category) {
-        requireActive();
+        requireActive(ARCHIVED_MESSAGE);
         UUID normalizedRoleId = Objects.requireNonNull(roleId, "역할 식별자는 필수입니다");
         String normalizedLabel = DomainAssertions.requiredText(label, "인수인계 항목", 500);
         HandoffCategory normalizedCategory = Objects.requireNonNull(
@@ -84,25 +83,12 @@ public class HandoffItem {
         this.category = normalizedCategory;
     }
 
-    public void updateCompletion(boolean completed) {
-        requireActive();
+    // 완료 상태가 바뀌었으면 true를 돌려준다.
+    public boolean updateCompletion(boolean completed) {
+        requireActive(ARCHIVED_MESSAGE);
+        boolean changed = this.completed != completed;
         this.completed = completed;
-    }
-
-    public void updateArchive(boolean archived, Instant archivedAt) {
-        if (archived) {
-            if (this.archivedAt == null) {
-                this.archivedAt = Objects.requireNonNull(archivedAt, "인수인계 항목 보관 시각은 필수입니다");
-            }
-            return;
-        }
-        this.archivedAt = null;
-    }
-
-    private void requireActive() {
-        if (archivedAt != null) {
-            throw new DomainValidationException("보관된 인수인계 항목은 수정할 수 없습니다");
-        }
+        return changed;
     }
 
     public UUID getId() {
@@ -127,9 +113,5 @@ public class HandoffItem {
 
     public Instant getCreatedAt() {
         return createdAt;
-    }
-
-    public Instant getArchivedAt() {
-        return archivedAt;
     }
 }

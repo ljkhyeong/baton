@@ -23,6 +23,7 @@ final class WorkspaceSeasonEndingCoordinator {
     private final Clock clock;
     private final WorkspaceResultMapper resultMapper;
     private final WatchMonitorChangeRecorder watchMonitorChangeRecorder;
+    private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
     WorkspaceSeasonEndingCoordinator(
             WorkspaceSeasonRepository seasonRepository,
@@ -30,7 +31,8 @@ final class WorkspaceSeasonEndingCoordinator {
             WorkspaceRecordsRepository recordsRepository,
             Clock clock,
             WorkspaceResultMapper resultMapper,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder
+            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
         this.seasonRepository = seasonRepository;
         this.peopleRepository = peopleRepository;
@@ -38,11 +40,11 @@ final class WorkspaceSeasonEndingCoordinator {
         this.clock = clock;
         this.resultMapper = resultMapper;
         this.watchMonitorChangeRecorder = watchMonitorChangeRecorder;
+        this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
     SeasonResult update(UUID teamId, Season season, boolean ended) {
         UUID seasonId = season.getId();
-        boolean endingChanged = season.isEnded() != ended;
         if (ended && peopleRepository.existsOpenRoleHandoffBySeasonId(seasonId)) {
             throw new RoleHandoffStateConflictException(
                     "준비 중이거나 수락을 기다리는 인수인계를 수락 또는 취소한 뒤 시즌을 종료해 주세요"
@@ -59,15 +61,15 @@ final class WorkspaceSeasonEndingCoordinator {
                     });
         }
 
-        season.updateEnding(ended, Instant.now(clock));
+        boolean endingChanged = season.updateEnding(ended, Instant.now(clock));
         Season savedSeason = seasonRepository.saveSeason(season);
         if (endingChanged) {
             watchMonitorChangeRecorder.recordSeasonState(
                     recordsRepository.findRoleResourcesByTeamIdAndSeasonId(teamId, seasonId),
                     ended
             );
+            briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         }
         return resultMapper.toSeasonResult(savedSeason);
     }
-
 }

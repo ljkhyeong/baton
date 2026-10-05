@@ -130,18 +130,7 @@ public class BriefContinuitySignalRecorder {
 
         WorkspaceContinuitySnapshot snapshot = continuitySnapshotReader.read(teamId, season.getId());
 
-        return analyzer.analyze(
-                        Clock.fixed(occurredAt, clock.getZone()),
-                        season,
-                        snapshot.members(),
-                        snapshot.roles(),
-                        snapshot.routines(),
-                        snapshot.rounds(),
-                        snapshot.executions(),
-                        snapshot.handoffItems(),
-                        snapshot.resources(),
-                        snapshot.roleHandoffs()
-                ).stream()
+        return analyzer.analyze(Clock.fixed(occurredAt, clock.getZone()), season, snapshot).stream()
                 .collect(Collectors.toMap(
                         BriefContinuitySignalRecorder::identity,
                         Function.identity(),

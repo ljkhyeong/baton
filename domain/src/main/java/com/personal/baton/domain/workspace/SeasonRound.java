@@ -28,7 +28,7 @@ import java.util.UUID;
                 )
         }
 )
-public class SeasonRound {
+public class SeasonRound extends ArchivableRecord {
 
     @Id
     @Column(nullable = false, columnDefinition = "binary(16)")
@@ -53,9 +53,6 @@ public class SeasonRound {
     @Column(name = "scheduled_at")
     private Instant scheduledAt;
 
-    @Column(name = "archived_at")
-    private Instant archivedAt;
-
     @Version
     @Column(nullable = false)
     private Long version;
@@ -74,7 +71,7 @@ public class SeasonRound {
     ) {
         this.id = Objects.requireNonNull(id, "회차 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
-        this.name = DomainAssertions.requiredText(name, "회차 이름", 100);
+        this.name = normalizeName(name);
         this.meetingDate = Objects.requireNonNull(meetingDate, "모임 날짜는 필수입니다");
         this.origin = Objects.requireNonNull(origin, "회차 생성 출처는 필수입니다");
         this.scheduledOccurrenceDate = scheduledOccurrenceDate;
@@ -119,7 +116,7 @@ public class SeasonRound {
     }
 
     public void update(String name, LocalDate meetingDate, ZoneId timeZone) {
-        requireActive();
+        requireActive("보관된 회차는 수정할 수 없습니다");
         String normalizedName = normalizeName(name);
         LocalDate normalizedMeetingDate = Objects.requireNonNull(meetingDate, "모임 날짜는 필수입니다");
         if (origin == RoundOrigin.AUTOMATIC && !normalizedMeetingDate.equals(this.meetingDate)) {
@@ -131,22 +128,6 @@ public class SeasonRound {
         }
         this.name = normalizedName;
         this.meetingDate = normalizedMeetingDate;
-    }
-
-    public void updateArchive(boolean archived, Instant archivedAt) {
-        if (archived) {
-            if (this.archivedAt == null) {
-                this.archivedAt = Objects.requireNonNull(archivedAt, "회차 보관 시각은 필수입니다");
-            }
-            return;
-        }
-        this.archivedAt = null;
-    }
-
-    private void requireActive() {
-        if (archivedAt != null) {
-            throw new DomainValidationException("보관된 회차는 수정할 수 없습니다");
-        }
     }
 
     private void validateScheduleMetadata() {
@@ -182,9 +163,5 @@ public class SeasonRound {
 
     public Instant getScheduledAt() {
         return scheduledAt;
-    }
-
-    public Instant getArchivedAt() {
-        return archivedAt;
     }
 }

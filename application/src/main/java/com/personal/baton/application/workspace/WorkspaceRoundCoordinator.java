@@ -11,7 +11,6 @@ import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepo
 import com.personal.baton.domain.workspace.ContentCreationOperation;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoutineExecution;
-import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
@@ -29,7 +28,6 @@ final class WorkspaceRoundCoordinator {
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceResultMapper resultMapper;
     private final WorkspaceSeasonRoundResolver roundResolver;
-    private final RoutineExecutionSnapshotFactory snapshotFactory;
     private final CalendarChangeRecorder calendarChangeRecorder;
     private final BriefContinuitySignalRecorder briefContinuitySignalRecorder;
 
@@ -39,7 +37,6 @@ final class WorkspaceRoundCoordinator {
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceResultMapper resultMapper,
             WorkspaceSeasonRoundResolver roundResolver,
-            RoutineExecutionSnapshotFactory snapshotFactory,
             CalendarChangeRecorder calendarChangeRecorder,
             BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
@@ -48,7 +45,6 @@ final class WorkspaceRoundCoordinator {
         this.contentIdempotency = contentIdempotency;
         this.resultMapper = resultMapper;
         this.roundResolver = roundResolver;
-        this.snapshotFactory = snapshotFactory;
         this.calendarChangeRecorder = calendarChangeRecorder;
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
@@ -87,7 +83,7 @@ final class WorkspaceRoundCoordinator {
         if (!season.contains(round.getMeetingDate())) {
             throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
-        List<RoutineExecution> executions = snapshotFactory.snapshotAll(
+        List<RoutineExecution> executions = RoutineExecution.snapshotAll(
                 round.getId(),
                 repository.findActiveRoutinesBySeasonId(seasonId),
                 round.getMeetingDate(),
@@ -132,8 +128,7 @@ final class WorkspaceRoundCoordinator {
 
     SeasonRoundResult updateArchive(Season season, UUID roundId, boolean archived) {
         SeasonRound round = roundResolver.requireForUpdate(season.getId(), roundId);
-        boolean changed = (round.getArchivedAt() != null) != archived;
-        round.updateArchive(archived, Instant.now(clock));
+        boolean changed = round.updateArchive(archived, Instant.now(clock));
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions =
                 repository.findRoutineExecutionsBySeasonRoundIdWithSharedLock(saved.getId());
@@ -155,8 +150,7 @@ final class WorkspaceRoundCoordinator {
                 roundId,
                 executionId
         );
-        boolean changed = (execution.getStatus() == RoutineStatus.DONE) != completed;
-        execution.updateCompletion(completed);
+        boolean changed = execution.updateCompletion(completed);
         RoutineExecution saved = repository.saveRoutineExecution(execution);
         if (changed) {
             briefContinuitySignalRecorder.reconcileSeason(season.getTeamId(), season.getId());

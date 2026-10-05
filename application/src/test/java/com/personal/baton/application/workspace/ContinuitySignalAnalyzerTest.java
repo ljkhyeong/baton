@@ -552,18 +552,9 @@ class ContinuitySignalAnalyzerTest {
             List<RoleResource> resources,
             List<RoleHandoff> roleHandoffs
     ) {
-        return analyzer.analyze(
-                clock,
-                season,
-                members,
-                roles,
-                routines,
-                rounds,
-                executions,
-                handoffItems,
-                resources,
-                roleHandoffs
-        );
+        return analyzer.analyze(clock, season, new WorkspaceContinuitySnapshot(
+                members, roles, routines, rounds, executions, handoffItems, resources, roleHandoffs
+        ));
     }
 
     private Member member(UUID id, String name) {

@@ -53,10 +53,6 @@ public interface WorkspacePeopleRepository {
 
     List<Role> findRolesByTeamIdAndSeasonIdAndIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
 
-    List<UUID> findExistingRoleIds(UUID teamId, UUID seasonId, List<UUID> roleIds);
-
-    List<String> findRoleNames(UUID teamId, UUID seasonId, List<UUID> roleIds);
-
     List<RoleHandoff> findRoleHandoffsByRoleIds(List<UUID> roleIds);
 
     List<TransferredHandoff> findTransferredHandoffs(UUID teamId, UUID seasonId, UUID memberId);

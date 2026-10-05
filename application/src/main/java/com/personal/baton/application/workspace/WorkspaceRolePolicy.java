@@ -63,7 +63,7 @@ final class WorkspaceRolePolicy {
                 roleIds
         );
         if (roles.size() != roleIds.size()) {
-            throw new WorkspaceNotFoundException("ROLE_NOT_FOUND", "역할을 찾을 수 없습니다");
+            throw WorkspaceNotFoundException.role();
         }
         for (UUID roleId : roleIds) {
             repository.findOpenRoleHandoffByRoleIdWithSharedLock(roleId)

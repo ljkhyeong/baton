@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -99,6 +100,18 @@ public class RoutineExecution {
         return execution;
     }
 
+    // 회차를 만들 때 반복 업무의 현재 내용을 회차별 실행 기록으로 고정한다.
+    public static List<RoutineExecution> snapshotAll(
+            UUID seasonRoundId,
+            List<Routine> routines,
+            LocalDate meetingDate,
+            ZoneId zoneId
+    ) {
+        return routines.stream()
+                .map(routine -> snapshot(UUID.randomUUID(), seasonRoundId, routine, meetingDate, zoneId))
+                .toList();
+    }
+
     public void reschedule(LocalDate meetingDate, ZoneId zoneId) {
         LocalDate validatedMeetingDate = Objects.requireNonNull(meetingDate, "모임 날짜는 필수입니다");
         ZoneId validatedZoneId = Objects.requireNonNull(zoneId, "시즌 시간대는 필수입니다");
@@ -113,8 +126,12 @@ public class RoutineExecution {
                 .toInstant();
     }
 
-    public void updateCompletion(boolean completed) {
-        status = completed ? RoutineStatus.DONE : RoutineStatus.WAITING;
+    // 완료 상태가 바뀌었으면 true를 돌려준다.
+    public boolean updateCompletion(boolean completed) {
+        RoutineStatus next = completed ? RoutineStatus.DONE : RoutineStatus.WAITING;
+        boolean changed = status != next;
+        status = next;
+        return changed;
     }
 
     public RoutineTimingStatus timingStatus(Clock clock, ZoneId zoneId) {

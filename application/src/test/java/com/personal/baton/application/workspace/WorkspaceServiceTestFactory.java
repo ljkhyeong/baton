@@ -73,7 +73,7 @@ final class WorkspaceServiceTestFactory {
                 briefContinuitySignalRecorder,
                 org.mockito.Mockito.mock(com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.class)
         );
-        WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(peopleRepository);
+        WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(peopleRepository, recordsRepository);
         WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(peopleRepository);
         WorkspaceRoleCoordinator roleCoordinator = new WorkspaceRoleCoordinator(
                 peopleRepository,
@@ -111,7 +111,6 @@ final class WorkspaceServiceTestFactory {
                 contentIdempotency,
                 resultMapper,
                 new WorkspaceSeasonRoundResolver(operationsRepository),
-                new RoutineExecutionSnapshotFactory(),
                 calendarChangeRecorder,
                 briefContinuitySignalRecorder
         );
@@ -150,7 +149,8 @@ final class WorkspaceServiceTestFactory {
                 peopleRepository,
                 resultMapper,
                 roundSchedulePolicy,
-                calendarChangeRecorder
+                calendarChangeRecorder,
+                briefContinuitySignalRecorder
         );
         WorkspaceSeasonEndingCoordinator seasonEndingCoordinator =
                 new WorkspaceSeasonEndingCoordinator(
@@ -159,7 +159,8 @@ final class WorkspaceServiceTestFactory {
                         recordsRepository,
                         clock,
                         resultMapper,
-                        watchMonitorChangeRecorder
+                        watchMonitorChangeRecorder,
+                        briefContinuitySignalRecorder
                 );
         WorkspaceSeasonSuccessorCoordinator seasonSuccessorCoordinator =
                 new WorkspaceSeasonSuccessorCoordinator(
@@ -183,15 +184,13 @@ final class WorkspaceServiceTestFactory {
                         accessKeyCoordinator,
                         seasonSettingsCoordinator,
                         seasonEndingCoordinator,
-                        seasonSuccessorCoordinator,
-                        briefContinuitySignalRecorder
+                        seasonSuccessorCoordinator
                 ),
                 new WorkspacePeopleService(
                         scopeAuthorizer,
                         memberCoordinator,
                         roleCoordinator,
-                        roleHandoffCoordinator,
-                        briefContinuitySignalRecorder
+                        roleHandoffCoordinator
                 ),
                 new WorkspaceOperationsService(
                         scopeAuthorizer,
