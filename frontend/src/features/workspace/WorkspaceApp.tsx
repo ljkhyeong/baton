@@ -911,6 +911,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 onManageMembership={openMemberManagementModal}
               /></>}
               calendarLabel={calendarLabel}
+              calendarDate={calendarDate}
+              roleHandoffs={roleHandoffs}
+              handoffProgress={handoffProgress}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}
               selectedRound={selectedRound}
@@ -921,6 +924,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onSelectRole={(roleId) => { setView('roles'); selectRole(roleId) }}
               onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
+              onOpenRoleHandoff={(roleId) => { selectRole(roleId, { showInspector: false }); openView('handoff') }}
               onOpenContinuitySignal={openContinuitySignal}
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}

@@ -1204,7 +1204,7 @@ a {
 .directory-head,
 .role-row-open {
   display: grid;
-  grid-template-columns: minmax(180px, 1.3fr) minmax(115px, .9fr) minmax(90px, .7fr) 76px;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(115px, .9fr) minmax(90px, .7fr) 128px;
   column-gap: 14px;
   align-items: center;
 }
@@ -1330,18 +1330,37 @@ a {
 .role-row > .inline-edit-button { margin: 0 10px 0 2px; }
 
 .thin-progress {
-  overflow: hidden;
+  position: relative;
   display: block;
   width: 100%;
-  height: 3px;
+  height: 4px;
+  border-radius: 999px;
   background: var(--rule);
 }
 
 .thin-progress i {
+  position: relative;
   display: block;
   height: 100%;
-  background: var(--baton-dark);
+  border-radius: inherit;
+  background: var(--baton);
   transition: width 280ms ease;
+}
+
+// 진행 끝에 바통 점을 둔다.
+.thin-progress i::after,
+.relay-lane i::after,
+.handoff-score > span i::after {
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--baton);
+  content: "";
+  transform: translateY(-50%);
 }
 
 
@@ -1681,8 +1700,8 @@ a {
 
 .handoff-score { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; }
 .handoff-score > strong { grid-column: 2; grid-row: 1; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.handoff-score > span { grid-column: 1 / -1; grid-row: 2; overflow: hidden; display: block; height: 4px; border-radius: var(--radius-sm); background: var(--rule); }
-.handoff-score > span i { display: block; height: 100%; background: var(--baton-dark); transition: width 240ms ease; }
+.handoff-score > span { grid-column: 1 / -1; grid-row: 2; display: block; height: 4px; border-radius: 999px; background: var(--rule); }
+.handoff-score > span i { position: relative; display: block; height: 100%; border-radius: inherit; background: var(--baton); transition: width 240ms ease; }
 .handoff-score small { grid-column: 1; grid-row: 1; color: var(--muted); font-size: 12px; }
 
 .handoff-checklist { padding: 20px 0; }
@@ -2768,6 +2787,22 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .today-summary dd small { display: block; margin-top: 4px; color: var(--faint); font-size: 12px; font-weight: 500; letter-spacing: 0; }
   .today-summary .needs-attention dd { color: var(--baton-dark); }
 
+  .relay-card { display: grid; gap: 10px; margin: 0 0 12px; padding: 16px 20px; border-radius: var(--radius-lg); background: var(--paper); }
+  .relay-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .relay-card-head strong { min-width: 0; font-size: 15px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+  .relay-due { flex: 0 0 auto; color: var(--muted); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .relay-due.overdue { color: var(--baton-dark); }
+  .relay-track { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 12px; }
+  .relay-runner { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 50%; color: #26302c; background: var(--rule); font-size: 12px; font-weight: 750; }
+  .relay-lane { position: relative; height: 4px; border-radius: 999px; background: var(--rule); }
+  .relay-lane i { position: relative; display: block; height: 100%; border-radius: inherit; background: var(--baton); transition: width 280ms ease; }
+  .relay-lane i::after { right: -8px; width: 16px; height: 16px; border-width: 3px; }
+  .relay-card-foot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; color: var(--muted); font-size: 12px; }
+  .relay-card-foot span { overflow-wrap: anywhere; }
+  .relay-card-foot span:nth-child(2) { text-align: center; }
+  .relay-card-foot span:last-child { text-align: right; }
+  .relay-open { justify-self: end; }
+
   .relay-board,
   .today-secondary,
   .today-lower .plain-section,
@@ -3125,6 +3160,8 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .mobile-topbar { background: rgba(242, 244, 246, .96); }
   .mobile-team { border-color: transparent; background: var(--paper); }
   .relay-board { padding: 4px 16px 8px; }
+  .relay-card { padding: 14px 16px; }
+  .relay-open { min-height: 44px; }
   .today-secondary,
   .today-lower .plain-section,
   .rhythm-timeline,

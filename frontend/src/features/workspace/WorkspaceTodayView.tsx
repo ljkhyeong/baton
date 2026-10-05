@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
+import { nearestRelayRole, RelayCard } from './WorkspaceRelayCard'
 import {
   ActionableEmpty,
   PageHeader,
@@ -10,6 +11,7 @@ import {
 } from './WorkspaceViews'
 import type {
   ContinuitySignal,
+  RoleHandoff,
   Routine,
   RoutineExecution,
   RoutineTimingStatus,
@@ -28,6 +30,9 @@ export function TodayView({
   personalWork,
   weeklyBrief,
   calendarLabel,
+  calendarDate,
+  roleHandoffs,
+  handoffProgress,
   rounds,
   archivedRoundCount,
   selectedRound,
@@ -38,6 +43,7 @@ export function TodayView({
   onSelectRole,
   onToggleRoutine,
   onNavigate,
+  onOpenRoleHandoff,
   onOpenContinuitySignal,
   onAddRole,
   onAddRoutine,
@@ -50,6 +56,9 @@ export function TodayView({
   personalWork: ReactNode
   weeklyBrief: ReactNode
   calendarLabel: string
+  calendarDate: string
+  roleHandoffs: RoleHandoff[]
+  handoffProgress: (roleId: string) => number
   rounds: SeasonRound[]
   archivedRoundCount: number
   selectedRound?: SeasonRound
@@ -60,6 +69,7 @@ export function TodayView({
   onSelectRole: (id: string) => void
   onToggleRoutine: (execution: RoutineExecution) => void
   onNavigate: (key: ViewKey) => void
+  onOpenRoleHandoff: (roleId: string) => void
   onOpenContinuitySignal: (signal: ContinuitySignal) => void
   onAddRole: () => void
   onAddRoutine: () => void
@@ -89,6 +99,7 @@ export function TodayView({
     .flatMap(({ execution }) => execution?.deadlineAt && execution.status !== 'DONE' ? [execution.deadlineAt] : [])
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
   const signalCount = workspace.continuitySignals.length
+  const relay = nearestRelayRole(roles, calendarDate)
   return (
     <>
       <PageHeader
@@ -112,6 +123,16 @@ export function TodayView({
             <dd>{signalCount ? `${signalCount}건` : '없음'}<small>역할·인수인계 점검</small></dd>
           </div>
         </dl>
+      )}
+      {relay && (
+        <RelayCard
+          role={relay.role}
+          days={relay.days}
+          members={members}
+          roleHandoffs={roleHandoffs}
+          progress={handoffProgress(relay.role.id)}
+          onOpenHandoff={onOpenRoleHandoff}
+        />
       )}
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="today-list-toolbar">

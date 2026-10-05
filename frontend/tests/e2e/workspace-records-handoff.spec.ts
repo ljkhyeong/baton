@@ -1302,3 +1302,20 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   await expect(panel.getByText('자료가 변경되어 재확인이 필요합니다.')).toBeVisible()
   await expect(panel.getByText('수정 필요 · 변경 전 확인 기록')).toBeVisible()
 })
+
+test('@handoff 오늘의 릴레이 카드는 인계가 가장 가까운 역할을 보여 주고 인수인계로 이동한다', async ({ page }, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-09-03T00:00:00+09:00'))
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  const relay = page.getByRole('region', { name: '인수인계 릴레이' })
+  await expect(relay).toContainText('문제 큐레이터 릴레이')
+  await expect(relay).toContainText('인계까지 D-14')
+  await expect(relay).toContainText('인수인계 준비 50%')
+  await expect(relay).toContainText('김준호에게')
+
+  await relay.getByRole('button', { name: '인수인계 열기' }).click()
+  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }))
+    .toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { level: 2, name: '김준호님에게 넘길 인수인계' })).toBeVisible()
+})
