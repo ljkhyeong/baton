@@ -42,15 +42,13 @@ import type {
   SeasonRound,
   ViewKey,
 } from './types'
+import type { MemberFormRequest, RoleFormRequest } from './WorkspacePeopleModals'
+import type { RoutineFormRequest, SeasonRoundFormRequest } from './WorkspaceOperationsModals'
 import type {
   DecisionFormRequest,
   HandoffItemFormRequest,
-  MemberFormRequest,
-  RoleFormRequest,
   RoleResourceFormRequest,
-  RoutineFormRequest,
-  SeasonRoundFormRequest,
-} from './WorkspaceModals'
+} from './WorkspaceRecordModals'
 import type { WorkspaceEditor } from './workspaceEditorActions'
 import {
   categoryCopy,

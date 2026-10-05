@@ -1,7 +1,7 @@
 import { queryOptions, useQuery } from '@tanstack/react-query'
 import { getAccountSecurity } from '@/features/auth/api'
 
-export const accountSecurityKeys = {
+const accountSecurityKeys = {
   all: ['auth', 'account'] as const,
   current: (accountId: string) => [...accountSecurityKeys.all, accountId] as const,
 }

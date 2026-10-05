@@ -15,7 +15,7 @@ import type {
   SeasonRound,
 } from './types'
 
-export const routineTimingStatusCopy = {
+const routineTimingStatusCopy = {
   UNSCHEDULED: '마감 미설정',
   PLANNED: '예정',
   IN_PROGRESS: '진행',
@@ -23,14 +23,14 @@ export const routineTimingStatusCopy = {
   COMPLETED: '완료',
 } satisfies Record<RoutineTimingStatus, string>
 
-export const roundTimingStatusCopy = {
+const roundTimingStatusCopy = {
   PLANNED: '예정',
   IN_PROGRESS: '진행',
   OVERDUE: '지연',
   COMPLETED: '완료',
 } as const
 
-export function roundOriginLabel(round: SeasonRound) {
+function roundOriginLabel(round: SeasonRound) {
   return round.origin === 'AUTOMATIC' ? '자동 생성' : '수동 생성'
 }
 

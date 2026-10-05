@@ -1,6 +1,6 @@
 import { useQueries } from '@tanstack/react-query'
-import { getWorkspace, isWorkspaceAccessDenied, type WorkspaceScope } from '../api'
-import { workspaceKeys } from '../queries'
+import type { WorkspaceScope } from '../api'
+import { workspaceQueryOptions } from '../queries'
 import type { WorkspaceProjection } from '../types'
 import { RecordSearchView } from './RecordSearchView'
 import type { RecordSearchFilters, RecordSearchResult } from './recordSearch'
@@ -16,14 +16,8 @@ export function SeasonRecordSearch({ scope, workspace, allSeasons, onAllSeasonsC
 }) {
   const seasons = allSeasons ? workspace.seasons.filter(season => season.id !== scope.seasonId) : []
   const queries = useQueries({ queries: seasons.map(season => ({
-    queryKey: workspaceKeys.detail(scope.teamId, season.id, scope.accessKey, scope.accountId),
-    queryFn: ({ signal }: { signal: AbortSignal }) => getWorkspace({ ...scope, seasonId: season.id }, signal),
+    ...workspaceQueryOptions({ ...scope, seasonId: season.id }, 30_000),
     staleTime: 0,
-    retry: (count: number, error: Error) => !isWorkspaceAccessDenied(error) && count < 1,
-    refetchInterval: (query: { state: { error: Error | null } }) => isWorkspaceAccessDenied(query.state.error) ? false : 30_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: (query: { state: { error: Error | null } }) => !isWorkspaceAccessDenied(query.state.error) && 'always' as const,
-    refetchOnReconnect: (query: { state: { error: Error | null } }) => !isWorkspaceAccessDenied(query.state.error) && 'always' as const,
   })) })
   const loading = queries.filter(query => query.isPending).length
   const failed = queries.flatMap((query, index) => query.isError ? [{ name: seasons[index]!.name, query }] : [])

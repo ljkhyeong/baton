@@ -28,6 +28,11 @@ export class ApiError extends Error {
   }
 }
 
+// 로그인이 필요하거나 권한이 없어 같은 요청을 반복해도 결과가 바뀌지 않는 응답이다.
+export function isAccessDenied(error: unknown): error is ApiError {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403)
+}
+
 export class ApiClientError extends Error {
   readonly kind: ApiClientErrorKind
 

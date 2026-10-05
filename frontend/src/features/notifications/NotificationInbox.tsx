@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { NotificationPreferencesPanel } from './NotificationPreferencesPanel'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 import { getNotifications, readNotification, type NotificationScope } from './api'
 import './notifications.scss'
 
-const accessDenied = (error: unknown) => error instanceof ApiError && [401, 403].includes(error.status)
 
 export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff }: {
   scope: NotificationScope; workspace: WorkspaceProjection
@@ -20,9 +19,9 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
   const client = useQueryClient()
   const key = ['teams', scope.teamId, 'seasons', scope.seasonId, 'notifications', scope.accountId, scope.accessKey]
   const inbox = useQuery({ queryKey: key, queryFn: ({ signal }) => getNotifications(scope, signal),
-    enabled: query => open && !accessDenied(query.state.error),
-    retry: (count, error) => !accessDenied(error) && count < 1,
-    refetchInterval: 30_000, refetchIntervalInBackground: false })
+    enabled: query => open && !isAccessDenied(query.state.error),
+    retry: (count, error) => !isAccessDenied(error) && count < 1,
+    refetchInterval: 30_000 })
   useEffect(() => {
     void client.invalidateQueries({ queryKey: ['teams', scope.teamId, 'seasons', scope.seasonId, 'notifications', scope.accountId] })
   }, [client, scope.teamId, scope.seasonId, scope.accountId, workspace])

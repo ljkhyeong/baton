@@ -62,7 +62,6 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
     enabled,
     staleTime: 30_000,
     refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     retry: false,

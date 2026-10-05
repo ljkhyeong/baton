@@ -3,10 +3,10 @@ import { csrfHeaders } from '@/features/auth/api'
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isNullableInstant, isNullableUuid, isSameUuid, isUuid } from '@/shared/api/responseValidation'
 
-export type MyTeams = operations['getMyTeams']['responses'][200]['content']['application/json']
-export type TeamAccess = operations['getTeamAccess']['responses'][200]['content']['application/json']
+type MyTeams = operations['getMyTeams']['responses'][200]['content']['application/json']
+type TeamAccess = operations['getTeamAccess']['responses'][200]['content']['application/json']
 export type Permission = NonNullable<TeamAccess['permission']>
-export type InvitationPreview = operations['previewTeamInvitation']['responses'][200]['content']['application/json']
+type InvitationPreview = operations['previewTeamInvitation']['responses'][200]['content']['application/json']
 type Accepted = operations['acceptTeamInvitation']['responses'][200]['content']['application/json']
 type CreatedResponse = operations['createTeamInvitation']['responses'][200]['content']['application/json']
 type Created = Omit<CreatedResponse, 'invitation' | 'token'> & {

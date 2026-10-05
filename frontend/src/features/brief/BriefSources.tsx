@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { queryBriefSources } from './api'
 import type { AttentionCursor, BriefScope, BriefSource } from './types'
 import { attentionReasons } from './types'
@@ -17,7 +17,7 @@ export function BriefSources({ scope, items, onOpen, children }: {
   const query = useQuery({ queryKey: ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }, 'sources', identities],
     queryFn: ({ signal }) => queryBriefSources(scope, identities, signal), enabled: identities.length > 0, retry: false, staleTime: 0 })
   const error = query.error
-  if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return <p role="alert">{error.message}{' '}
+  if (isAccessDenied(error)) return <p role="alert">{error.message}{' '}
     <button type="button" onClick={() => void query.refetch()}>업무 조회 권한 다시 확인</button></p>
   return <BriefSourceContext value={{ sources: query.isError ? [] : query.data?.sources ?? [], loading: query.isFetching, onOpen }}>
     {query.isError && <p role="alert">현재 업무 정보를 불러오지 못했습니다. <button type="button" onClick={() => void query.refetch()}>업무 정보 다시 조회</button></p>}

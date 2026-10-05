@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { matchMutation, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
-import { isWorkspaceMutationForScope } from './queries'
+import { workspaceMutationKey } from './queries'
 
 type WorkspaceMutationRecoveryOptions = {
   teamId: string
@@ -36,10 +36,7 @@ export function useWorkspaceMutationRecovery({
   useEffect(() => {
     return queryClient.getMutationCache().subscribe((event) => {
       if (event.type !== 'updated' || event.action.type !== 'error') return
-      if (!isWorkspaceMutationForScope(event.mutation.options.mutationKey, {
-        teamId,
-        seasonId,
-      })) return
+      if (!matchMutation({ mutationKey: workspaceMutationKey({ teamId, seasonId }), exact: true }, event.mutation)) return
 
       const error = event.action.error
       if (!(error instanceof ApiError)) return

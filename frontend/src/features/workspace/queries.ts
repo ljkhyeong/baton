@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseMutationOptions } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 import {
@@ -94,19 +94,10 @@ export const workspaceKeys = {
 
 const WORKSPACE_MUTATION_KEY_PREFIX = 'workspace-mutation'
 
-function workspaceMutationKey(
+export function workspaceMutationKey(
   scope: Pick<WorkspaceScope, 'teamId' | 'seasonId'>,
 ) {
   return [WORKSPACE_MUTATION_KEY_PREFIX, scope.teamId, scope.seasonId] as const
-}
-
-export function isWorkspaceMutationForScope(
-  mutationKey: readonly unknown[] | undefined,
-  scope: Pick<WorkspaceScope, 'teamId' | 'seasonId'>,
-) {
-  const expected = workspaceMutationKey(scope)
-  return mutationKey?.length === expected.length
-    && mutationKey.every((value, index) => value === expected[index])
 }
 
 function useWorkspaceMutation<
@@ -134,19 +125,22 @@ function canAutomaticallyRefetchWorkspace(query: { state: { error: unknown } }) 
   return !isWorkspaceAccessDenied(query.state.error)
 }
 
-export function useWorkspaceQuery(scope: WorkspaceScope) {
-  return useQuery({
+// 같은 캐시 키를 쓰는 작업 공간·기록 검색·모든 팀의 할 일이 같은 재시도·재조회 규칙을 쓴다.
+export function workspaceQueryOptions(scope: WorkspaceScope, refetchInterval = WORKSPACE_SYNC_INTERVAL_MS) {
+  return queryOptions({
     queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId),
     queryFn: ({ signal }) => getWorkspace(scope, signal),
-    enabled: Boolean(scope.teamId && scope.seasonId),
-    retry: (failureCount, error) => !isWorkspaceAccessDenied(error)
-      && failureCount < 1,
-    refetchInterval: (query) => !canAutomaticallyRefetchWorkspace(query)
-      ? false
-      : WORKSPACE_SYNC_INTERVAL_MS,
-    refetchIntervalInBackground: false,
+    retry: (failureCount, error) => !isWorkspaceAccessDenied(error) && failureCount < 1,
+    refetchInterval: (query) => canAutomaticallyRefetchWorkspace(query) && refetchInterval,
     refetchOnReconnect: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
     refetchOnWindowFocus: (query) => canAutomaticallyRefetchWorkspace(query) && 'always',
+  })
+}
+
+export function useWorkspaceQuery(scope: WorkspaceScope) {
+  return useQuery({
+    ...workspaceQueryOptions(scope),
+    enabled: Boolean(scope.teamId && scope.seasonId),
   })
 }
 

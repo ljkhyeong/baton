@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { WorkspaceScope } from '@/features/workspace/api'
 import { formatLocalDate } from '@/features/workspace/workspacePresentation'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { dueReviewsKey, getDueReviews } from './api'
 import './resource-verification.scss'
 
@@ -10,7 +10,7 @@ export function DueResourceReviewsPanel({ scope, timeZone, ended, onOpenResource
 }) {
   const query = useQuery({ queryKey: dueReviewsKey(scope), queryFn: () => getDueReviews(scope, timeZone),
     enabled: !ended, staleTime: 30_000, refetchOnWindowFocus: true,
-    refetchInterval: current => current.state.error instanceof ApiError && [401, 403].includes(current.state.error.status) ? false : 30_000,
+    refetchInterval: current => !isAccessDenied(current.state.error) && 30_000,
   })
   if (ended) return null
   return <section className="due-resource-reviews" aria-labelledby="due-reviews-title">

@@ -19,7 +19,7 @@ function resourcePath(scope: ResourceHealthScope) {
   return `/api/v1/teams/${encodeURIComponent(scope.teamId)}/seasons/${encodeURIComponent(scope.seasonId)}/role-resources/${encodeURIComponent(scope.resourceId)}`
 }
 
-export function decodeResourceHealth(value: unknown, resourceId: string): ResourceHealth {
+function decodeResourceHealth(value: unknown, resourceId: string): ResourceHealth {
   if (!isJsonObject(value) || !isSameUuid(value.resourceId, resourceId)
     || !healthValues.some((health) => health === value.health)
     || !availabilityValues.some((availability) => availability === value.availability)

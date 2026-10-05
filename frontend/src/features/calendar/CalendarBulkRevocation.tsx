@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { isSameUuid } from '@/shared/api/responseValidation'
 import { getCalendarSubscription, revokeCalendarSubscription } from './api'
 import type { CalendarSubscription, CalendarSubscriptionSummary } from './types'
@@ -13,7 +13,6 @@ const outcomeLabels: Record<Outcome, string> = {
   REVOKED: '해제됨', PENDING: '해제 처리 중', CHECK_REQUIRED: '해제 여부 확인 필요', CHANGED: '구독 변경됨 · 다시 확인',
   ACCOUNT_REQUIRED: '로그인 계정 확인 필요', NOT_ATTEMPTED: '요청 안 함',
 }
-const accountError = (error: unknown) => error instanceof ApiError && [401, 403].includes(error.status)
 function observedOutcome(status: CalendarSubscription, expectedId: string): Outcome {
   if (status.status === 'NOT_CREATED') return 'REVOKED'
   if (!isSameUuid(status.subscriptionId, expectedId)) return 'CHANGED'
@@ -58,13 +57,13 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
           }
         } catch (error) {
           if (abort.signal.aborted) outcome = requested ? 'CHECK_REQUIRED' : 'NOT_ATTEMPTED'
-          else if (accountError(error)) { outcome = 'ACCOUNT_REQUIRED'; stopped = true }
+          else if (isAccessDenied(error)) { outcome = 'ACCOUNT_REQUIRED'; stopped = true }
           else {
             outcome = 'CHECK_REQUIRED'
             if (requested) {
               try { outcome = observedOutcome(await getCalendarSubscription(scope, abort.signal), target.subscriptionId) }
               catch (checkError) {
-                if (accountError(checkError)) { outcome = 'ACCOUNT_REQUIRED'; stopped = true }
+                if (isAccessDenied(checkError)) { outcome = 'ACCOUNT_REQUIRED'; stopped = true }
               }
             }
           }
@@ -75,7 +74,7 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
       setResults(completed)
       // 결과를 알 수 없는 해제 요청은 반복하지 않고 사용자가 상태를 확인하도록 남긴다.
     },
-    retry: false, gcTime: 0, networkMode: 'always',
+    gcTime: 0, networkMode: 'always',
     onSettled: () => {
       locked.current = false
       onLockChange(false)

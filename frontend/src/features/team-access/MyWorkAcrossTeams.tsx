@@ -2,10 +2,10 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getNotificationPreferences } from '@/features/notifications/api'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
-import { getWorkspace, type WorkspaceScope } from '@/features/workspace/api'
-import { workspaceKeys } from '@/features/workspace/queries'
+import type { WorkspaceScope } from '@/features/workspace/api'
+import { workspaceQueryOptions } from '@/features/workspace/queries'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
 import { personalWork } from '@/features/workspace/personalWork'
 import { getMyTeams } from './api'
@@ -13,31 +13,21 @@ import { MyRecentRecordsAcrossTeams } from './MyRecentRecordsAcrossTeams'
 
 type Teams = Awaited<ReturnType<typeof getMyTeams>>['teams']
 type WorkKind = 'overdue' | 'soon' | 'routine' | 'handoff'
-const denied = (error: unknown) => error instanceof ApiError && [401, 403].includes(error.status)
 const taskOrder: Record<WorkKind, number> = { overdue: 0, soon: 1, routine: 2, handoff: 3 }
-const queryOptions = (scope: WorkspaceScope) => ({
-  queryKey: workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId),
-  queryFn: ({ signal }: { signal: AbortSignal }) => getWorkspace(scope, signal),
-  staleTime: 0,
-  refetchOnWindowFocus: (query: { state: { error: Error | null } }) => !denied(query.state.error) && 'always' as const,
-  refetchOnReconnect: (query: { state: { error: Error | null } }) => !denied(query.state.error) && 'always' as const,
-  retry: (count: number, error: Error) => !denied(error) && count < 1,
-  refetchInterval: (query: { state: { error: Error | null } }) => denied(query.state.error) ? false : 30_000,
-  refetchIntervalInBackground: false,
-})
+const workspaceOptions = (scope: WorkspaceScope) => ({ ...workspaceQueryOptions(scope, 30_000), staleTime: 0 })
 
 export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; teams: Teams }) {
   const [filter, setFilter] = useState('all')
   const preferences = useQuery({ queryKey: ['auth', 'notification-preferences', accountId],
     queryFn: () => getNotificationPreferences(accountId), staleTime: 0 })
-  const primary = useQueries({ queries: teams.map(team => queryOptions({ accountId, teamId: team.teamId, seasonId: team.seasonId, accessKey: '' })) })
+  const primary = useQueries({ queries: teams.map(team => workspaceOptions({ accountId, teamId: team.teamId, seasonId: team.seasonId, accessKey: '' })) })
   const otherScopes = primary.flatMap((query, index) => query.data && !query.isError
     ? query.data.seasons.filter(season => !season.endedAt && season.id !== teams[index]!.seasonId)
       .map(season => ({ accountId, teamId: teams[index]!.teamId, seasonId: season.id, accessKey: '' })) : [])
-  const others = useQueries({ queries: otherScopes.map(queryOptions) })
+  const others = useQueries({ queries: otherScopes.map(workspaceOptions) })
   const blockedTeams = new Set([
     ...primary.flatMap((query, index) => query.isError ? [teams[index]!.teamId] : []),
-    ...others.flatMap((query, index) => denied(query.error) ? [otherScopes[index]!.teamId] : []),
+    ...others.flatMap((query, index) => isAccessDenied(query.error) ? [otherScopes[index]!.teamId] : []),
   ])
   const all = [...primary, ...others]
   const workspaces = all.flatMap(query => query.data && !query.isError && !query.data.season.endedAt

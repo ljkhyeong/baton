@@ -6,7 +6,7 @@ import {
   useState,
 } from 'react'
 
-export type WorkspaceModal = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
+type WorkspaceModal = 'decision' | 'members' | 'member' | 'role' | 'roleResource' | 'routine' | 'round' | 'roundSchedule' | 'handoffItem' | 'roleHandoff' | 'handoffPreview' | 'shareLink' | 'accessKey' | 'seasonSwitcher' | 'seasonEdit' | 'seasonSuccessor' | null
 export type OpenWorkspaceModal = Exclude<WorkspaceModal, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 

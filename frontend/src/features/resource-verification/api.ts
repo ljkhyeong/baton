@@ -6,7 +6,7 @@ import { workspaceKeys } from '@/features/workspace/queries'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
 import type { operations } from '@/generated/api'
 
-export type VerificationHistory = operations['getResourceVerifications']['responses'][200]['content']['application/json']
+type VerificationHistory = operations['getResourceVerifications']['responses'][200]['content']['application/json']
 export type VerifyResourceRequest = NonNullable<operations['verifyResource']['requestBody']>['content']['application/json']
 
 function decode(value: unknown, scope: WorkspaceScope, resourceId: string): VerificationHistory {
@@ -64,7 +64,7 @@ export async function configureReviewSchedule(scope: WorkspaceScope, resourceId:
     decode: value => decodeSchedule(value, scope, resourceId) })
 }
 
-export type DueReviews = operations['getDueResourceReviews']['responses'][200]['content']['application/json']
+type DueReviews = operations['getDueResourceReviews']['responses'][200]['content']['application/json']
 export const dueReviewsKey = (scope: WorkspaceScope) => [
   ...workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId), 'due-resource-reviews',
 ] as const

@@ -1,4 +1,4 @@
-import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import { matchQuery, MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/shared/api/ApiError'
 
 export const authSessionQueryKey = ['auth', 'session'] as const
@@ -20,9 +20,6 @@ export const queryClient = new QueryClient({
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     },
-    mutations: {
-      retry: false,
-    },
   },
 })
 
@@ -30,7 +27,7 @@ export const queryClient = new QueryClient({
 let observedAccount: string | undefined
 queryClient.getQueryCache().subscribe(event => {
   if (event.type !== 'updated' || event.action.type !== 'success'
-    || event.query.queryKey.length !== 2 || event.query.queryKey[0] !== 'auth' || event.query.queryKey[1] !== 'session') return
+    || !matchQuery({ queryKey: authSessionQueryKey, exact: true }, event.query)) return
   const data = event.query.state.data as { authenticated?: boolean; accountId?: string } | undefined
   if (typeof data?.authenticated !== 'boolean') return
   const account = data.authenticated ? data.accountId : 'anonymous'

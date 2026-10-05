@@ -5,7 +5,7 @@ import { useCurrentAccountMembership } from '@/features/membership/queries'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { isSameUuid } from '@/shared/api/responseValidation'
 import { getAttentionPage, getAttentionSummary, getAttentionTransitions, getWeeklyResolutions } from './api'
@@ -74,7 +74,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
   const resolutionWeekChanged = Boolean(resolutionPage && resolutionData
     && (resolutionPage.weekStart !== resolutionData.weekStart || resolutionPage.zoneId !== resolutionData.zoneId))
   const pageData = page.isError ? undefined : page.data
-  const accessError = [summary.error, page.error, history.error, resolutions.error].find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
+  const accessError = [summary.error, page.error, history.error, resolutions.error].find(isAccessDenied)
   if (accessError) return <p role="alert">{accessError.message}{' '}
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
   return <div className="brief-attention-body">

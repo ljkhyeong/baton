@@ -19,6 +19,7 @@ import {
   isNullableUuid,
   isSameUuid,
   isStringArray,
+  isSupportedTimeZone,
   isUuid,
 } from '@/shared/api/responseValidation'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
@@ -72,16 +73,6 @@ function hasNullableUuidFields(
   fields: readonly string[],
 ) {
   return fields.every((field) => isNullableUuid(value[field]))
-}
-
-function isSupportedTimeZone(value: unknown): value is string {
-  if (typeof value !== 'string') return false
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: value }).format()
-    return true
-  } catch {
-    return false
-  }
 }
 
 function isRoundSchedule(value: unknown) {

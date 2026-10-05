@@ -68,17 +68,9 @@ import { isWorkspaceAccessDenied } from './api'
 import { useWorkspaceAccessKeyFlow } from './useWorkspaceAccessKeyFlow'
 import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
 import { useWorkspaceMutationRecovery } from './useWorkspaceMutationRecovery'
-import {
-  DecisionModal,
-  HandoffItemModal,
-  MemberModal,
-  MemberManagementModal,
-  RoleModal,
-  RoleResourceModal,
-  RoutineModal,
-  RoundScheduleModal,
-  SeasonRoundModal,
-} from './WorkspaceModals'
+import { MemberManagementModal, MemberModal, RoleModal } from './WorkspacePeopleModals'
+import { RoundScheduleModal, RoutineModal, SeasonRoundModal } from './WorkspaceOperationsModals'
+import { DecisionModal, HandoffItemModal, RoleResourceModal } from './WorkspaceRecordModals'
 import {
   HandoffPreview,
   RoleHandoffModal,
@@ -223,10 +215,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     source: 'relevant-default',
   })
   const selectedRoundId = roundSelection.roundId
-
-  useEffect(() => {
-    setRecordSearchFilters(initialRecordSearchFilters)
-  }, [seasonId])
 
   const selectRound = (roundId: string) => {
     setRoundSelection({ roundId, source: 'user' })

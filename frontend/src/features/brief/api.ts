@@ -1,5 +1,5 @@
 import { apiRequest } from '@/shared/api/client'
-import { isInstant, isJsonObject, isUuid, isSameUuid } from '@/shared/api/responseValidation'
+import { isInstant, isJsonObject, isSameUuid, isSupportedTimeZone, isUuid } from '@/shared/api/responseValidation'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { csrfHeaders } from '@/features/auth/api'
 import { attentionReasons } from './types'
@@ -53,12 +53,11 @@ export function getWeeklyResolutions(scope: BriefScope, cursor: AttentionCursor 
     method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey },
     query: { afterEventType: cursor?.eventType, afterSourceReference: cursor?.sourceReference },
     decode: (value): WeeklyResolutions => {
-      if (!isJsonObject(value) || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
+      if (!isJsonObject(value) || !isCalendarDate(value.weekStart) || !isSupportedTimeZone(value.zoneId)
         || !isInstant(value.windowStart) || !isInstant(value.windowEnd) || !isInstant(value.evaluatedAt)
         || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !isNonNegativeInteger(value.resolvedCount) || !Array.isArray(value.items)) {
         throw new Error('이번 주 해결 요약을 확인할 수 없습니다.')
       }
-      new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
       return { weekStart: value.weekStart, zoneId: value.zoneId, windowStart: value.windowStart,
         windowEnd: value.windowEnd, evaluatedAt: value.evaluatedAt, resolvedCount: value.resolvedCount,
         items: value.items.map((item) => {
@@ -141,12 +140,11 @@ function decodeEdition(value: unknown, scope: BriefScope): BriefEdition {
   if (!isJsonObject(value) || !isUuid(value.editionId) || !isUuid(value.workspaceId) || !isUuid(value.seasonId)
     || !isSameUuid(value.workspaceId, scope.teamId) || !isSameUuid(value.seasonId, scope.seasonId)
     || !isPositiveInteger(value.generation) || !isPositiveInteger(value.ruleVersion) || !isNonNegativeInteger(value.sourceCursor)
-    || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
+    || !isCalendarDate(value.weekStart) || !isSupportedTimeZone(value.zoneId)
     || !isInstant(value.generatedAt) || !isInstant(value.windowStart) || !isInstant(value.windowEnd)
     || Date.parse(value.windowStart) >= Date.parse(value.windowEnd) || !Array.isArray(value.items)) {
     throw new Error('저장된 주간 요약 응답을 확인할 수 없습니다.')
   }
-  new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
   const items = value.items.map(decodeEditionItem)
   return { editionId: value.editionId, workspaceId: value.workspaceId, seasonId: value.seasonId,
     generation: value.generation, ruleVersion: value.ruleVersion, sourceCursor: value.sourceCursor,
@@ -175,12 +173,11 @@ export async function generateEdition(scope: BriefScope): Promise<BriefGeneratio
 
 function decodeEditionSummary(value: unknown): BriefEditionHistory['editions'][number] {
   if (!isJsonObject(value) || !isUuid(value.editionId) || !isPositiveInteger(value.generation)
-    || !isCalendarDate(value.weekStart) || typeof value.zoneId !== 'string' || !value.zoneId
+    || !isCalendarDate(value.weekStart) || !isSupportedTimeZone(value.zoneId)
     || !isInstant(value.generatedAt) || !isNonNegativeInteger(value.sourceCursor)
     || !isPositiveInteger(value.ruleVersion) || !isNonNegativeInteger(value.itemCount)) {
     throw new Error('주간 요약 이력의 저장 정보를 확인할 수 없습니다.')
   }
-  new Intl.DateTimeFormat('ko-KR', { timeZone: value.zoneId })
   return { editionId: value.editionId, generation: value.generation, weekStart: value.weekStart, zoneId: value.zoneId,
     generatedAt: value.generatedAt, sourceCursor: value.sourceCursor, ruleVersion: value.ruleVersion, itemCount: value.itemCount }
 }

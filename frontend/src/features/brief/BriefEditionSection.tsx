@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError } from '@/shared/api/ApiError'
+import { ApiError, isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
 import { attentionReasons, editionSections } from './types'
@@ -52,7 +52,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
   const effectiveBaseId = previousMode ? (previous.isError ? '' : previous.data?.editionId ?? '') : baseId
   const comparison = useQuery({ queryKey: [...scopeKey, 'edition-comparison', effectiveBaseId, edition?.editionId], enabled: Boolean(effectiveBaseId && edition),
     queryFn: ({ signal }) => compareEditions(scope, effectiveBaseId, edition!.editionId, signal), retry: false, staleTime: 0 })
-  const generation = useMutation({ mutationFn: () => generateEdition(scope), retry: false,
+  const generation = useMutation({ mutationFn: () => generateEdition(scope),
     onSuccess: async () => {
       navigation.update({ selectedId: '', baseId: '', previousTargetId: '' }); onGenerated()
       await Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'latest-edition'] }),
@@ -60,7 +60,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
     }, onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: [...scopeKey, 'generation-readiness'] }),
       queryClient.invalidateQueries({ queryKey: [...scopeKey, 'edition-delivery-status'] })]) })
   const accessError = [latest.error, history.error, selected.error, comparison.error, readiness.error, delivery.error, generation.error, previousMode ? previous.error : null]
-    .find((error) => error instanceof ApiError && (error.status === 401 || error.status === 403))
+    .find(isAccessDenied)
   const refresh = () => {
     navigation.update({ selectedId: '', baseId: '', previousTargetId: '' }); generation.reset()
     void queryClient.resetQueries({ queryKey: scopeKey })

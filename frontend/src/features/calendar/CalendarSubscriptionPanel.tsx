@@ -5,7 +5,7 @@ import { useCurrentAccountMembership } from '@/features/membership/queries'
 import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import { isActiveMember } from '@/features/workspace/workspacePresentation'
 import type { WorkspaceProjection } from '@/features/workspace/types'
-import { ApiError } from '@/shared/api/ApiError'
+import { isAccessDenied } from '@/shared/api/ApiError'
 import { isSameUuid } from '@/shared/api/responseValidation'
 import { getCalendarSubscription, issueCalendarSubscription, revokeCalendarSubscription } from './api'
 import { CalendarRegistrationGuide } from './CalendarRegistrationGuide'
@@ -70,7 +70,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
   const [pollUntil, setPollUntil] = useState<number | null>(null)
   const [pollExpired, setPollExpired] = useState(false)
   const subscription = useQuery({ queryKey, queryFn: ({ signal }) => getCalendarSubscription(scope, signal),
-    retry: false, gcTime: 0, staleTime: 0, refetchOnWindowFocus: 'always', refetchIntervalInBackground: false,
+    retry: false, gcTime: 0, staleTime: 0, refetchOnWindowFocus: 'always',
     refetchInterval: (query) => {
       if (!['IN_PROGRESS', 'REVOCATION_PENDING'].includes(query.state.data?.status ?? '')) return false
       if (query.state.status === 'error' || actionLock.current || pollExpired) return false
@@ -112,7 +112,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
       }
       // 구독 주소는 mutation 반환값이나 조회 캐시에 넣지 않는다.
     },
-    retry: false, gcTime: 0, networkMode: 'always',
+    gcTime: 0, networkMode: 'always',
     onError: async () => { await subscription.refetch() },
     onSettled: () => {
       actionLock.current = false
@@ -123,7 +123,7 @@ export function CalendarContent({ accountId, scope, canIssue, ended, managementO
   const status = subscription.data?.status
   const error = operation.variables === 'revoke' && status === 'REVOKED'
     ? subscription.error : operation.error ?? subscription.error
-  const unavailable = [operation.error, subscription.error].some((value) => value instanceof ApiError && [401, 403].includes(value.status))
+  const unavailable = [operation.error, subscription.error].some(isAccessDenied)
   const ready = !busy && !subscription.isError && !!status && !unavailable
   const request = (action: 'create' | 'rotate' | 'revoke') => {
     if (actionLock.current) return

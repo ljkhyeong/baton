@@ -49,3 +49,13 @@ export function isNullableUuid(value: unknown): value is string | null {
 export function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
+
+export function isSupportedTimeZone(value: unknown): value is string {
+  if (typeof value !== 'string' || !value) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format()
+    return true
+  } catch {
+    return false
+  }
+}
