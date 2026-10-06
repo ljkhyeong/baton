@@ -1,4 +1,6 @@
+import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
+import { ReceivedBatonNotice } from './WorkspaceBatonNotice'
 import {
   ActionableEmpty,
   formatDateRange,
@@ -11,29 +13,102 @@ import {
   latestRoleHandoff,
   memberDisplayName,
 } from './workspacePresentation'
-import type { Member, Role, RoleHandoff } from './types'
+import type { Member, Role, RoleHandoff, SeasonRound } from './types'
 
-export function RolesView({
+function MyRoles({
+  me,
   roles,
   roleHandoffs,
   members,
+  rounds,
+  timeZone,
+  handoffProgress,
+  onOpenHandoff,
+}: {
+  me: Member
+  roles: Role[]
+  roleHandoffs: RoleHandoff[]
+  members: Member[]
+  rounds: SeasonRound[]
+  timeZone: string
+  handoffProgress: (id: string) => number
+  onOpenHandoff: (roleId: string) => void
+}) {
+  const myRoles = roles.filter((role) => role.currentMemberId === me.id)
+  const receiving = roles.flatMap((role) => {
+    const handoff = latestRoleHandoff(roleHandoffs, role.id)
+    return handoff?.status === 'TRANSFERRED' && handoff.toMemberId === me.id ? [{ role, handoff }] : []
+  })
+  if (!myRoles.length && !receiving.length) return null
+  const nextTask = (roleId: string) => rounds
+    .flatMap((round) => round.routineExecutions)
+    .filter((execution) => execution.ownerRoleId === roleId && execution.status !== 'DONE')
+    .sort((left, right) => (left.deadlineAt ?? 'z').localeCompare(right.deadlineAt ?? 'z'))[0]
+  return (
+    <section className="my-roles" aria-label="내 역할">
+      {receiving.map(({ role, handoff }) => (
+        <ReceivedBatonNotice key={handoff.id} role={role} handoff={handoff} members={members} onOpenHandoff={onOpenHandoff} />
+      ))}
+      {myRoles.map((role) => {
+        const task = nextTask(role.id)
+        const next = getMember(members, role.nextMemberId)
+        const handoff = latestRoleHandoff(roleHandoffs, role.id)
+        const progress = handoffProgress(role.id)
+        return (
+          <article className="my-role" key={role.id} aria-labelledby={`my-role-${role.id}`}>
+            <div className="my-role-head">
+              <h2 id={`my-role-${role.id}`}>{role.name}</h2>
+              <span>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</span>
+            </div>
+            <p className="my-role-line">
+              <span>다음 할 일</span>
+              <strong>{task ? `${task.title}${task.deadlineAt ? ` · ${formatInstant(task.deadlineAt, timeZone)}` : ''}` : '남은 업무가 없습니다'}</strong>
+            </p>
+            <button type="button" className="my-role-handoff" onClick={() => onOpenHandoff(role.id)}>
+              <span>넘겨줄 준비</span>
+              <strong>
+                {next ? `${memberDisplayName(next)}님에게` : '다음 담당자 미정'}
+                {' · '}
+                {handoff?.status === 'TRANSFERRED' ? '수락 대기' : `준비 ${progress}%`}
+              </strong>
+              <span className="thin-progress"><i style={{ width: `${progress}%` }} /></span>
+            </button>
+          </article>
+        )
+      })}
+    </section>
+  )
+}
+
+export function RolesView({
+  me,
+  roles,
+  roleHandoffs,
+  members,
+  rounds,
+  timeZone,
   selectedRoleId,
   onSelectRole,
   onManageMembers,
   onAddRole,
   onEditRole,
+  onOpenHandoff,
   handoffProgress,
   changesDisabled = false,
   memberManagementDisabled = changesDisabled,
 }: {
+  me?: Member
   roles: Role[]
   roleHandoffs: RoleHandoff[]
   members: Member[]
+  rounds: SeasonRound[]
+  timeZone: string
   selectedRoleId: string
   onSelectRole: (id: string, options?: { opener?: HTMLElement }) => void
   onManageMembers: () => void
   onAddRole: () => void
   onEditRole: (role: Role) => void
+  onOpenHandoff: (roleId?: string) => void
   handoffProgress: (id: string) => number
   changesDisabled?: boolean
   memberManagementDisabled?: boolean
@@ -53,12 +128,27 @@ export function RolesView({
             >
               <Icon name="roles" size={15} /> 구성원 관리
             </button>
+            <button type="button" className="secondary-button" onClick={() => onOpenHandoff()}>
+              <Icon name="handoff" size={15} /> 인수인계
+            </button>
             <PrimaryButton onClick={onAddRole} disabled={changesDisabled}>역할 추가</PrimaryButton>
           </div>
         )}
       />
+      {me && (
+        <MyRoles
+          me={me}
+          roles={roles}
+          roleHandoffs={roleHandoffs}
+          members={members}
+          rounds={rounds}
+          timeZone={timeZone}
+          handoffProgress={handoffProgress}
+          onOpenHandoff={onOpenHandoff}
+        />
+      )}
       {roles.length ? (
-        <section className="role-directory">
+        <section className="role-directory" aria-label="모든 역할">
           <div className="directory-head"><span>역할과 목적</span><span>현재 담당자</span><span>다음 담당자</span><span>인수인계 준비</span></div>
           {roles.map((role) => {
             const owner = getMember(members, role.currentMemberId)

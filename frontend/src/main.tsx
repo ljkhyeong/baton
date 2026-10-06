@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { initializeErrorReporting, reportReactError } from './app/errorReporting'
 import { createRoot } from 'react-dom/client'
 import App from '@/app/App'
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
 import '@/styles/global.scss'
 
 const root = document.getElementById('root')

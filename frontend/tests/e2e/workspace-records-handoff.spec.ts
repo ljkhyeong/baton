@@ -28,6 +28,7 @@ import {
   recordedCall,
   expectScopedCall,
   openRecordSearch,
+  openHandoffView,
 } from './support/workspaceApiHarness'
 
 test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ page }, testInfo) => {
@@ -372,7 +373,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
   const api = await installApi(page)
   await openSharedWorkspace(page)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
 
   const prepareDialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
@@ -424,7 +425,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
     },
   )
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '내용 확인 후 전달' }).click()
   const transferDialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
   const readiness = transferDialog.getByLabel('전달 전 체크리스트와 자료 현황')
@@ -486,7 +487,7 @@ test('@handoff 역할 인수인계를 준비하고 경고 확인 후 전달·수
   })
 
   await page.reload()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await expect(page.getByText('최근 인수인계 수락 완료')).toBeVisible()
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await expect(page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }))
@@ -509,7 +510,7 @@ test('@handoff 역할 탭은 방향키로 순환하고 선택한 tabpanel을 연
   })
   await installApi(page, projection)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
 
   const tablist = page.getByRole('tablist', { name: '역할별 인수인계' })
   const first = tablist.getByRole('tab', { name: /^문제 큐레이터/ })
@@ -652,7 +653,7 @@ test('@handoff 역할 자료를 수정하고 인수인계 문서와 다시 불�
   if (testInfo.project.name === 'mobile') {
     await inspector.getByRole('button', { name: '상세 닫기' }).click()
   }
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   const previewLink = preview.getByRole('link', {
@@ -786,7 +787,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 임시 기록을 지우�
   const api = await installApi(page)
   api.rejectNextContentCreationAsReused('handoffItem')
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
 
   const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
@@ -813,7 +814,7 @@ test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전�
   const api = await installApi(page)
   api.rejectNextContentCreationAsReused('handoffItem')
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
 
   const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
@@ -856,8 +857,8 @@ test('@handoff 같은 인수인계 생성 요청의 탭 경합은 한 번만 전
 
   try {
     await openSharedWorkspace(peerPage)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
-    await navigation(peerPage, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+    await openHandoffView(page, testInfo.project.name)
+    await openHandoffView(peerPage, testInfo.project.name)
 
     await page.getByRole('button', { name: '항목 추가' }).click()
     const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
@@ -905,7 +906,7 @@ test('@handoff Web Locks를 사용할 수 없으면 인수인계 생성 요청�
   })
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
 
   const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
@@ -924,7 +925,7 @@ for (const failurePoint of ['잠금 접근', '잠금 요청', '요청 준비'] a
   test(`@handoff @webkit ${failurePoint} 실패 후 인수인계 생성 요청을 다시 보낼 수 있다`, async ({ page }, testInfo) => {
     const api = await installApi(page)
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+    await openHandoffView(page, testInfo.project.name)
     await page.getByRole('button', { name: '항목 추가' }).click()
 
     const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
@@ -1007,7 +1008,7 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임
   })
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
   const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await dialog.getByLabel('남길 내용').fill('멀티탭 복구 보존')
@@ -1032,7 +1033,7 @@ test('@handoff @webkit 인수인계 문서 인쇄 중에는 주소의 접근 키
   await installApi(page)
   const sharedPath = `${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`
   await page.goto(sharedPath)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   await expect(page).toHaveURL(sharedPath)
@@ -1061,7 +1062,7 @@ test('@handoff @webkit 인수인계 문서 인쇄 중에는 주소의 접근 키
 test('@handoff @webkit 인수인계 문서는 완료한 항목과 역할 맥락을 보존하고 기록만 출력한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
 
   const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
@@ -1106,14 +1107,14 @@ test('@handoff @webkit 인수인계 문서는 완료한 항목과 역할 맥락�
   await preview.getByRole('button', { name: '미리보기 닫기' }).click()
 
   await page.reload()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await expect(page.getByRole('checkbox', { name: '문제 선정 기준 문서 링크' })).toBeChecked()
 })
 
 test('@handoff 인수인계 완료 실패 롤백이 동시에 성공한 회차 상태를 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
 
   api.holdNextHandoffCompletion()
   api.failNextHandoffCompletion()
@@ -1124,7 +1125,7 @@ test('@handoff 인수인계 완료 실패 롤백이 동시에 성공한 회차 �
     await handoffCheckbox.click()
     await expect(handoffCheckbox).toBeChecked()
 
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '할 일' }).click()
     await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
     await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 상태 변경 중' }))
       .toBeDisabled()
@@ -1141,7 +1142,7 @@ test('@handoff 인수인계 완료 실패 롤백이 동시에 성공한 회차 �
     api.releaseWorkspaceGets()
     await expect(page.getByRole('button', { name: '풀이 노트 정리 완료 취소' })).toBeVisible()
 
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+    await openHandoffView(page, testInfo.project.name)
     await expect(handoffCheckbox).not.toBeChecked()
   } finally {
     api.releaseWorkspaceGets()
@@ -1151,7 +1152,7 @@ test('@handoff 인수인계 완료 실패 롤백이 동시에 성공한 회차 �
 test('@handoff 완료한 인수인계 항목을 수정하고 보관·복원해 완료 상태를 보존한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
 
   const originalLabel = '역할의 한 줄 목적'
   const updatedLabel = '역할의 한 줄 목적과 성공 기준'
@@ -1200,7 +1201,7 @@ test('@handoff 완료한 인수인계 항목을 수정하고 보관·복원해 �
   await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
 
   await page.reload()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
   expect(api.projection().handoffItems.find((item) => item.id === HANDOFF_ONE_ID)).toMatchObject({
     completed: true,
@@ -1301,19 +1302,18 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   await expect(panel.getByText('수정 필요 · 변경 전 확인 기록')).toBeVisible()
 })
 
-test('@handoff 오늘의 릴레이 카드는 인계가 가장 가까운 역할을 보여 주고 인수인계로 이동한다', async ({ page }, testInfo) => {
+test('@handoff 할 일 화면의 바통 알림은 인계가 가장 가까운 역할을 보여 주고 인수인계로 이동한다', async ({ page }, testInfo) => {
   await page.clock.setFixedTime(new Date('2026-09-03T00:00:00+09:00'))
   await installApi(page)
   await openSharedWorkspace(page)
 
-  const relay = page.getByRole('region', { name: '인수인계 릴레이' })
-  await expect(relay).toContainText('문제 큐레이터 릴레이')
-  await expect(relay).toContainText('인계까지 D-14')
+  const relay = page.getByRole('region', { name: '다가오는 인계' })
+  await expect(relay).toContainText('문제 큐레이터 인계까지 D-14')
   await expect(relay).toContainText('인수인계 준비 50%')
-  await expect(relay).toContainText('김준호에게')
+  await expect(relay).toContainText('박민서 → 김준호')
 
   await relay.getByRole('button', { name: '인수인계 열기' }).click()
-  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }))
+  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }))
     .toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { level: 2, name: '김준호님에게 넘길 인수인계' })).toBeVisible()
 })

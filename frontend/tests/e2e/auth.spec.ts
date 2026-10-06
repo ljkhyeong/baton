@@ -1008,7 +1008,7 @@ for (const otherTab of [false, true]) {
       await logoutPage.goto('/login')
       await expect(logoutPage.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible()
     }
-    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
     await chrome.getByRole('button', { name: '링크 관리' }).click()
     workspaceApi.holdAccessKeyRotations()
     try {

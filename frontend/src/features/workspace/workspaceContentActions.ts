@@ -92,7 +92,7 @@ type WorkspaceContentActionOptions = {
   members: Member[]
   roleHandoffs: RoleHandoff[]
   activeHandoffItems: HandoffItem[]
-  selectedRound?: SeasonRound
+  activeRounds: SeasonRound[]
   editingMember?: Member | null
   editingRole?: Role | null
   editingRoleResource?: RoleResource | null
@@ -131,7 +131,7 @@ export function createWorkspaceContentActions({
   members,
   roleHandoffs,
   activeHandoffItems,
-  selectedRound,
+  activeRounds,
   editingMember,
   editingRole,
   editingRoleResource,
@@ -380,8 +380,9 @@ export function createWorkspaceContentActions({
   }
 
   const toggleRoutineExecution = (execution: RoutineExecution) => {
-    if (!ensureFreshWorkspace() || !selectedRound || execution.roundId !== selectedRound.id) return
-    const roundId = selectedRound.id
+    // 내 할 일 보기에서는 선택하지 않은 회차의 업무도 완료할 수 있다.
+    if (!ensureFreshWorkspace() || !activeRounds.some((round) => round.id === execution.roundId)) return
+    const roundId = execution.roundId
     if (!beginRoundOperation(roundId)) return
     selectRound(roundId)
     const completed = execution.status !== 'DONE'

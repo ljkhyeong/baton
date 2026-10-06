@@ -35,6 +35,7 @@ import {
   pendingContentCreationEntries,
   recordedCall,
   expectScopedCall,
+  openHandoffView,
 } from './support/workspaceApiHarness'
 
 test('공유 링크의 URL 접근 키를 지울 때 React Router 이력을 보존한다', async ({ page }) => {
@@ -89,7 +90,7 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   await expect(keyDialog.getByText('이전 공유 링크는 즉시 사용할 수 없습니다.')).toBeVisible()
@@ -121,7 +122,7 @@ test('@smoke 키 변경 중 화면을 떠나면 임시 기록을 유지하고 �
   await openSharedWorkspace(page)
   await page.goto('/')
   await page.getByRole('link', { name: /알고리즘 한 바퀴.*2026 여름 시즌/ }).click()
-  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
   await chrome.getByRole('button', { name: '링크 관리' }).click()
   api.holdAccessKeyRotations()
   try {
@@ -165,7 +166,7 @@ test('접근 키 회전 응답이 손상되면 기존 키와 URL 및 임시 기�
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   page.once('dialog', (dialog) => dialog.accept())
@@ -203,7 +204,7 @@ test('접근 키 회전은 서버 응답 전 대화 상자 종료와 재진입�
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   const rotationPath = `${SCOPE_PATH}/access-key/rotate`
@@ -289,7 +290,7 @@ test('접근 키 회전 임시 기록은 탭 간 요청 완료까지 같은 임�
   const openKeyManagement = async (target: Page) => {
     const workspaceChrome = testInfo.project.name === 'mobile'
       ? target.locator('.mobile-topbar')
-      : target.locator('.sidebar')
+      : target.locator('.workspace-header')
     await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
     return target.getByRole('dialog', { name: '공유 링크 관리' })
   }
@@ -341,7 +342,7 @@ test('Web Locks를 사용할 수 없으면 접근 키 회전 요청을 보내지
   await openSharedWorkspace(page)
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
 
@@ -367,7 +368,7 @@ test('접근 키 회전 완료 기록을 전혀 정리하지 못하면 과거 �
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
   const acceptConfirmation = (dialog: Dialog) => dialog.accept()
@@ -443,7 +444,7 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('dialog', { name: '공유 링크 관리' })
@@ -496,7 +497,7 @@ test('접근 키 변경 후 사이트 데이터 저장이 실패하면 새 키�
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
@@ -520,7 +521,7 @@ test('공유 링크 변경 기록을 안전하게 저장할 수 없으면 새로
   const tryRotation = async () => {
     const workspaceChrome = page.viewportSize()?.width === 390
       ? page.locator('.mobile-topbar')
-      : page.locator('.sidebar')
+      : page.locator('.workspace-header')
     await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
@@ -548,7 +549,7 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
 
   const workspaceChrome = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   const keyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
 
@@ -585,7 +586,7 @@ test('@smoke 응답이 유실된 접근 키 회전을 403 화면에서 같은 �
 
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
@@ -620,7 +621,7 @@ test('충돌 임시 기록 복구가 403이면 반복을 멈추고 최신 공유
 
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
@@ -663,7 +664,7 @@ test('만료된 접근 키 임시 기록을 지우고 최신 공유 링크 확�
 
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('dialog', { name: '공유 링크 관리' }).getByRole('button', { name: '공유 링크 재발급' }).click()
@@ -696,7 +697,7 @@ test('손상된 회전 임시 기록 저장소를 무시하고 정상 멱등 키
   await openSharedWorkspace(page)
   const workspaceChrome = page.viewportSize()?.width === 390
     ? page.locator('.mobile-topbar')
-    : page.locator('.sidebar')
+    : page.locator('.workspace-header')
   await workspaceChrome.getByRole('button', { name: '링크 관리' }).click()
 
   page.once('dialog', (dialog) => dialog.accept())
@@ -1101,7 +1102,7 @@ test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행
     await inspector.getByRole('button', { name: '상세 닫기' }).click()
   }
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '인수인계 문서 미리보기' }).click()
   const preview = page.getByRole('dialog', { name: '문제 큐레이터 인수인계 문서' })
   const routineSection = preview.locator('.book-preview > section')
@@ -1359,7 +1360,7 @@ test('@operations @handoff 완료 충돌은 공용 복구로 상대 사용자의
   expectScopedCall(await recordedCall(api, 'PATCH', routineCompletionPath), { completed: true })
   expect(completionPatchCount(routineCompletionPath)).toBe(1)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   const handoffCheckbox = page.getByRole('checkbox', { name: '자주 생기는 문제와 대응법' })
   api.conflictNextHandoffCompletion(false)
   const getsBeforeHandoffConflict = workspaceGetCount()

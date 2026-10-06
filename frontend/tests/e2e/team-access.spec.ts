@@ -188,7 +188,7 @@ test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람�
   await expect(page.getByRole('button', { name: '결정 남기기' })).toBeDisabled()
   expect((await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)).headers['x-baton-access-key'] ?? '').toBe('')
   expect(await page.evaluate(() => sessionStorage.getItem('baton:team-invitation:v1'))).toBeNull()
-  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
   await chrome.getByRole('button', { name: '공유', exact: true }).click()
   const shared = await page.evaluate(() => JSON.parse(document.documentElement.dataset.sharedWorkspace ?? 'null'))
   expect(shared).toEqual({ url: new URL(WORKSPACE_PATH, page.url()).href })

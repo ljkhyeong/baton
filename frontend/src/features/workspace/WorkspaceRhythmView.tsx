@@ -1,6 +1,6 @@
 import { formatInstant, formatLocalTime } from '@/shared/lib/dateTimeFormat'
 import { PublicHolidayPanel } from '@/features/calendar/PublicHolidayPanel'
-import { clampToSeason, pilotCalendarDate } from './seasonCalendar'
+import { clampToSeason, pilotCalendarDate, seasonProgress } from './seasonCalendar'
 import {
   ActionableEmpty,
   PageHeader,
@@ -23,6 +23,7 @@ import type {
 
 export function RhythmView({
   season,
+  calendarDate,
   roles,
   routines,
   archivedRoutines,
@@ -46,6 +47,7 @@ export function RhythmView({
   changesDisabled = false,
 }: {
   season: Season
+  calendarDate: string
   roles: Role[]
   routines: Routine[]
   archivedRoutines: Routine[]
@@ -72,9 +74,10 @@ export function RhythmView({
   const timelineItems = routineTimelineItems(routines, selectedRound)
   const roundScheduleWaitingForRoutine = Boolean(season.roundSchedule?.enabled)
     && routines.length === 0
+  const progress = seasonProgress(season, calendarDate)
   return (
     <>
-      <PageHeader eyebrow={`반복 업무 ${routines.length}개 · 회차 ${rounds.length}개`} title="일정" action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
+      <PageHeader eyebrow={`시즌 ${progress.elapsedWeeks} / ${progress.totalWeeks}주 · ${formatLocalDate(season.endDate)} 종료`} title="일정" action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
       <section
         className={`round-schedule-card ${season.roundSchedule?.enabled ? 'active' : ''}`}
         aria-labelledby="round-schedule-title"

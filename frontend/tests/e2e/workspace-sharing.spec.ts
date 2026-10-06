@@ -14,7 +14,7 @@ test('@webkit 공유 창이 열려 있는 동안 중복 요청을 막고 현재 
   })
   await installApi(page)
   await openSharedWorkspace(page)
-  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
   const share = chrome.getByRole('button', { name: '공유', exact: true })
   await share.click()
   await share.click()
@@ -46,7 +46,7 @@ for (const [mode, title] of [
     }, mode)
     await installApi(page)
     await openSharedWorkspace(page)
-    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.sidebar')
+    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
     await chrome.getByRole('button', { name: '공유', exact: true }).click()
     if (mode === 'cancelled') {
       expect(await page.evaluate(() => document.documentElement.dataset.shareAttempted)).toBe('true')

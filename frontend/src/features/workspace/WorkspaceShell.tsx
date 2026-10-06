@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom'
 import '@/features/team-access/my-teams.scss'
 import { Icon } from '@/shared/ui/Icon'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
-import { seasonProgress } from './seasonCalendar'
 import { PageHeader, PrimaryButton } from './WorkspaceViews'
-import { formatLocalDate, isActiveMember } from './workspacePresentation'
 import type { ViewKey, WorkspaceProjection } from './types'
 
 const navItems: {
@@ -13,11 +11,10 @@ const navItems: {
   label: string
   icon: Parameters<typeof Icon>[0]['name']
 }[] = [
-  { key: 'today', label: '오늘', icon: 'today' },
+  { key: 'today', label: '할 일', icon: 'today' },
   { key: 'roles', label: '역할', icon: 'roles' },
   { key: 'rhythm', label: '일정', icon: 'rhythm' },
   { key: 'memory', label: '기록', icon: 'memory' },
-  { key: 'handoff', label: '인수인계', icon: 'handoff' },
 ]
 
 const recordViews: { key: ViewKey; label: string }[] = [
@@ -25,9 +22,21 @@ const recordViews: { key: ViewKey; label: string }[] = [
   { key: 'records', label: '검색' },
 ]
 
-// 기록 검색은 기록 메뉴 안의 보기로 둔다.
+// 기록 검색은 기록 메뉴, 인수인계는 역할 메뉴 안의 화면으로 둔다.
 function navKey(view: ViewKey): ViewKey {
-  return view === 'records' ? 'memory' : view
+  if (view === 'records') return 'memory'
+  if (view === 'handoff') return 'roles'
+  return view
+}
+
+function hasHandoffToCheck(workspace: WorkspaceProjection) {
+  return workspace.roleHandoffs.some((handoff) => handoff.status === 'TRANSFERRED')
+    || workspace.handoffItems.some((candidate) => !candidate.completed)
+}
+
+// 점은 버튼 이름에 섞이지 않게 숨기고, 설명 문구는 버튼 밖에 둔 뒤 aria-describedby로 연결한다.
+function HandoffDotDescription({ id }: { id: string }) {
+  return <span id={id} className="visually-hidden">확인할 인수인계 있음</span>
 }
 
 function formatSyncTime(value: number) {
@@ -58,9 +67,8 @@ export function WorkspaceState({
   )
 }
 
-export function Sidebar({
+export function WorkspaceHeader({
   workspace,
-  calendarDate,
   view,
   onNavigate,
   onSwitchSeason,
@@ -68,62 +76,47 @@ export function Sidebar({
   onManageAccess,
 }: {
   workspace: WorkspaceProjection
-  calendarDate: string
   view: ViewKey
   onNavigate: (key: ViewKey) => void
   onSwitchSeason: () => void
   onShare: () => void
   onManageAccess: () => void
 }) {
-  const progress = seasonProgress(workspace.season, calendarDate)
-  const activeMemberCount = workspace.members.filter(isActiveMember).length
+  const handoffWaiting = hasHandoffToCheck(workspace)
   return (
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark" />BATON</div>
-      <div className="workspace-label">현재 팀 <Link className="team-list-link" to="/my-teams">내 팀</Link></div>
+    <header className="workspace-header">
+      <span className="brand"><span className="brand-mark" aria-hidden="true" /><span className="visually-hidden">BATON</span></span>
       <button
         type="button"
         className="workspace-switcher"
         aria-label={`현재 시즌 ${workspace.season.name}. 시즌 전환`}
         onClick={onSwitchSeason}
       >
-        <span className="workspace-symbol">{workspace.team.name.slice(0, 1)}</span>
-        <span><strong>{workspace.team.name}</strong><small>{workspace.season.name}</small></span>
+        <strong>{workspace.team.name}</strong><small>{workspace.season.name}</small>
         <Icon name="chevron" size={15} />
       </button>
-      <nav className="side-nav" aria-label="주 메뉴">
+      <nav className="header-nav" aria-label="주 메뉴">
         {navItems.map((item) => (
           <button
             type="button"
             className={navKey(view) === item.key ? 'active' : ''}
             key={item.key}
             aria-current={navKey(view) === item.key ? 'page' : undefined}
+            aria-describedby={item.key === 'roles' && handoffWaiting ? 'header-handoff-dot' : undefined}
             onClick={() => onNavigate(item.key)}
           >
-            <Icon name={item.icon} /><span>{item.label}</span>
-            {item.key === 'handoff'
-              && (workspace.roleHandoffs.some((handoff) => handoff.status === 'TRANSFERRED')
-                || workspace.handoffItems.some((candidate) => !candidate.completed))
-              && <span className="nav-dot" aria-label="확인할 인수인계 있음" />}
+            {item.label}
+            {item.key === 'roles' && handoffWaiting && <span className="nav-dot" aria-hidden="true" />}
           </button>
         ))}
+        {handoffWaiting && <HandoffDotDescription id="header-handoff-dot" />}
       </nav>
-      <div className="sidebar-bottom">
-        <div className="season-mini">
-          <div><span>시즌 진행</span><strong>{progress.elapsedWeeks} / {progress.totalWeeks}주</strong></div>
-          <div className="mini-progress"><span style={{ width: `${progress.percent}%` }} /></div>
-          <small>{formatLocalDate(workspace.season.endDate)} 종료</small>
-        </div>
-        <div className="profile-row">
-          <span className="avatar avatar-dark">{activeMemberCount}</span>
-          <span><strong>구성원 {activeMemberCount}명</strong><small>활동 중</small></span>
-          <span className="profile-actions">
-            <button type="button" onClick={onShare} title="작업 공간 공유">공유</button>
-            <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
-          </span>
-        </div>
-      </div>
-    </aside>
+      <span className="header-actions">
+        <Link className="team-list-link" to="/my-teams">내 팀</Link>
+        <button type="button" onClick={onShare} title="작업 공간 공유">공유</button>
+        <button type="button" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
+      </span>
+    </header>
   )
 }
 
@@ -164,12 +157,15 @@ export function MobileTopbar({
 }
 
 export function MobileNav({
+  workspace,
   view,
   onNavigate,
 }: {
+  workspace: WorkspaceProjection
   view: ViewKey
   onNavigate: (key: ViewKey) => void
 }) {
+  const handoffWaiting = hasHandoffToCheck(workspace)
   return (
     <nav className="mobile-nav" aria-label="모바일 주 메뉴">
       {navItems.map((item) => (
@@ -178,11 +174,14 @@ export function MobileNav({
           className={navKey(view) === item.key ? 'active' : ''}
           key={item.key}
           aria-current={navKey(view) === item.key ? 'page' : undefined}
+          aria-describedby={item.key === 'roles' && handoffWaiting ? 'mobile-handoff-dot' : undefined}
           onClick={() => onNavigate(item.key)}
         >
           <Icon name={item.icon} size={20} /><span>{item.label}</span>
+          {item.key === 'roles' && handoffWaiting && <span className="nav-dot" aria-hidden="true" />}
         </button>
       ))}
+      {handoffWaiting && <HandoffDotDescription id="mobile-handoff-dot" />}
     </nav>
   )
 }

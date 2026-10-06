@@ -10,6 +10,7 @@ import {
   installApi,
   openSharedWorkspace,
   navigation,
+  openHandoffView,
 } from './support/workspaceApiHarness'
 
 test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역을 전달한다', async ({ page }, testInfo) => {
@@ -17,7 +18,7 @@ test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역�
   await openSharedWorkspace(page)
 
   const primaryNavigation = navigation(page, testInfo.project.name)
-  const todayButton = primaryNavigation.getByRole('button', { name: '오늘' })
+  const todayButton = primaryNavigation.getByRole('button', { name: '할 일' })
   const rolesButton = primaryNavigation.getByRole('button', { name: '역할' })
   await expect(todayButton).toHaveAttribute('aria-current', 'page')
   await expect(rolesButton).not.toHaveAttribute('aria-current')
@@ -241,7 +242,7 @@ test('@responsive 보조 문구와 경고 및 키보드 초점 대비를 유지�
   await expect(archiveSummary).toBeFocused()
   await expectVisibleFocus(archiveSummary, palette.canvas)
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   const selectedRoleTab = page.getByRole('tab', { selected: true })
   if (testInfo.project.name === 'mobile') {
     const prepareButton = page.getByRole('button', { name: '인수인계 준비 시작' })
@@ -294,7 +295,7 @@ test('@responsive 역할 상세는 desktop 보조 패널과 1100px drawer 경계
   await expect(inspector).toHaveJSProperty('open', false)
   await expect(page.locator('.main-surface')).toBeFocused()
 
-  await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+  await page.locator('.workspace-header').getByRole('button', { name: '역할' }).click()
   const opener = page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' })
   await opener.click()
   const drawer = page.getByRole('dialog', { name: /선택한 역할 상세: 문제 큐레이터/ })
@@ -334,7 +335,7 @@ test('@responsive 390x844에서 반복 업무 추가와 완료를 수행할 수 
   await expect(roundDialog).toBeInViewport()
   await roundDialog.getByLabel('모임 날짜').fill('2026-07-31')
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '할 일' }).click()
 
   const todayChecklist = page.getByRole('region', { name: '3회차 반복 업무 완료하기' })
   const todayToggle = todayChecklist.getByRole('button', { name: '다음 문제 예고 완료 처리' })

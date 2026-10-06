@@ -1360,6 +1360,9 @@ export async function openSharedWorkspace(page: Page) {
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+  // 로그인한 구성원이면 내 할 일이 먼저 열리므로 회차 목록을 보려면 팀 전체로 바꾼다.
+  const teamView = page.getByRole('button', { name: '팀 전체' })
+  if (await teamView.isVisible()) await teamView.click()
   await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
 }
 
@@ -1372,6 +1375,12 @@ export async function openMemberCreationDialog(page: Page) {
 
 export function navigation(page: Page, projectName: string) {
   return page.getByRole('navigation', { name: projectName === 'mobile' ? '모바일 주 메뉴' : '주 메뉴' })
+}
+
+// 인수인계는 역할 메뉴 안의 화면이다.
+export async function openHandoffView(page: Page, projectName: string) {
+  await navigation(page, projectName).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '인수인계', exact: true }).click()
 }
 
 export async function openRecordSearch(page: Page, projectName: string) {

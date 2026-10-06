@@ -21,18 +21,19 @@ import {
   pendingCreationEntries,
   recordedCall,
   expectScopedCall,
+  openHandoffView,
 } from './support/workspaceApiHarness'
 
 test.describe('조직 달력 날짜 경계', () => {
   test.use({ timezoneId: 'UTC' })
 
   test('시즌 첫날은 경과한 주 없이 시작한다', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
     await page.clock.setFixedTime(new Date('2026-07-02T14:00:00Z'))
     await installApi(page)
     await openSharedWorkspace(page)
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
 
-    await expect(page.locator('.season-mini strong')).toHaveText('0 / 11주')
+    await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText('시즌 0 / 11주 · 2026. 9. 17. 종료')
   })
 
   test('브라우저가 UTC여도 시즌 시간대로 오늘 날짜를 표시한다', async ({ page }) => {
@@ -55,7 +56,6 @@ test.describe('조직 달력 날짜 경계', () => {
   })
 
   test('하루짜리 시즌은 해당 날짜에 완료 진행률을 표시한다', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
     const projection = makeProjection()
     projection.season = {
       ...projection.season,
@@ -71,24 +71,19 @@ test.describe('조직 달력 날짜 경계', () => {
     await installApi(page, projection)
     await openSharedWorkspace(page)
 
-    await expect(page.locator('.season-mini strong')).toHaveText('1 / 1주')
-    await expect(page.locator('.season-mini .mini-progress > span')).toHaveAttribute(
-      'style',
-      'width: 100%;',
-    )
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+
+    await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText('시즌 1 / 1주 · 2026. 7. 2. 종료')
   })
 
   test('일반 시즌은 종료일에 전체 진행률을 표시한다', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'chromium', '데스크톱 사이드바에서만 표시되는 진행률입니다.')
     await page.clock.setFixedTime(new Date('2026-09-16T15:00:00Z'))
     await installApi(page)
     await openSharedWorkspace(page)
 
-    await expect(page.locator('.season-mini strong')).toHaveText('11 / 11주')
-    await expect(page.locator('.season-mini .mini-progress > span')).toHaveAttribute(
-      'style',
-      'width: 100%;',
-    )
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+
+    await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText('시즌 11 / 11주 · 2026. 9. 17. 종료')
   })
 
   test('한국 날짜가 종료일 다음 날이면 지난 시즌으로 표시한다', async ({ page }, testInfo) => {
@@ -99,7 +94,7 @@ test.describe('조직 달력 날짜 경계', () => {
     await expect(page.locator('.main-surface .page-header .eyebrow')).toHaveText(
       '9월 18일 금요일',
     )
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+    await openHandoffView(page, testInfo.project.name)
 
     const pageHeader = page.locator('.main-surface .page-header')
     await expect(pageHeader.locator('.eyebrow')).toHaveText('2026. 9. 17. 시즌 종료')

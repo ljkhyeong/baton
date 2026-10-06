@@ -31,6 +31,7 @@ import {
   recordedCall,
   expectScopedCall,
   expectPendingCreationDialogLocked,
+  openHandoffView,
 } from './support/workspaceApiHarness'
 
 test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 안전하게 처리한다', async ({ page }, testInfo) => {
@@ -216,7 +217,7 @@ test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 �
 
   const shareButton = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar').getByRole('button', { name: '공유' })
-    : page.locator('.sidebar').getByRole('button', { name: '공유' })
+    : page.locator('.workspace-header').getByRole('button', { name: '공유' })
   await shareButton.focus()
   await shareButton.press('Enter')
   await expect(page.locator('.toast[role="status"]')).toHaveText(/직접 복사할 링크를 열었습니다/)
@@ -231,7 +232,7 @@ test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 �
 
   const manageAccessButton = testInfo.project.name === 'mobile'
     ? page.locator('.mobile-topbar').getByRole('button', { name: '링크 관리' })
-    : page.locator('.sidebar').getByRole('button', { name: '링크 관리' })
+    : page.locator('.workspace-header').getByRole('button', { name: '링크 관리' })
   await manageAccessButton.focus()
   await manageAccessButton.press('Enter')
   const accessKeyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
@@ -480,7 +481,7 @@ test('@operations @webkit 충돌 초안은 세션 조회 실패와 같은 계정
   await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
 
   sessionFails = true
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '할 일' }).click()
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
   await expect(panel).toContainText('로그인 상태를 확인하지 못했습니다')
@@ -723,7 +724,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 대화 상자 종료와 재�
     submitLabel: '결정 기록하기',
   })
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가', exact: true }).click()
   const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('생성 요청이 끝날 때까지 dialog 유지')
@@ -806,7 +807,7 @@ test('생성 재시도 정보를 안전하게 저장할 수 없으면 콘텐츠 
   await decisionDialog.getByLabel('왜 이 선택을 했나요?').fill('응답 유실 뒤 중복 생성을 막기 위해서입니다.')
   await expectStorageBlock(decisionDialog, '결정 기록하기')
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
   const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('저장 차단 확인')
@@ -895,7 +896,7 @@ test('콘텐츠 임시 기록 삭제 실패는 새로고침과 다른 작업 전
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   await expect(cleanupBanner).toBeVisible()
 
-  await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '항목 추가' }).click()
   const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('남길 내용').fill('다른 작업의 새 키는 아직 만들지 않기')
@@ -948,7 +949,7 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
   await openSharedWorkspace(page)
 
   const openHandoffCreation = async () => {
-    await navigation(page, testInfo.project.name).getByRole('button', { name: /^인수인계/ }).click()
+    await openHandoffView(page, testInfo.project.name)
     await page.getByRole('button', { name: '항목 추가' }).click()
     const dialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
     await dialog.getByLabel('남길 내용').fill('guard 원본 요청 재확인')

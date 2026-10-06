@@ -1,7 +1,8 @@
 import { useRef, type ReactNode } from 'react'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
-import { nearestRelayRole, RelayCard } from './WorkspaceRelayCard'
+import { personalWork as findPersonalWork } from './personalWork'
+import { ReceivedBatonNotice, TeamBatonNotice } from './WorkspaceBatonNotice'
 import {
   ActionableEmpty,
   PageHeader,
@@ -11,6 +12,7 @@ import {
 } from './WorkspaceViews'
 import type {
   ContinuitySignal,
+  Member,
   RoleHandoff,
   Routine,
   RoutineExecution,
@@ -25,8 +27,14 @@ const continuitySeverityCopy = {
   WARNING: '주의',
 } satisfies Record<ContinuitySignal['severity'], string>
 
+export type TodayMode = 'mine' | 'team'
+
 export function TodayView({
   workspace,
+  me,
+  meResolved,
+  chosenMode,
+  onChooseMode,
   personalWork,
   weeklyBrief,
   calendarLabel,
@@ -50,9 +58,14 @@ export function TodayView({
   onEditRoutine,
   selectedRoundBusy,
   selectedRoundOperationPending,
+  isRoundBusy,
   changesDisabled = false,
 }: {
   workspace: WorkspaceProjection
+  me?: Member
+  meResolved: boolean
+  chosenMode?: TodayMode
+  onChooseMode: (mode: TodayMode) => void
   personalWork: ReactNode
   weeklyBrief: ReactNode
   calendarLabel: string
@@ -76,8 +89,12 @@ export function TodayView({
   onEditRoutine: (routine: Routine) => void
   selectedRoundBusy: boolean
   selectedRoundOperationPending: boolean
+  isRoundBusy: (roundId: string) => boolean
   changesDisabled?: boolean
 }) {
+  // 로그인한 구성원을 알면 내 할 일을 먼저 보여 주고, 모르면 팀 전체 회차 업무를 보여 준다.
+  const mode: TodayMode = me ? chosenMode ?? 'mine' : 'team'
+  const mine = me && mode === 'mine' ? findPersonalWork(workspace, me.id) : undefined
   const { roles, routines, members, season } = workspace
   const timingPriority: Record<RoutineTimingStatus, number> = {
     OVERDUE: 0,
@@ -95,24 +112,67 @@ export function TodayView({
     .flatMap(({ execution }) => execution?.deadlineAt && execution.status !== 'DONE' ? [execution.deadlineAt] : [])
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
   const signalCount = workspace.continuitySignals.length
-  const relay = nearestRelayRole(roles, calendarDate)
   const roundComplete = executionCount > 0 && completedCount === executionCount
   const signalSectionRef = useRef<HTMLElement>(null)
   const openSignals = () => {
     signalSectionRef.current?.scrollIntoView({ block: 'start' })
     signalSectionRef.current?.focus({ preventScroll: true })
   }
+  if (!meResolved) {
+    return (
+      <>
+        <PageHeader eyebrow={calendarLabel} title="할 일" />
+        <p className="today-loading" aria-busy="true">내 할 일을 확인하고 있습니다.</p>
+      </>
+    )
+  }
   return (
     <>
       <PageHeader
         eyebrow={calendarLabel}
-        title={`남은 업무 ${pendingCount}개`}
+        title={`남은 업무 ${mine ? mine.unfinished.length : pendingCount}개`}
         action={(
           <button type="button" className="secondary-button" onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>
             <Icon name="plus" size={15} />{roles.length ? '업무 추가' : '역할 추가'}
           </button>
         )}
       />
+      {me && (
+        <div className="today-mode" role="group" aria-label="할 일 보기">
+          <button type="button" aria-pressed={mode === 'mine'} onClick={() => onChooseMode('mine')}>내 할 일</button>
+          <button type="button" aria-pressed={mode === 'team'} onClick={() => onChooseMode('team')}>팀 전체</button>
+        </div>
+      )}
+      {mine ? (
+        <section className="my-work" aria-label="내 할 일">
+          {mine.awaiting.map((handoff) => {
+            const role = roles.find((item) => item.id === handoff.roleId)
+            return role && (
+              <ReceivedBatonNotice key={handoff.id} role={role} handoff={handoff} members={members} onOpenHandoff={onOpenRoleHandoff} />
+            )
+          })}
+          {mine.unfinished.length ? (
+            <div className="today-task-list" role="list">
+              {mine.unfinished.map(({ round, execution }) => (
+                <div key={execution.id} role="listitem">
+                  <RoutineRow
+                    routine={routines.find((item) => item.id === execution.routineId)}
+                    execution={execution}
+                    role={roles.find((item) => item.id === execution.ownerRoleId)}
+                    members={members}
+                    timeZone={season.timeZone}
+                    onToggle={onToggleRoutine}
+                    onSelectRole={onSelectRole}
+                    onEdit={onEditRoutine}
+                    pending={changesDisabled || isRoundBusy(round.id)}
+                    operationPending={isRoundBusy(round.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : <p className="my-work-empty">남은 담당 업무가 없습니다.</p>}
+        </section>
+      ) : <>
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="today-list-toolbar">
           <RoundControl
@@ -183,16 +243,14 @@ export function TodayView({
           />
         )}
       </section>
-      {relay && (
-        <RelayCard
-          role={relay.role}
-          days={relay.days}
-          members={members}
-          roleHandoffs={roleHandoffs}
-          progress={handoffProgress(relay.role.id)}
-          onOpenHandoff={onOpenRoleHandoff}
-        />
-      )}
+      <TeamBatonNotice
+        roles={roles}
+        members={members}
+        roleHandoffs={roleHandoffs}
+        calendarDate={calendarDate}
+        progress={handoffProgress}
+        onOpenHandoff={onOpenRoleHandoff}
+      />
       {workspace.continuitySignals.length > 0 && (
         <div className="today-lower">
           <section className="plain-section" aria-labelledby="continuity-radar-title" ref={signalSectionRef} tabIndex={-1}>
@@ -234,6 +292,7 @@ export function TodayView({
           </section>
         </div>
       )}
+      </>}
       <div className="today-more">
         <details className="today-secondary">
           <summary><strong>내 업무와 확인할 자료</strong><span>내가 맡은 업무와 재확인할 자료</span></summary>

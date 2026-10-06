@@ -15,6 +15,7 @@ import { DueResourceReviewsPanel } from '@/features/resource-verification/DueRes
 import { clearRecordDraft } from './RecordDraft'
 import { PersonalWorkTarget } from './PersonalWorkTarget'
 import { PersonalWorkPanel } from './PersonalWorkPanel'
+import { activeMember, useCurrentMemberId } from './useCurrentMember'
 import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { useBriefNavigation } from '@/features/brief/useBriefNavigation'
 import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
@@ -98,11 +99,11 @@ import {
   MobileNav,
   MobileTopbar,
   RecordsHeader,
-  Sidebar,
+  WorkspaceHeader,
   WorkspaceState,
   WorkspaceSyncStatus,
 } from './WorkspaceShell'
-import { TodayView } from './WorkspaceTodayView'
+import { TodayView, type TodayMode } from './WorkspaceTodayView'
 import { RoleInspector } from './WorkspaceRoleInspector'
 import { HandoffView } from './WorkspaceHandoffView'
 import { MemoryView } from './WorkspaceMemoryView'
@@ -174,6 +175,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const scope = { teamId, seasonId, accessKey: currentAccessKey,
     accountId: sessionQuery.data?.authenticated ? sessionQuery.data.accountId : 'anonymous' }
   const workspaceQuery = useWorkspaceQuery(scope)
+  const { memberId: currentMemberId, resolved: currentMemberResolved } = useCurrentMemberId(teamId, currentAccessKey)
+  const [todayMode, setTodayMode] = useState<TodayMode>()
   const briefNavigation = useBriefNavigation(JSON.stringify([teamId, seasonId, currentAccessKey, scope.accountId]))
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
     teamId, seasonId, currentAccessKey, scope.accountId,
@@ -733,7 +736,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     members,
     roleHandoffs,
     activeHandoffItems,
-    selectedRound,
+    activeRounds,
     editingMember,
     editingRole,
     editingRoleResource,
@@ -832,7 +835,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <Sidebar workspace={activeWorkspace} calendarDate={calendarDate} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+        <WorkspaceHeader workspace={activeWorkspace} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
 
         <main className="main-surface" tabIndex={-1}>
           <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
@@ -884,6 +887,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
+              me={activeMember(members, currentMemberId)}
+              meResolved={currentMemberResolved}
+              chosenMode={todayMode}
+              onChooseMode={setTodayMode}
               personalWork={<><DueResourceReviewsPanel scope={scope} timeZone={workspace.season.timeZone} ended={Boolean(workspace.season.endedAt)}
                 onOpenResource={openResourceReview} /><PersonalWorkPanel
                 workspace={workspace}
@@ -925,19 +932,27 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               selectedRoundOperationPending={Boolean(
                 selectedRound && busyRoundIds.has(selectedRound.id),
               )}
+              isRoundBusy={(roundId) => busyRoundIds.has(roundId)}
               changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'roles' && (
             <RolesView
+              me={activeMember(members, currentMemberId)}
               roles={roles}
               roleHandoffs={roleHandoffs}
               members={members}
+              rounds={orderedActiveRounds}
+              timeZone={workspace.season.timeZone}
               selectedRoleId={effectiveSelectedRoleId}
               onSelectRole={selectRole}
               onManageMembers={openMemberManagementModal}
               onAddRole={openRoleModal}
               onEditRole={openRoleEditModal}
+              onOpenHandoff={(roleId) => {
+                if (roleId) selectRole(roleId, { showInspector: false })
+                openView('handoff')
+              }}
               handoffProgress={handoffProgress}
               changesDisabled={contentChangesDisabled}
               memberManagementDisabled={Boolean(conflictRecoveryStatus)}
@@ -946,6 +961,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'rhythm' && (
             <RhythmView
               season={workspace.season}
+              calendarDate={calendarDate}
               roles={roles}
               routines={activeRoutines}
               archivedRoutines={archivedRoutines}
@@ -1073,7 +1089,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           />
         )}
 
-        <MobileNav view={view} onNavigate={openView} />
+        <MobileNav workspace={activeWorkspace} view={view} onNavigate={openView} />
       </div>
 
       {modal === 'decision' && (

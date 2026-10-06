@@ -23,6 +23,26 @@ import type {
   Season,
 } from './types'
 
+const handoffSteps = ['준비', '전달', '수락'] as const
+
+// 준비 중이면 첫 단계, 전달했으면 수락 단계가 현재 단계다. 수락을 마치면 모든 단계를 완료로 표시한다.
+function HandoffSteps({ status }: { status?: RoleHandoff['status'] }) {
+  const current = status === 'PREPARING' ? 0 : status === 'TRANSFERRED' ? 2 : status === 'ACCEPTED' ? 3 : -1
+  return (
+    <ol className="handoff-steps" aria-label="인수인계 단계">
+      {handoffSteps.map((label, index) => (
+        <li
+          key={label}
+          className={index < current ? 'done' : index === current ? 'current' : undefined}
+          aria-current={index === current ? 'step' : undefined}
+        >
+          {label}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 export function HandoffView({
   roles,
   roleHandoffs,
@@ -179,6 +199,7 @@ export function HandoffView({
             className={`handoff-lifecycle-card ${selectedHandoff?.status.toLowerCase() ?? 'ready'}`}
             aria-live="polite"
           >
+            <HandoffSteps status={selectedHandoff?.status} />
             {!selectedHandoff || selectedHandoff.status === 'ACCEPTED'
               || selectedHandoff.status === 'CANCELLED' ? (
                 <>
@@ -224,11 +245,11 @@ export function HandoffView({
                   <div className="handoff-lifecycle-actions">
                     <button
                       type="button"
-                      className="primary-button"
+                      className="primary-button baton-button"
                       disabled={changesDisabled || handoffTransitionPending}
                       onClick={() => onTransferHandoff(selected, selectedHandoff)}
                     >
-                      내용 확인 후 전달
+                      <span className="baton-glyph" aria-hidden="true" />내용 확인 후 전달
                     </button>
                     <button
                       type="button"
@@ -253,11 +274,11 @@ export function HandoffView({
                   <div className="handoff-lifecycle-actions">
                     <button
                       type="button"
-                      className="primary-button"
+                      className="primary-button baton-button"
                       disabled={changesDisabled || handoffTransitionPending}
                       onClick={() => onAcceptHandoff(selected, selectedHandoff)}
                     >
-                      인수인계 수락
+                      <span className="baton-glyph" aria-hidden="true" />인수인계 수락
                     </button>
                     <button
                       type="button"

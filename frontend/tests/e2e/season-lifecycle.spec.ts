@@ -455,7 +455,8 @@ test('@operations 종료된 시즌은 기록 변경 동작을 막고 조회·공
   await expect(page.getByRole('button', { name: '격주 회고를 진행한다 수정' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '격주 회고를 진행한다 보관' })).toBeDisabled()
 
-  await page.getByRole('button', { name: /^인수인계/ }).first().click()
+  await page.getByRole('button', { name: '역할', exact: true }).first().click()
+  await page.getByRole('button', { name: '인수인계', exact: true }).click()
   await expect(page.getByRole('button', { name: '항목 추가' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: /문제 선정 기준 공유/ })).toBeDisabled()
   await expect(page.getByRole('button', { name: '문제 선정 기준 공유 수정' })).toBeDisabled()

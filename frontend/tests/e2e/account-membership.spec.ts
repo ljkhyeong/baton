@@ -191,12 +191,59 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
   const execution = page.getByRole('button', { name: /^풀이 노트 정리 이번 회차의 핵심 풀이를/ })
   await expect(execution).toBeFocused()
   await expect(execution).toBeInViewport()
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '오늘' }).click()
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '할 일' }).click()
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await panel.getByRole('button', { name: /진행 담당/ }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByRole('tabpanel', { name: /진행 담당/ })).toBeFocused()
   await expect(page.getByRole('button', { name: '인수인계 수락', exact: true })).toBeVisible()
+})
+
+test('@operations @responsive 로그인한 구성원은 할 일과 역할 화면에서 내 업무와 받을 바통을 먼저 본다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.roles.push({
+    ...projection.roles[0]!, id: SECOND_ROLE_ID, name: '진행 담당',
+    currentMemberId: MEMBER_TWO_ID, nextMemberId: MEMBER_ONE_ID,
+  })
+  projection.roleHandoffs.push({
+    id: ROLE_HANDOFF_ID, roleId: SECOND_ROLE_ID,
+    fromMemberId: MEMBER_TWO_ID, toMemberId: MEMBER_ONE_ID,
+    outgoingAssignmentStartDate: '2026-07-02', outgoingAssignmentEndDate: '2026-09-17',
+    incomingAssignmentStartDate: '2026-08-01', incomingAssignmentEndDate: '2026-09-17',
+    status: 'TRANSFERRED', preparedAt: '2026-07-22T09:00:00Z', transferredAt: '2026-07-22T09:10:00Z',
+    acceptedAt: null, cancelledAt: null, transferredByMemberId: MEMBER_TWO_ID,
+    acceptedByMemberId: null, cancelledByMemberId: null,
+    activeItemCount: 0, incompleteItemCount: 0, resourceCount: 0, warningAcknowledged: true,
+  })
+  await installApi(page, projection)
+  await installMembershipApi(page, { currentMembershipResponse: {
+    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
+  } })
+  await openSharedWorkspace(page)
+
+  const modeGroup = page.getByRole('group', { name: '할 일 보기' })
+  await modeGroup.getByRole('button', { name: '내 할 일' }).click()
+  await expect(modeGroup.getByRole('button', { name: '내 할 일' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('heading', { level: 1, name: '남은 업무 3개' })).toBeVisible()
+  const mine = page.getByRole('region', { name: '내 할 일' })
+  await expect(mine.getByRole('region', { name: '진행 담당 바통 도착' })).toContainText('김준호님이 넘겼습니다')
+  await expect(mine.getByRole('button', { name: '풀이 노트 정리 완료 처리' })).toHaveCount(2)
+  await expect(mine.getByText('문제 5개 선정')).toHaveCount(1)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  const myRoles = page.getByRole('region', { name: '내 역할' })
+  await expect(myRoles.getByRole('heading', { name: '문제 큐레이터' })).toBeVisible()
+  await expect(myRoles).toContainText('다음 할 일')
+  await myRoles.getByRole('button', { name: '확인하기' }).click()
+  await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }))
+    .toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('list', { name: '인수인계 단계' }).getByRole('listitem').nth(2))
+    .toHaveAttribute('aria-current', 'step')
+  await expect(page.getByRole('button', { name: '인수인계 수락', exact: true })).toBeVisible()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '할 일' }).click()
+  await expect(page.getByRole('group', { name: '할 일 보기' }).getByRole('button', { name: '내 할 일' }))
+    .toHaveAttribute('aria-pressed', 'true')
 })
 
 test('@operations 내 담당 업무는 활동 종료된 구성원의 업무를 표시하지 않는다', async ({ page }) => {

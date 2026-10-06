@@ -30,7 +30,7 @@ test('@smoke @responsive 내 팀에서 공유 키 없이 이동하고 계정을 
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))
   await link.click()
   await expect(page).toHaveURL(WORKSPACE_PATH)
-  await expect(page.getByRole('button', { name: '오늘', exact: true }).filter({ visible: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '할 일', exact: true }).filter({ visible: true })).toBeVisible()
   accountId = OTHER_ACCOUNT
   await page.getByRole('link', { name: '내 팀', exact: true }).filter({ visible: true }).click()
   await expect(page.getByText('이 계정으로 참여한 팀이 없습니다.', { exact: false })).toBeVisible()
