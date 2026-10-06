@@ -1458,11 +1458,13 @@ test('@operations @continuity 오늘 요약은 조치할 항목으로 이동하�
   await installApi(page, projection)
   await openSharedWorkspace(page)
 
+  const roundMeta = page.locator('.round-meta')
+  await expect(roundMeta).toContainText('다음 마감 2026. 7. 18. 오후 9:00')
   await page.getByRole('button', { name: '조치할 항목 1건 보기' }).click()
   await expect(page.getByRole('region', { name: '조치할 항목' })).toBeFocused()
 
   await page.getByRole('button', { name: '풀이 노트 정리 완료 처리' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
-  await expect(page.getByText('이번 회차 업무를 모두 끝냈습니다.', { exact: false })).toBeVisible()
-  await expect(page.locator('.today-summary .is-complete')).toContainText('모두 완료')
+  await expect(roundMeta).toContainText('모두 완료')
+  await expect(roundMeta).not.toContainText('다음 마감')
 })

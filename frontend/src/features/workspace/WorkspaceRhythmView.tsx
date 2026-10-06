@@ -74,7 +74,7 @@ export function RhythmView({
     && routines.length === 0
   return (
     <>
-      <PageHeader eyebrow={`반복 업무 ${routines.length}개 · 회차 ${rounds.length}개`} title="일정" description="회차와 단계별 반복 업무를 관리하고 회차별 완료 여부를 확인합니다." action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
+      <PageHeader eyebrow={`반복 업무 ${routines.length}개 · 회차 ${rounds.length}개`} title="일정" action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
       <section
         className={`round-schedule-card ${season.roundSchedule?.enabled ? 'active' : ''}`}
         aria-labelledby="round-schedule-title"

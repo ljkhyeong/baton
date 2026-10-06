@@ -1,4 +1,4 @@
-.my-teams-page { height: 100%; overflow: auto; background: var(--canvas); }
+.my-teams-page { height: 100%; overflow: auto; background: var(--paper); }
 
 .account-topbar {
   position: sticky;
@@ -10,14 +10,15 @@
   justify-content: space-between;
   gap: 16px;
   padding: 0 32px;
-  background: var(--canvas-translucent);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-translucent);
   backdrop-filter: saturate(1.4) blur(8px);
 }
 .account-topbar .brand { padding: 0; color: var(--ink); text-decoration: none; }
 .account-topbar nav { display: flex; gap: 4px; }
 .account-topbar nav a { display: inline-flex; min-height: 36px; align-items: center; padding: 0 10px; border-radius: var(--radius); color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; }
 .account-topbar nav a:hover { color: var(--ink); background: var(--rule); }
-.account-topbar nav a[aria-current="page"] { color: var(--ink); background: var(--paper); }
+.account-topbar nav a[aria-current="page"] { color: var(--ink); background: var(--rule); }
 
 .my-teams-content { width: min(100%, 960px); margin: 0 auto; padding: 40px 32px 72px; }
 .account-content { width: min(100%, 720px); }
@@ -26,7 +27,7 @@
 .my-teams-intro h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -.045em; }
 .my-teams-intro p { margin: 0; color: var(--muted); font-size: 14px; }
 
-.pending-invitation-notice { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 32px; padding: 16px 18px; border: 1px solid var(--rule); border-left: 3px solid var(--info); border-radius: var(--radius-lg); background: var(--info-soft); }
+.pending-invitation-notice { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 32px; padding: 16px 18px; border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .pending-invitation-notice strong { font-size: 14px; }
 .pending-invitation-notice p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .pending-invitation-notice a { flex-shrink: 0; text-decoration: none; }
@@ -36,14 +37,14 @@
 .my-teams-heading h2 { margin: 0; font-size: 18px; letter-spacing: -.03em; }
 .my-teams-description { max-width: 64ch; margin: -6px 0 16px; color: var(--muted); font-size: 13px; line-height: 1.65; word-break: keep-all; }
 
-.my-teams-state { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius); color: var(--muted); background: var(--paper); font-size: 13px; line-height: 1.6; }
+.my-teams-state { margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radius); color: var(--muted); background: var(--nav); font-size: 13px; line-height: 1.6; }
 .my-teams-state-warning { color: var(--warning); background: var(--warning-soft); }
 .my-teams-state > p { margin: 0 0 10px; }
 .my-teams-empty { margin: 0; padding: 28px 16px; border: 1px dashed var(--rule-strong); border-radius: var(--radius-lg); color: var(--muted); font-size: 13px; text-align: center; word-break: keep-all; }
 
 .my-teams-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
-.my-team-card { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-content: start; gap: 4px 12px; padding: 18px; border: 1px solid transparent; border-radius: var(--radius-lg); background: var(--paper); transition: border-color 150ms ease, box-shadow 150ms ease; }
-.my-team-card:hover { border-color: var(--rule-strong); box-shadow: 0 4px 14px rgba(24, 28, 36, .06); }
+.my-team-card { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-content: start; gap: 4px 12px; padding: 18px; border: 1px solid var(--rule); border-radius: var(--radius-lg); transition: border-color 150ms ease; }
+.my-team-card:hover { border-color: var(--rule-strong); }
 .my-team-card .workspace-symbol { width: 36px; height: 36px; }
 .my-team-copy { min-width: 0; }
 .my-team-copy h3 { margin: 6px 0; font-size: 16px; letter-spacing: -.02em; overflow-wrap: anywhere; }
@@ -53,7 +54,7 @@
 .my-work-filter { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .my-work-filter select { min-width: 180px; color: var(--ink); font-weight: 500; }
 
-.my-work-list { margin: 0; padding: 0 12px; border-radius: var(--radius-lg); background: var(--paper); list-style: none; }
+.my-work-list { margin: 0; padding: 0; border-block: 1px solid var(--rule); list-style: none; }
 .my-work-list li + li { border-top: 1px solid var(--rule); }
 .my-work-row { display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 8px; color: var(--ink); text-decoration: none; }
 .my-work-row:hover { border-radius: var(--radius); background: var(--nav); }
@@ -62,10 +63,10 @@
 .my-work-copy span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .my-work-deadline { color: var(--muted); font-size: 12px; text-align: right; white-space: nowrap; }
 
-.work-kind { display: inline-flex; justify-self: start; padding: 3px 8px; border-radius: var(--radius-sm); color: var(--muted); background: var(--canvas); font-size: 12px; font-weight: 650; white-space: nowrap; }
-.work-kind-overdue { color: var(--warning); background: var(--warning-soft); }
-.work-kind-soon { color: var(--caution); background: var(--caution-soft); }
-.work-kind-handoff { color: var(--info); background: var(--info-soft); }
+.work-kind { display: inline-flex; justify-self: start; color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.work-kind-overdue { color: var(--warning); }
+.work-kind-soon { color: var(--caution); }
+.work-kind-handoff,
 .work-kind-record { color: var(--ink); }
 
 .my-teams-note { margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 12px; line-height: 1.7; word-break: keep-all; }

@@ -43,7 +43,6 @@ export function RolesView({
       <PageHeader
         eyebrow={`역할 ${roles.length}개 · 활동 중인 구성원 ${members.filter(isActiveMember).length}명`}
         title="역할과 담당자"
-        description="현재 담당자와 다음 담당자, 담당 업무를 확인하세요."
         action={(
           <div className="action-cluster">
             <button
@@ -74,7 +73,7 @@ export function RolesView({
                   className="role-row-open"
                   onClick={(event) => onSelectRole(role.id, { opener: event.currentTarget })}
                 >
-                  <span className="role-main"><span className="role-glyph"><Icon name="roles" size={17} /></span><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
+                  <span className="role-main"><span><strong>{role.name}<span className="visually-hidden"> 역할 상세 열기</span></strong><small>{role.purpose}</small></span></span>
                   <span className="person-cell">
                     <span className="role-person-label">현재</span>
                     {owner ? <><span className="avatar" style={{ background: owner.tone }}>{owner.initials}</span><span><strong>{memberDisplayName(owner)}</strong><small>{formatDateRange(role.assignmentStartDate, role.assignmentEndDate)}</small></span></> : <em>담당자 미정</em>}

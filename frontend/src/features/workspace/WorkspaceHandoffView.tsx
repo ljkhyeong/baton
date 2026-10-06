@@ -77,7 +77,7 @@ export function HandoffView({
   const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
   const selected = roles[selectedIndex] ?? roles[0]
   if (!selected) {
-    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" description="역할을 만들면 담당 업무와 자료를 인수인계 문서로 정리할 수 있습니다." /><ActionableEmpty icon="handoff" title="넘겨줄 역할이 아직 없습니다" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
+    return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" /><ActionableEmpty icon="handoff" title="넘겨줄 역할이 아직 없습니다" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
   }
   const panelId = `${tabSetId}-panel`
   const selectedTabId = `${tabSetId}-tab-${selected.id}`
@@ -128,7 +128,6 @@ export function HandoffView({
       <PageHeader
         eyebrow={remainingDays >= 0 ? `시즌 종료까지 ${remainingDays}일` : `${formatLocalDate(season.endDate)} 시즌 종료`}
         title="역할 인수인계"
-        description="담당 업무와 참고 자료를 정리해 다음 담당자에게 전달합니다."
         action={<div className="action-cluster"><button type="button" className="secondary-button" disabled={selectedChangesDisabled} onClick={onAddItem}><Icon name="plus" size={15} /> 항목 추가</button><button type="button" className="secondary-button" onClick={onPreview}>인수인계 문서 미리보기</button></div>}
       />
       <div className="handoff-role-tabs" role="tablist" aria-label="역할별 인수인계" aria-orientation="horizontal">

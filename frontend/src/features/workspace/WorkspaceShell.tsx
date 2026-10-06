@@ -205,9 +205,6 @@ export function RecordsHeader({
       <PageHeader
         eyebrow={`결정 ${decisionCount}개`}
         title="기록"
-        description={view === 'records'
-          ? '결정·인수인계·자료를 시즌별로 다시 찾습니다.'
-          : '결정한 내용과 이유, 검토한 대안을 남깁니다.'}
         action={view === 'memory'
           ? <PrimaryButton onClick={onOpenDecision} disabled={createDisabled}>결정 남기기</PrimaryButton>
           : undefined}

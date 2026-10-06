@@ -91,7 +91,6 @@ export function TodayView({
       - timingPriority[right.execution?.timingStatus ?? 'UNSCHEDULED']
   })
   const executionCount = selectedRound?.routineExecutions.length ?? 0
-  const completionRate = executionCount ? Math.round((completedCount / executionCount) * 100) : 0
   const nextDeadline = orderedRoutines
     .flatMap(({ execution }) => execution?.deadlineAt && execution.status !== 'DONE' ? [execution.deadlineAt] : [])
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
@@ -108,36 +107,12 @@ export function TodayView({
       <PageHeader
         eyebrow={calendarLabel}
         title={`남은 업무 ${pendingCount}개`}
-        description={roundComplete
-          ? '이번 회차 업무를 모두 끝냈습니다. 다음 회차와 인수인계를 준비하세요.'
-          : '끝낸 업무를 체크하세요. 자료는 담당자를 눌러 확인하세요.'}
         action={(
           <button type="button" className="secondary-button" onClick={roles.length ? onAddRoutine : onAddRole} disabled={changesDisabled}>
             <Icon name="plus" size={15} />{roles.length ? '업무 추가' : '역할 추가'}
           </button>
         )}
       />
-      {selectedRound && (
-        <dl className="today-summary">
-          <div className={roundComplete ? 'is-complete' : undefined}>
-            <dt>회차 완료율</dt>
-            <dd>{completionRate}%<small>{roundComplete ? '모두 완료' : `${executionCount}개 중 ${completedCount}개 완료`}</small></dd>
-          </div>
-          <div>
-            <dt>다음 마감</dt>
-            <dd>{nextDeadline ? formatInstant(nextDeadline, season.timeZone) : '없음'}<small>남은 업무 기준</small></dd>
-          </div>
-          <div className={signalCount ? 'needs-attention' : undefined}>
-            <dt>조치 필요</dt>
-            <dd>
-              {signalCount
-                ? <button type="button" className="summary-jump" aria-label={`조치할 항목 ${signalCount}건 보기`} onClick={openSignals}>{signalCount}건<Icon name="chevron" size={16} /></button>
-                : '0건'}
-              <small>역할·인수인계 점검</small>
-            </dd>
-          </div>
-        </dl>
-      )}
       <section className="relay-board" aria-labelledby="relay-title">
         <div className="today-list-toolbar">
           <RoundControl
@@ -152,7 +127,13 @@ export function TodayView({
           />
           <h2 id="relay-title" className="visually-hidden">이번 회차 업무</h2>
           <div className="round-meta">
-            <strong>{completedCount}/{selectedRound?.routineExecutions.length ?? 0} 완료</strong>
+            <strong>{roundComplete ? '모두 완료' : `${completedCount}/${executionCount} 완료`}</strong>
+            {nextDeadline && <span>다음 마감 {formatInstant(nextDeadline, season.timeZone)}</span>}
+            {signalCount > 0 && (
+              <button type="button" className="summary-jump" aria-label={`조치할 항목 ${signalCount}건 보기`} onClick={openSignals}>
+                조치할 항목 {signalCount}건
+              </button>
+            )}
           </div>
         </div>
         {!orderedRoutines.length ? (
