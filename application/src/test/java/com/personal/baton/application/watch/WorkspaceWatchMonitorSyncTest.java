@@ -1,7 +1,5 @@
 package com.personal.baton.application.watch;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;

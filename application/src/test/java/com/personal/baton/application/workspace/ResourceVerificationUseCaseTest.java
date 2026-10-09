@@ -6,7 +6,6 @@ import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCa
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
-import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerifyResourceCommand;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.ConfigureReviewScheduleCommand;

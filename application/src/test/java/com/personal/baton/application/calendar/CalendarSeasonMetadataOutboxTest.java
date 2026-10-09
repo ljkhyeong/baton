@@ -1,7 +1,5 @@
 package com.personal.baton.application.calendar;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.BatonApplication;
 import com.personal.baton.adapter.out.external.calendar.RestClientCalendarClient;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase;

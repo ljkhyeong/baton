@@ -548,21 +548,6 @@ class IdentityServicesTest {
         );
     }
 
-    private AccountSecurityService securityService(IdentityRepository repository) {
-        EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
-        return new AccountSecurityService(
-                repository,
-                mock(PasswordEncoder.class),
-                mock(StringKeyGenerator.class),
-                outboxPort,
-                new EmailChallengeDeliveryRegistrar(
-                        outboxPort,
-                        mock(EmailVerificationOutboxPayloadProtector.class)
-                ),
-                Clock.fixed(NOW, ZoneOffset.UTC)
-        );
-    }
-
     private LocalAccountRegistrationService service(
             IdentityRepository repository,
             PasswordEncoder passwordEncoder,

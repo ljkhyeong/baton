@@ -1,7 +1,5 @@
 package com.personal.baton.adapter.in.web.auth;
 
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;

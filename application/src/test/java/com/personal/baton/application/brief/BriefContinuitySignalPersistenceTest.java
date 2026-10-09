@@ -1,7 +1,5 @@
 package com.personal.baton.application.brief;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.Mockito.clearInvocations;

@@ -6,7 +6,6 @@ import com.personal.baton.application.identity.error.IdentityOperationUnavailabl
 import com.personal.baton.domain.identity.Account;
 import com.personal.baton.domain.identity.AccountIdentity;
 import com.personal.baton.domain.identity.EmailVerificationChallenge;
-import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;

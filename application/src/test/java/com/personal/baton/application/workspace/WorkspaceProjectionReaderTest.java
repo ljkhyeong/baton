@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
