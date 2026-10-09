@@ -313,7 +313,6 @@ for forbidden_name in \
 	  BATON_ROUND_RELEASE_REVISION \
 	  BATON_ROUND_TURN_URLS \
 	  BATON_ROUND_TURN_SHARED_SECRET_FILE \
-  BATON_SECRET_ROUND_TURN_SHARED_SECRET \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -683,7 +682,6 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_ROUND_RELEASE_REVISION=ambient-revision \
   BATON_ROUND_TURN_URLS='turn:ambient.invalid:3478?transport=udp' \
   BATON_ROUND_TURN_SHARED_SECRET_FILE=/tmp/ambient-turn-secret \
-  BATON_SECRET_ROUND_TURN_SHARED_SECRET=ambient-round-turn-secret \
   BATON_BRIEF_DELIVERY_ENABLED=true \
   BATON_BRIEF_BASE_URL=https://ambient-brief.invalid \
   BATON_BRIEF_BEARER_TOKEN_FILE=/tmp/ambient-brief-token \
@@ -1435,7 +1433,6 @@ BATON_ROUND_SIGNALING_IMAGE=ambient.invalid/round/signaling:latest \
 BATON_ROUND_RELEASE_REVISION=ambient-revision \
 BATON_ROUND_TURN_URLS='turn:ambient.invalid:3478?transport=udp' \
 BATON_ROUND_TURN_SHARED_SECRET_FILE=/tmp/ambient-turn-secret \
-BATON_SECRET_ROUND_TURN_SHARED_SECRET=ambient-turn-shared-secret \
 COMPOSE_IGNORE_ORPHANS=1 \
 "$production_compose_script" ps >/dev/null \
   || fail 'enabled ROUND runtime ps failed'
