@@ -176,12 +176,9 @@ case "$compose_command" in
     ;;
 esac
 
-canonical_file() {
-  local target="$1"
-  local directory
-
-  directory="$(CDPATH= cd -- "$(dirname -- "$target")" && pwd -P)"
-  printf '%s/%s' "$directory" "$(basename -- "$target")"
+fail() {
+  printf 'Production Compose failed: %s\n' "$1" >&2
+  exit 1
 }
 
 read_secret_or_placeholder() {
@@ -192,7 +189,7 @@ read_secret_or_placeholder() {
     printf '%s' "$placeholder"
     return 0
   fi
-  target="$(canonical_file "$target")"
+  target="$(production_validation_canonical_file fail "$target")" || exit 1
   printf '%s' "$(< "$target")"
 }
 
@@ -255,7 +252,10 @@ smtp_password="$(
 holidays_service_key="$(
   read_secret_or_placeholder "$holidays_service_key_file" disabled-holidays-service-key
 )"
-email_outbox_encryption_key="$(< "$(canonical_file "$email_outbox_encryption_key_file")")"
+email_outbox_encryption_key_file="$(
+  production_validation_canonical_file fail "$email_outbox_encryption_key_file"
+)"
+email_outbox_encryption_key="$(< "$email_outbox_encryption_key_file")"
 brief_bearer_token="$(
   read_secret_or_placeholder "$brief_bearer_token_file" disabled-brief-bearer-token
 )"
@@ -272,7 +272,9 @@ round_previous_public_key="$(
 )"
 round_turn_shared_secret_path=/dev/null
 if [[ -n "$round_turn_shared_secret_file" ]]; then
-  round_turn_shared_secret_path="$(canonical_file "$round_turn_shared_secret_file")"
+  round_turn_shared_secret_path="$(
+    production_validation_canonical_file fail "$round_turn_shared_secret_file"
+  )"
 fi
 
 smtp_test_connection=false
