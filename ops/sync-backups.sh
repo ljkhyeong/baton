@@ -71,7 +71,7 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 backup_dir="${BATON_BACKUP_DIR:-$script_dir/backups}"
 remote="${BATON_RCLONE_REMOTE:-}"
 retention_days="${BATON_BACKUP_LOCAL_RETENTION_DAYS:-14}"
-state_dir="${BATON_BACKUP_STATE_DIR:-$backup_dir/.state}"
+state_dir="${BATON_BACKUP_STATE_DIR:-}"
 
 case "$backup_dir" in
   /*) ;;

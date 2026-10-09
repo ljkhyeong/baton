@@ -585,6 +585,22 @@ if PATH="$fake_bin:$PATH" \
   fail 'old snapshot upload unexpectedly passed freshness check'
 fi
 
+missing_sync_state_root="$test_root/missing-sync-state"
+mkdir -p -- "$missing_sync_state_root/backups" "$missing_sync_state_root/remote"
+write_valid_backup "$missing_sync_state_root/backups/baton-20200101T000000Z-pending.sql.gz"
+if env -u BATON_BACKUP_STATE_DIR \
+  PATH="$fake_bin:$PATH" \
+  BATON_BACKUP_DIR="$missing_sync_state_root/backups" \
+  BATON_RCLONE_REMOTE=fake:daily \
+  FAKE_REMOTE_ROOT="$missing_sync_state_root/remote" \
+  FAKE_RCLONE_COUNT_FILE="$missing_sync_state_root/rclone-count" \
+  "$repo_root/ops/sync-backups.sh" >/dev/null 2>&1; then
+  fail 'backup synchronization without BATON_BACKUP_STATE_DIR unexpectedly succeeded'
+fi
+assert_count 0 "$(find "$missing_sync_state_root/remote" -type f | wc -l | tr -d ' ')" \
+  'missing synchronization state remote files'
+assert_no_file "$missing_sync_state_root/backups/.state"
+
 prune_audit_root="$test_root/prune-audit-failure"
 mkdir -p -- "$prune_audit_root/backups" "$prune_audit_root/remote"
 write_valid_production_env "$prune_audit_root/production.env"
