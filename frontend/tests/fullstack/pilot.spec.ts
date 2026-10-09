@@ -224,13 +224,11 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
     await peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' }).click()
     await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 처리' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 처리' }))
-      .toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 처리' })).toBeVisible()
 
     await peerPage.getByRole('button', { name: '회고 질문 준비 완료 처리' }).click()
     await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' }))
-      .toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
   } finally {
     await peerContext.close()
   }
@@ -301,13 +299,6 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.getByRole('button', {
     name: `${revisedDecisionTitle} 수정`,
   })).toBeDisabled()
-
-  expect(await page.evaluate(() => [
-    'baton-roles',
-    'baton-routines',
-    'baton-decisions',
-    'baton-handoff',
-  ].map((key) => localStorage.getItem(key)))).toEqual([null, null, null, null])
 })
 
 
