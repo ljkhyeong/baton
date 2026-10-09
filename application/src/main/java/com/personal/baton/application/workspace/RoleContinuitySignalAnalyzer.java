@@ -9,7 +9,6 @@ import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleResource;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +16,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.personal.baton.application.workspace.HandoffContinuitySignalAnalyzer.SUCCESSOR_WARNING_DAYS;
+import static com.personal.baton.application.workspace.HandoffContinuitySignalAnalyzer.assignmentDateDescription;
+import static com.personal.baton.application.workspace.HandoffContinuitySignalAnalyzer.hasEligibleNextMember;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.summingInt;
@@ -24,8 +26,6 @@ import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 final class RoleContinuitySignalAnalyzer {
-
-    private static final int SUCCESSOR_WARNING_DAYS = 14;
 
     List<ContinuitySignalResult> analyze(
             LocalDate seasonStartDate,
@@ -170,19 +170,7 @@ final class RoleContinuitySignalAnalyzer {
                         + "님을 다음 담당자로 지정해 역할을 넘길 수 없습니다."
                         : "다음 담당자로 정한 " + nextMember.getName()
                         + "님이 활동을 종료했습니다.";
-        if (assignmentEndDate.isBefore(today)) {
-            long elapsedDays = ChronoUnit.DAYS.between(assignmentEndDate, today);
-            return role.getName() + " 역할의 담당 기간이 " + elapsedDays + "일 전에 끝났지만 " + gapReason;
-        }
-        if (assignmentEndDate.equals(today)) {
-            return role.getName() + " 역할의 담당 기간이 오늘 끝나지만 " + gapReason;
-        }
-        long remainingDays = ChronoUnit.DAYS.between(today, assignmentEndDate);
-        return role.getName() + " 역할의 담당 기간이 " + remainingDays + "일 뒤 끝나지만 " + gapReason;
-    }
-
-    private boolean hasEligibleNextMember(Role role, Set<UUID> activeMemberIds) {
-        return activeMemberIds.contains(role.getNextMemberId())
-                && !Objects.equals(role.getCurrentMemberId(), role.getNextMemberId());
+        return role.getName() + " 역할의 담당 기간이 "
+                + assignmentDateDescription(assignmentEndDate, today) + " " + gapReason;
     }
 }
