@@ -11,6 +11,25 @@ PRODUCTION_VALIDATION_ERROR=""
 PRODUCTION_VALIDATION_ENV_KEYS=()
 PRODUCTION_VALIDATION_ENV_VALUES=()
 
+# 운영 Docker 명령은 주변 Docker·BuildKit 설정을 무시하고 로컬 데몬 소켓만 사용한다.
+# shellcheck disable=SC2034  # 불러온 스크립트가 이 명령 배열을 실행한다.
+PRODUCTION_DOCKER_COMMAND=(
+  env
+  -u DOCKER_HOST
+  -u DOCKER_CONTEXT
+  -u DOCKER_CONFIG
+  -u DOCKER_TLS_VERIFY
+  -u DOCKER_CERT_PATH
+  -u DOCKER_API_VERSION
+  -u DOCKER_DEFAULT_PLATFORM
+  -u BUILDX_BUILDER
+  -u BUILDX_CONFIG
+  -u BUILDKIT_HOST
+  -u DOCKER_BUILDKIT
+  docker
+  --host unix:///var/run/docker.sock
+)
+
 # shellcheck disable=SC2034  # 함수 반환 후 호출자가 PRODUCTION_VALIDATION_ERROR를 읽는다.
 production_validation_parse_literal_env() {
   local env_file="$1"

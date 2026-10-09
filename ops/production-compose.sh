@@ -416,17 +416,6 @@ env \
   -u COMPOSE_IGNORE_ORPHANS \
   -u COMPOSE_REMOVE_ORPHANS \
   -u COMPOSE_CONVERT_WINDOWS_PATHS \
-  -u DOCKER_HOST \
-  -u DOCKER_CONTEXT \
-  -u DOCKER_CONFIG \
-  -u DOCKER_TLS_VERIFY \
-  -u DOCKER_CERT_PATH \
-  -u DOCKER_API_VERSION \
-  -u DOCKER_DEFAULT_PLATFORM \
-  -u BUILDX_BUILDER \
-  -u BUILDX_CONFIG \
-  -u BUILDKIT_HOST \
-  -u DOCKER_BUILDKIT \
   COMPOSE_MENU=false \
   BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
   BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
@@ -446,7 +435,7 @@ env \
   BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE="$round_turn_shared_secret_path" \
   BATON_EFFECTIVE_SMTP_TEST_CONNECTION="$smtp_test_connection" \
   BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH="$round_previous_container_path" \
-  docker --host unix:///var/run/docker.sock compose \
+  "${PRODUCTION_DOCKER_COMMAND[@]}" compose \
     --project-directory "$repo_root" \
     --project-name baton-production \
     --env-file "$env_file" \

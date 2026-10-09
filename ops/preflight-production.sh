@@ -25,25 +25,9 @@ if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
 fi
 
 command -v docker >/dev/null 2>&1 || fail "docker is required"
-docker_command=(
-  env
-  -u DOCKER_HOST
-  -u DOCKER_CONTEXT
-  -u DOCKER_CONFIG
-  -u DOCKER_TLS_VERIFY
-  -u DOCKER_CERT_PATH
-  -u DOCKER_API_VERSION
-  -u DOCKER_DEFAULT_PLATFORM
-  -u BUILDX_BUILDER
-  -u BUILDX_CONFIG
-  -u BUILDKIT_HOST
-  -u DOCKER_BUILDKIT
-  docker
-  --host unix:///var/run/docker.sock
-)
-"${docker_command[@]}" info >/dev/null 2>&1 \
+"${PRODUCTION_DOCKER_COMMAND[@]}" info >/dev/null 2>&1 \
   || fail "local Docker daemon is not available through /var/run/docker.sock"
-"${docker_command[@]}" compose version >/dev/null 2>&1 \
+"${PRODUCTION_DOCKER_COMMAND[@]}" compose version >/dev/null 2>&1 \
   || fail "Docker Compose v2 is required"
 
 if ! production_validation_parse_literal_env "$env_file"; then
@@ -54,7 +38,7 @@ brief_service_api_enabled="${brief_service_api_enabled:-false}"
 if [[ "$brief_service_api_enabled" == "true" ]]; then
   brief_private_network="$(production_validation_env_value BATON_BRIEF_PRIVATE_NETWORK)"
   brief_network_internal="$(
-    "${docker_command[@]}" network inspect \
+    "${PRODUCTION_DOCKER_COMMAND[@]}" network inspect \
       --format '{{.Internal}}' "$brief_private_network" 2>/dev/null
   )" || fail "BRIEF private Docker network does not exist: $brief_private_network"
   [[ "$brief_network_internal" == "true" ]] \

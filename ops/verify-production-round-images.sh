@@ -39,29 +39,13 @@ round_signaling_image="$(production_validation_env_value BATON_ROUND_SIGNALING_I
 round_release_revision="$(production_validation_env_value BATON_ROUND_RELEASE_REVISION)"
 
 command -v docker >/dev/null 2>&1 || fail "docker is required"
-docker_command=(
-  env
-  -u DOCKER_HOST
-  -u DOCKER_CONTEXT
-  -u DOCKER_CONFIG
-  -u DOCKER_TLS_VERIFY
-  -u DOCKER_CERT_PATH
-  -u DOCKER_API_VERSION
-  -u DOCKER_DEFAULT_PLATFORM
-  -u BUILDX_BUILDER
-  -u BUILDX_CONFIG
-  -u BUILDKIT_HOST
-  -u DOCKER_BUILDKIT
-  docker
-  --host unix:///var/run/docker.sock
-)
 
 for image in "$round_web_image" "$round_signaling_image"; do
   resolved_repo_digests=""
-  "${docker_command[@]}" pull --quiet "$image" >/dev/null \
+  "${PRODUCTION_DOCKER_COMMAND[@]}" pull --quiet "$image" >/dev/null \
     || fail "could not pull an exact configured ROUND image digest"
   if ! resolved_repo_digests="$(
-    "${docker_command[@]}" image inspect \
+    "${PRODUCTION_DOCKER_COMMAND[@]}" image inspect \
       --format '{{ join .RepoDigests "\n" }}' \
       "$image"
   )"; then
@@ -79,7 +63,7 @@ inspect_label() {
   local value
 
   if ! value="$(
-    "${docker_command[@]}" image inspect \
+    "${PRODUCTION_DOCKER_COMMAND[@]}" image inspect \
       --format "{{ index .Config.Labels \"$label\" }}" \
       "$image"
   )"; then

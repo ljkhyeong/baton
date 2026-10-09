@@ -14,6 +14,8 @@ if [[ $# -ne 1 || -z "$1" ]]; then
 fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 repo_root="$(dirname -- "$script_dir")"
 env_file="${BATON_PRODUCTION_ENV_FILE:-$repo_root/.env.production}"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
@@ -141,18 +143,6 @@ compose=(
   BATON_PRODUCTION_LIFECYCLE_LOCK_FD="$BATON_PRODUCTION_LIFECYCLE_LOCK_FD"
   "$script_dir/production-compose.sh"
 )
-docker_command=(
-  env
-  -u DOCKER_HOST
-  -u DOCKER_CONTEXT
-  -u DOCKER_CONFIG
-  -u DOCKER_TLS_VERIFY
-  -u DOCKER_CERT_PATH
-  -u DOCKER_API_VERSION
-  -u DOCKER_DEFAULT_PLATFORM
-  docker
-  --host unix:///var/run/docker.sock
-)
 
 "${compose[@]}" ps --all -q app web round-web round-signaling > "$compose_output_path"
 service_ids="$(< "$compose_output_path")"
@@ -162,7 +152,7 @@ while IFS= read -r container_id; do
     continue
   fi
   container_state="$(
-    "${docker_command[@]}" inspect --format '{{.Name}} {{.State.Status}}' "$container_id"
+    "${PRODUCTION_DOCKER_COMMAND[@]}" inspect --format '{{.Name}} {{.State.Status}}' "$container_id"
   )"
   if [[ "${container_state##* }" != "exited" ]]; then
     unsafe_containers+="${container_state#/}"$'\n'
