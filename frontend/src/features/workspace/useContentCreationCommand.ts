@@ -77,9 +77,12 @@ const contentCreationJournalPolicy = {
 }
 
 export const pendingStorageRequiredMessage = '입력을 저장하지 못해 새 항목을 추가하지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
-const contentCreationBusyMessage = '다른 탭에서 새 항목을 추가하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도하세요.'
-const contentCreationLockUnsupportedMessage = '이 브라우저에서는 새 항목을 만들 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
-const contentCreationLockFailedMessage = '새 항목을 만들 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
+// 탭 사이 잠금을 얻지 못한 이유별 안내
+const contentCreationLockMessages = {
+  busy: '다른 탭에서 새 항목을 추가하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도하세요.',
+  unsupported: '이 브라우저에서는 새 항목을 만들 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.',
+  failed: '새 항목을 만들 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.',
+}
 const contentCreationCleanupRequiredMessage = '임시 기록을 삭제하지 못해 요청을 보내지 않았습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const contentCreationCleanupCompletedMessage = '임시 기록을 삭제했습니다. 목록과 입력을 확인한 뒤 다시 제출해 주세요.'
 const guardedContentCreationMessage = '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다. 이전과 같은 내용을 다시 제출해 저장 여부를 확인하세요.'
@@ -160,19 +163,9 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       }
       return { status: 'requested' as const }
     }).then((lockResult) => {
-      if (lockResult.status === 'busy') {
+      if (lockResult.status !== 'completed') {
         mutation.reset()
-        setStorageError(contentCreationBusyMessage)
-        return false
-      }
-      if (lockResult.status === 'unsupported') {
-        mutation.reset()
-        setStorageError(contentCreationLockUnsupportedMessage)
-        return false
-      }
-      if (lockResult.status === 'failed') {
-        mutation.reset()
-        setStorageError(contentCreationLockFailedMessage)
+        setStorageError(contentCreationLockMessages[lockResult.status])
         return false
       }
       if (lockResult.value.status === 'blocked') {
@@ -236,16 +229,8 @@ export function usePendingContentCreationCleanupCommand() {
         clearPendingContentCreationCleanup(cleanupRetry),
       ),
     ).then((lockResult) => {
-      if (lockResult.status === 'busy') {
-        setMessage(contentCreationBusyMessage)
-        return false
-      }
-      if (lockResult.status === 'unsupported') {
-        setMessage(contentCreationLockUnsupportedMessage)
-        return false
-      }
-      if (lockResult.status === 'failed') {
-        setMessage(contentCreationLockFailedMessage)
+      if (lockResult.status !== 'completed') {
+        setMessage(contentCreationLockMessages[lockResult.status])
         return false
       }
       if (!lockResult.value) {
