@@ -11,7 +11,6 @@ import com.personal.baton.domain.workspace.Season;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
@@ -27,9 +26,7 @@ public class WorkspaceSeasonPersistenceAdapter implements WorkspaceSeasonReposit
     @Override
     public Season saveSeason(Season season) {
         try {
-            return seasonRepository.saveAndFlush(season);
-        } catch (ConcurrencyFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
+            return WorkspaceConflicts.translate(() -> seasonRepository.saveAndFlush(season));
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_seasons_team_name")) {
                 throw new SeasonNameConflictException(exception);

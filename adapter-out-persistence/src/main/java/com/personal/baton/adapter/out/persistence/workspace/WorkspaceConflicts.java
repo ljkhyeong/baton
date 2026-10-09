@@ -17,11 +17,4 @@ final class WorkspaceConflicts {
             throw new WorkspaceContentConflictException(exception);
         }
     }
-
-    static void translate(Runnable operation) {
-        translate(() -> {
-            operation.run();
-            return null;
-        });
-    }
 }

@@ -3,7 +3,6 @@ package com.personal.baton.adapter.out.persistence.workspace;
 import static com.personal.baton.adapter.out.persistence.PersistenceConstraintViolations.hasConstraint;
 
 import com.personal.baton.application.workspace.error.SeasonRoundNameConflictException;
-import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutineExecution;
@@ -12,7 +11,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
@@ -46,9 +44,7 @@ public class WorkspaceOperationsPersistenceAdapter implements WorkspaceOperation
     @Override
     public SeasonRound saveSeasonRound(SeasonRound seasonRound) {
         try {
-            return seasonRoundRepository.saveAndFlush(seasonRound);
-        } catch (ConcurrencyFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
+            return WorkspaceConflicts.translate(() -> seasonRoundRepository.saveAndFlush(seasonRound));
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_season_rounds_season_name")) {
                 throw new SeasonRoundNameConflictException(exception);
