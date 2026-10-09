@@ -4,44 +4,23 @@ set -Eeuo pipefail
 umask 077
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 backup_dir="${BATON_BACKUP_DIR:-$script_dir/backups}"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
+
+fail() {
+  printf '%s\n' "$1" >&2
+  exit 1
+}
 
 if ! command -v flock >/dev/null 2>&1; then
   printf 'flock is required to prevent overlapping backup cycles.\n' >&2
   exit 1
 fi
 
-if [[ -z "$state_dir" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR is required for the shared backup and restore lock.\n' >&2
-  exit 1
-fi
-case "$state_dir" in
-  /*) ;;
-  *)
-    printf 'BATON_BACKUP_STATE_DIR must be an absolute path: %s\n' "$state_dir" >&2
-    exit 1
-    ;;
-esac
-if [[ "$state_dir" == "/" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR must not be the filesystem root.\n' >&2
-  exit 1
-fi
-if [[ -L "$state_dir" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR must not be a symbolic link: %s\n' "$state_dir" >&2
-  exit 1
-fi
-mkdir -p -- "$state_dir"
-if [[ ! -O "$state_dir" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR must be owned by the service user: %s\n' "$state_dir" >&2
-  exit 1
-fi
-chmod 700 "$state_dir"
 lock_file="$state_dir/backup-cycle.lock"
-if [[ -L "$lock_file" || ( -e "$lock_file" && ( ! -f "$lock_file" || ! -O "$lock_file" ) ) ]]; then
-  printf 'Backup lock must be a regular file owned by the service user: %s\n' "$lock_file" >&2
-  exit 1
-fi
+production_validation_prepare_backup_state_dir fail "$state_dir" "$lock_file"
 
 exec 9>"$lock_file"
 if ! flock -n 9; then

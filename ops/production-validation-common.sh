@@ -192,3 +192,27 @@ production_validation_secret_file() {
   fi
   printf '%s' "$canonical_target"
 }
+
+# 백업 주기와 복구가 공유하는 상태 디렉터리를 만들어 0700으로 맞추고 공유 잠금 파일 경계를 확인한다.
+# 디렉터리를 만들고 권한을 바꾸므로 그 잠금을 잡는 백업·복구 스크립트만 호출한다.
+production_validation_prepare_backup_state_dir() {
+  local fail_callback="$1"
+  local state_dir="$2"
+  local lock_file="$3"
+
+  [[ -n "$state_dir" ]] \
+    || "$fail_callback" 'BATON_BACKUP_STATE_DIR is required for the shared backup and restore lock.'
+  [[ "$state_dir" == /* ]] \
+    || "$fail_callback" "BATON_BACKUP_STATE_DIR must be an absolute path: $state_dir"
+  [[ "$state_dir" != "/" ]] \
+    || "$fail_callback" 'BATON_BACKUP_STATE_DIR must not be the filesystem root.'
+  [[ ! -L "$state_dir" ]] \
+    || "$fail_callback" "BATON_BACKUP_STATE_DIR must not be a symbolic link: $state_dir"
+  mkdir -p -- "$state_dir"
+  [[ -O "$state_dir" ]] \
+    || "$fail_callback" "BATON_BACKUP_STATE_DIR must be owned by the service user: $state_dir"
+  chmod 700 "$state_dir"
+  if [[ -L "$lock_file" || ( -e "$lock_file" && ( ! -f "$lock_file" || ! -O "$lock_file" ) ) ]]; then
+    "$fail_callback" "Backup lock must be a regular file owned by the service user: $lock_file"
+  fi
+}
