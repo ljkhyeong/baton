@@ -5,7 +5,6 @@ import com.personal.baton.application.identity.port.out.EmailVerificationOutboxP
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.PlainPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectedPayload;
 import com.personal.baton.application.identity.port.out.EmailVerificationOutboxPayloadProtector.ProtectionContext;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -29,18 +28,10 @@ public final class AesGcmEmailVerificationOutboxPayloadProtector
     private static final int MAXIMUM_CIPHERTEXT_BYTES = MAXIMUM_PLAINTEXT_BYTES + 32;
 
     private final SecretKeySpec key;
-    private final SecureRandom secureRandom;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public AesGcmEmailVerificationOutboxPayloadProtector(String base64Key) {
-        this(base64Key, new SecureRandom());
-    }
-
-    AesGcmEmailVerificationOutboxPayloadProtector(
-            String base64Key,
-            SecureRandom secureRandom
-    ) {
         this.key = requiredSecretKey(base64Key);
-        this.secureRandom = Objects.requireNonNull(secureRandom, "보안 난수 생성기는 필수입니다");
     }
 
     @Override
@@ -127,17 +118,13 @@ public final class AesGcmEmailVerificationOutboxPayloadProtector
     }
 
     private PlainPayload deserialize(byte[] plaintext) {
-        try {
-            ByteBuffer buffer = ByteBuffer.wrap(plaintext);
-            String email = readUtf8(buffer, 1, 1280);
-            String token = readUtf8(buffer, 32, 512);
-            if (buffer.hasRemaining()) {
-                throw new IllegalArgumentException("이메일 인증 payload 뒤에 예상하지 못한 값이 있습니다");
-            }
-            return new PlainPayload(email, token);
-        } catch (BufferUnderflowException | IllegalArgumentException exception) {
-            throw invalidPayload(exception);
+        ByteBuffer buffer = ByteBuffer.wrap(plaintext);
+        String email = readUtf8(buffer, 1, 1280);
+        String token = readUtf8(buffer, 32, 512);
+        if (buffer.hasRemaining()) {
+            throw new IllegalArgumentException("이메일 인증 payload 뒤에 예상하지 못한 값이 있습니다");
         }
+        return new PlainPayload(email, token);
     }
 
     private String readUtf8(ByteBuffer buffer, int minimumBytes, int maximumBytes) {

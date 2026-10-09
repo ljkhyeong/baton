@@ -37,9 +37,9 @@ public final class TurnstileHumanVerificationAdapter implements HumanVerificatio
             String expectedHostname
     ) {
         this.restClient = Objects.requireNonNull(restClient, "Turnstile RestClient는 필수입니다");
-        this.siteKey = requireValue(siteKey, "Turnstile site key");
-        this.secretKey = requireValue(secretKey, "Turnstile secret key");
-        this.expectedHostname = requireValue(expectedHostname, "Turnstile 허용 호스트");
+        this.siteKey = siteKey;
+        this.secretKey = secretKey;
+        this.expectedHostname = expectedHostname;
     }
 
     @Override
@@ -99,13 +99,6 @@ public final class TurnstileHumanVerificationAdapter implements HumanVerificatio
             return VerificationOutcome.REJECTED;
         }
         return VerificationOutcome.VERIFIED;
-    }
-
-    private static String requireValue(String value, String label) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(label + "가 필요합니다");
-        }
-        return value;
     }
 
     private record SiteverifyResponse(
