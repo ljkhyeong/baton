@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import tools.jackson.databind.ObjectMapper;
 
 @Configuration(proxyBeanMethods = false)
 public class BrevoWebhookSecurityConfig {
@@ -20,7 +19,7 @@ public class BrevoWebhookSecurityConfig {
     @Bean
     @Order(1)
     SecurityFilterChain brevoWebhookSecurityFilterChain(
-            HttpSecurity http, ObjectMapper objectMapper,
+            HttpSecurity http, SecurityErrorResponseWriter errorResponseWriter,
             @Value("${baton.brevo.webhook.enabled:false}") boolean enabled,
             @Value("${baton.brevo.webhook.bearer-token:}") String token
     ) throws Exception {
@@ -34,7 +33,7 @@ public class BrevoWebhookSecurityConfig {
                 new DefaultBearerTokenResolver(),
                 presented -> enabled && MessageDigest.isEqual(expected, presented.getBytes(StandardCharsets.UTF_8)),
                 "brevo",
-                new SecurityErrorResponseWriter(objectMapper)
+                errorResponseWriter
         );
     }
 }

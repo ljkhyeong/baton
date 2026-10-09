@@ -14,7 +14,7 @@ public final class WorkspaceAccountMutationFilter extends OncePerRequestFilter {
     private final SecurityErrorResponseWriter errors;
     public WorkspaceAccountMutationFilter(SecurityErrorResponseWriter errors) { this.errors = errors; }
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !AccountSessionRequestMatchers.workspaceAccountMutation().matches(request);
+        return !AccountSessionRequestMatchers.workspaceAccountHeaderRequired().matches(request);
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {

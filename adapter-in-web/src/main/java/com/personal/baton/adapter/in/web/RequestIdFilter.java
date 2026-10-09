@@ -30,7 +30,6 @@ public class RequestIdFilter extends OncePerRequestFilter {
     private static final String SERVER_ERROR_LOGGED_ATTRIBUTE =
             RequestIdFilter.class.getName() + ".serverErrorLogged";
     private static final RequestMatcher PRODUCT_API_REQUEST = new OrRequestMatcher(
-            pathPattern("/api/v1"),
             pathPattern("/api/v1/**"),
             pathPattern(ParticipationGrantController.REFRESH_PATH_PATTERN)
     );
@@ -76,7 +75,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return requestId(request) == null && !isProductApiRequest(request);
+        return requestId(request) == null && !PRODUCT_API_REQUEST.matches(request);
     }
 
     @Override
@@ -91,10 +90,6 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     static void markServerErrorLogged(HttpServletRequest request) {
         request.setAttribute(SERVER_ERROR_LOGGED_ATTRIBUTE, Boolean.TRUE);
-    }
-
-    private boolean isProductApiRequest(HttpServletRequest request) {
-        return PRODUCT_API_REQUEST.matches(request);
     }
 
     private String requestId(HttpServletRequest request) {

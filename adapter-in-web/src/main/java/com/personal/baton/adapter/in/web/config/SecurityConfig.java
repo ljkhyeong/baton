@@ -19,6 +19,7 @@ import com.personal.baton.adapter.in.web.holiday.PublicHolidayController;
 import com.personal.baton.adapter.in.web.roundauth.RoundGrantAdmissionFilter;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
+import com.personal.baton.adapter.in.web.system.SystemStatusController;
 import com.personal.baton.adapter.in.web.watch.WatchHealthEventController;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
@@ -60,6 +61,7 @@ import tools.jackson.databind.ObjectMapper;
 @EnableConfigurationProperties(AuthFeatureProperties.class)
 public class SecurityConfig {
 
+    private static final String WORKSPACE_CREATION_PATH = "/api/v1/workspaces";
     private static final ErrorResponse AUTHENTICATION_REQUIRED = new ErrorResponse(
             "AUTHENTICATION_REQUIRED",
             "BATON 계정 로그인이 필요합니다"
@@ -152,7 +154,7 @@ public class SecurityConfig {
                         .csrfTokenRepository(csrfTokenRepository)
                         .ignoringRequestMatchers(
                                 PathPatternRequestMatcher.pathPattern(
-                                        "/api/v1/workspaces"
+                                        WORKSPACE_CREATION_PATH
                                 ),
                                 AccountSessionRequestMatchers
                                         .workspaceCapabilityWithoutAccountSession()
@@ -202,7 +204,7 @@ public class SecurityConfig {
                             .access(IpAddressAuthorizationManager.hasIpAddress("127.0.0.1"))
                             .requestMatchers(
                                     "/actuator/health",
-                                    "/api/v1/system/status"
+                                    SystemStatusController.PATH
                             ).permitAll()
                             .requestMatchers(HttpMethod.GET,
                                     PublicHolidayController.PATH,
@@ -227,7 +229,7 @@ public class SecurityConfig {
                             ).authenticated()
                             .requestMatchers(
                                     HttpMethod.POST,
-                                    "/api/v1/workspaces"
+                                    WORKSPACE_CREATION_PATH
                             ).permitAll()
                             .requestMatchers(
                                     "/api/v1/teams/*/seasons/*/**"
@@ -262,7 +264,6 @@ public class SecurityConfig {
                         .loginPage(AuthController.LOCAL_SESSION_PATH)
                         .loginProcessingUrl(AuthController.LOCAL_SESSION_PATH)
                         .usernameParameter("email")
-                        .securityContextRepository(securityContextRepository)
                         .successHandler((request, response, authentication) -> {
                             authRateLimiter.recordLoginSuccess(request.getParameter("email"));
                             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
@@ -291,7 +292,6 @@ public class SecurityConfig {
             http.oauth2Login(oauth2 -> oauth2
                     .clientRegistrationRepository(clientRegistrationRepository)
                     .authorizedClientRepository(authorizedClientRepository)
-                    .securityContextRepository(securityContextRepository)
                     .authorizationEndpoint(endpoint -> endpoint
                             .authorizationRequestResolver(authorizationRequestResolver))
                     .tokenEndpoint(endpoint -> endpoint.accessTokenResponseClient(
