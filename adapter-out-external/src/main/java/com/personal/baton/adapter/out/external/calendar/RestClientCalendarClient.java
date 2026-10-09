@@ -50,7 +50,7 @@ public final class RestClientCalendarClient implements
             if (body == null || !recoveryId.equals(body.recoveryId()) || body.status() == null
                     || body.recoveryMode() == null || body.verifiedSeasonCount() == null || body.verifiedSeasonCount() < 0
                     || (body.status() == RunStatus.COMPLETED) != (body.completedAt() != null)) return null;
-            return new RecoveryRun(recoveryId, body.status(), body.recoveryMode(), body.verifiedSeasonCount(), body.completedAt());
+            return new RecoveryRun(body.status());
         });
     }
 
@@ -62,7 +62,7 @@ public final class RestClientCalendarClient implements
                     || body.itemDigest() == null || !body.itemDigest().matches("[0-9a-f]{64}")
                     || (body.metadataRevision() == null) != (body.metadataDigest() == null)
                     || (body.metadataRevision() != null && (body.metadataRevision() < 0 || !body.metadataDigest().matches("[0-9a-f]{64}")))) return null;
-            return new SeasonState(seasonId, body.itemCount(), body.itemDigest(), body.metadataRevision(), body.metadataDigest());
+            return new SeasonState(body.itemCount(), body.itemDigest(), body.metadataRevision(), body.metadataDigest());
         });
     }
 
@@ -96,7 +96,7 @@ public final class RestClientCalendarClient implements
                     if (body == null || !subscriptionId.equals(body.subscriptionId()) || body.seasonId() == null
                             || !Set.of("ACTIVE", "REVOKED").contains(body.status() == null ? "" : body.status())
                             || body.generationMatches() == null) return Result.of(CalendarSubscriptionClient.Outcome.INVALID_RESPONSE);
-                    return new Result(CalendarSubscriptionClient.Outcome.SUCCESS, null, new RemoteStatus(body.subscriptionId(), body.seasonId(),
+                    return new Result(CalendarSubscriptionClient.Outcome.SUCCESS, null, new RemoteStatus(body.seasonId(),
                             "REVOKED".equals(body.status()), body.generationMatches()));
                 });
     }

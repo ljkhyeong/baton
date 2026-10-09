@@ -29,11 +29,10 @@ public class CalendarSnapshotBackfillService implements BackfillCalendarSnapshot
             worker.verifyTextCompatibility(candidate);
             return 0;
         });
-        ScanResult result = scanCandidates(worker::backfill);
-        return new BackfillResult(result.candidateCount(), result.appendedCount());
+        return scanCandidates(worker::backfill);
     }
 
-    private ScanResult scanCandidates(ToIntFunction<CalendarBackfillCandidate> operation) {
+    private BackfillResult scanCandidates(ToIntFunction<CalendarBackfillCandidate> operation) {
         UUID afterRoundId = null;
         int candidateCount = 0;
         int appendedCount = 0;
@@ -55,9 +54,6 @@ public class CalendarSnapshotBackfillService implements BackfillCalendarSnapshot
                 break;
             }
         }
-        return new ScanResult(candidateCount, appendedCount);
-    }
-
-    private record ScanResult(int candidateCount, int appendedCount) {
+        return new BackfillResult(candidateCount, appendedCount);
     }
 }

@@ -168,7 +168,7 @@ class CalendarSubscriptionServiceTest {
         when(client.create(any(), any())).thenReturn(Result.of(Outcome.UNAVAILABLE), Result.of(Outcome.ALREADY_EXISTS));
         assertReason(Reason.UNAVAILABLE, () -> service.create(scope));
         UUID id = store.find(owner()).orElseThrow().subscriptionId();
-        when(client.findSubscription(id)).thenReturn(new Result(Outcome.SUCCESS, null, new RemoteStatus(id, scope.seasonId(), false, true)));
+        when(client.findSubscription(id)).thenReturn(new Result(Outcome.SUCCESS, null, new RemoteStatus(scope.seasonId(), false, true)));
         assertThat(service.find(scope).status()).isEqualTo(Status.ACTIVE);
         assertReason(Reason.CREDENTIAL_REQUIRED, () -> service.create(scope));
         verify(client, times(2)).create(id, scope.seasonId());
@@ -277,7 +277,7 @@ class CalendarSubscriptionServiceTest {
     @DisplayName("서버 복원으로 구독 세대가 달라지면 재발급 필요 상태를 반환한다")
     void detectsGenerationMismatch() {
         UUID id = service.create(scope).subscriptionId();
-        when(client.findSubscription(id)).thenReturn(new Result(Outcome.SUCCESS, null, new RemoteStatus(id, scope.seasonId(), false, false)));
+        when(client.findSubscription(id)).thenReturn(new Result(Outcome.SUCCESS, null, new RemoteStatus(scope.seasonId(), false, false)));
         assertThat(service.find(scope).status()).isEqualTo(Status.REISSUE_REQUIRED);
         verify(client, never()).rotate(any());
     }

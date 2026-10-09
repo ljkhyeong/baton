@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.persistence.calendar;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.instant;
 import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
 
 import com.personal.baton.application.calendar.CalendarSubscriptionException;
@@ -9,8 +10,6 @@ import jakarta.persistence.EntityManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -96,8 +95,7 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
         }
         Stored stored = jdbc.query(SELECT + OWNER + " FOR UPDATE", this::read, args(owner)).stream()
                 .findFirst().orElseThrow(() -> new CalendarSubscriptionException(Reason.NOT_FOUND));
-        if (stored.leaseUntil() != null && stored.leaseUntil().isAfter(now)
-                || stored.revocationPending() && !revoking) {
+        if (stored.leasedAt(now) || stored.revocationPending() && !revoking) {
             throw new CalendarSubscriptionException(Reason.IN_PROGRESS);
         }
         UUID subscriptionId = create && stored.revoked() ? UUID.randomUUID() : stored.subscriptionId();
@@ -165,10 +163,9 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
     }
 
     private Stored read(ResultSet rs, int ignored) throws SQLException {
-        LocalDateTime lease = rs.getObject("lease_until", LocalDateTime.class);
         return new Stored(new Owner(UUID.fromString(rs.getString("account_id")), UUID.fromString(rs.getString("team_id")),
                 UUID.fromString(rs.getString("season_id"))), UUID.fromString(rs.getString("subscription_id")),
-                rs.getBoolean("revoked"), rs.getBoolean("revocation_pending"), lease == null ? null : lease.toInstant(ZoneOffset.UTC));
+                rs.getBoolean("revoked"), rs.getBoolean("revocation_pending"), instant(rs, "lease_until"));
     }
     private Object[] args(Owner owner) { return new Object[] { owner.accountId().toString(), owner.teamId().toString(), owner.seasonId().toString() }; }
 }

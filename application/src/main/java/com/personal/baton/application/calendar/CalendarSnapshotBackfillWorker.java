@@ -7,9 +7,7 @@ import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,21 +74,14 @@ public class CalendarSnapshotBackfillWorker {
                 ));
         List<RoutineExecution> executions = operationsRepository
                 .findRoutineExecutionsBySeasonRoundIdWithSharedLock(round.getId());
-        Instant occurredAt = clock.instant();
-        int appendedCount = outboxPort.appendIfChanged(snapshotFactory.fromRound(
-                UUID.randomUUID(),
-                occurredAt,
+        int appendedCount = 0;
+        for (CalendarSnapshotDraft snapshot : snapshotFactory.roundSnapshots(
+                clock.instant(),
                 season,
-                round
-        )) ? 1 : 0;
-        for (RoutineExecution execution : executions) {
-            var snapshot = snapshotFactory.fromExecution(
-                    UUID.randomUUID(),
-                    occurredAt,
-                    round,
-                    execution
-            );
-            if (snapshot.isPresent() && outboxPort.appendIfChanged(snapshot.get())) {
+                round,
+                executions
+        )) {
+            if (outboxPort.appendIfChanged(snapshot)) {
                 appendedCount++;
             }
         }
