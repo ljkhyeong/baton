@@ -808,7 +808,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 임시 기록을 지우�
 test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전송을 막는다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
-    { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
+    PENDING_CONTENT_CREATION_STORAGE_PREFIX,
     'baton-e2e-content-terminal-cleanup-failure',
   )
   const api = await installApi(page)

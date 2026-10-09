@@ -1,7 +1,6 @@
 import { expect } from '@playwright/test'
 import type { Locator, Page, Route } from '@playwright/test'
 import type {
-  CancelRoleHandoffRequest,
   ConfirmRoleHandoffRequest,
   CreateDecisionRequest,
   CreateHandoffItemRequest,
@@ -142,22 +141,6 @@ function serializeLocalTime(value: string) {
   return value.length === 5 ? `${value}:00` : value
 }
 
-function nextScheduleOccurrence(
-  firstMeetingDate: string,
-  recurrence: 'WEEKLY' | 'BIWEEKLY',
-  previousCursor?: string,
-) {
-  if (!previousCursor || previousCursor <= firstMeetingDate) return firstMeetingDate
-  const first = Date.parse(`${firstMeetingDate}T00:00:00Z`)
-  const lowerBound = Date.parse(`${previousCursor}T00:00:00Z`)
-  const intervalDays = recurrence === 'WEEKLY' ? 7 : 14
-  const daysFromFirst = Math.floor((lowerBound - first) / 86_400_000)
-  const intervals = Math.ceil(daysFromFirst / intervalDays)
-  return new Date(first + intervals * intervalDays * 86_400_000)
-    .toISOString()
-    .slice(0, 10)
-}
-
 export async function expectVisibleFocus(locator: Locator, background: string) {
   const focusStyle = await locator.evaluate((element) => {
     const style = getComputedStyle(element)
@@ -206,7 +189,6 @@ type ApiHarness = {
   rejectNextMemberAsConflict: () => void
   holdNextContentCreation: (operation: ContentCreationOperation) => void
   releaseContentCreation: () => void
-  failNextWorkspaceGet: () => void
   makeWorkspaceGetsUnavailable: () => void
   restoreWorkspaceGets: () => void
   holdNextRoleUpdate: () => void
@@ -484,7 +466,6 @@ export async function installApi(page: Page, initialProjection = makeProjection(
   const expiredAccessKeyRotationResults = new Set<string>()
   const workspaceCreationResults = new Map<string, { teamId: string; seasonId: string; accessKey: string }>()
   const contentCreationResults = new Map<string, unknown>()
-  let failedGetsRemaining = 0
   let workspaceGetsUnavailable = false
   let roleUpdateGate: Promise<void> | null = null
   let releaseRoleUpdate = () => {}
@@ -634,16 +615,11 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       if (workspaceGetsUnavailable) {
         return error(503, 'WORKSPACE_TEMPORARILY_UNAVAILABLE', '작업 공간을 잠시 불러올 수 없습니다.')
       }
-      if (failedGetsRemaining > 0) {
-        failedGetsRemaining -= 1
-        return error(503, 'WORKSPACE_TEMPORARILY_UNAVAILABLE', '작업 공간을 잠시 불러올 수 없습니다.')
-      }
       return json(200, structuredClone(projection))
     }
 
     if (method === 'PUT' && path === `${SCOPE_PATH}/round-schedule`) {
       const input = body as UpdateRoundScheduleRequest
-      const previousCursor = projection.season.roundSchedule?.nextOccurrenceDate
       const updatedSeason = {
         ...projection.season,
         timeZone: input.timeZone.trim(),
@@ -653,11 +629,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
           recurrence: input.recurrence,
           generationLeadDays: input.generationLeadDays,
           enabled: input.enabled,
-          nextOccurrenceDate: nextScheduleOccurrence(
-            input.firstMeetingDate,
-            input.recurrence,
-            previousCursor,
-          ),
+          nextOccurrenceDate: input.firstMeetingDate,
         },
       }
       projection.season = updatedSeason
@@ -696,8 +668,7 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     if (method === 'POST' && path === `${SCOPE_PATH}/members`) {
       const input = body as CreateMemberRequest
       const normalizedName = input.name.trim()
-      if (rejectMemberAsConflict
-        || projection.members.some((member) => member.name.trim() === normalizedName)) {
+      if (rejectMemberAsConflict) {
         rejectMemberAsConflict = false
         return error(
           409,
@@ -733,14 +704,6 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       const member = projection.members.find((candidate) => candidate.id === memberUpdate[1])
       if (!member) return error(404, 'MEMBER_NOT_FOUND', '구성원을 찾을 수 없습니다.')
       const normalizedName = (body as UpdateMemberRequest).name.trim()
-      if (projection.members.some((candidate) =>
-        candidate.id !== member.id && candidate.name.trim() === normalizedName)) {
-        return error(
-          409,
-          'MEMBER_NAME_CONFLICT',
-          '같은 팀에 동일한 구성원 이름을 사용할 수 없습니다.',
-        )
-      }
       member.name = normalizedName
       member.initials = [...normalizedName][0] ?? ''
       projection.decisions
@@ -778,25 +741,13 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     if (method === 'POST' && roleHandoffPreparation) {
       const role = projection.roles.find((candidate) => candidate.id === roleHandoffPreparation[1])
       if (!role) return error(404, 'ROLE_NOT_FOUND', '역할을 찾을 수 없습니다.')
-      if (!role.currentMemberId || !role.assignmentStartDate) {
-        return error(
-          409,
-          'ROLE_HANDOFF_STATE_CONFLICT',
-          '현재 담당자와 담당 시작일이 있는 역할만 인수인계를 준비할 수 있습니다.',
-        )
-      }
-      if (projection.roleHandoffs.some((handoff) =>
-        handoff.roleId === role.id
-        && (handoff.status === 'PREPARING' || handoff.status === 'TRANSFERRED'))) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '이미 진행 중인 역할 인수인계가 있습니다.')
-      }
       const input = body as PrepareRoleHandoffRequest
       const handoff: RoleHandoff = {
         id: ROLE_HANDOFF_ID,
         roleId: role.id,
-        fromMemberId: role.currentMemberId,
+        fromMemberId: role.currentMemberId!,
         toMemberId: input.toMemberId,
-        outgoingAssignmentStartDate: role.assignmentStartDate,
+        outgoingAssignmentStartDate: role.assignmentStartDate!,
         outgoingAssignmentEndDate: role.assignmentEndDate,
         incomingAssignmentStartDate: input.incomingAssignmentStartDate,
         incomingAssignmentEndDate: input.incomingAssignmentEndDate ?? null,
@@ -825,32 +776,15 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs/([^/]+)/transfer$`),
     )
     if (method === 'PATCH' && roleHandoffTransfer) {
-      const role = projection.roles.find((candidate) => candidate.id === roleHandoffTransfer[1])
+      const role = projection.roles.find((candidate) => candidate.id === roleHandoffTransfer[1])!
       const handoff = projection.roleHandoffs.find((candidate) =>
-        candidate.id === roleHandoffTransfer[2] && candidate.roleId === roleHandoffTransfer[1])
-      if (!role || !handoff) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계를 전달할 수 없습니다.')
-      }
+        candidate.id === roleHandoffTransfer[2] && candidate.roleId === roleHandoffTransfer[1])!
       const input = body as TransferRoleHandoffRequest
       const activeItems = projection.handoffItems.filter((item) =>
         item.roleId === role.id && !item.archivedAt)
       const incompleteItemCount = activeItems.filter((item) => !item.completed).length
       const resourceCount = projection.resources.filter((resource) =>
         resource.roleId === role.id).length
-      const hasWarning = activeItems.length === 0
-        || incompleteItemCount > 0
-        || resourceCount === 0
-      if (hasWarning && !input.warningAcknowledged) {
-        return error(
-          409,
-          'ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED',
-          '준비도 경고를 확인해야 역할 인수인계를 전달할 수 있습니다.',
-        )
-      }
-      if (handoff.status !== 'PREPARING'
-        || input.confirmedByMemberId !== handoff.fromMemberId) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계 상태가 먼저 바뀌었습니다.')
-      }
       handoff.status = 'TRANSFERRED'
       handoff.transferredAt = '2026-07-22T09:10:00Z'
       handoff.transferredByMemberId = input.confirmedByMemberId
@@ -868,14 +802,10 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs/([^/]+)/acceptance$`),
     )
     if (method === 'PATCH' && roleHandoffAcceptance) {
-      const role = projection.roles.find((candidate) => candidate.id === roleHandoffAcceptance[1])
+      const role = projection.roles.find((candidate) => candidate.id === roleHandoffAcceptance[1])!
       const handoff = projection.roleHandoffs.find((candidate) =>
-        candidate.id === roleHandoffAcceptance[2] && candidate.roleId === roleHandoffAcceptance[1])
+        candidate.id === roleHandoffAcceptance[2] && candidate.roleId === roleHandoffAcceptance[1])!
       const input = body as ConfirmRoleHandoffRequest
-      if (!role || !handoff || handoff.status !== 'TRANSFERRED'
-        || input.confirmedByMemberId !== handoff.toMemberId) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계를 수락할 수 없습니다.')
-      }
       handoff.status = 'ACCEPTED'
       handoff.acceptedAt = '2026-07-22T09:20:00Z'
       handoff.acceptedByMemberId = input.confirmedByMemberId
@@ -883,29 +813,6 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       role.nextMemberId = null
       role.assignmentStartDate = handoff.incomingAssignmentStartDate
       role.assignmentEndDate = handoff.incomingAssignmentEndDate
-      return json(200, {
-        role: structuredClone(role),
-        handoff: structuredClone(handoff),
-      })
-    }
-
-    const roleHandoffCancellation = path.match(
-      new RegExp(`^${SCOPE_PATH}/roles/([^/]+)/handoffs/([^/]+)/cancellation$`),
-    )
-    if (method === 'PATCH' && roleHandoffCancellation) {
-      const role = projection.roles.find((candidate) => candidate.id === roleHandoffCancellation[1])
-      const handoff = projection.roleHandoffs.find((candidate) =>
-        candidate.id === roleHandoffCancellation[2] && candidate.roleId === roleHandoffCancellation[1])
-      const input = body as CancelRoleHandoffRequest
-      if (!role || !handoff
-        || (handoff.status !== 'PREPARING' && handoff.status !== 'TRANSFERRED')
-        || input.confirmedByMemberId !== handoff.fromMemberId) {
-        return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', '역할 인수인계를 취소할 수 없습니다.')
-      }
-      handoff.status = 'CANCELLED'
-      handoff.cancelledAt = '2026-07-22T09:20:00Z'
-      handoff.cancelledByMemberId = input.confirmedByMemberId
-      role.nextMemberId = null
       return json(200, {
         role: structuredClone(role),
         handoff: structuredClone(handoff),
@@ -927,9 +834,6 @@ export async function installApi(page: Page, initialProjection = makeProjection(
 
     if (method === 'POST' && path === `${SCOPE_PATH}/rounds`) {
       const input = body as CreateSeasonRoundRequest
-      if (projection.rounds.some((round) => round.name.trim() === input.name.trim())) {
-        return error(409, 'ROUND_NAME_CONFLICT', '같은 시즌에 동일한 회차 이름을 사용할 수 없습니다.')
-      }
       const executionIds = [
         CREATED_ROUND_ROUTINE_ONE_EXECUTION_ID,
         CREATED_ROUND_ROUTINE_TWO_EXECUTION_ID,
@@ -1298,7 +1202,6 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       releaseContentCreation()
       releaseContentCreation = () => {}
     },
-    failNextWorkspaceGet: () => { failedGetsRemaining = 2 },
     makeWorkspaceGetsUnavailable: () => { workspaceGetsUnavailable = true },
     restoreWorkspaceGets: () => { workspaceGetsUnavailable = false },
     holdNextRoleUpdate: () => {
@@ -1417,26 +1320,24 @@ export async function blockContentCreationStorage(page: Page) {
   }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
 }
 
+// 저장 키 접두사가 맞는 임시 기록의 첫 삭제만 실패시킨다. 키 하나는 그 키 전체를 접두사로 넘긴다.
 export async function failNextJournalCleanup(
   page: Page,
-  target: { storageKey?: string; storagePrefix?: string },
+  storagePrefix: string,
   failureStateKey: string,
 ) {
-  await page.addInitScript(({ targetStorageKey, targetStoragePrefix, stateKey }) => {
+  await page.addInitScript(({ prefix, stateKey }) => {
     const originalRemoveItem = Storage.prototype.removeItem
-    const matches = (key: string) => key === targetStorageKey
-      || Boolean(targetStoragePrefix && key.startsWith(targetStoragePrefix))
 
     Storage.prototype.removeItem = function removeItem(key) {
-      if (matches(key) && sessionStorage.getItem(stateKey) === null) {
+      if (key.startsWith(prefix) && sessionStorage.getItem(stateKey) === null) {
         sessionStorage.setItem(stateKey, 'failed')
         throw new DOMException('Storage removal disabled', 'SecurityError')
       }
       originalRemoveItem.call(this, key)
     }
   }, {
-    targetStorageKey: target.storageKey,
-    targetStoragePrefix: target.storagePrefix,
+    prefix: storagePrefix,
     stateKey: failureStateKey,
   })
 }
@@ -1494,7 +1395,7 @@ export async function failContentCreationMarkerAndCleanupUntilReleased(page: Pag
 export async function failNextAccessKeyRotationCleanup(page: Page) {
   await failNextJournalCleanup(
     page,
-    { storageKey: PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY },
+    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
     'baton-e2e-access-key-cleanup-failure',
   )
 }
@@ -1505,14 +1406,23 @@ type PendingWorkspaceCreationEntry = {
   createdAt: number
 }
 
+type PendingContentCreationEntry = {
+  teamId: string
+  seasonId: string
+  operation: ContentCreationOperation
+  normalizedPayload: string
+  idempotencyKey: string
+  createdAt: number
+  cleanupRequired?: true
+}
+
 export function pendingWorkspaceCreationEntry(
   request: CreateWorkspaceRequest,
   sequence: number,
-  createdAt = sequence,
 ): PendingWorkspaceCreationEntry {
   return {
     idempotencyKey: fixtureUuid(sequence),
-    createdAt,
+    createdAt: sequence,
     normalizedPayload: JSON.stringify({
       teamName: request.teamName.trim(),
       seasonName: request.seasonName.trim(),
@@ -1523,10 +1433,10 @@ export function pendingWorkspaceCreationEntry(
   }
 }
 
+// 페이지마다 한 번만 호출하며, 새로고침해도 같은 탭에서는 다시 심지 않는다.
 export async function seedPendingWorkspaceCreations(
   page: Page,
   entries: PendingWorkspaceCreationEntry[],
-  marker: string,
 ) {
   await page.addInitScript(({ prefix, pendingEntries, seedMarker }) => {
     if (sessionStorage.getItem(seedMarker) !== null) return
@@ -1537,7 +1447,7 @@ export async function seedPendingWorkspaceCreations(
   }, {
     prefix: PENDING_CREATION_STORAGE_PREFIX,
     pendingEntries: entries,
-    seedMarker: marker,
+    seedMarker: 'baton-e2e-pending-workspace-seeded',
   })
 }
 
@@ -1549,12 +1459,12 @@ export async function fillOnboardingForm(page: Page, request: CreateWorkspaceReq
   await page.getByLabel('구성원 이름').fill(request.memberNames.join('\n'))
 }
 
-export async function pendingCreationEntries(page: Page) {
-  return page.evaluate((prefix) => {
-    const entries: PendingWorkspaceCreationEntry[] = []
+async function journalEntries<T>(page: Page, prefix: string): Promise<T[]> {
+  return page.evaluate((storagePrefix) => {
+    const entries: unknown[] = []
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index)
-      if (!key?.startsWith(prefix)) continue
+      if (!key?.startsWith(storagePrefix)) continue
       try {
         const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
         if (parsed) entries.push(parsed)
@@ -1563,32 +1473,15 @@ export async function pendingCreationEntries(page: Page) {
       }
     }
     return entries
-  }, PENDING_CREATION_STORAGE_PREFIX)
+  }, prefix) as Promise<T[]>
 }
 
-export async function pendingContentCreationEntries(page: Page) {
-  return page.evaluate((prefix) => {
-    const entries: {
-      teamId: string
-      seasonId: string
-      operation: ContentCreationOperation
-      normalizedPayload: string
-      idempotencyKey: string
-      createdAt: number
-      cleanupRequired?: true
-    }[] = []
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index)
-      if (!key?.startsWith(prefix)) continue
-      try {
-        const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
-        if (parsed) entries.push(parsed)
-      } catch {
-        // 형식이 잘못된 값은 유효한 생성 대기 기록으로 보지 않는다.
-      }
-    }
-    return entries
-  }, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+export function pendingCreationEntries(page: Page) {
+  return journalEntries<PendingWorkspaceCreationEntry>(page, PENDING_CREATION_STORAGE_PREFIX)
+}
+
+export function pendingContentCreationEntries(page: Page) {
+  return journalEntries<PendingContentCreationEntry>(page, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
 }
 
 export async function recordedCall(api: ApiHarness, method: string, path: string) {
@@ -1598,8 +1491,8 @@ export async function recordedCall(api: ApiHarness, method: string, path: string
   return call!
 }
 
-export function expectScopedCall(call: RecordedCall, body?: unknown, accessKey = ACCESS_KEY) {
-  expect(call.headers['x-baton-access-key']).toBe(accessKey)
+export function expectScopedCall(call: RecordedCall, body?: unknown) {
+  expect(call.headers['x-baton-access-key']).toBe(ACCESS_KEY)
   if (call.method === 'POST') expect(call.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   if (body !== undefined) expect(call.body).toEqual(body)
 }

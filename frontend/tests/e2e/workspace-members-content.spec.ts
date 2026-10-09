@@ -820,7 +820,7 @@ test('생성 재시도 정보를 안전하게 저장할 수 없으면 콘텐츠 
 test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음 요청 전에 기록부터 삭제한다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
-    { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
+    PENDING_CONTENT_CREATION_STORAGE_PREFIX,
     'baton-e2e-content-success-cleanup-failure',
   )
   const api = await installApi(page)

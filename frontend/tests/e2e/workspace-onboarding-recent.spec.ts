@@ -342,11 +342,7 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
     memberNames: ['박민서'],
   }
   const pendingEntry = pendingWorkspaceCreationEntry(request, 970)
-  await seedPendingWorkspaceCreations(
-    page,
-    [pendingEntry],
-    'baton-e2e-terminal-recovery-workspace-seeded',
-  )
+  await seedPendingWorkspaceCreations(page, [pendingEntry])
   const api = await installApi(page)
   api.rejectNextWorkspaceCreationAsInvalidInput()
   await page.goto('/')
@@ -379,7 +375,7 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
 test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전송 전에 삭제를 요구한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
-    { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
+    PENDING_CREATION_STORAGE_PREFIX,
     'baton-e2e-workspace-terminal-cleanup-failure',
   )
   const api = await installApi(page)
@@ -423,7 +419,7 @@ test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전�
 test('온보딩 성공 기록을 삭제하지 못하면 삭제 재시도 후 한 번만 이동한다', async ({ page }) => {
   await failNextJournalCleanup(
     page,
-    { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
+    PENDING_CREATION_STORAGE_PREFIX,
     'baton-e2e-workspace-success-cleanup-failure',
   )
   const api = await installApi(page)
@@ -468,7 +464,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 임시 기록 삭제 �
   }
   await failNextJournalCleanup(
     page,
-    { storagePrefix: PENDING_CREATION_STORAGE_PREFIX },
+    PENDING_CREATION_STORAGE_PREFIX,
     'baton-e2e-workspace-cleanup-lock-contention',
   )
   const api = await installApi(page)
@@ -521,11 +517,7 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
     memberNames: ['박민서', '김준호'],
   }
   const pendingEntry = pendingWorkspaceCreationEntry(request, 971)
-  await seedPendingWorkspaceCreations(
-    page,
-    [pendingEntry],
-    'baton-e2e-expired-workspace-replay-seeded',
-  )
+  await seedPendingWorkspaceCreations(page, [pendingEntry])
   const api = await installApi(page)
   api.expireNextWorkspaceCreationReplay()
   await page.goto('/')
@@ -579,14 +571,10 @@ test('만료된 온보딩 결과 확인은 다른 항목의 저장된 입력을 
     endDate: '2029-11-30',
     memberNames: ['김준호'],
   }
-  await seedPendingWorkspaceCreations(
-    page,
-    [
-      pendingWorkspaceCreationEntry(expiredRequest, 973),
-      pendingWorkspaceCreationEntry(otherRequest, 974),
-    ],
-    'baton-e2e-expired-confirmation-survives-load',
-  )
+  await seedPendingWorkspaceCreations(page, [
+    pendingWorkspaceCreationEntry(expiredRequest, 973),
+    pendingWorkspaceCreationEntry(otherRequest, 974),
+  ])
   const api = await installApi(page)
   api.expireNextWorkspaceCreationReplay()
   await page.goto('/')
@@ -721,12 +709,8 @@ test('생성 계약을 벗어난 v3 온보딩 임시 기록을 삭제하고 정�
     { ...baseRequest, startDate: '2028-04-01', endDate: '2028-03-31' },
   ]
   const invalidEntries = invalidRequests.map((request, index) =>
-    pendingWorkspaceCreationEntry(request, 901 + index, index + 1))
-  await seedPendingWorkspaceCreations(
-    page,
-    invalidEntries,
-    'baton-e2e-invalid-pending-workspace-seeded',
-  )
+    pendingWorkspaceCreationEntry(request, 901 + index))
+  await seedPendingWorkspaceCreations(page, invalidEntries)
 
   const api = await installApi(page)
   await page.goto('/')
@@ -779,16 +763,8 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
     endDate: '2028-11-30',
     memberNames: ['박민서', '김준호'],
   }
-  const pendingEntry = pendingWorkspaceCreationEntry(
-    pendingRequest,
-    951,
-    Date.UTC(2028, 8, 1, 9),
-  )
-  await seedPendingWorkspaceCreations(
-    page,
-    [pendingEntry],
-    'baton-e2e-recover-pending-workspace-seeded',
-  )
+  const pendingEntry = pendingWorkspaceCreationEntry(pendingRequest, 951)
+  await seedPendingWorkspaceCreations(page, [pendingEntry])
 
   const api = await installApi(page)
   await page.goto('/')
@@ -837,11 +813,7 @@ test('불러온 온보딩 입력이 바뀌면 명시적 확인 전 새 요청으
     memberNames: ['박민서'],
   }
   const pendingEntry = pendingWorkspaceCreationEntry(request, 972)
-  await seedPendingWorkspaceCreations(
-    page,
-    [pendingEntry],
-    'baton-e2e-changed-workspace-snapshot-seeded',
-  )
+  await seedPendingWorkspaceCreations(page, [pendingEntry])
   const api = await installApi(page)
   await page.goto('/')
 
@@ -885,16 +857,8 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 임시 기록
     endDate: '2029-02-28',
     memberNames: ['박민서'],
   }
-  const pendingEntry = pendingWorkspaceCreationEntry(
-    pendingRequest,
-    952,
-    Date.UTC(2028, 11, 1, 9),
-  )
-  await seedPendingWorkspaceCreations(
-    page,
-    [pendingEntry],
-    'baton-e2e-lock-pending-workspace-seeded',
-  )
+  const pendingEntry = pendingWorkspaceCreationEntry(pendingRequest, 952)
+  await seedPendingWorkspaceCreations(page, [pendingEntry])
 
   const api = await installApi(page)
   api.holdNextWorkspaceCreation()
@@ -1004,13 +968,9 @@ test('온보딩 임시 기록 한 건을 확인 후 폐기하고 새 작업 공�
     memberNames: [`구성원 ${index + 1}`],
   }))
   const pendingEntries = pendingRequests.map((request, index) =>
-    pendingWorkspaceCreationEntry(request, 961 + index, Date.UTC(2028, 2, index + 1, 9)))
+    pendingWorkspaceCreationEntry(request, 961 + index))
   const seededKeys = pendingEntries.map((entry) => entry.idempotencyKey).sort()
-  await seedPendingWorkspaceCreations(
-    page,
-    pendingEntries,
-    'baton-e2e-discard-pending-workspace-seeded',
-  )
+  await seedPendingWorkspaceCreations(page, pendingEntries)
 
   const api = await installApi(page)
   await page.goto('/')
