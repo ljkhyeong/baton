@@ -150,9 +150,6 @@ public final class WorkspaceRequests {
     ) {
     }
 
-    public record UpdateRoutineExecutionCompletionRequest(@NotNull Boolean completed) {
-    }
-
     public record CompletionRequest(@NotNull Boolean completed) {
     }
 

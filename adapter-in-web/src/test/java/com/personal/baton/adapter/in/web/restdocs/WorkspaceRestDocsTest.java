@@ -2353,7 +2353,7 @@ class WorkspaceRestDocsTest {
                         routineExecutionPathParameters(),
                         accessKeyHeader(),
                         requestFields(requestField(
-                                WorkspaceRequests.UpdateRoutineExecutionCompletionRequest.class,
+                                WorkspaceRequests.CompletionRequest.class,
                                 "completed", "완료 여부")),
                         responseFields(routineExecutionResponseFields())));
     }
