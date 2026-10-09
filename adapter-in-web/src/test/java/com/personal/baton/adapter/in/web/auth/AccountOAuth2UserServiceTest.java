@@ -41,21 +41,22 @@ class AccountOAuth2UserServiceTest {
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
 
+    private final ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
+    @SuppressWarnings("unchecked")
+    private final OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
+            mock(OAuth2UserService.class);
+    @SuppressWarnings("unchecked")
+    private final OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
+            mock(OAuth2UserService.class);
+    private final AccountOAuth2UserService service = new AccountOAuth2UserService(
+            resolveUseCase,
+            oidcDelegate,
+            oauth2Delegate
+    );
+
     @DisplayName("Google OIDC sub로 계정을 찾고 콜백 처리 중 공급자의 OIDC 계약을 유지한다")
     @Test
     void resolvesGoogleByOidcSubject() {
-        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
-                mock(OAuth2UserService.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
-                mock(OAuth2UserService.class);
-        AccountOAuth2UserService service = service(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
         OidcUserRequest userRequest = mock(OidcUserRequest.class);
         OidcUser providerUser = mock(OidcUser.class);
         OidcIdToken idToken = mock(OidcIdToken.class);
@@ -101,18 +102,6 @@ class AccountOAuth2UserServiceTest {
     @DisplayName("Naver OAuth2 프로필의 중첩 response.id를 공급자 사용자 식별자로 사용한다")
     @Test
     void resolvesNaverByNestedResponseId() {
-        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
-                mock(OAuth2UserService.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
-                mock(OAuth2UserService.class);
-        AccountOAuth2UserService service = service(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
         OAuth2UserRequest userRequest = mock(OAuth2UserRequest.class);
         when(userRequest.getClientRegistration()).thenReturn(naverRegistration());
         Map<String, Object> response = Map.of(
@@ -151,24 +140,11 @@ class AccountOAuth2UserServiceTest {
     @DisplayName("Google 표시 이름은 도메인 길이 제한에 맞추되 서로게이트 쌍을 자르지 않는다")
     @Test
     void safelyLimitsUnicodeDisplayName() {
-        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
-                mock(OAuth2UserService.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
-                mock(OAuth2UserService.class);
-        AccountOAuth2UserService service = service(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
         OidcUserRequest userRequest = mock(OidcUserRequest.class);
         OidcUser providerUser = mock(OidcUser.class);
         when(userRequest.getClientRegistration()).thenReturn(googleRegistration());
         when(providerUser.getSubject()).thenReturn("unicode-name-subject");
         when(providerUser.getFullName()).thenReturn("🙂".repeat(60));
-        when(providerUser.getIdToken()).thenReturn(mock(OidcIdToken.class));
         when(oidcDelegate.loadUser(userRequest)).thenReturn(providerUser);
         when(resolveUseCase.resolveExternalLogin(any())).thenReturn(
                 new ExternalLoginResult(ACCOUNT_ID, 0, true)
@@ -188,18 +164,6 @@ class AccountOAuth2UserServiceTest {
     @DisplayName("Naver response.id가 없으면 공통 OAuth 프로필 오류로 차단한다")
     @Test
     void rejectsNaverProfileWithoutSubject() {
-        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
-                mock(OAuth2UserService.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
-                mock(OAuth2UserService.class);
-        AccountOAuth2UserService service = service(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
         OAuth2UserRequest userRequest = mock(OAuth2UserRequest.class);
         when(userRequest.getClientRegistration()).thenReturn(naverRegistration());
         OAuth2User providerUser = new DefaultOAuth2User(
@@ -217,18 +181,6 @@ class AccountOAuth2UserServiceTest {
     @DisplayName("Google 신원 인프라 장애는 원인을 보존한 OAuth 인증 실패로 변환한다")
     @Test
     void wrapsGoogleIdentityInfrastructureFailureForSecurityFailureHandler() {
-        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
-                mock(OAuth2UserService.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
-                mock(OAuth2UserService.class);
-        AccountOAuth2UserService service = service(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
         OidcUserRequest userRequest = mock(OidcUserRequest.class);
         OidcUser providerUser = mock(OidcUser.class);
         IdentityOperationUnavailableException failure =
@@ -250,18 +202,6 @@ class AccountOAuth2UserServiceTest {
     @DisplayName("신원 처리와 무관한 외부 로그인 결함은 OAuth 실패로 오분류하지 않는다")
     @Test
     void preservesUnrelatedExternalLoginFailure() {
-        ResolveExternalLoginUseCase resolveUseCase = mock(ResolveExternalLoginUseCase.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate =
-                mock(OAuth2UserService.class);
-        @SuppressWarnings("unchecked")
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate =
-                mock(OAuth2UserService.class);
-        AccountOAuth2UserService service = service(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
         OAuth2UserRequest userRequest = mock(OAuth2UserRequest.class);
         OAuth2User providerUser = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -281,35 +221,18 @@ class AccountOAuth2UserServiceTest {
     }
 
     @Test @DisplayName("비활성 계정의 OAuth 로그인은 계정 상태 안내로 리디렉션한다")
-    @SuppressWarnings("unchecked")
     void rejectsDeactivatedOAuthAccount() throws Exception {
-        var resolve = mock(ResolveExternalLoginUseCase.class);
-        OAuth2UserService<OidcUserRequest, OidcUser> oidc = mock(OAuth2UserService.class);
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth = mock(OAuth2UserService.class);
         var request = mock(OidcUserRequest.class);
         var user = mock(OidcUser.class);
         when(request.getClientRegistration()).thenReturn(googleRegistration());
         when(user.getSubject()).thenReturn("disabled-google-subject");
-        when(oidc.loadUser(request)).thenReturn(user);
-        when(resolve.resolveExternalLogin(any())).thenThrow(new AccountDeactivatedException());
-        var service = service(resolve, oidc, oauth);
+        when(oidcDelegate.loadUser(request)).thenReturn(user);
+        when(resolveUseCase.resolveExternalLogin(any())).thenThrow(new AccountDeactivatedException());
         var failure = assertThrows(OAuth2AuthenticationException.class, () -> service.loadOidcUser(request));
         assertThat(failure.getError().getErrorCode()).isEqualTo("account_deactivated");
         var response = new MockHttpServletResponse();
         new OAuthBrowserAuthenticationFailureHandler().onAuthenticationFailure(new MockHttpServletRequest(), response, failure);
         assertThat(response.getRedirectedUrl()).isEqualTo("/login?accountNotice=account_deactivated");
-    }
-
-    private AccountOAuth2UserService service(
-            ResolveExternalLoginUseCase resolveUseCase,
-            OAuth2UserService<OidcUserRequest, OidcUser> oidcDelegate,
-            OAuth2UserService<OAuth2UserRequest, OAuth2User> oauth2Delegate
-    ) {
-        return new AccountOAuth2UserService(
-                resolveUseCase,
-                oidcDelegate,
-                oauth2Delegate
-        );
     }
 
     private ClientRegistration googleRegistration() {

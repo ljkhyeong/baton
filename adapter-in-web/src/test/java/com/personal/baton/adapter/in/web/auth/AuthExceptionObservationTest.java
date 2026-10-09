@@ -10,9 +10,13 @@ import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
@@ -75,13 +79,13 @@ class AuthExceptionObservationTest {
                 .build();
     }
 
-    @DisplayName("인증 트랜잭션 시작 실패는 공통 503으로 응답하고 HTTP 관측 정보에는 원래 오류를 기록한다")
-    @Test
-    void recordsTransactionStartFailureAsObservationError() throws Exception {
-        CannotCreateTransactionException failure = new CannotCreateTransactionException(
-                "database connection is unavailable",
-                new IllegalStateException("jdbc:mysql://secret-host/internal")
-        );
+    @DisplayName("인증 트랜잭션 시작 실패와 커밋 연결 장애는 공통 503으로 응답하고 HTTP 관측 정보에는 원래 오류를 기록한다")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("infrastructureFailures")
+    void recordsInfrastructureFailureAsObservationError(
+            String description,
+            RuntimeException failure
+    ) throws Exception {
         doThrow(failure).when(registerLocalAccountUseCase).registerLocalAccount(any());
 
         mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
@@ -97,29 +101,6 @@ class AuthExceptionObservationTest {
                 .andExpect(jsonPath("$.message").value(
                         "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
                 ));
-
-        assertThat(stoppedObservation.get()).isNotNull();
-        assertThat(stoppedObservation.get().getError()).isSameAs(failure);
-    }
-
-    @DisplayName("인증 커밋 연결 장애는 공통 503으로 응답하고 HTTP 관측 정보에는 원래 오류를 기록한다")
-    @Test
-    void recordsCommitResourceFailureAsObservationError() throws Exception {
-        DataAccessResourceFailureException failure = new DataAccessResourceFailureException(
-                "database connection was lost during commit"
-        );
-        doThrow(failure).when(registerLocalAccountUseCase).registerLocalAccount(any());
-
-        mockMvc.perform(post(AuthController.LOCAL_REGISTRATIONS_PATH)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "email": "member@example.com",
-                                  "displayName": "박민서"
-                                }
-                                """))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"));
 
         assertThat(stoppedObservation.get()).isNotNull();
         assertThat(stoppedObservation.get().getError()).isSameAs(failure);
@@ -150,5 +131,23 @@ class AuthExceptionObservationTest {
 
         assertThat(stoppedObservation.get()).isNotNull();
         assertThat(stoppedObservation.get().getError()).isSameAs(failure);
+    }
+
+    private static Stream<Arguments> infrastructureFailures() {
+        return Stream.of(
+                Arguments.of(
+                        "트랜잭션 시작 실패",
+                        new CannotCreateTransactionException(
+                                "database connection is unavailable",
+                                new IllegalStateException("jdbc:mysql://secret-host/internal")
+                        )
+                ),
+                Arguments.of(
+                        "커밋 연결 장애",
+                        new DataAccessResourceFailureException(
+                                "database connection was lost during commit"
+                        )
+                )
+        );
     }
 }

@@ -639,35 +639,6 @@ class AuthSecurityTest {
                 .header("Sec-Fetch-Site", "same-origin");
     }
 
-    private LocalAccountPrincipal principal() {
-        return new LocalAccountPrincipal(
-                ACCOUNT_ID,
-                EMAIL,
-                passwordEncoder.encode(PASSWORD), 0
-        );
-    }
-
-    private UsernamePasswordAuthenticationToken authenticated(
-            LocalAccountPrincipal principal
-    ) {
-        return UsernamePasswordAuthenticationToken.authenticated(
-                principal,
-                null,
-                principal.getAuthorities()
-        );
-    }
-
-    private MockHttpSession authenticatedSession(LocalAccountPrincipal principal) {
-        MockHttpSession session = new MockHttpSession();
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authenticated(principal));
-        session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                context
-        );
-        return session;
-    }
-
     private String validRegistration() {
         return """
                 {

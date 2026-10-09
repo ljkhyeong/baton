@@ -1,9 +1,5 @@
 package com.personal.baton.adapter.in.web.auth;
 
-import static org.mockito.ArgumentMatchers.anyLong;
-
-import org.junit.jupiter.api.BeforeEach;
-
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
@@ -89,11 +85,6 @@ class ConfiguredSocialLoginSecurityTest {
 
     @MockitoBean
     private HumanVerificationUseCase humanVerificationUseCase;
-
-    @BeforeEach
-    void acceptCurrentAccountSessions() {
-        when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
-    }
 
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
