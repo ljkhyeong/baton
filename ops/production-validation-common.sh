@@ -111,6 +111,13 @@ production_validation_validate_boolean() {
   fi
 }
 
+# 운영 기본 비밀값과 Bearer 토큰이 함께 따르는 32~200자 URL 안전 ASCII 정책이다.
+production_validation_is_url_safe_secret() {
+  local value="$1"
+
+  [[ ${#value} -ge 32 && ${#value} -le 200 && "$value" =~ ^[A-Za-z0-9._~-]+$ ]]
+}
+
 production_validation_portable_mode() {
   local fail_callback="$1"
   local target="$2"

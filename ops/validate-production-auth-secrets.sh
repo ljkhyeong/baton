@@ -196,9 +196,8 @@ validate_bearer_token_file() {
 
   validate_scalar_secret_file "$name" "$target"
   value="$(< "$target")"
-  if [[ ${#value} -lt 32 || ${#value} -gt 200 || ! "$value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
-    fail "$name must contain 32-200 URL-safe ASCII characters"
-  fi
+  production_validation_is_url_safe_secret "$value" \
+    || fail "$name must contain 32-200 URL-safe ASCII characters"
 }
 
 validate_truststore_file() {
