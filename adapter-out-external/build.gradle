@@ -58,41 +58,32 @@ tasks.register('roundConsumerContractTest', Test) {
 def calendarBaseUrl = providers.environmentVariable('BATON_CAL_LIVE_BASE_URL')
 def calendarBearerToken = providers.environmentVariable('BATON_CAL_LIVE_BEARER_TOKEN')
 
-tasks.register('calendarConsumerContractTest', Test) {
-	group = 'verification'
-	description = 'BATON CAL 실제 런타임에서 일정 스냅샷 생산자 계약 검증'
-	testClassesDirs = sourceSets.test.output.classesDirs
-	classpath = sourceSets.test.runtimeClasspath
-	outputs.upToDateWhen { false }
-	useJUnitPlatform {
-		includeTags 'calendar-crossservice'
-		includeTags 'calendar-metadata-crossservice'
-	}
-
-	doFirst {
-		if (!calendarBaseUrl.isPresent() || !calendarBearerToken.isPresent()) {
-			throw new GradleException(
-					'BATON_CAL_LIVE_BASE_URL과 BATON_CAL_LIVE_BEARER_TOKEN이 필요합니다.'
-			)
+[
+		calendarConsumerContractTest: [
+				description: 'BATON CAL 실제 런타임에서 일정 스냅샷 생산자 계약 검증',
+				tags: ['calendar-crossservice', 'calendar-metadata-crossservice']
+		],
+		calendarRecoveryConsumerContractTest: [
+				description: 'BATON CAL 실제 복구 모드에서 매니페스트와 완료 계약 검증',
+				tags: ['calendar-recovery-crossservice']
+		]
+].each { taskName, contract ->
+	tasks.register(taskName, Test) {
+		group = 'verification'
+		description = contract.description
+		testClassesDirs = sourceSets.test.output.classesDirs
+		classpath = sourceSets.test.runtimeClasspath
+		outputs.upToDateWhen { false }
+		useJUnitPlatform {
+			includeTags(*contract.tags)
 		}
-	}
-}
 
-tasks.register('calendarRecoveryConsumerContractTest', Test) {
-	group = 'verification'
-	description = 'BATON CAL 실제 복구 모드에서 매니페스트와 완료 계약 검증'
-	testClassesDirs = sourceSets.test.output.classesDirs
-	classpath = sourceSets.test.runtimeClasspath
-	outputs.upToDateWhen { false }
-	useJUnitPlatform {
-		includeTags 'calendar-recovery-crossservice'
-	}
-
-	doFirst {
-		if (!calendarBaseUrl.isPresent() || !calendarBearerToken.isPresent()) {
-			throw new GradleException(
-					'BATON_CAL_LIVE_BASE_URL과 BATON_CAL_LIVE_BEARER_TOKEN이 필요합니다.'
-			)
+		doFirst {
+			if (!calendarBaseUrl.isPresent() || !calendarBearerToken.isPresent()) {
+				throw new GradleException(
+						'BATON_CAL_LIVE_BASE_URL과 BATON_CAL_LIVE_BEARER_TOKEN이 필요합니다.'
+				)
+			}
 		}
 	}
 }

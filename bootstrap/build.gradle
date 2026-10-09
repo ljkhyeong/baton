@@ -7,7 +7,6 @@ springBoot {
 }
 
 dependencies {
-	implementation project(':domain')
 	implementation project(':application')
 	implementation project(':adapter-in-web')
 	implementation project(':adapter-out-persistence')
