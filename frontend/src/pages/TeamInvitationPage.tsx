@@ -27,7 +27,7 @@ function InvitationPageContent() {
     {!token ? <p>초대 링크를 다시 열어 주세요. 링크에는 유효 기간이 있습니다.</p>
       : session.isPending ? <p role="status">로그인 상태를 확인하고 있습니다.</p>
         : session.isError ? <p role="alert">{session.error.message} <button className="secondary-button" type="button" onClick={() => void session.refetch()}>다시 확인</button></p>
-          : !session.data?.authenticated ? <>
+          : !session.data.authenticated ? <>
             <p>초대를 받을 계정으로 로그인한 뒤 팀과 구성원 이름을 확인해 주세요.</p>
             {stored ? <Link to="/login?returnTo=%2Fjoin" className="primary-button">로그인하고 초대 확인</Link>
               : <p>이 브라우저에 초대 링크를 저장하지 못했습니다. 로그인한 뒤 받은 링크를 다시 여세요. <Link to="/login">로그인</Link></p>}

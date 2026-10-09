@@ -78,9 +78,7 @@ export default function RegistrationForm({ turnstileSiteKey }: { turnstileSiteKe
       )}
       {registrationMutation.isError && (
         <p className="form-error" role="alert">
-          {registrationMutation.error instanceof Error
-            ? registrationMutation.error.message
-            : '가입 요청을 처리하지 못했습니다.'}
+          {registrationMutation.error.message}
         </p>
       )}
       <button

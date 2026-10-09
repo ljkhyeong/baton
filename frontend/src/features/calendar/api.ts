@@ -1,11 +1,16 @@
 import { csrfHeaders } from '@/features/auth/api'
-import { ApiClientError } from '@/shared/api/ApiError'
 import { apiRequest } from '@/shared/api/client'
 import { isJsonObject, isNullableUuid, isSameUuid, isUuid } from '@/shared/api/responseValidation'
 import type { CalendarCredential, CalendarScope, CalendarStatus, CalendarSubscription, CalendarSubscriptionList, CalendarSubscriptionSummary, CalendarListFilters } from './types'
 
 const statuses: CalendarStatus[] = ['NOT_CREATED', 'IN_PROGRESS', 'ACTIVE', 'REISSUE_REQUIRED', 'REVOKED', 'REVOCATION_PENDING']
-const invalid = () => new ApiClientError('invalid-response', undefined)
+// apiRequest가 디코더 오류를 invalid-response로 감싼다.
+const invalid = () => new Error('캘린더 구독 응답 형식이 올바르지 않습니다.')
+export const calendarKeys = {
+  list: (accountId: string) => ['calendar-subscriptions', accountId] as const,
+  status: (accountId: string) => ['calendar-subscription', accountId] as const,
+  scope: (scope: CalendarScope) => [...calendarKeys.status(scope.accountId), scope.teamId, scope.seasonId, { accessKey: scope.accessKey }] as const,
+}
 function path(scope: CalendarScope) {
   return `/api/v1/teams/${encodeURIComponent(scope.teamId)}/seasons/${encodeURIComponent(scope.seasonId)}/calendar-subscription`
 }

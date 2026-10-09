@@ -4,7 +4,6 @@ import { generatePath, Link, useLocation, useNavigate, useParams } from 'react-r
 import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import WorkspaceApp from '@/features/workspace/WorkspaceApp'
 import { useAuthSession } from '@/features/auth/useAuthSession'
-import { CalendarSubscriptionCleanup } from '@/features/calendar/CalendarSubscriptionPanel'
 import { workspaceKeys } from '@/features/workspace/queries'
 import {
   readAccessKey,
@@ -112,21 +111,6 @@ export default function WorkspacePage() {
     )
   }, [navigate, teamId])
 
-  if (!teamId || !seasonId) {
-    return (
-      <>
-        <title>{workspaceTitle}</title>
-        <main className="remote-state-page">
-          <section className="remote-state" role="alert">
-            <strong>작업 공간 주소를 확인해 주세요.</strong>
-            <p>팀 또는 시즌 정보가 빠져 있습니다.</p>
-            <Link to="/" className="primary-button">처음부터 시작하기</Link>
-          </section>
-        </main>
-      </>
-    )
-  }
-
   if (!accessKey && !session.data?.authenticated) {
     return (
       <>
@@ -140,7 +124,6 @@ export default function WorkspacePage() {
               <Link to={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`} className="primary-button">로그인</Link>
               <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
             </div>
-            <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />
           </section>
         </main>
       </>

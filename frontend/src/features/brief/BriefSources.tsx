@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { isAccessDenied } from '@/shared/api/ApiError'
-import { queryBriefSources } from './api'
+import { briefScopeKey, queryBriefSources } from './api'
 import type { AttentionCursor, BriefScope, BriefSource } from './types'
 import { attentionReasons } from './types'
 
@@ -14,7 +14,7 @@ export function BriefSources({ scope, items, onOpen, children }: {
 }) {
   const identities = [...new Map(items.filter((item) => Object.hasOwn(attentionReasons, item.reasonCode) && item.sourceReference.length <= 512 && item.sourceReference.startsWith('baton-continuity:'))
     .map((item) => [JSON.stringify([item.reasonCode, item.sourceReference]), { eventType: item.reasonCode as AttentionCursor['eventType'], sourceReference: item.sourceReference }])).values()]
-  const query = useQuery({ queryKey: ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }, 'sources', identities],
+  const query = useQuery({ queryKey: [...briefScopeKey(scope), 'sources', identities],
     queryFn: ({ signal }) => queryBriefSources(scope, identities, signal), enabled: identities.length > 0, retry: false, staleTime: 0 })
   const error = query.error
   if (isAccessDenied(error)) return <p role="alert">{error.message}{' '}

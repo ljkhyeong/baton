@@ -21,11 +21,21 @@ export type AttentionFilter = {
 }
 export type BriefScope = { accountId: string; teamId: string; seasonId: string; accessKey: string }
 
+export const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전 주부터 미해결' } as const
+
 export const editionSections = [
-  { value: 'CURRENT_WEEK', label: '이번 주 변경' },
-  { value: 'CARRY_OVER', label: '이전 주부터 미해결' },
+  { value: 'CURRENT_WEEK', label: sectionNames.CURRENT_WEEK },
+  { value: 'CARRY_OVER', label: sectionNames.CARRY_OVER },
   { value: null, label: '이전 주간 요약 · 분류 미기록' },
 ] as const
+
+export const severityLabel = (severity: string) => severity === 'HIGH' ? '높음' : '보통'
+export const statusLabel = (status: string) => status === 'ACTIVE' ? '미해결' : '해결'
+
+export function editionItemEvidence({ aggregateRevision, revisionGap }: Pick<BriefEdition['items'][number], 'aggregateRevision' | 'revisionGap'>) {
+  return aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
+    : `원본 변경 번호 ${aggregateRevision} · ${revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`
+}
 
 export const attentionReasons = {
   HANDOFF_BLOCKED: '인수인계 진행이 막힘',

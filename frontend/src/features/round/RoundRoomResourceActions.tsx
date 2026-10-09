@@ -18,12 +18,6 @@ import type { RoundRoomMapping, RoundRoomMappingScope } from '@/features/round/t
 import WorkspaceLoginLink from '@/features/workspace/WorkspaceLoginLink'
 import { isSameUuid } from '@/shared/api/responseValidation'
 
-function errorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : 'ROUND 방 요청을 처리하지 못했습니다.'
-}
-
 export function RoundRoomResourceActions({
   accessKey,
   changesDisabled,
@@ -167,7 +161,7 @@ export function RoundRoomResourceActions({
           {currentMappingsQuery.isFetching ? 'ROUND 연결 다시 확인 중' : 'ROUND 연결 다시 확인'}
         </button>
         <small className="round-room-error" role="alert">
-          {errorMessage(currentMappingsQuery.error)}
+          {currentMappingsQuery.error.message}
         </small>
       </div>
     )
@@ -179,8 +173,8 @@ export function RoundRoomResourceActions({
   const busy = mappingMutation.isPending
     || endMutation.isPending
   const visibleError = storageError
-    || (mappingMutation.isError ? errorMessage(mappingMutation.error) : '')
-    || (endMutation.isError ? errorMessage(endMutation.error) : '')
+    || (mappingMutation.isError ? mappingMutation.error.message : '')
+    || (endMutation.isError ? endMutation.error.message : '')
 
   return (
     <div className="round-room-resource-actions">

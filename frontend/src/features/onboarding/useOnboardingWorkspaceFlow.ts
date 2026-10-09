@@ -33,6 +33,7 @@ import {
   prepareWorkspaceCreation,
   runWithWorkspaceCreationLock,
   subscribePendingWorkspaceCreations,
+  WORKSPACE_CREATION_BUSY_MESSAGE,
 } from './pendingWorkspaceCreation'
 import type {
   PendingWorkspaceCreationItem,
@@ -60,7 +61,6 @@ function errorMessage(error: unknown) {
 
 const pendingStorageRequiredMessage = '입력을 저장하지 못해 작업 공간을 만들지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const pendingCreationLimitMessage = '생성 결과를 확인하지 못한 작업 공간이 5개입니다. 아래 목록에서 결과를 확인하거나 필요 없는 항목을 삭제해 주세요.'
-const creationBusyMessage = '다른 탭에서 생성 결과를 확인하고 있습니다. 끝난 뒤 다시 시도해 주세요.'
 const creationLockUnsupportedMessage = '이 브라우저에서는 작업 공간을 만들거나 생성 결과를 확인할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
 const creationJournalCleanupRequiredMessage = '생성 확인에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const workspaceCapabilityRemovalFailedMessage = '이 기기의 공유 링크를 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
@@ -219,7 +219,7 @@ export function useOnboardingWorkspaceFlow() {
       reason: 'pendingMissing',
     })
     setSelectedPendingCreation(null)
-    setValidationMessage((current) => current === creationBusyMessage ? '' : current)
+    setValidationMessage((current) => current === WORKSPACE_CREATION_BUSY_MESSAGE ? '' : current)
   }, [selectedPendingCreation, selectedPendingKnownMissing])
 
   const attemptCreation = async (variables: CreateWorkspaceVariables) => {
@@ -323,6 +323,7 @@ export function useOnboardingWorkspaceFlow() {
       ? selectedPendingCreation
       : null
 
+    const requestedCreationKey = creationKey.trim() || undefined
     setCreationAttemptPending(true)
     try {
       const lockResult = await runWithWorkspaceCreationLock(async () => {
@@ -334,7 +335,7 @@ export function useOnboardingWorkspaceFlow() {
           await attemptCreation({
             request: pendingToRecover.request,
             idempotencyKey: recovery.idempotencyKey,
-            creationKey: creationKey.trim() || undefined,
+            creationKey: requestedCreationKey,
           })
           return { status: 'requested' as const }
         }
@@ -347,14 +348,14 @@ export function useOnboardingWorkspaceFlow() {
         await attemptCreation({
           request,
           idempotencyKey: preparation.idempotencyKey,
-          creationKey: creationKey.trim() || undefined,
+          creationKey: requestedCreationKey,
         })
         return { status: 'requested' as const }
       })
 
       if (lockResult.status === 'busy') {
         if (pendingToRecover) {
-          setValidationMessage(creationBusyMessage)
+          setValidationMessage(WORKSPACE_CREATION_BUSY_MESSAGE)
         } else {
           setNewRequestConfirmation({
             request,
@@ -383,7 +384,7 @@ export function useOnboardingWorkspaceFlow() {
             request: pendingToRecover!.request,
             reason: 'pendingMissing',
           })
-          setValidationMessage('다른 탭에서 생성 결과를 확인했거나 임시 기록을 삭제했습니다. 최근 작업 공간이나 기존 공유 링크를 확인해 주세요.')
+          setValidationMessage(confirmationMessage('pendingMissing'))
         } else if (lockResult.value.reason === 'changed') {
           setSelectedPendingCreation(null)
           setNewRequestConfirmation({
@@ -395,8 +396,6 @@ export function useOnboardingWorkspaceFlow() {
           setValidationMessage(pendingStorageRequiredMessage)
         }
       }
-    } catch (error) {
-      setValidationMessage(errorMessage(error))
     } finally {
       setCreationAttemptPending(false)
     }
@@ -422,7 +421,7 @@ export function useOnboardingWorkspaceFlow() {
     }
 
     if (lockResult.status === 'busy') {
-      setValidationMessage(creationBusyMessage)
+      setValidationMessage(WORKSPACE_CREATION_BUSY_MESSAGE)
       return
     }
     if (lockResult.status === 'unsupported') {

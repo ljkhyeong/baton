@@ -33,28 +33,13 @@ export default defineConfig(({ command }) => {
     server: {
       host: '127.0.0.1',
       port: 3000,
-      proxy: {
-        '/api': {
-          target: apiProxyTarget,
-          changeOrigin: false,
-        },
-        '/oauth2': {
-          target: apiProxyTarget,
-          changeOrigin: false,
-        },
-        '/login/oauth2': {
-          target: apiProxyTarget,
-          changeOrigin: false,
-        },
-        '^/round/rooms/[^/?]+/participation-grant/refresh$': {
-          target: apiProxyTarget,
-          changeOrigin: false,
-        },
-        '/.well-known/round-participation-jwks.json': {
-          target: apiProxyTarget,
-          changeOrigin: false,
-        },
-      },
+      proxy: Object.fromEntries([
+        '/api',
+        '/oauth2',
+        '/login/oauth2',
+        '^/round/rooms/[^/?]+/participation-grant/refresh$',
+        '/.well-known/round-participation-jwks.json',
+      ].map((path) => [path, { target: apiProxyTarget, changeOrigin: false }])),
     },
   }
 })

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useWorkspacePrint } from '@/features/workspace/useWorkspacePrint'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { BriefSourceContext } from './BriefSources'
-import { attentionReasons, editionSections } from './types'
+import { attentionReasons, editionItemEvidence, editionSections, severityLabel, statusLabel } from './types'
 import type { AttentionItem, BriefEdition, BriefScope } from './types'
 
 export function BriefEditionActions({ edition, workspaceName, scope, loading }: {
@@ -72,10 +72,9 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
             return <li key={`${item.reasonCode}:${item.sourceReference}`}>
               <h3>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</h3>
               <p>현재 업무명: {source?.target?.title ?? '확인할 수 없음'}</p>
-              <p>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'} · 상태 기록 {formatInstant(item.observedAt, edition.zoneId)}</p>
+              <p>{severityLabel(item.severity)} · {statusLabel(item.status)} · 상태 기록 {formatInstant(item.observedAt, edition.zoneId)}</p>
               <p className="brief-print-evidence">원본 항목 ID: {item.sourceReference}<br />
-                {item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
-                  : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`}</p>
+                {editionItemEvidence(item)}</p>
             </li>
           })}</ol>
         </section>

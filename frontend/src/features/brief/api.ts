@@ -6,6 +6,18 @@ import { attentionReasons } from './types'
 import type { AttentionCursor, AttentionFilter, AttentionItem, AttentionPage, AttentionSummary, AttentionTransitions,
   BriefEdition, BriefGeneration, BriefScope, BriefEditionHistory, BriefComparison, BriefSources, BriefReadiness, BriefDeliveryStatus, WeeklyResolutions } from './types'
 
+function briefPath(scope: BriefScope, suffix: string) {
+  return `/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/${suffix}`
+}
+
+function accessKeyHeader(scope: BriefScope) {
+  return { 'X-Baton-Access-Key': scope.accessKey }
+}
+
+// 점검 항목·주간 요약·업무 연결 쿼리가 함께 초기화되도록 같은 접두사를 쓴다.
+export const briefScopeKey = (scope: BriefScope) =>
+  ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }] as const
+
 function isReason(value: unknown): value is AttentionItem['reasonCode'] {
   return typeof value === 'string' && Object.hasOwn(attentionReasons, value)
 }
@@ -49,8 +61,8 @@ function decodeSummary(value: unknown): AttentionSummary {
 }
 
 export function getWeeklyResolutions(scope: BriefScope, cursor: AttentionCursor | null, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/attention-items/resolutions`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey },
+  return apiRequest(briefPath(scope, 'attention-items/resolutions'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope),
     query: { afterEventType: cursor?.eventType, afterSourceReference: cursor?.sourceReference },
     decode: (value): WeeklyResolutions => {
       if (!isJsonObject(value) || !isCalendarDate(value.weekStart) || !isSupportedTimeZone(value.zoneId)
@@ -70,20 +82,20 @@ export function getWeeklyResolutions(scope: BriefScope, cursor: AttentionCursor 
 }
 
 export function getPreviousWeekEdition(scope: BriefScope, editionId: string, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${editionId}/previous-week`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value) => decodeEdition(value, scope),
+  return apiRequest(briefPath(scope, `editions/${editionId}/previous-week`), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), decode: (value) => decodeEdition(value, scope),
   })
 }
 
 export function getAttentionSummary(scope: BriefScope, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/attention-items/summary`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: decodeSummary,
+  return apiRequest(briefPath(scope, 'attention-items/summary'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), decode: decodeSummary,
   })
 }
 
 export function getAttentionPage(scope: BriefScope, filter: AttentionFilter, cursor: AttentionCursor | null, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/attention-items`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey },
+  return apiRequest(briefPath(scope, 'attention-items'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope),
     query: { ...filter, afterEventType: cursor?.eventType, afterSourceReference: cursor?.sourceReference },
     decode: decodePage,
   })
@@ -106,8 +118,8 @@ function decodeTransitions(value: unknown): AttentionTransitions {
 }
 
 export function getAttentionTransitions(scope: BriefScope, item: AttentionCursor, before: number | null, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/attention-items/transitions`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey },
+  return apiRequest(briefPath(scope, 'attention-items/transitions'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope),
     query: { ...item, beforeAggregateRevision: before }, decode: decodeTransitions,
   })
 }
@@ -153,14 +165,14 @@ function decodeEdition(value: unknown, scope: BriefScope): BriefEdition {
 }
 
 export function getLatestEdition(scope: BriefScope, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/latest`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value) => decodeEdition(value, scope),
+  return apiRequest(briefPath(scope, 'editions/latest'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), decode: (value) => decodeEdition(value, scope),
   })
 }
 
 export async function generateEdition(scope: BriefScope): Promise<BriefGeneration> {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions`, {
-    method: 'POST', headers: { 'X-Baton-Access-Key': scope.accessKey, ...await csrfHeaders() },
+  return apiRequest(briefPath(scope, 'editions'), {
+    method: 'POST', headers: { ...accessKeyHeader(scope), ...await csrfHeaders() },
     decode: (value) => {
       if (!isJsonObject(value) || !isUuid(value.executionId) || !isUuid(value.editionId)
         || !isPositiveInteger(value.generation) || !isNonNegativeInteger(value.deliveryWatermark) || !isNonNegativeInteger(value.sourceCursor)
@@ -183,8 +195,8 @@ function decodeEditionSummary(value: unknown): BriefEditionHistory['editions'][n
 }
 
 export function getEditionHistory(scope: BriefScope, before: number | null, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, query: { beforeGeneration: before ?? undefined },
+  return apiRequest(briefPath(scope, 'editions'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), query: { beforeGeneration: before },
     decode: (value): BriefEditionHistory => {
       if (!isJsonObject(value) || !Array.isArray(value.editions)
         || (value.nextBeforeGeneration !== null && !isPositiveInteger(value.nextBeforeGeneration))) throw new Error('주간 요약 이력을 확인할 수 없습니다.')
@@ -199,8 +211,8 @@ export function getEditionHistory(scope: BriefScope, before: number | null, sign
 }
 
 export function getEdition(scope: BriefScope, editionId: string, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${editionId}`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value) => {
+  return apiRequest(briefPath(scope, `editions/${editionId}`), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), decode: (value) => {
       const edition = decodeEdition(value, scope)
       if (!isSameUuid(edition.editionId, editionId)) throw new Error('선택한 주간 요약과 조회 결과가 다릅니다.')
       return edition
@@ -209,8 +221,8 @@ export function getEdition(scope: BriefScope, editionId: string, signal: AbortSi
 }
 
 export function compareEditions(scope: BriefScope, fromId: string, toId: string, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${toId}/changes`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, query: { fromEditionId: fromId },
+  return apiRequest(briefPath(scope, `editions/${toId}/changes`), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), query: { fromEditionId: fromId },
     decode: (value): BriefComparison => {
       if (!isJsonObject(value) || !Array.isArray(value.added) || !Array.isArray(value.removed) || !Array.isArray(value.changed)) {
         throw new Error('주간 요약 비교 결과를 확인할 수 없습니다.')
@@ -233,8 +245,8 @@ export async function queryBriefSources(scope: BriefScope, sources: AttentionCur
   const result: BriefSources['sources'] = []
   for (let offset = 0; offset < sources.length; offset += 100) {
     const batch = sources.slice(offset, offset + 100)
-    const response = await apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/sources/query`, {
-      method: 'POST', signal, headers: { 'X-Baton-Access-Key': scope.accessKey, ...csrf }, body: { sources: batch },
+    const response = await apiRequest(briefPath(scope, 'sources/query'), {
+      method: 'POST', signal, headers: { ...accessKeyHeader(scope), ...csrf }, body: { sources: batch },
       decode: (value): BriefSources => {
         if (!isJsonObject(value) || !Array.isArray(value.sources) || value.sources.length !== batch.length) throw new Error('현재 업무 정보를 확인할 수 없습니다.')
         return { sources: value.sources.map((source, index) => {
@@ -258,8 +270,8 @@ export async function queryBriefSources(scope: BriefScope, sources: AttentionCur
 }
 
 export function getGenerationReadiness(scope: BriefScope, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/generation-readiness`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value): BriefReadiness => {
+  return apiRequest(briefPath(scope, 'generation-readiness'), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), decode: (value): BriefReadiness => {
       const statuses = ['READY', 'DELIVERY_PENDING', 'DELIVERY_FAILED', 'GENERATING', 'GENERATION_FAILED', 'SEASON_ENDED', 'DISABLED'] as const
       if (!isJsonObject(value) || !statuses.some((status) => status === value.status)
         || !isNonNegativeInteger(value.pendingCount) || !isNonNegativeInteger(value.failedCount)
@@ -271,8 +283,8 @@ export function getGenerationReadiness(scope: BriefScope, signal: AbortSignal) {
 }
 
 export function getEditionDeliveryStatus(scope: BriefScope, editionId: string, signal: AbortSignal) {
-  return apiRequest(`/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/brief/editions/${editionId}/delivery-status`, {
-    method: 'GET', signal, headers: { 'X-Baton-Access-Key': scope.accessKey }, decode: (value): BriefDeliveryStatus => {
+  return apiRequest(briefPath(scope, `editions/${editionId}/delivery-status`), {
+    method: 'GET', signal, headers: accessKeyHeader(scope), decode: (value): BriefDeliveryStatus => {
       if (!isJsonObject(value) || !isUuid(value.editionId) || !isSameUuid(value.editionId, editionId)
         || !['ADDITIONAL_DELIVERIES', 'NO_ADDITIONAL_DELIVERIES', 'UNKNOWN'].includes(value.status as string)
         || !isInstant(value.checkedAt)) throw new Error('선택한 주간 요약의 추가 전달 기록을 확인할 수 없습니다.')

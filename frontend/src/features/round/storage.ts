@@ -40,14 +40,12 @@ export function rememberRoundRoomMapping(
     const storage = window.sessionStorage
     storage.setItem(entryStorageKey(mapping.roomId), serialized)
     storage.setItem(resourceStorageKey(scope), mapping.roomId)
-    return true
   } catch {
     try {
       removeStoredContext(window.sessionStorage, scope, mapping.roomId)
     } catch {
       // 저장이 차단돼도 서버 방 매핑을 유지하고 입장은 계속한다.
     }
-    return false
   }
 }
 

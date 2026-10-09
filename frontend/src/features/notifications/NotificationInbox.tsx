@@ -43,7 +43,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
         <label><input type="checkbox" checked={unreadOnly} onChange={event => setUnreadOnly(event.target.checked)} />안 읽은 알림만</label>
         <button type="button" className="text-button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>알림 설정</button>
       </div>
-      {settingsOpen && <NotificationPreferencesPanel key={scope.accountId} accountId={scope.accountId} />}
+      {settingsOpen && <NotificationPreferencesPanel accountId={scope.accountId} />}
       {inbox.isPending ? <p role="status">알림을 불러오고 있습니다.</p>
         : inbox.isError ? <p role="alert">{inbox.error.message} <button className="secondary-button" type="button" onClick={() => void inbox.refetch()}>다시 불러오기</button></p>
           : visible.length === 0 ? <p>{unreadOnly && notifications.length > 0 ? '안 읽은 알림이 없습니다.' : '지금 확인할 알림이 없습니다.'}</p>

@@ -5,7 +5,9 @@ import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import {
   discardPendingWorkspaceCreation,
   isSamePendingWorkspaceCreationItem,
+  WORKSPACE_CREATION_BUSY_MESSAGE,
 } from './pendingWorkspaceCreation'
+import { MAX_PENDING_CREATIONS } from './workspaceCreationConstraints'
 import type {
   PendingWorkspaceCreationItem,
 } from './pendingWorkspaceCreation'
@@ -26,7 +28,6 @@ function formatCreatedAt(value: number) {
 }
 
 const loadedNoticeMessage = '저장된 입력을 불러왔습니다. 생성 코드가 필요하면 입력한 뒤 ‘생성 결과 다시 확인’을 누르세요.'
-const discardBusyMessage = '다른 탭에서 생성 결과를 확인하고 있습니다. 끝난 뒤 다시 시도해 주세요.'
 
 export default function PendingWorkspaceCreationPanel({
   items,
@@ -48,13 +49,13 @@ export default function PendingWorkspaceCreationPanel({
   const keepButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (items.length >= 5) setOpen(true)
+    if (items.length >= MAX_PENDING_CREATIONS) setOpen(true)
   }, [items.length])
 
   useEffect(() => {
     if (confirmingId && !items.some((item) => item.idempotencyKey === confirmingId)) {
       setConfirmingId(null)
-      setError((current) => current === discardBusyMessage ? '' : current)
+      setError((current) => current === WORKSPACE_CREATION_BUSY_MESSAGE ? '' : current)
     }
   }, [confirmingId, items])
 
@@ -69,7 +70,7 @@ export default function PendingWorkspaceCreationPanel({
     }
     setLoadedItem(null)
     setNotice((current) => current === loadedNoticeMessage ? '' : current)
-    setError((current) => current === discardBusyMessage ? '' : current)
+    setError((current) => current === WORKSPACE_CREATION_BUSY_MESSAGE ? '' : current)
   }, [items, loadedItem, selectedItem])
 
   const openConfirmation = (item: PendingWorkspaceCreationItem) => {
@@ -110,7 +111,7 @@ export default function PendingWorkspaceCreationPanel({
     }
 
     if (result === 'busy') {
-      setError(discardBusyMessage)
+      setError(WORKSPACE_CREATION_BUSY_MESSAGE)
       return
     }
     if (result === 'unsupported') {

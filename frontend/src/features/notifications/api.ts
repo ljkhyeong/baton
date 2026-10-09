@@ -1,3 +1,4 @@
+import { queryOptions } from '@tanstack/react-query'
 import type { operations } from '@/generated/api'
 import { csrfHeaders } from '@/features/auth/api'
 import type { WorkspaceScope } from '@/features/workspace/api'
@@ -44,6 +45,12 @@ function decodePreferences(value: unknown, accountId: string): NotificationPrefe
 export function getNotificationPreferences(accountId: string) {
   return apiRequest('/api/v1/notification-preferences', { method: 'GET', decode: value => decodePreferences(value, accountId) })
 }
+// 설정 저장 결과가 다른 화면(모든 팀의 내 할 일)의 마감 임박 기준에도 반영되도록 같은 키를 쓴다.
+export const notificationPreferencesQueryOptions = (accountId: string) => queryOptions({
+  queryKey: ['auth', 'notification-preferences', accountId] as const,
+  queryFn: () => getNotificationPreferences(accountId),
+  staleTime: 0,
+})
 export async function configureNotificationPreferences(accountId: string, request: ConfigurePreferences) {
   return apiRequest('/api/v1/notification-preferences', { method: 'POST', body: request,
     headers: await csrfHeaders(), decode: value => decodePreferences(value, accountId) })

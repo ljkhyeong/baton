@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'baton:team-invitation:v1'
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
+export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
 
 export function readStoredTeamInvitationToken() {
   try {

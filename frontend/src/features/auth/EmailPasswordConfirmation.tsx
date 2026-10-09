@@ -9,12 +9,6 @@ import { ApiError } from '@/shared/api/ApiError'
 type VerificationState = 'ready' | 'invalid' | 'success'
 type PasswordPurpose = 'registration' | 'password-reset'
 
-function errorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : '비밀번호를 저장하지 못했습니다. 다시 시도해 주세요.'
-}
-
 export default function EmailPasswordConfirmation({ purpose }: { purpose: PasswordPurpose }) {
   const location = useLocation()
   const [token, setToken] = useState<string | null>(null)
@@ -144,7 +138,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
       </label>
       {(validationError || verificationMutation.isError) && (
         <p className="form-error" role="alert">
-          {validationError ?? errorMessage(verificationMutation.error)}
+          {validationError ?? verificationMutation.error?.message}
         </p>
       )}
       {passwordReset && verificationMutation.isError && !validationError && (

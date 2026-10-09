@@ -51,7 +51,7 @@ export const errorLocationOnly: NonNullable<BrowserOptions['beforeSend']> = (eve
 }
 
 export function initializeErrorReporting(dsn = import.meta.env.VITE_SENTRY_DSN?.trim()) {
-  if (!dsn) return ready
+  if (!dsn) return
   ready = import('@sentry/react').then(({
     init, globalHandlersIntegration, browserApiErrorsIntegration, dedupeIntegration, reactErrorHandler: createReactErrorHandler,
   }) => {
@@ -70,7 +70,6 @@ export function initializeErrorReporting(dsn = import.meta.env.VITE_SENTRY_DSN?.
   }).catch(() => {
     console.warn('오류 수집 설정을 확인해 주세요.')
   })
-  return ready
 }
 
 export const reportReactError: ReactErrorHandler = (error, errorInfo) => {

@@ -1,15 +1,14 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
-import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
-import { attentionReasons, editionSections } from './types'
+import { briefScopeKey, compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
+import { attentionReasons, editionItemEvidence, editionSections, sectionNames, severityLabel, statusLabel } from './types'
 import { BriefEditionActions } from './BriefEditionActions'
 import type { BriefNavigation } from './useBriefNavigation'
 import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 
 type Props = { navigation: BriefNavigation; workspaceName: string; scope: BriefScope; timeZone: string; readOnly: boolean; changesDisabled: boolean; onGenerated: () => void; onOpenSource: (source: BriefSource) => void }
-const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전 주부터 미해결' }
 const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
   ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 새 변경이 전달됐습니다.',
   NO_ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 추가 전달 기록이 없습니다.',
@@ -33,7 +32,7 @@ export function BriefEditionSection(props: Props) {
 function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpenSource, onGenerated, navigation, workspaceName }: Props) {
   const queryClient = useQueryClient()
   const { selectedId, baseId, previousTargetId } = navigation.selection
-  const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
+  const scopeKey = briefScopeKey(scope)
   const latest = useQuery({ queryKey: [...scopeKey, 'latest-edition'], queryFn: ({ signal }) => getLatestEdition(scope, signal), retry: false, staleTime: 0 })
   const history = useInfiniteQuery({ queryKey: [...scopeKey, 'edition-history'], initialPageParam: null as number | null,
     queryFn: ({ pageParam, signal }) => getEditionHistory(scope, pageParam, signal),
@@ -189,7 +188,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
 function EditionItems({ items, zoneId, readOnly }: { items: BriefEdition['items']; zoneId: string; readOnly: boolean }) {
   return <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
-      <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}</span></div>
+      <span>{severityLabel(item.severity)} · {statusLabel(item.status)}</span></div>
     <BriefSourceLink item={item} readOnly={readOnly} />
     <small>상태 기록 {formatInstant(item.observedAt, zoneId)} ({zoneId})</small>
   </li>)}</ul>
@@ -199,7 +198,6 @@ function EditionEvidence({ items }: { items: BriefEdition['items'] }) {
   return items.length === 0 ? <p>항목 없음</p> : <ul className="brief-evidence-list">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
     <span>원본 항목 ID <code>{item.sourceReference}</code></span>
-    <span>{item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
-      : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`}</span>
+    <span>{editionItemEvidence(item)}</span>
   </li>)}</ul>
 }
