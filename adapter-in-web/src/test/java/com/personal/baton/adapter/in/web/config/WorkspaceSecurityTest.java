@@ -236,7 +236,7 @@ class WorkspaceSecurityTest {
 
     private WorkspaceContract.WorkspaceResult emptyWorkspace() {
         return new WorkspaceContract.WorkspaceResult(
-                new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
+                new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴", false, null),
                 seasonResult(),
                 List.of(new WorkspaceContract.SeasonResult(
                         SEASON_ID,

@@ -4087,7 +4087,7 @@ class WorkspaceRestDocsTest {
 
     private WorkspaceContract.WorkspaceResult workspaceResult() {
         return new WorkspaceContract.WorkspaceResult(
-                new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴"),
+                new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴", false, null),
                 seasonResult(),
                 List.of(new WorkspaceContract.SeasonResult(
                         SEASON_ID,
@@ -4544,7 +4544,8 @@ class WorkspaceRestDocsTest {
                 MEMBER_ID,
                 "박민서",
                 List.of(ROLE_ID),
-                archivedAt
+                archivedAt,
+                DecisionTextFormat.PLAIN_TEXT
         );
     }
 

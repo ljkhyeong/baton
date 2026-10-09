@@ -44,7 +44,6 @@ public final class WorkspaceContract {
     }
 
     public record TeamResult(UUID id, String name, boolean accountAccessEnabled, TeamPermission permission) {
-        public TeamResult(UUID id, String name) { this(id, name, false, null); }
     }
 
     public record SeasonResult(
@@ -184,11 +183,6 @@ public final class WorkspaceContract {
             Instant archivedAt,
             DecisionTextFormat textFormat
     ) {
-        public DecisionResult(UUID id, String title, String reason, String alternative, Instant createdAt,
-                              UUID authorMemberId, String authorName, List<UUID> roleIds, Instant archivedAt) {
-            this(id, title, reason, alternative, createdAt, authorMemberId, authorName, roleIds,
-                    archivedAt, DecisionTextFormat.PLAIN_TEXT);
-        }
     }
 
     public record HandoffItemResult(
