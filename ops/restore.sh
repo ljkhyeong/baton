@@ -301,8 +301,6 @@ fi
 
 mv -f -- "$recovery_targets_tmp" "$recovery_targets_path"
 recovery_targets_tmp=""
-rm -f -- "$restore_sql_path"
-trap - EXIT INT TERM
 printf 'Restore completed from: %s\n' "$backup_path"
 printf 'Invalidated workspace access keys: %s\n' "$invalidated_access_key_count"
 printf 'Workspace recovery targets: %s\n' "$recovery_targets_path"

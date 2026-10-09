@@ -471,8 +471,11 @@ write_valid_production_env "$restore_security_root/production.env"
 restore_security_backup="$restore_security_root/baton-20200101T000000Z-restore.sql.gz"
 write_valid_backup "$restore_security_backup"
 restore_security_docker_log="$restore_security_root/docker.log"
+restore_security_tmp="$restore_security_root/tmp"
+mkdir -p -- "$restore_security_tmp"
 restore_security_output="$(
   PATH="$fake_bin:$PATH" \
+  TMPDIR="$restore_security_tmp" \
   BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   BATON_BACKUP_STATE_DIR="$restore_security_root/state" \
@@ -481,6 +484,8 @@ restore_security_output="$(
   FAKE_RESTORE_SQL_LOG="$restore_security_root/revocation.sql" \
   "$fixture_restore_script" "$restore_security_backup"
 )"
+assert_count 0 "$(find "$restore_security_tmp" -mindepth 1 | wc -l | tr -d ' ')" \
+  'restore temporary files after success'
 if PATH="$fake_bin:$PATH" \
   BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
