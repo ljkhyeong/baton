@@ -98,7 +98,7 @@ final class WorkspaceDecisionCoordinator {
                 teamId,
                 decision.getAuthorMemberId()
         ).get(decision.getAuthorMemberId());
-        validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
+        requireRoles(teamId, seasonId, decision.getRoleIds());
         contentIdempotency.reserve(attempt);
         Decision saved = recordsRepository.saveDecision(decision);
         return resultMapper.toDecisionResult(saved, Map.of(author.getId(), author));
@@ -112,8 +112,9 @@ final class WorkspaceDecisionCoordinator {
     ) {
         Decision decision = requireActiveDecision(seasonId, decisionId);
         Member previousAuthor = memberResolver.requireMember(teamId, decision.getAuthorMemberId());
-        List<UUID> previousRoleIds = List.copyOf(decision.getRoleIds());
-        String previousRoleNames = roleNames(teamId, seasonId, previousRoleIds);
+        String previousRoleNames = roleNames(
+                peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, decision.getRoleIds())
+        );
         var before = changes.snapshot(decision, previousAuthor.getName(), previousRoleNames);
         Member author = Objects.equals(decision.getAuthorMemberId(), command.authorMemberId())
                 ? previousAuthor
@@ -129,9 +130,7 @@ final class WorkspaceDecisionCoordinator {
                 command.roleIds(),
                 command.textFormat()
         );
-        validateRoleOwnership(teamId, seasonId, decision.getRoleIds());
-        String roleNames = previousRoleIds.equals(decision.getRoleIds())
-                ? previousRoleNames : roleNames(teamId, seasonId, decision.getRoleIds());
+        String roleNames = roleNames(requireRoles(teamId, seasonId, decision.getRoleIds()));
         changes.record(teamId, seasonId, ContentRecordKind.DECISION, decisionId, before,
                 changes.snapshot(decision, author.getName(), roleNames));
         return resultMapper.toDecisionResult(
@@ -148,7 +147,9 @@ final class WorkspaceDecisionCoordinator {
     ) {
         Decision decision = requireDecision(seasonId, decisionId);
         Member author = memberResolver.requireMember(teamId, decision.getAuthorMemberId());
-        String roleNames = roleNames(teamId, seasonId, decision.getRoleIds());
+        String roleNames = roleNames(
+                peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, decision.getRoleIds())
+        );
         var before = changes.snapshot(decision, author.getName(), roleNames);
         decision.updateArchive(archived, Instant.now(clock));
         changes.record(teamId, seasonId, ContentRecordKind.DECISION, decisionId, before,
@@ -173,17 +174,18 @@ final class WorkspaceDecisionCoordinator {
         return decision;
     }
 
-    private String roleNames(UUID teamId, UUID seasonId, List<UUID> roleIds) {
-        return peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, roleIds).stream()
-                .map(Role::getName).sorted().collect(Collectors.joining(", "));
+    private static String roleNames(List<Role> roles) {
+        return roles.stream().map(Role::getName).sorted().collect(Collectors.joining(", "));
     }
 
-    private void validateRoleOwnership(UUID teamId, UUID seasonId, List<UUID> roleIds) {
-        if (peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, roleIds).size() != roleIds.size()) {
+    private List<Role> requireRoles(UUID teamId, UUID seasonId, List<UUID> roleIds) {
+        List<Role> roles = peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, seasonId, roleIds);
+        if (roles.size() != roleIds.size()) {
             throw new WorkspaceNotFoundException(
                     "ROLE_NOT_FOUND",
                     "관련 역할을 찾을 수 없습니다"
             );
         }
+        return roles;
     }
 }

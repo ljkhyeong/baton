@@ -45,10 +45,10 @@ final class WorkspaceSeasonSettingsCoordinator {
     }
 
     SeasonResult updateSeason(
-            UUID teamId,
             Season season,
             UpdateSeasonCommand command
     ) {
+        UUID teamId = season.getTeamId();
         boolean periodChanged = !Objects.equals(season.getStartDate(), command.startDate())
                 || !Objects.equals(season.getEndDate(), command.endDate());
         if (periodChanged) {

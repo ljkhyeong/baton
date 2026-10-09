@@ -132,7 +132,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 );
 
         NextSeasonResult result = coordinator.createNext(
-                teamId,
                 sourceSeason,
                 "next-season-batch-idempotency-key-0001",
                 new CreateNextSeasonCommand(
@@ -213,7 +212,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 );
 
         assertThatThrownBy(() -> coordinator.createNext(
-                teamId,
                 sourceSeason,
                 "next-season-missing-routine-key-001",
                 new CreateNextSeasonCommand(

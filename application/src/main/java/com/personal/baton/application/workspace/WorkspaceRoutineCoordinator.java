@@ -45,11 +45,11 @@ final class WorkspaceRoutineCoordinator {
     }
 
     RoutineResult create(
-            UUID teamId,
             Season season,
             String idempotencyKey,
             CreateRoutineCommand command
     ) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         Routine routine = Routine.create(
                 UUID.randomUUID(),
@@ -93,14 +93,13 @@ final class WorkspaceRoutineCoordinator {
     }
 
     RoutineResult update(
-            UUID teamId,
             Season season,
             UUID routineId,
             UpdateRoutineCommand command
     ) {
         UUID seasonId = season.getId();
         Routine routine = requireActiveRoutine(seasonId, routineId);
-        roleResolver.requireRole(teamId, seasonId, command.ownerRoleId());
+        roleResolver.requireRole(season.getTeamId(), seasonId, command.ownerRoleId());
         roundSchedulePolicy.requireDeadlineRuleForEnabledSchedule(
                 season,
                 command.deadlineDayOffset(),

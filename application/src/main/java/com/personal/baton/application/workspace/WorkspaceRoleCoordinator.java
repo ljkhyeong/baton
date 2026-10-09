@@ -43,11 +43,11 @@ final class WorkspaceRoleCoordinator {
     }
 
     RoleResult create(
-            UUID teamId,
             Season season,
             String idempotencyKey,
             CreateRoleCommand command
     ) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         Role role = Role.create(
                 UUID.randomUUID(),
@@ -100,11 +100,11 @@ final class WorkspaceRoleCoordinator {
     }
 
     RoleResult update(
-            UUID teamId,
             Season season,
             UUID roleId,
             UpdateRoleCommand command
     ) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         Role role = roleResolver.requireRoleForUpdate(teamId, seasonId, roleId);
         rolePolicy.requireUpdateAllowed(

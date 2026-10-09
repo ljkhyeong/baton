@@ -43,7 +43,8 @@ final class WorkspaceSeasonEndingCoordinator {
         this.briefContinuitySignalRecorder = briefContinuitySignalRecorder;
     }
 
-    SeasonResult update(UUID teamId, Season season, boolean ended) {
+    SeasonResult update(Season season, boolean ended) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         if (ended && peopleRepository.existsOpenRoleHandoffBySeasonId(seasonId)) {
             throw new RoleHandoffStateConflictException(

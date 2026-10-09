@@ -88,7 +88,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         WorkspaceIdempotencyKeyPolicy.requireValid(idempotencyKey);
-        return roleCoordinator.create(teamId, scope.season(), idempotencyKey, command);
+        return roleCoordinator.create(scope.season(), idempotencyKey, command);
     }
 
     @Override
@@ -101,7 +101,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             UpdateRoleCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        return roleCoordinator.update(teamId, scope.season(), roleId, command);
+        return roleCoordinator.update(scope.season(), roleId, command);
     }
 
     @Override
@@ -117,7 +117,6 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         WorkspaceIdempotencyKeyPolicy.requireValid(idempotencyKey);
         return roleHandoffCoordinator.prepare(
-                teamId,
                 scope.season(),
                 roleId,
                 idempotencyKey,
@@ -152,7 +151,7 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         scopeAuthorizer.requireConfirmedMember(scope.team(), command.confirmedByMemberId());
-        return roleHandoffCoordinator.accept(teamId, scope.season(), roleId, handoffId, command);
+        return roleHandoffCoordinator.accept(scope.season(), roleId, handoffId, command);
     }
 
     @Override

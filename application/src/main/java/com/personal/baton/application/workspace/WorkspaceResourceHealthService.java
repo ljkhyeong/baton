@@ -42,7 +42,7 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
             return unavailableMonitoring(resourceId, MonitoringReason.SYNC_PENDING);
         }
         if (remote.status() == LookupStatus.UNAVAILABLE) {
-            return unknown(resourceId, Availability.UNAVAILABLE);
+            return unavailable(resourceId);
         }
         if (remote.status() == LookupStatus.MISSING
                 || remote.sourceRevision() != snapshot.sourceRevision()
@@ -93,8 +93,8 @@ public class WorkspaceResourceHealthService implements InspectResourceHealthUseC
         };
     }
 
-    private Result unknown(UUID resourceId, Availability availability) {
-        return new Result(resourceId, WatchResourceHealth.UNKNOWN, availability, null, false, null, null, null, null);
+    private Result unavailable(UUID resourceId) {
+        return new Result(resourceId, WatchResourceHealth.UNKNOWN, Availability.UNAVAILABLE, null, false, null, null, null, null);
     }
 
     private Result unavailableMonitoring(UUID resourceId, MonitoringReason reason) {
