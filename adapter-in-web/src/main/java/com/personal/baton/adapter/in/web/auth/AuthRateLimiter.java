@@ -29,18 +29,10 @@ public final class AuthRateLimiter {
     private static final Limit ROUND_NETWORK = new Limit(120, Duration.ofMinutes(1));
     private static final Pattern IPV6_LITERAL = Pattern.compile("[0-9a-fA-F:.]+");
 
-    private final Cache<String, Bucket> buckets;
-
-    public AuthRateLimiter() {
-        this(Caffeine.newBuilder()
-                .maximumSize(50_000)
-                .expireAfterAccess(Duration.ofHours(1))
-                .build());
-    }
-
-    AuthRateLimiter(Cache<String, Bucket> buckets) {
-        this.buckets = Objects.requireNonNull(buckets);
-    }
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .maximumSize(50_000)
+            .expireAfterAccess(Duration.ofHours(1))
+            .build();
 
     public void checkRegistration(String remoteAddress, String email) {
         consume(

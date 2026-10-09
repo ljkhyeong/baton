@@ -10,17 +10,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.logout.CompositeLogoutHandler;
-import org.springframework.security.web.authentication.logout.CookieClearingLogoutHandler;
-import org.springframework.security.web.authentication.logout.LogoutHandler;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public final class AccountSessionVersionFilter extends OncePerRequestFilter {
     private final ValidateAccountSessionUseCase useCase;
     private final SecurityErrorResponseWriter errorResponseWriter;
-    private final LogoutHandler logoutHandler = new CompositeLogoutHandler(
-            new SecurityContextLogoutHandler(), new CookieClearingLogoutHandler("JSESSIONID"));
 
     public AccountSessionVersionFilter(
             ValidateAccountSessionUseCase useCase, SecurityErrorResponseWriter errorResponseWriter
@@ -51,7 +45,7 @@ public final class AccountSessionVersionFilter extends OncePerRequestFilter {
                 return;
             }
             if (!current) {
-                logoutHandler.logout(request, response, authentication);
+                AccountSecurityController.CURRENT_SESSION_LOGOUT.logout(request, response, authentication);
             }
         }
         chain.doFilter(request, response);

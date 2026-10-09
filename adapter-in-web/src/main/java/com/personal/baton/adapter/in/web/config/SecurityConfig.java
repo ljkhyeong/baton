@@ -68,10 +68,6 @@ public class SecurityConfig {
             "REQUEST_FORBIDDEN",
             "요청을 허용할 수 없습니다"
     );
-    private static final ErrorResponse INVALID_CREDENTIALS = new ErrorResponse(
-            "INVALID_CREDENTIALS",
-            "이메일 또는 비밀번호가 올바르지 않습니다"
-    );
 
     @Bean
     LocalAccountUserDetailsService localAccountUserDetailsService(
@@ -277,7 +273,6 @@ public class SecurityConfig {
                         })
                         .failureHandler(new AccountAuthenticationFailureHandler(
                                 errorResponseWriter,
-                                INVALID_CREDENTIALS,
                                 authRateLimiter
                         ))
                         .permitAll());

@@ -44,11 +44,11 @@ public final class AccountOAuth2UserService {
         String subject = requiredText(providerUser.getSubject(), "Google subject가 없습니다");
         String email = optionalText(providerUser.getEmail());
         String displayName = displayName(
+                "Google 사용자",
                 providerUser.getFullName(),
                 providerUser.getGivenName(),
                 providerUser.getPreferredUsername(),
-                email,
-                "Google 사용자"
+                email
         );
         AccountView account = resolveIdentity(
                 IdentityProvider.GOOGLE,
@@ -69,10 +69,10 @@ public final class AccountOAuth2UserService {
         String subject = requiredText(profile.get("id"), "Naver profile id가 없습니다");
         String email = optionalText(profile.get("email"));
         String displayName = displayName(
+                "Naver 사용자",
                 optionalText(profile.get("name")),
                 optionalText(profile.get("nickname")),
-                email,
-                "Naver 사용자"
+                email
         );
         AccountView account = resolveIdentity(
                 IdentityProvider.NAVER,
@@ -121,14 +121,14 @@ public final class AccountOAuth2UserService {
         throw invalidProviderProfile("Naver profile response가 없습니다");
     }
 
-    private String displayName(String... candidates) {
+    private String displayName(String fallback, String... candidates) {
         for (String candidate : candidates) {
             String value = optionalText(candidate);
             if (value != null) {
-                return limitDisplayName(value, MAXIMUM_DISPLAY_NAME_LENGTH);
+                return limitDisplayName(value);
             }
         }
-        throw invalidProviderProfile("표시 이름을 결정할 수 없습니다");
+        return fallback;
     }
 
     private String requiredText(Object value, String message) {
@@ -146,11 +146,11 @@ public final class AccountOAuth2UserService {
         return text.trim();
     }
 
-    private String limitDisplayName(String value, int maximumLength) {
-        if (value.length() <= maximumLength) {
+    private String limitDisplayName(String value) {
+        if (value.length() <= MAXIMUM_DISPLAY_NAME_LENGTH) {
             return value;
         }
-        int endIndex = maximumLength;
+        int endIndex = MAXIMUM_DISPLAY_NAME_LENGTH;
         if (Character.isHighSurrogate(value.charAt(endIndex - 1))
                 && Character.isLowSurrogate(value.charAt(endIndex))) {
             endIndex--;

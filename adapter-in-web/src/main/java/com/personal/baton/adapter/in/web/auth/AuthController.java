@@ -35,11 +35,9 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     public static final String CSRF_PATH = "/api/v1/auth/csrf";
@@ -80,7 +78,7 @@ public class AuthController {
         this.humanVerificationUseCase = humanVerificationUseCase;
     }
 
-    @GetMapping("/csrf")
+    @GetMapping(CSRF_PATH)
     public ResponseEntity<CsrfResponse> csrf(CsrfToken csrfToken) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -90,7 +88,7 @@ public class AuthController {
                 ));
     }
 
-    @GetMapping("/session")
+    @GetMapping(SESSION_PATH)
     public ResponseEntity<Object> session(
             @AuthenticationPrincipal AuthenticatedAccountPrincipal principal,
             CsrfToken csrfToken
@@ -109,7 +107,7 @@ public class AuthController {
                 ));
     }
 
-    @GetMapping("/providers")
+    @GetMapping(PROVIDERS_PATH)
     public ResponseEntity<AuthProvidersResponse> providers() {
         SocialLoginProviderCatalog providerCatalog =
                 socialLoginProviderCatalogProvider.getIfAvailable();
@@ -126,7 +124,7 @@ public class AuthController {
                 ));
     }
 
-    @PostMapping("/local/registrations")
+    @PostMapping(LOCAL_REGISTRATIONS_PATH)
     public ResponseEntity<LocalRegistrationResponse> registerLocalAccount(
             @Valid @RequestBody LocalRegistrationRequest request,
             HttpServletRequest servletRequest
@@ -159,7 +157,7 @@ public class AuthController {
                 .body(new LocalRegistrationResponse());
     }
 
-    @PostMapping("/local/email-verifications")
+    @PostMapping(LOCAL_EMAIL_VERIFICATIONS_PATH)
     public ResponseEntity<Void> verifyLocalEmail(
             @Valid @RequestBody LocalEmailVerificationRequest request,
             HttpServletRequest servletRequest
@@ -177,7 +175,7 @@ public class AuthController {
                 .build();
     }
 
-    @PostMapping("/local/password-reset-requests")
+    @PostMapping(PASSWORD_RESET_REQUESTS_PATH)
     public ResponseEntity<PasswordResetRequestResponse> requestPasswordReset(
             @Valid @RequestBody PasswordResetRequest request, HttpServletRequest servletRequest
     ) {
@@ -195,7 +193,7 @@ public class AuthController {
                 .body(new PasswordResetRequestResponse(true));
     }
 
-    @PostMapping("/local/password-resets")
+    @PostMapping(PASSWORD_RESETS_PATH)
     public ResponseEntity<Void> resetPassword(
             @Valid @RequestBody PasswordResetCompletionRequest request, HttpServletRequest servletRequest
     ) {

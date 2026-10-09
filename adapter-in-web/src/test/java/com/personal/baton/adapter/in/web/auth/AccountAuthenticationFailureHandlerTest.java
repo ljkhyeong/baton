@@ -1,6 +1,5 @@
 package com.personal.baton.adapter.in.web.auth;
 
-import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import java.util.stream.Stream;
@@ -23,16 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AccountAuthenticationFailureHandlerTest {
 
-    private static final ErrorResponse FALLBACK = new ErrorResponse(
-            "INVALID_CREDENTIALS",
-            "이메일 또는 비밀번호가 올바르지 않습니다"
-    );
     private final AuthRateLimiter rateLimiter = new AuthRateLimiter();
 
     private final AccountAuthenticationFailureHandler handler =
             new AccountAuthenticationFailureHandler(
                     new SecurityErrorResponseWriter(new ObjectMapper()),
-                    FALLBACK,
                     rateLimiter
             );
 
