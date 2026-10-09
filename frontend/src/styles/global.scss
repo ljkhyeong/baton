@@ -13,7 +13,6 @@
   --rule: #e5e8eb;
   --rule-strong: #d1d6db;
   --nav: #f2f4f6;
-  --nav-muted: #60646c;
   --ink-hover: #414752;
   // 색의 역할: baton은 브랜드·진행률, warning은 경고·오류·위험 동작, info는 진행 상태와 포커스, 선택은 ink로 표시한다.
   --baton: #ef643d;
@@ -38,7 +37,6 @@
   --avatar-ink: #191f28;
   --scrim: rgba(17, 23, 20, .38);
   --scrim-strong: rgba(17, 23, 20, .56);
-  --canvas-translucent: rgba(242, 244, 246, .94);
   --surface-translucent: rgba(255, 255, 255, .96);
   // 글자 크기는 12·13·14·16·18·20·24·28px 단계만 쓴다.
   --radius-sm: 4px;
@@ -60,7 +58,6 @@
     --rule: #2a2f37;
     --rule-strong: #3b414b;
     --nav: #0f1216;
-    --nav-muted: #a3a9b2;
     --ink-hover: #c9cdd3;
     --baton: #f2774f;
     --baton-dark: #f5a184;
@@ -83,7 +80,6 @@
     --field-border-hover: #5d6470;
     --scrim: rgba(0, 0, 0, .55);
     --scrim-strong: rgba(0, 0, 0, .7);
-    --canvas-translucent: rgba(15, 18, 22, .94);
     --surface-translucent: rgba(25, 29, 36, .96);
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23a3a9b2' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
   }
@@ -798,11 +794,6 @@ a {
   font-weight: 750;
 }
 
-.avatar-dark {
-  color: var(--ink);
-  background: var(--rule);
-}
-
 .avatar-large {
   flex-basis: 38px;
   width: 38px;
@@ -814,7 +805,7 @@ a {
   min-width: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: var(--canvas);
+  background: var(--paper);
 }
 
 .page-stage {
@@ -1055,6 +1046,7 @@ a {
   gap: 16px;
   margin: 0 0 18px;
   padding: 16px 18px;
+  border: 1px solid var(--rule);
   border-radius: var(--radius-lg);
 }
 
@@ -1135,12 +1127,12 @@ a {
 .today-page .routine-copy { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; }
 .today-page .routine-text strong { font-size: 14px; font-weight: 550; }
 .today-page .routine-row:hover { background: var(--nav); }
-.today-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; }
+.today-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--rule); }
 .today-list-toolbar .round-control { margin: 0; flex: 1; }
 .today-list-toolbar .round-control label { width: min(100%, 310px); }
-.today-list-toolbar .round-meta { flex: 0 0 auto; color: var(--muted); }
+.today-list-toolbar .round-meta { flex: 0 0 auto; flex-flow: row wrap; align-items: baseline; justify-content: flex-end; gap: 2px 12px; color: var(--muted); }
 .today-list-toolbar .round-meta strong { font-size: 12px; font-weight: 500; }
-.today-list-columns { display: grid; grid-template-columns: minmax(0, 1fr) 220px 140px; gap: 10px; padding: 10px 12px 10px 50px; background: var(--nav); color: var(--muted); font-size: 12px; }
+.today-list-columns { display: grid; grid-template-columns: minmax(0, 1fr) 220px 140px; gap: 10px; padding: 10px 12px 10px 50px; border-bottom: 1px solid var(--rule); background: var(--nav); color: var(--muted); font-size: 12px; }
 .today-page .routine-owner strong { display: none; }
 .today-page .routine-owner small { color: var(--ink); font-size: 13px; }
 .today-secondary { margin-top: 24px; border-top: 1px solid var(--rule); }
@@ -1520,10 +1512,6 @@ a {
 
 .routine-archive-shelf { margin-top: 20px; }
 
-.memory-ledger {
-  border-top: 1px solid var(--rule);
-}
-
 .decision-entry { border-bottom: 1px solid var(--rule); }
 .decision-entry:last-of-type { border-bottom: 0; }
 .decision-body { padding: 24px 0; }
@@ -1655,15 +1643,19 @@ a {
 .handoff-role-tabs::-webkit-scrollbar { display: none; }
 .handoff-role-tabs button {
   display: flex;
+  flex: 1 0 140px;
   justify-content: space-between;
+  gap: 8px;
   padding: 14px 12px;
   border: 0;
+  border-right: 1px solid var(--rule);
   color: var(--muted);
+  background: transparent;
   font-size: 12px;
   cursor: pointer;
 }
 .handoff-role-tabs button:last-child { border-right: 0; }
-.handoff-role-tabs button.active { color: var(--ink); }
+.handoff-role-tabs button.active { color: var(--ink); box-shadow: inset 0 -2px var(--ink); }
 .handoff-role-tabs button:focus-visible { outline-offset: -3px; }
 .handoff-role-tabs strong { font-size: 12px; }
 
@@ -2585,6 +2577,8 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   font-weight: 650;
 }
 
+.record-search-results { margin-top: 34px; }
+
 .record-search-summary {
   display: flex;
   align-items: flex-end;
@@ -2646,10 +2640,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   font-weight: 760;
 }
 
-.record-archived {
-  color: var(--muted);
-  background: var(--canvas);
-}
+.record-archived { background: var(--canvas); }
 
 .record-search-card h3 {
   margin: 13px 0 16px;
@@ -2747,12 +2738,7 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   outline-offset: 4px;
 }
 
-// 평면 화면: 본문은 흰 바탕에 두고 구역은 카드 대신 구분선으로 나눈다. 기본 규칙 뒤, 반응형 규칙 앞에 둔다.
-.main-surface { background: var(--paper); }
-
-.today-list-toolbar { border-top: 1px solid var(--rule); }
-.today-list-toolbar .round-meta { flex-flow: row wrap; align-items: baseline; justify-content: flex-end; gap: 2px 12px; }
-.today-list-columns { border-bottom: 1px solid var(--rule); }
+// 할 일·내 역할 화면: 구역은 카드 대신 구분선으로 나눈다. 기본 규칙 뒤, 반응형 규칙 앞에 둔다.
 .summary-jump { display: inline-flex; align-items: center; padding: 0; border: 0; color: var(--warning); background: transparent; font-size: 12px; font-weight: 650; cursor: pointer; }
 .summary-jump:hover { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -2798,12 +2784,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 .today-more > details > summary strong,
 .today-more > details > summary h2 { margin: 0; font-size: 14px; font-weight: 650; }
 .today-more > details > summary span { color: var(--muted); font-size: 12px; font-weight: 500; }
-
-.handoff-role-tabs button { flex: 1 0 140px; gap: 8px; border-right: 1px solid var(--rule); background: transparent; }
-.handoff-role-tabs button.active { box-shadow: inset 0 -2px var(--ink); }
-.record-search-results { margin-top: 34px; }
-.memory-ledger { border-top: 0; }
-.round-schedule-card { border: 1px solid var(--rule); }
 
 @media (max-width: 1240px) {
   .app-shell { grid-template-columns: 232px minmax(0, 1fr); }
@@ -3030,6 +3010,20 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
   .form-actions { flex-direction: column-reverse; }
   .form-actions button { width: 100%; }
   .toast { right: 16px; bottom: 76px; left: 16px; justify-content: center; }
+  .summary-jump { min-height: 44px; margin: -12px 0; }
+  .mobile-topbar { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand team actions"; gap: 8px; padding: 8px 15px; }
+  .mobile-topbar .brand { gap: 0; font-size: 0; }
+  .mobile-team { min-height: 44px; gap: 6px; padding: 4px 10px; }
+  .mobile-team strong { font-size: 13px; }
+  .mobile-team small { font-size: 12px; }
+  .mobile-workspace-actions { gap: 0; }
+  .mobile-share,
+  .mobile-workspace-actions .team-list-link { padding: 0 7px; }
+  /* 체크 상자를 업무 제목 줄에 맞춘다. */
+  .routine-row { align-items: start; }
+  .routine-row .check-button { align-self: start; margin-top: -11px; }
+  .today-page .routine-row .check-button { grid-row: 1; }
+  .routine-row .routine-actions { align-self: start; flex-direction: row; margin-top: -10px; }
 }
 
 @media (max-width: 820px) {
@@ -3062,7 +3056,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 }
 
 @media (max-width: 420px) {
-  .mobile-topbar { padding-right: 15px; padding-left: 15px; }
   .page-stage { padding-right: 15px; padding-left: 15px; }
   .page-header h1 { font-size: 24px; }
   .record-search-filters { grid-template-columns: 1fr; }
@@ -3122,26 +3115,6 @@ a.round-room-text-action { display: inline-flex; min-height: 32px; align-items: 
 
 .workspace-template-preview { border: 1px solid var(--rule); padding: 16px; overflow-wrap: anywhere; }
 .workspace-template-preview h3 { margin-top: 0; }
-
-@media (max-width: 720px) {
-  .summary-jump { min-height: 44px; margin: -12px 0; }
-  .mobile-topbar { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand team actions"; gap: 8px; padding: 8px 15px; }
-  .mobile-topbar .brand { gap: 0; font-size: 0; }
-  .mobile-team { min-height: 44px; gap: 6px; padding: 4px 10px; }
-  .mobile-team strong { font-size: 13px; }
-  .mobile-team small { font-size: 12px; }
-  .mobile-workspace-actions { gap: 0; }
-  .mobile-share,
-  .mobile-workspace-actions .team-list-link { padding: 0 7px; }
-}
-
-@media (max-width: 720px) {
-  /* 체크 상자를 업무 제목 줄에 맞춘다. */
-  .routine-row { align-items: start; }
-  .routine-row .check-button { align-self: start; margin-top: -11px; }
-  .today-page .routine-row .check-button { grid-row: 1; }
-  .routine-row .routine-actions { align-self: start; flex-direction: row; margin-top: -10px; }
-}
 
 @media (max-width: 360px) {
   .mobile-team small { display: none; }
