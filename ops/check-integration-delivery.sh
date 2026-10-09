@@ -26,18 +26,13 @@ fi
 metric_value() {
   local metric_name="$1"
   local integration="${2:-}"
-  local status="${3:-}"
 
   printf '%s\n' "$metrics_output" | awk \
     -v metric_name="$metric_name" \
-    -v integration="$integration" \
-    -v status="$status" '
+    -v integration="$integration" '
       index($0, metric_name " ") == 1 || index($0, metric_name "{") == 1 {
         if (integration != "" \
             && index($0, "integration=\"" integration "\"") == 0) {
-          next
-        }
-        if (status != "" && index($0, "status=\"" status "\"") == 0) {
           next
         }
         count += 1
@@ -55,13 +50,12 @@ metric_value() {
 require_metric() {
   local metric_name="$1"
   local integration="${2:-}"
-  local status="${3:-}"
   local value
 
-  if ! value="$(metric_value "$metric_name" "$integration" "$status")" \
+  if ! value="$(metric_value "$metric_name" "$integration")" \
     || [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$ ]]; then
-    printf '필수 BATON 연동 지표가 없거나 숫자가 아닙니다: metric=%s integration=%s status=%s\n' \
-      "$metric_name" "${integration:--}" "${status:--}" >&2
+    printf '필수 BATON 연동 지표가 없거나 숫자가 아닙니다: metric=%s integration=%s\n' \
+      "$metric_name" "${integration:--}" >&2
     return 1
   fi
   printf '%s\n' "$value"
