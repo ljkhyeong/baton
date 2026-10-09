@@ -69,19 +69,15 @@ public class SecurityConfig {
             "요청을 허용할 수 없습니다"
     );
 
-    @Bean
-    LocalAccountUserDetailsService localAccountUserDetailsService(
-            ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider
-    ) {
-        return new LocalAccountUserDetailsService(loadLocalCredentialUseCaseProvider);
-    }
-
-    @Bean
-    DaoAuthenticationProvider localAccountAuthenticationProvider(
-            LocalAccountUserDetailsService userDetailsService,
+    // 빈으로 등록하면 전역 AuthenticationManager에도 들어가 로그인 실패마다 부모 관리자가
+    // 같은 자격 증명 조회와 비밀번호 비교를 한 번 더 실행한다. 로컬 로그인 체인에만 등록한다.
+    private static DaoAuthenticationProvider localAccountAuthenticationProvider(
+            ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider,
             PasswordEncoder passwordEncoder
     ) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(
+                new LocalAccountUserDetailsService(loadLocalCredentialUseCaseProvider)
+        );
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }
@@ -134,7 +130,8 @@ public class SecurityConfig {
             ObjectProvider<DefaultOAuth2UserService> oauth2UserServiceProvider,
             ObjectProvider<RestClientAuthorizationCodeTokenResponseClient>
                     tokenResponseClientProvider,
-            DaoAuthenticationProvider localAccountAuthenticationProvider,
+            ObjectProvider<LoadLocalCredentialUseCase> loadLocalCredentialUseCaseProvider,
+            PasswordEncoder passwordEncoder,
             AuthRateLimiter authRateLimiter,
             ValidateAccountSessionUseCase validateAccountSessionUseCase,
             SecurityContextRepository securityContextRepository,
@@ -260,7 +257,7 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class
                 );
 
-        http.authenticationProvider(localAccountAuthenticationProvider)
+        http.authenticationProvider(localAccountAuthenticationProvider(loadLocalCredentialUseCaseProvider, passwordEncoder))
                 .formLogin(form -> form
                         .loginPage(AuthController.LOCAL_SESSION_PATH)
                         .loginProcessingUrl(AuthController.LOCAL_SESSION_PATH)
