@@ -73,8 +73,7 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
         Set<UUID> read = receipts.findRead(accountId, pending.stream().map(NotificationResult::id).toList());
         List<NotificationResult> results = pending.stream()
                 .sorted(Comparator.comparing(NotificationResult::occurredAt).thenComparing(NotificationResult::id))
-                .map(value -> new NotificationResult(value.id(), value.kind(), value.sourceId(), value.roleId(),
-                        value.roundId(), value.title(), value.occurredAt(), read.contains(value.id()))).toList();
+                .map(value -> withRead(value, read.contains(value.id()))).toList();
         return new NotificationInboxResult(accountId, teamId, seasonId, results);
     }
 
@@ -87,8 +86,12 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
         }
         receipts.markRead(accountId, notificationId, clock.instant());
         return new NotificationInboxResult(accountId, teamId, seasonId, inbox.notifications().stream()
-                .map(value -> new NotificationResult(value.id(), value.kind(), value.sourceId(), value.roleId(),
-                        value.roundId(), value.title(), value.occurredAt(), value.read() || value.id().equals(notificationId))).toList());
+                .map(value -> withRead(value, value.read() || value.id().equals(notificationId))).toList());
+    }
+
+    private static NotificationResult withRead(NotificationResult value, boolean read) {
+        return new NotificationResult(value.id(), value.kind(), value.sourceId(), value.roleId(),
+                value.roundId(), value.title(), value.occurredAt(), read);
     }
 
     private NotificationResult notification(UUID accountId, UUID teamId, UUID seasonId, WorkspaceNotificationKind kind,

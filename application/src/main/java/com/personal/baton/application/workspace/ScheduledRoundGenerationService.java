@@ -50,7 +50,7 @@ public class ScheduledRoundGenerationService implements ScheduledRoundGeneration
         try {
             for (int count = 0; count < MAX_OCCURRENCES_PER_SEASON_PER_TICK; count++) {
                 if (!worker.generateNextOccurrence(candidate, triggeredAt)) {
-                    return true;
+                    break;
                 }
             }
             return true;

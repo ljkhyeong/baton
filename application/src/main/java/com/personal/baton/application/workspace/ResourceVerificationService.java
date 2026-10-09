@@ -39,7 +39,7 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
     public DueReviewsResult getDueReviews(UUID teamId, UUID seasonId, String accessKey) {
         var scope = authorizer.authorizeRead(teamId, seasonId, accessKey);
         var today = LocalDate.ofInstant(clock.instant(), scope.season().getZoneId());
-        if (scope.season().getEndedAt() != null) {
+        if (scope.season().isEnded()) {
             return new DueReviewsResult(teamId, seasonId, today, scope.season().getZoneId().getId(), List.of());
         }
         var due = verifications.findDueReviews(teamId, seasonId, today).stream()
