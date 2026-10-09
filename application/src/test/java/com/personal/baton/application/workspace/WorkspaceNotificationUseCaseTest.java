@@ -8,7 +8,6 @@ import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedExcep
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
@@ -53,7 +52,6 @@ import static org.assertj.core.api.Assertions.*;
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = {BatonApplication.class, WorkspaceNotificationUseCaseTest.TimeConfig.class}, properties = {
         "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
-        "baton.identity.email-verification.outbox-encryption-key=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
         "baton.round-automation.poll-interval=PT24H",
         "baton.identity.email-verification.dispatch-interval=PT24H"
 })
@@ -63,7 +61,6 @@ class WorkspaceNotificationUseCaseTest {
             .withDatabaseName("resource_verification_test").withUsername("baton").withPassword("password");
     @Autowired WorkspaceLifecycleUseCase lifecycle;
     @Autowired WorkspacePeopleUseCase people;
-    @Autowired WorkspaceRecordsUseCase records;
     @Autowired RoundAdministrationUseCase memberships;
     @Autowired IdentityRepository identities;
     @Autowired Clock clock;

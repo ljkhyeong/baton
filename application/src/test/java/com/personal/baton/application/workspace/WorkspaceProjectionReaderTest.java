@@ -53,8 +53,6 @@ class WorkspaceProjectionReaderTest {
                 .thenReturn(List.of(scope.season()));
         when(operationsRepository.findSeasonRoundsBySeasonId(scope.season().getId()))
                 .thenReturn(List.of(round));
-        when(operationsRepository.findRoutineExecutionsBySeasonRoundIds(List.of(round.getId())))
-                .thenReturn(List.of());
 
         WorkspaceResult result = reader(
                 seasonRepository, peopleRepository, operationsRepository, recordsRepository, clock

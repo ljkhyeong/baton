@@ -42,7 +42,6 @@ class WorkspaceScopeAuthorizerTest {
     @Test
     void authorizesTeamReadWithoutSeasonState() {
         AuthorizationFixture fixture = fixture();
-        fixture.season.updateEnding(true, Instant.parse("2026-07-20T03:04:05Z"));
         when(fixture.accessRepository.findTeamById(TEAM_ID))
                 .thenReturn(Optional.of(fixture.team));
 

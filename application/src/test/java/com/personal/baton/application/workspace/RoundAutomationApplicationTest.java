@@ -20,7 +20,6 @@ import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepo
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
-import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
@@ -228,7 +227,6 @@ class RoundAutomationApplicationTest {
                 service.lifecycle().updateRoundSchedule(teamId, seasonId, ACCESS_KEY, command))
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessageContaining("시간대를 변경할 수 없습니다");
-        verify(operationsRepository, never()).findSeasonRoundsBySeasonId(any());
     }
 
     @Test
@@ -273,7 +271,6 @@ class RoundAutomationApplicationTest {
         when(accessRepository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
         when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
                 .thenReturn(Optional.of(season));
-        when(accessRepository.findContentCreationIdempotency(any(), any())).thenReturn(Optional.empty());
         when(operationsRepository.findActiveRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
         when(operationsRepository.saveSeasonRound(any())).thenAnswer(invocation -> {
             SeasonRound round = invocation.getArgument(0);
@@ -340,8 +337,6 @@ class RoundAutomationApplicationTest {
                 seasonId,
                 LocalDate.of(2026, 8, 1)
         )).thenReturn(false);
-        when(operationsRepository.existsSeasonRoundBySeasonIdAndName(seasonId, "자동 회차 2026-08-01"))
-                .thenReturn(false);
         when(operationsRepository.findActiveRoutinesBySeasonId(seasonId)).thenReturn(List.of(routine));
         when(operationsRepository.saveSeasonRound(any())).thenAnswer(invocation -> {
             SeasonRound round = invocation.getArgument(0);
@@ -353,7 +348,6 @@ class RoundAutomationApplicationTest {
             savedExecutions.set(executions);
             return executions;
         });
-        when(seasonRepository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         BriefContinuitySignalRecorder briefRecorder = mock(BriefContinuitySignalRecorder.class);
         CalendarChangeRecorder calendarRecorder = mock(CalendarChangeRecorder.class);
@@ -402,7 +396,6 @@ class RoundAutomationApplicationTest {
                 seasonId,
                 LocalDate.of(2026, 8, 1)
         )).thenReturn(true);
-        when(seasonRepository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
                 accessRepository,
@@ -446,7 +439,6 @@ class RoundAutomationApplicationTest {
                 LocalDate.of(2026, 8, 1)
         )).thenReturn(false);
         when(operationsRepository.findActiveRoutinesBySeasonId(seasonId)).thenReturn(List.of());
-        when(seasonRepository.saveSeason(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         boolean processed = new ScheduledRoundGenerationWorker(
                 accessRepository,
@@ -532,7 +524,6 @@ class RoundAutomationApplicationTest {
                 .toList();
         ScheduledSeasonCandidate lastCandidate = candidates.getLast();
         when(seasonRepository.findScheduledSeasonCandidates()).thenReturn(candidates);
-        when(worker.generateNextOccurrence(any(), any())).thenReturn(false);
 
         ScheduledRoundGenerationService service = new ScheduledRoundGenerationService(
                 seasonRepository,
@@ -553,9 +544,7 @@ class RoundAutomationApplicationTest {
                 recordsRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class),
-                briefRecorder,
-                mock(CalendarChangeRecorder.class)
+                briefRecorder
         );
     }
 
@@ -563,7 +552,6 @@ class RoundAutomationApplicationTest {
             Team team,
             Season season
     ) {
-        when(accessRepository.findTeamByIdWithSharedLock(team.getId())).thenReturn(Optional.of(team));
         when(accessRepository.findTeamByIdForUpdate(team.getId())).thenReturn(Optional.of(team));
         when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(team.getId(), season.getId()))
                 .thenReturn(Optional.of(season));

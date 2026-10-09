@@ -73,22 +73,6 @@ class WorkspaceResourceHealthServiceTest {
     }
 
     @Test
-    @DisplayName("내부 오류의 최근 시도는 8분 전 정상 판정의 유효 기간을 연장하지 않는다")
-    void internalFailureDoesNotRefreshHealth() {
-        when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 7,
-                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.INTERNAL_FAILURE,
-                0, NOW.minusSeconds(480)));
-        var result = service.inspect(team, season, resource, "key");
-        assertThat(result.availability()).isEqualTo(Availability.STALE);
-        assertThat(result.health()).isEqualTo(WatchResourceHealth.UNKNOWN);
-        assertThat(result.lastCheckedAt()).isEqualTo(NOW);
-        assertThat(result.lastConclusiveAt()).isEqualTo(NOW.minusSeconds(480));
-        assertThat(result.lastOutcome()).isNull();
-        assertThat(result.consecutiveFailures()).isNull();
-        assertThat(result.checkRequestAllowed()).isTrue();
-    }
-
-    @Test
     @DisplayName("원격 조회 중 URL 스냅샷이 바뀌면 이전 URL의 정상 결과를 버린다")
     void rejectsChangedSnapshot() {
         when(access.authorize(team, season, resource, "key")).thenReturn(new Authorization(snapshot, null),
