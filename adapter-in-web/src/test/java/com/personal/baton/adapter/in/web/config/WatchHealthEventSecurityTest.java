@@ -139,10 +139,7 @@ class WatchHealthEventSecurityTest {
 
 @WebMvcTest(controllers = WatchHealthEventController.class)
 @Import({SecurityConfig.class, WebFilterConfig.class, WatchEventReceiverConfig.class})
-@TestPropertySource(properties = {
-        "baton.watch.source-namespace=study-pilot",
-        "baton.watch.event-receiver.enabled=false"
-})
+@TestPropertySource(properties = "baton.watch.event-receiver.enabled=false")
 class DisabledWatchHealthEventSecurityTest {
 
     @MockitoBean

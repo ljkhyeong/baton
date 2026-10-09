@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 
 import org.junit.jupiter.api.BeforeEach;
 
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
@@ -17,17 +17,18 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,11 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         ParticipationGrantController.class,
         RoundAdministrationController.class
 })
-@Import({
-        SecurityConfig.class,
-        WebFilterConfig.class,
-        RoundGrantSecurityConfigTest.PasswordEncoderTestConfig.class
-})
+@Import({SecurityConfig.class, WebFilterConfig.class})
 class RoundGrantSecurityConfigTest {
 
     @MockitoBean
@@ -79,6 +76,9 @@ class RoundGrantSecurityConfigTest {
     @MockitoBean
     private Clock clock;
 
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
+
     @DisplayName("ROUND public JWK Set은 계정 session 없이 조회할 수 있다")
     @Test
     void permitsPublicJwkSet() throws Exception {
@@ -93,34 +93,11 @@ class RoundGrantSecurityConfigTest {
                 ));
     }
 
-    @DisplayName("현재 계정 연결 조회는 actual chain에서 계정 session을 요구한다")
-    @Test
-    void rejectsAnonymousCurrentMembershipLookupThroughSecurityChain() throws Exception {
-        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
-                        .queryParam("teamId", "11111111-1111-4111-8111-111111111111")
-                        .header("X-Baton-Access-Key", "workspace-access-key"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(content().json("""
-                        {
-                          "code": "AUTHENTICATION_REQUIRED",
-                          "message": "BATON 계정 로그인이 필요합니다"
-                        }
-                        """, true));
-    }
-
     @DisplayName("현재 계정 연결 GET은 actual chain에서 인증 뒤 CSRF 없이 조회할 수 있다")
     @Test
     void permitsAuthenticatedCurrentMembershipLookupWithoutCsrf() throws Exception {
         UUID accountId = UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
         UUID teamId = UUID.fromString("11111111-1111-4111-8111-111111111111");
-        UsernamePasswordAuthenticationToken authentication =
-                UsernamePasswordAuthenticationToken.authenticated(
-                        new TestAccountPrincipal(accountId),
-                        null,
-                        List.of()
-                );
         when(roundAdministrationUseCase.findCurrentMembership(
                 new RoundAdministrationUseCase.CurrentMembershipQuery(
                         accountId,
@@ -130,7 +107,7 @@ class RoundGrantSecurityConfigTest {
         )).thenReturn(Optional.empty());
 
         mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
-                        .with(authentication(authentication))
+                        .with(authentication(accountAuthentication(accountId)))
                         .queryParam("teamId", teamId.toString())
                         .header("X-Baton-Access-Key", "workspace-access-key"))
                 .andExpect(status().isOk())
@@ -148,12 +125,6 @@ class RoundGrantSecurityConfigTest {
         UUID accountId = UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
         UUID teamId = UUID.fromString("11111111-1111-4111-8111-111111111111");
         UUID seasonId = UUID.fromString("22222222-2222-4222-8222-222222222222");
-        UsernamePasswordAuthenticationToken authentication =
-                UsernamePasswordAuthenticationToken.authenticated(
-                        new TestAccountPrincipal(accountId),
-                        null,
-                        List.of()
-                );
         when(roundAdministrationUseCase.findCurrentRoomMappings(
                 new RoundAdministrationUseCase.CurrentRoomMappingsQuery(
                         accountId,
@@ -164,7 +135,7 @@ class RoundGrantSecurityConfigTest {
         )).thenReturn(List.of());
 
         mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
-                        .with(authentication(authentication))
+                        .with(authentication(accountAuthentication(accountId)))
                         .queryParam("teamId", teamId.toString())
                         .queryParam("seasonId", seasonId.toString())
                         .header("X-Baton-Access-Key", "workspace-access-key"))
@@ -177,37 +148,13 @@ class RoundGrantSecurityConfigTest {
                         """, true));
     }
 
-    @DisplayName("현재 ROUND 방 GET은 actual chain에서 계정 session을 요구한다")
-    @Test
-    void rejectsAnonymousCurrentRoomMappingLookupThroughSecurityChain() throws Exception {
-        mockMvc.perform(get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
-                        .queryParam("teamId", "11111111-1111-4111-8111-111111111111")
-                        .queryParam("seasonId", "22222222-2222-4222-8222-222222222222")
-                        .header("X-Baton-Access-Key", "workspace-access-key"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(content().json("""
-                        {
-                          "code": "AUTHENTICATION_REQUIRED",
-                          "message": "BATON 계정 로그인이 필요합니다"
-                        }
-                        """, true));
-    }
-
     @DisplayName("ROUND 갱신 요청이 CSRF로 거부되면 토큰 쿠키를 유지하고 항상 403을 반환한다")
     @Test
     void mapsRefreshCsrfFailureWithoutExpiringGrantCookie() throws Exception {
-        UsernamePasswordAuthenticationToken authentication =
-                UsernamePasswordAuthenticationToken.authenticated(
-                        new TestAccountPrincipal(
-                                UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b")
-                        ),
-                        null,
-                        List.of()
-                );
-
         mockMvc.perform(post(REFRESH_PATH)
-                        .with(authentication(authentication))
+                        .with(authentication(accountAuthentication(
+                                UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b")
+                        )))
                         .header(HttpHeaders.ORIGIN, "http://localhost")
                         .header("Sec-Fetch-Site", "same-origin")
                         .cookie(new Cookie("__Secure-round_access", "existing-token")))
@@ -235,10 +182,13 @@ class RoundGrantSecurityConfigTest {
     }
 
     @DisplayName("ROUND 관리 경로의 미인증 요청은 실제 필터 체인에서 항상 401을 반환한다")
-    @Test
-    void rejectsAnonymousRoundAdministrationThroughSecurityChain() throws Exception {
-        mockMvc.perform(sameOrigin(post(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH))
-                        .with(csrf()))
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("anonymousRoundAdministrationRequests")
+    void rejectsAnonymousRoundAdministrationThroughSecurityChain(
+            String description,
+            MockHttpServletRequestBuilder request
+    ) throws Exception {
+        mockMvc.perform(request)
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -253,17 +203,10 @@ class RoundGrantSecurityConfigTest {
     @DisplayName("ROUND 관리 경로의 CSRF 거부는 실제 필터 체인에서 항상 403을 반환한다")
     @Test
     void rejectsRoundAdministrationWithoutCsrfThroughSecurityChain() throws Exception {
-        UsernamePasswordAuthenticationToken authentication =
-                UsernamePasswordAuthenticationToken.authenticated(
-                        new TestAccountPrincipal(
-                                UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b")
-                        ),
-                        null,
-                        List.of()
-                );
-
         mockMvc.perform(sameOrigin(post(RoundAdministrationController.ROOM_MAPPINGS_PATH))
-                        .with(authentication(authentication)))
+                        .with(authentication(accountAuthentication(
+                                UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b")
+                        ))))
                 .andExpect(status().isForbidden())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -275,26 +218,31 @@ class RoundGrantSecurityConfigTest {
                         """, true));
     }
 
-    private MockHttpServletRequestBuilder sameOrigin(MockHttpServletRequestBuilder request) {
+    private static Stream<Arguments> anonymousRoundAdministrationRequests() {
+        return Stream.of(
+                Arguments.of("현재 계정 연결 조회", get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .queryParam("teamId", "11111111-1111-4111-8111-111111111111")
+                        .header("X-Baton-Access-Key", "workspace-access-key")),
+                Arguments.of("현재 ROUND 방 조회", get(RoundAdministrationController.ROOM_MAPPINGS_PATH)
+                        .queryParam("teamId", "11111111-1111-4111-8111-111111111111")
+                        .queryParam("seasonId", "22222222-2222-4222-8222-222222222222")
+                        .header("X-Baton-Access-Key", "workspace-access-key")),
+                Arguments.of("계정 구성원 연결", sameOrigin(post(RoundAdministrationController.MEMBERSHIP_CLAIMS_PATH))
+                        .with(csrf()))
+        );
+    }
+
+    private static MockHttpServletRequestBuilder sameOrigin(MockHttpServletRequestBuilder request) {
         return request
                 .header(HttpHeaders.ORIGIN, "http://localhost")
                 .header("Sec-Fetch-Site", "same-origin");
     }
 
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class PasswordEncoderTestConfig {
-
-        @Bean
-        PasswordEncoder passwordEncoder() {
-            return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-        }
+    private UsernamePasswordAuthenticationToken accountAuthentication(UUID accountId) {
+        return UsernamePasswordAuthenticationToken.authenticated(
+                new AccountSessionPrincipal(accountId, 0),
+                null,
+                List.of()
+        );
     }
 }

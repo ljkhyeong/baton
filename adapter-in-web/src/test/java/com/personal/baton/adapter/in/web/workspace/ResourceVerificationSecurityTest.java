@@ -1,6 +1,6 @@
 package com.personal.baton.adapter.in.web.workspace;
 
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.auth.AccountDeactivationController;
 import com.personal.baton.application.identity.port.in.DeactivateAccountUseCase;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
@@ -13,16 +13,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerificationHistoryResult;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,21 +32,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 
 @WebMvcTest({ResourceVerificationController.class, WorkspaceNotificationController.class, NotificationPreferencesController.class, AccountDeactivationController.class})
-@Import({SecurityConfig.class, WebFilterConfig.class, ResourceVerificationSecurityTest.PasswordConfig.class})
+@Import({SecurityConfig.class, WebFilterConfig.class})
 class ResourceVerificationSecurityTest {
     private static final UUID ID = UUID.fromString("00000000-0000-4000-8000-000000000001");
+    private final UsernamePasswordAuthenticationToken auth =
+            UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ID, 0), null, List.of());
     @Autowired MockMvc mvc;
     @MockitoBean ResourceVerificationUseCase useCase;
     @MockitoBean WorkspaceNotificationUseCase notifications;
     @MockitoBean NotificationPreferencesUseCase preferences;
     @MockitoBean ValidateAccountSessionUseCase sessions;
     @MockitoBean DeactivateAccountUseCase deactivation;
+    @MockitoBean PasswordEncoder passwordEncoder;
+
+    @BeforeEach
+    void acceptCurrentAccountSessions() {
+        when(sessions.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
+    }
 
     @Test
     @DisplayName("자료 확인은 공유 키만으로 기록할 수 없고 계정 세션과 CSRF 및 동일 출처를 모두 요구한다")
     void requiresAccountCsrfAndSameOrigin() throws Exception {
-        when(sessions.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
-        var auth = UsernamePasswordAuthenticationToken.authenticated(new Principal(ID, 0), null, List.of());
         mvc.perform(request().with(csrf())).andExpect(status().isUnauthorized());
         mvc.perform(request().with(authentication(auth))).andExpect(status().isForbidden());
         mvc.perform(request().with(authentication(auth)).with(csrf()).header("Origin", "https://foreign.example"))
@@ -70,9 +74,7 @@ class ResourceVerificationSecurityTest {
     @Test
     @DisplayName("내 알림은 계정 세션을 요구하고 읽음 변경에도 CSRF를 적용한다")
     void protectsPersonalNotifications() throws Exception {
-        when(sessions.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
         mvc.perform(get(WorkspaceNotificationController.PATH, ID, ID)).andExpect(status().isUnauthorized());
-        var auth = UsernamePasswordAuthenticationToken.authenticated(new Principal(ID, 0), null, List.of());
         mvc.perform(post(WorkspaceNotificationController.READ_PATH, ID, ID, ID).with(authentication(auth))
                         .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin"))
                 .andExpect(status().isForbidden());
@@ -89,8 +91,6 @@ class ResourceVerificationSecurityTest {
 
     @Test @DisplayName("계정 비활성화는 인증·동일 출처·CSRF와 화면 계정을 대조한다")
     void protectsAccountDeactivation() throws Exception {
-        when(sessions.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
-        var auth = UsernamePasswordAuthenticationToken.authenticated(new Principal(ID, 0), null, List.of());
         mvc.perform(post(AccountDeactivationController.PATH).with(csrf()).header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post(AccountDeactivationController.PATH).with(authentication(auth))).andExpect(status().isForbidden());
@@ -109,10 +109,5 @@ class ResourceVerificationSecurityTest {
                 .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"expectedAccountId\":\"" + ID + "\",\"resourceVersion\":0,\"status\":\"CONFIRMED\"}");
-    }
-    private record Principal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
-    @TestConfiguration(proxyBeanMethods = false)
-    static class PasswordConfig {
-        @Bean PasswordEncoder passwordEncoder() { return PasswordEncoderFactories.createDelegatingPasswordEncoder(); }
     }
 }
