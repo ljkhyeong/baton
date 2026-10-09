@@ -7,6 +7,7 @@ import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SameOriginRequestPolicy;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
+import com.personal.baton.domain.roundauth.RoundRoomId;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -68,11 +69,11 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
             return;
         }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String roomId = refreshRoomId(request);
         if (authentication == null
                 || !authentication.isAuthenticated()
                 || !(authentication.getPrincipal()
                 instanceof AuthenticatedAccountPrincipal principal)) {
-            String roomId = refreshRoomId(request);
             if (roomId != null) {
                 response.addHeader(
                         HttpHeaders.SET_COOKIE,
@@ -86,7 +87,6 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
             );
             return;
         }
-        String roomId = refreshRoomId(request);
         if (roomId != null) {
             try {
                 rateLimiter.checkRoundGrant(
@@ -119,8 +119,7 @@ public final class RoundGrantAdmissionFilter extends OncePerRequestFilter {
             return null;
         }
         try {
-            RoundGrantCookie.path(candidate);
-            return candidate;
+            return new RoundRoomId(candidate).value();
         } catch (IllegalArgumentException exception) {
             return null;
         }

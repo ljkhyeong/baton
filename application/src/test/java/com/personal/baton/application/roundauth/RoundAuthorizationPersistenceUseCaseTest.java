@@ -822,8 +822,8 @@ class RoundAuthorizationPersistenceUseCaseTest {
         }
 
         @Override
-        public RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone) {
-            return delegate.saveTombstone(tombstone);
+        public void saveTombstone(RoundRoomTombstone tombstone) {
+            delegate.saveTombstone(tombstone);
         }
 
         @Override

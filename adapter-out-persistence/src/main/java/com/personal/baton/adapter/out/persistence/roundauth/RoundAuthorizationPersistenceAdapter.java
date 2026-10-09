@@ -79,8 +79,8 @@ public class RoundAuthorizationPersistenceAdapter implements RoundAuthorizationR
     }
 
     @Override
-    public RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone) {
-        return tombstoneRepository.saveAndFlush(tombstone);
+    public void saveTombstone(RoundRoomTombstone tombstone) {
+        tombstoneRepository.saveAndFlush(tombstone);
     }
 
     @Override

@@ -53,33 +53,27 @@ public class RoundRoomMappingCreationTransaction {
 
     static final class TombstoneInsertException extends RuntimeException {
 
-        private final RuntimeException persistenceFailure;
-
         TombstoneInsertException(
                 RuntimeException persistenceFailure
         ) {
             super(persistenceFailure);
-            this.persistenceFailure = persistenceFailure;
         }
 
         RuntimeException persistenceFailure() {
-            return persistenceFailure;
+            return (RuntimeException) getCause();
         }
     }
 
     static final class MappingInsertException extends RuntimeException {
 
-        private final RuntimeException persistenceFailure;
-
         MappingInsertException(
                 RuntimeException persistenceFailure
         ) {
             super(persistenceFailure);
-            this.persistenceFailure = persistenceFailure;
         }
 
         RuntimeException persistenceFailure() {
-            return persistenceFailure;
+            return (RuntimeException) getCause();
         }
     }
 }

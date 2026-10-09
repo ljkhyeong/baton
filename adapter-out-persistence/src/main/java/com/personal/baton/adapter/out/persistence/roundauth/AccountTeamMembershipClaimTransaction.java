@@ -55,15 +55,12 @@ public class AccountTeamMembershipClaimTransaction {
 
     static final class MembershipInsertException extends RuntimeException {
 
-        private final RuntimeException persistenceFailure;
-
         MembershipInsertException(RuntimeException persistenceFailure) {
             super(persistenceFailure);
-            this.persistenceFailure = persistenceFailure;
         }
 
         RuntimeException persistenceFailure() {
-            return persistenceFailure;
+            return (RuntimeException) getCause();
         }
     }
 }

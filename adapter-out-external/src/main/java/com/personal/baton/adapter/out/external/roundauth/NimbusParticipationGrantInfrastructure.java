@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.converter.RsaKeyConverters;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -171,38 +172,27 @@ public final class NimbusParticipationGrantInfrastructure
     }
 
     private static RSAPublicKey readPublicKey(Path path) {
-        try (InputStream input = openKey(path, "ROUND RSA public key")) {
-            return Objects.requireNonNull(
-                    RsaKeyConverters.x509().convert(input),
-                    "ROUND RSA public key를 읽을 수 없습니다"
-            );
-        } catch (IOException exception) {
-            throw new IllegalStateException(
-                    "ROUND RSA public key 파일을 읽을 수 없습니다",
-                    exception
-            );
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException(
-                    "ROUND RSA public key PEM 형식이 올바르지 않습니다",
-                    exception
-            );
-        }
+        return readKey(path, "ROUND RSA public key", RsaKeyConverters.x509());
     }
 
     private static RSAPrivateKey readPrivateKey(Path path) {
-        try (InputStream input = openKey(path, "ROUND RSA private key")) {
+        return readKey(path, "ROUND RSA private key", RsaKeyConverters.pkcs8());
+    }
+
+    private static <T> T readKey(Path path, String description, Converter<InputStream, T> converter) {
+        try (InputStream input = openKey(path, description)) {
             return Objects.requireNonNull(
-                    RsaKeyConverters.pkcs8().convert(input),
-                    "ROUND RSA private key를 읽을 수 없습니다"
+                    converter.convert(input),
+                    description + "를 읽을 수 없습니다"
             );
         } catch (IOException exception) {
             throw new IllegalStateException(
-                    "ROUND RSA private key 파일을 읽을 수 없습니다",
+                    description + " 파일을 읽을 수 없습니다",
                     exception
             );
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException(
-                    "ROUND RSA private key PEM 형식이 올바르지 않습니다",
+                    description + " PEM 형식이 올바르지 않습니다",
                     exception
             );
         }

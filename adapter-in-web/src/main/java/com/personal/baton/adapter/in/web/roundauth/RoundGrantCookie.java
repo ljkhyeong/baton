@@ -35,7 +35,7 @@ final class RoundGrantCookie {
                 .build();
     }
 
-    static String path(String roomId) {
+    private static String path(String roomId) {
         return "/round/rooms/" + new RoundRoomId(roomId).value();
     }
 
