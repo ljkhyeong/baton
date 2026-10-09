@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.function.ToDoubleFunction;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -24,6 +25,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     private static final System.Logger LOGGER = System.getLogger(
             IntegrationDeliveryMetrics.class.getName()
     );
+    private static final String SECONDS = "seconds";
 
     private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
@@ -40,101 +42,67 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     @Override
     public void bindTo(MeterRegistry registry) {
         for (EmailDeliveryEvent event : EmailDeliveryEvent.values()) {
-            Gauge.builder("baton.email.delivery.receipts", this,
-                            metrics -> metrics.snapshot.emailReceipts().getOrDefault(event, 0L))
-                    .description("최근 24시간의 메일별 전달 결과 수; 재전송 중복 제외")
-                    .tag("event", event.name().toLowerCase(java.util.Locale.ROOT))
-                    .register(registry);
+            gauge(registry, "baton.email.delivery.receipts",
+                    "최근 24시간의 메일별 전달 결과 수; 재전송 중복 제외", null,
+                    metrics -> metrics.snapshot.emailReceipts().getOrDefault(event, 0L),
+                    "event", event.name().toLowerCase(java.util.Locale.ROOT));
         }
         for (Integration integration : Integration.values()) {
             for (DeliveryStatus status : DeliveryStatus.values()) {
-                Gauge.builder(
-                                "baton.integration.delivery.items",
-                                this,
-                                metrics -> metrics.snapshot.delivery(integration).count(status)
-                        )
-                        .description("BATON 외부 연동 전달 상태별 아웃박스 항목 수")
-                        .tag("integration", integration.tag)
-                        .tag("status", status.tag)
-                        .register(registry);
+                gauge(registry, "baton.integration.delivery.items",
+                        "BATON 외부 연동 전달 상태별 아웃박스 항목 수", null,
+                        metrics -> metrics.snapshot.delivery(integration).count(status),
+                        "integration", integration.tag, "status", status.tag);
             }
-            Gauge.builder(
-                            "baton.integration.delivery.actionable.failed.items",
-                            this,
-                            metrics -> metrics.snapshot
-                                    .delivery(integration)
-                                    .actionableFailedItems()
-                    )
-                    .description("운영자 조치가 필요한 BATON 외부 연동 영구 실패 항목 수")
-                    .tag("integration", integration.tag)
-                    .register(registry);
-            Gauge.builder(
-                            "baton.integration.delivery.oldest.pending.age",
-                            this,
-                            metrics -> metrics.oldestPendingAgeSeconds(integration)
-                    )
-                    .description("BATON 외부 연동에서 가장 오래된 대기 항목의 경과 시간")
-                    .baseUnit("seconds")
-                    .tag("integration", integration.tag)
-                    .register(registry);
-            Gauge.builder(
-                            "baton.integration.delivery.last.success.time",
-                            this,
-                            metrics -> metrics.snapshot
-                                    .delivery(integration)
-                                    .lastSuccessfulDeliveryEpochSeconds()
-                    )
-                    .description("BATON 외부 연동의 마지막 전달 성공 시각")
-                    .baseUnit("seconds")
-                    .tag("integration", integration.tag)
-                    .register(registry);
-            Gauge.builder(
-                            "baton.integration.delivery.expired.processing.items",
-                            this,
-                            metrics -> metrics.snapshot
-                                    .delivery(integration)
-                                    .expiredProcessingItems()
-                    )
-                    .description("BATON 외부 연동에서 임대가 만료된 처리 중 항목 수")
-                    .tag("integration", integration.tag)
-                    .register(registry);
+            gauge(registry, "baton.integration.delivery.actionable.failed.items",
+                    "운영자 조치가 필요한 BATON 외부 연동 영구 실패 항목 수", null,
+                    metrics -> metrics.snapshot.delivery(integration).actionableFailedItems(),
+                    "integration", integration.tag);
+            gauge(registry, "baton.integration.delivery.oldest.pending.age",
+                    "BATON 외부 연동에서 가장 오래된 대기 항목의 경과 시간", SECONDS,
+                    metrics -> metrics.oldestPendingAgeSeconds(integration),
+                    "integration", integration.tag);
+            gauge(registry, "baton.integration.delivery.last.success.time",
+                    "BATON 외부 연동의 마지막 전달 성공 시각", SECONDS,
+                    metrics -> metrics.snapshot.delivery(integration).lastSuccessfulDeliveryEpochSeconds(),
+                    "integration", integration.tag);
+            gauge(registry, "baton.integration.delivery.expired.processing.items",
+                    "BATON 외부 연동에서 임대가 만료된 처리 중 항목 수", null,
+                    metrics -> metrics.snapshot.delivery(integration).expiredProcessingItems(),
+                    "integration", integration.tag);
         }
 
-        Gauge.builder(
-                        "baton.integration.watch.inbox.items",
-                        this,
-                        metrics -> metrics.snapshot.watchInbox().storedItems()
-                )
-                .description("BATON이 저장한 WATCH 상태 변경 인박스 항목 수")
-                .register(registry);
-        Gauge.builder(
-                        "baton.integration.watch.inbox.last.accepted.time",
-                        this,
-                        metrics -> metrics.snapshot.watchInbox().lastAcceptedEpochSeconds()
-                )
-                .description("BATON이 마지막 WATCH 상태 변경 이벤트를 접수한 시각")
-                .baseUnit("seconds")
-                .register(registry);
-        Gauge.builder(
-                        "baton.integration.metrics.refresh.success",
-                        this,
-                        metrics -> metrics.refreshSuccessful ? 1 : 0
-                )
-                .description("BATON 외부 연동 운영 지표의 최근 갱신 성공 여부")
-                .register(registry);
-        Gauge.builder(
-                        "baton.integration.metrics.last.successful.refresh.time",
-                        this,
-                        metrics -> metrics.lastSuccessfulRefreshEpochSeconds
-                )
-                .description("BATON 외부 연동 운영 지표의 마지막 정상 갱신 시각")
-                .baseUnit("seconds")
+        gauge(registry, "baton.integration.watch.inbox.items",
+                "BATON이 저장한 WATCH 상태 변경 인박스 항목 수", null,
+                metrics -> metrics.snapshot.watchInbox().storedItems());
+        gauge(registry, "baton.integration.watch.inbox.last.accepted.time",
+                "BATON이 마지막 WATCH 상태 변경 이벤트를 접수한 시각", SECONDS,
+                metrics -> metrics.snapshot.watchInbox().lastAcceptedEpochSeconds());
+        gauge(registry, "baton.integration.metrics.refresh.success",
+                "BATON 외부 연동 운영 지표의 최근 갱신 성공 여부", null,
+                metrics -> metrics.refreshSuccessful ? 1 : 0);
+        gauge(registry, "baton.integration.metrics.last.successful.refresh.time",
+                "BATON 외부 연동 운영 지표의 마지막 정상 갱신 시각", SECONDS,
+                metrics -> metrics.lastSuccessfulRefreshEpochSeconds);
+    }
+
+    private void gauge(
+            MeterRegistry registry,
+            String name,
+            String description,
+            String baseUnit,
+            ToDoubleFunction<IntegrationDeliveryMetrics> value,
+            String... tags
+    ) {
+        Gauge.builder(name, this, value)
+                .description(description)
+                .baseUnit(baseUnit)
+                .tags(tags)
                 .register(registry);
     }
 
     @Scheduled(
             fixedDelay = 30,
-            initialDelay = 0,
             timeUnit = java.util.concurrent.TimeUnit.SECONDS,
             scheduler = "integrationMetricsTaskScheduler"
     )
