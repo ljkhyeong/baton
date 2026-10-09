@@ -121,9 +121,9 @@ class WorkspaceProjectionReaderTest {
                 teamId,
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 8, 31),
-                "Etc/UTC"
+                LocalDate.of(2026, 8, 31)
         );
+        season.updateTimeZone("Etc/UTC");
         return new WorkspaceScope(team, season);
     }
 }

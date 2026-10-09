@@ -565,8 +565,7 @@ class ContinuitySignalAnalyzerTest {
                 TEAM_ID,
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 9, 30),
-                "Asia/Seoul"
+                LocalDate.of(2026, 9, 30)
         );
     }
 
@@ -622,14 +621,15 @@ class ContinuitySignalAnalyzerTest {
     }
 
     private HandoffItem handoffItem(UUID roleId, String label, boolean completed) {
-        return HandoffItem.create(
+        HandoffItem item = HandoffItem.create(
                 UUID.randomUUID(),
                 roleId,
                 label,
                 HandoffCategory.RESPONSIBILITY,
-                completed,
                 NOW
         );
+        item.updateCompletion(completed);
+        return item;
     }
 
     private RoleHandoff handoff(Role role, LocalDate incomingStartDate) {

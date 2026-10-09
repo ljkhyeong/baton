@@ -80,50 +80,31 @@ public class Decision extends ArchivableRecord {
             String alternative,
             Instant createdAt,
             UUID authorMemberId,
-            List<UUID> roleIds
+            List<UUID> roleIds,
+            DecisionTextFormat textFormat
     ) {
         this.id = Objects.requireNonNull(id, "결정 식별자는 필수입니다");
         this.seasonId = Objects.requireNonNull(seasonId, "시즌 식별자는 필수입니다");
         this.createdAt = Objects.requireNonNull(createdAt, "결정 생성 시각은 필수입니다");
-        update(title, reason, alternative, authorMemberId, roleIds);
+        update(title, reason, alternative, authorMemberId, roleIds, textFormat);
     }
 
-    public static Decision create(
-            UUID id,
-            UUID seasonId,
-            String title,
-            String reason,
-            String alternative,
-            Instant createdAt,
-            UUID authorMemberId,
-            List<UUID> roleIds
-    ) {
-        return new Decision(id, seasonId, title, reason, alternative, createdAt, authorMemberId, roleIds);
-    }
-
+    // 서식을 지정하지 않으면 일반 텍스트로 만든다.
     public static Decision create(
             UUID id, UUID seasonId, String title, String reason, String alternative,
             Instant createdAt, UUID authorMemberId, List<UUID> roleIds, DecisionTextFormat textFormat
     ) {
-        Decision decision = create(id, seasonId, title, reason, alternative, createdAt, authorMemberId, roleIds);
-        decision.textFormat = Objects.requireNonNullElse(textFormat, DecisionTextFormat.PLAIN_TEXT);
-        return decision;
+        return new Decision(id, seasonId, title, reason, alternative, createdAt, authorMemberId, roleIds, textFormat);
     }
 
-    public void update(
-            String title, String reason, String alternative, UUID authorMemberId,
-            List<UUID> roleIds, DecisionTextFormat textFormat
-    ) {
-        update(title, reason, alternative, authorMemberId, roleIds);
-        if (textFormat != null) this.textFormat = textFormat;
-    }
-
+    // 서식을 지정하지 않으면 기존 서식을 유지한다. 검증에 실패하면 어떤 값도 바꾸지 않는다.
     public void update(
             String title,
             String reason,
             String alternative,
             UUID authorMemberId,
-            List<UUID> roleIds
+            List<UUID> roleIds,
+            DecisionTextFormat textFormat
     ) {
         requireActive("보관된 결정은 수정할 수 없습니다");
         String normalizedTitle = DomainAssertions.requiredText(title, "결정 제목", 200);
@@ -144,6 +125,7 @@ public class Decision extends ArchivableRecord {
         this.authorMemberId = normalizedAuthorMemberId;
         // 연결 행을 한 줄씩 바꾸면 순서 교체 중 고유 제약에 걸리므로 컬렉션을 교체한다.
         this.roleIds = normalizedRoleIds;
+        if (textFormat != null) this.textFormat = textFormat;
     }
 
     private static List<UUID> normalizeRoleIds(List<UUID> roleIds) {

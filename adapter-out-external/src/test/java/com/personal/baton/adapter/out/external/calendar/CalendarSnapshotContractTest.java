@@ -78,8 +78,7 @@ class CalendarSnapshotContractTest {
                 UUID.randomUUID(),
                 "2026 하반기",
                 LocalDate.of(2026, 8, 1),
-                LocalDate.of(2026, 12, 31),
-                "Asia/Seoul"
+                LocalDate.of(2026, 12, 31)
         );
         SeasonRound manualRound = SeasonRound.create(
                 UUID.fromString("c2000000-0000-4000-8000-000000000001"),

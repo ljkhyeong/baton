@@ -20,7 +20,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,7 +40,6 @@ class RoutineArchiveApplicationTest {
 
     private static final String ACCESS_KEY = "routine-archive-access-key";
     private static final Instant NOW = Instant.parse("2026-08-01T00:00:00Z");
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     private final WorkspaceAccessRepository accessRepository = mock(WorkspaceAccessRepository.class);
     private final WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
@@ -222,8 +220,7 @@ class RoutineArchiveApplicationTest {
                 teamId,
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 8, 31),
-                SEOUL.getId()
+                LocalDate.of(2026, 8, 31)
         );
     }
 

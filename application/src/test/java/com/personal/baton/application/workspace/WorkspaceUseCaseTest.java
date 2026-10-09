@@ -5780,8 +5780,8 @@ class WorkspaceUseCaseTest {
             staleDecision.getRoleIds().size();
             firstEntityManager.detach(firstDecision);
             secondEntityManager.detach(staleDecision);
-            firstDecision.update("첫 결정", "첫 이유", "", member.id(), List.of(role.id()));
-            staleDecision.update("늦은 결정", "늦은 이유", "", member.id(), List.of(role.id()));
+            firstDecision.update("첫 결정", "첫 이유", "", member.id(), List.of(role.id()), null);
+            staleDecision.update("늦은 결정", "늦은 이유", "", member.id(), List.of(role.id()), null);
             recordsRepository.saveDecision(firstDecision);
             assertThatThrownBy(() -> recordsRepository.saveDecision(staleDecision))
                     .isInstanceOf(WorkspaceContentConflictException.class);

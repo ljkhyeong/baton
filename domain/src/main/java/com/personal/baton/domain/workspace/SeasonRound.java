@@ -76,7 +76,6 @@ public class SeasonRound extends ArchivableRecord {
         this.origin = Objects.requireNonNull(origin, "회차 생성 출처는 필수입니다");
         this.scheduledOccurrenceDate = scheduledOccurrenceDate;
         this.scheduledAt = scheduledAt;
-        validateScheduleMetadata();
     }
 
     public static SeasonRound create(UUID id, UUID seasonId, String name, LocalDate meetingDate) {
@@ -128,13 +127,6 @@ public class SeasonRound extends ArchivableRecord {
         }
         this.name = normalizedName;
         this.meetingDate = normalizedMeetingDate;
-    }
-
-    private void validateScheduleMetadata() {
-        boolean automatic = origin == RoundOrigin.AUTOMATIC;
-        if (automatic != (scheduledOccurrenceDate != null && scheduledAt != null)) {
-            throw new DomainValidationException("자동 회차에만 예정 날짜와 예정 시각을 설정할 수 있습니다");
-        }
     }
 
     public UUID getId() {

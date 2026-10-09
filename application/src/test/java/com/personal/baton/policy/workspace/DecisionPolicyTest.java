@@ -28,7 +28,8 @@ class DecisionPolicyTest {
                 "당일에도 받는 방안을 검토했습니다",
                 Instant.parse("2026-07-20T03:04:05Z"),
                 originalAuthorId,
-                List.of(originalRoleId)
+                List.of(originalRoleId),
+                null
         );
         UUID duplicatedRoleId = UUID.randomUUID();
 
@@ -37,7 +38,8 @@ class DecisionPolicyTest {
                 "바뀐 이유",
                 "바뀐 대안",
                 UUID.randomUUID(),
-                List.of(duplicatedRoleId, duplicatedRoleId)
+                List.of(duplicatedRoleId, duplicatedRoleId),
+                null
         )).isInstanceOf(DomainValidationException.class);
 
         assertThat(decision.getTitle()).isEqualTo("질문은 전날 마감한다");
@@ -59,7 +61,8 @@ class DecisionPolicyTest {
                 "",
                 Instant.parse("2026-07-20T03:04:05Z"),
                 UUID.randomUUID(),
-                List.of(roleId)
+                List.of(roleId),
+                null
         );
         Instant firstArchiveTime = Instant.parse("2026-07-21T01:02:03Z");
 
@@ -72,7 +75,8 @@ class DecisionPolicyTest {
                 "복원 전에는 바꿀 수 없습니다",
                 "",
                 UUID.randomUUID(),
-                List.of(roleId)
+                List.of(roleId),
+                null
         )).isInstanceOf(DomainValidationException.class);
 
         decision.updateArchive(false, Instant.parse("2026-07-23T07:08:09Z"));

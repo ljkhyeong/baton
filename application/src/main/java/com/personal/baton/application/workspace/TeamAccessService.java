@@ -124,8 +124,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         Team team = requireAdministrator(teamId);
         TeamInvitation invitation = access.findInvitation(invitationId).filter(value -> value.getTeamId().equals(teamId))
                 .orElseThrow(this::invitationNotFound);
-        if (invitation.getRevokedAt() == null && invitation.getAcceptedAt() == null) {
-            invitation.revoke(clock.instant());
+        if (invitation.revoke(clock.instant())) {
             access.saveInvitation(invitation);
             audit(teamId, accountId, invitation.getMemberId(), "INVITATION_REVOKED", null, invitation.getPermission());
         }

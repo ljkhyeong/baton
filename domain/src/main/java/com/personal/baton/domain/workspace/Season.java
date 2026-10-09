@@ -26,7 +26,7 @@ import java.util.UUID;
 )
 public class Season {
 
-    public static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
+    private static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
     private static final Set<String> AVAILABLE_TIME_ZONE_IDS = ZoneId.getAvailableZoneIds();
     private static final Set<String> UNSUPPORTED_TIME_ZONE_ALIASES = Set.of("UTC");
 
@@ -82,18 +82,7 @@ public class Season {
     }
 
     public static Season create(UUID id, UUID teamId, String name, LocalDate startDate, LocalDate endDate) {
-        return create(id, teamId, name, startDate, endDate, DEFAULT_TIME_ZONE);
-    }
-
-    public static Season create(
-            UUID id,
-            UUID teamId,
-            String name,
-            LocalDate startDate,
-            LocalDate endDate,
-            String timeZone
-    ) {
-        return new Season(id, teamId, name, startDate, endDate, null, timeZone);
+        return new Season(id, teamId, name, startDate, endDate, null, DEFAULT_TIME_ZONE);
     }
 
     public static Season createSuccessor(
@@ -160,37 +149,18 @@ public class Season {
         LocalDate cursorLowerBound = roundSchedule == null
                 ? firstMeetingDate
                 : roundSchedule.getNextOccurrenceDate();
+        // 첫 모임 날짜와 반복 주기의 null 검사는 커서 계산이 먼저 맡는다.
         LocalDate nextOccurrenceDate = RoundSchedule.occurrenceOnOrAfter(
                 firstMeetingDate,
                 recurrence,
                 cursorLowerBound
         );
-        configureRoundSchedule(
-                firstMeetingDate,
-                meetingTime,
-                recurrence,
-                generationLeadDays,
-                enabled,
-                nextOccurrenceDate
-        );
-    }
-
-    public void configureRoundSchedule(
-            LocalDate firstMeetingDate,
-            LocalTime meetingTime,
-            RoundRecurrence recurrence,
-            int generationLeadDays,
-            boolean enabled,
-            LocalDate nextOccurrenceDate
-    ) {
         requireActiveForScheduling();
-        LocalDate validatedFirstMeetingDate =
-                Objects.requireNonNull(firstMeetingDate, "첫 모임 날짜는 필수입니다");
-        if (!contains(validatedFirstMeetingDate)) {
+        if (!contains(firstMeetingDate)) {
             throw new DomainValidationException("첫 모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
         roundSchedule = RoundSchedule.configure(
-                validatedFirstMeetingDate,
+                firstMeetingDate,
                 meetingTime,
                 recurrence,
                 generationLeadDays,

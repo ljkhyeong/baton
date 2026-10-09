@@ -31,7 +31,6 @@ public class ResourceReviewSchedule {
     }
     public void confirmOn(LocalDate today) { if (intervalDays != null) nextReviewOn = today.plusDays(intervalDays); }
     public boolean isDueOn(LocalDate today) { return nextReviewOn != null && !today.isBefore(nextReviewOn); }
-    public UUID getResourceId() { return resourceId; }
     public Integer getIntervalDays() { return intervalDays; }
     public LocalDate getNextReviewOn() { return nextReviewOn; }
     public Long getVersion() { return version; }

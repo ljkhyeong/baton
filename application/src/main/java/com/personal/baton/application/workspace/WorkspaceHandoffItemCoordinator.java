@@ -54,7 +54,6 @@ final class WorkspaceHandoffItemCoordinator {
                 command.roleId(),
                 command.label(),
                 command.category(),
-                false,
                 Instant.now(clock)
         );
         ContentCreationAttempt attempt = contentIdempotency.prepare(
