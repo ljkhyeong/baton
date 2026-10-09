@@ -1,11 +1,8 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
-import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
 import com.personal.baton.application.workspace.port.out.ResourceVerificationRepository;
-import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.Member;
 import com.personal.baton.domain.workspace.ResourceVerification;
 import com.personal.baton.domain.workspace.RoleResource;
@@ -25,18 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResourceVerificationService implements ResourceVerificationUseCase {
     private final WorkspaceScopeAuthorizer authorizer;
     private final WorkspaceRoleResolver roleResolver;
-    private final WorkspacePeopleRepository people;
-    private final RoundAuthorizationRepository memberships;
+    private final TeamAccountAccessPolicy accountAccess;
     private final ResourceVerificationRepository verifications;
     private final Clock clock;
 
     public ResourceVerificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceRoleResolver roleResolver,
-            WorkspacePeopleRepository people,
-            RoundAuthorizationRepository memberships, ResourceVerificationRepository verifications, Clock clock) {
+            TeamAccountAccessPolicy accountAccess, ResourceVerificationRepository verifications, Clock clock) {
         this.authorizer = authorizer;
         this.roleResolver = roleResolver;
-        this.people = people;
-        this.memberships = memberships;
+        this.accountAccess = accountAccess;
         this.verifications = verifications;
         this.clock = clock;
     }
@@ -70,7 +64,7 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
             UUID accountId, ConfigureReviewScheduleCommand command) {
         var scope = authorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         if (roleResolver.requireRoleResource(teamId, seasonId, resourceId).isArchived()) throw new WorkspaceContentConflictException();
-        requireMember(teamId, accountId);
+        accountAccess.requireActiveAccountMember(teamId, accountId);
         var existing = verifications.findSchedule(resourceId);
         if (existing.map(ResourceReviewSchedule::getVersion).orElse(-1L) != command.expectedVersion()) throw new WorkspaceContentConflictException();
         var schedule = existing.orElseGet(() -> ResourceReviewSchedule.create(resourceId));
@@ -102,7 +96,7 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
         if (resource.isArchived() || resource.getVersion() != command.resourceVersion()) {
             throw new WorkspaceContentConflictException();
         }
-        Member member = requireMember(teamId, accountId);
+        Member member = accountAccess.requireActiveAccountMember(teamId, accountId);
         verifications.save(ResourceVerification.create(resource, accountId, member, command.status(),
                 command.note(), clock.instant()));
         if (command.status() == ResourceVerificationStatus.CONFIRMED) {
@@ -113,13 +107,6 @@ public class ResourceVerificationService implements ResourceVerificationUseCase 
             }
         }
         return history(teamId, seasonId, resource);
-    }
-
-    private Member requireMember(UUID teamId, UUID accountId) {
-        return memberships.findMembership(accountId, teamId)
-                .flatMap(membership -> people.findMemberById(membership.getMemberId()))
-                .filter(found -> found.getTeamId().equals(teamId)).filter(Member::isActive)
-                .orElseThrow(WorkspaceAccessDeniedException::new);
     }
 
     private VerificationHistoryResult history(UUID teamId, UUID seasonId, RoleResource resource) {

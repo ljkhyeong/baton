@@ -44,6 +44,7 @@ public class TeamAccessService implements TeamAccessUseCase {
     private final TeamAccessRepository access;
     private final WorkspaceAccessControl secrets;
     private final TeamAccountAccessPolicy policy;
+    private final WorkspaceScopeAuthorizer scopeAuthorizer;
     private final CurrentAccountProvider accounts;
     private final IdentityRepository identities;
     private final Clock clock;
@@ -51,7 +52,8 @@ public class TeamAccessService implements TeamAccessUseCase {
     private final StringKeyGenerator tokenGenerator;
     public TeamAccessService(WorkspaceAccessRepository teams, WorkspacePeopleRepository people,
             WorkspaceSeasonRepository seasons, RoundAuthorizationRepository memberships, TeamAccessRepository access,
-            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities,
+            WorkspaceAccessControl secrets, TeamAccountAccessPolicy policy, WorkspaceScopeAuthorizer scopeAuthorizer,
+            CurrentAccountProvider accounts, Clock clock, CalendarSubscriptionStore calendarSubscriptions, IdentityRepository identities,
             StringKeyGenerator tokenGenerator) {
         this.teams = teams;
         this.people = people;
@@ -60,6 +62,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         this.access = access;
         this.secrets = secrets;
         this.policy = policy;
+        this.scopeAuthorizer = scopeAuthorizer;
         this.accounts = accounts;
         this.clock = clock;
         this.identities = identities;
@@ -74,9 +77,7 @@ public class TeamAccessService implements TeamAccessUseCase {
     @Override
     public TeamAccessResult getAccess(UUID teamId, UUID accountId, String accessKey) {
         requireActor(accountId);
-        Team team = teams.findTeamById(teamId).orElseThrow(WorkspaceNotFoundException::team);
-        if (team.isAccountAccessEnabled()) policy.requireRead(team);
-        else secrets.verifyAccessKey(team, accessKey);
+        Team team = scopeAuthorizer.authorizeTeamRead(teamId, accessKey);
         return result(team, accountId);
     }
     @Override
@@ -160,11 +161,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         if (!team.isAccountAccessEnabled()) throw invitationNotFound();
         Member member = requireActiveMember(team.getId(), invitation.getMemberId());
         TeamPermission permission = invitation.getPermission();
-        if (acceptedByMe) {
-            permission = memberships.findMembership(accountId, team.getId())
-                    .filter(value -> value.getMemberId().equals(member.getId()) && value.getPermission() != null)
-                    .orElseThrow(WorkspaceAccessDeniedException::new).getPermission();
-        }
+        if (acceptedByMe) permission = acceptedMembership(accountId, team.getId(), member.getId()).getPermission();
         return new InvitationPreviewResult(team.getId(), team.getName(), member.getId(), member.getName(),
                 permission, invitation.getExpiresAt());
     }
@@ -181,10 +178,7 @@ public class TeamAccessService implements TeamAccessUseCase {
         Member member = requireActiveMember(teamId, invitation.getMemberId());
         if (invitation.getAcceptedAt() != null) {
             if (!accountId.equals(invitation.getAcceptedBy())) throw invitationNotFound();
-            var membership = memberships.findMembership(accountId, teamId)
-                    .filter(value -> value.getMemberId().equals(member.getId()) && value.getPermission() != null)
-                    .orElseThrow(WorkspaceAccessDeniedException::new);
-            return accepted(team, membership);
+            return accepted(team, acceptedMembership(accountId, teamId, member.getId()));
         }
         if (!invitation.isPending(clock.instant())) throw invitationNotFound();
         AccountTeamMembership membership = memberships.findMembership(accountId, teamId)
@@ -200,6 +194,11 @@ public class TeamAccessService implements TeamAccessUseCase {
         access.saveInvitation(invitation);
         audit(teamId, accountId, member.getId(), "INVITATION_ACCEPTED", previous, membership.getPermission());
         return accepted(team, membership);
+    }
+    private AccountTeamMembership acceptedMembership(UUID accountId, UUID teamId, UUID memberId) {
+        return memberships.findMembership(accountId, teamId)
+                .filter(value -> value.getMemberId().equals(memberId) && value.getPermission() != null)
+                .orElseThrow(WorkspaceAccessDeniedException::new);
     }
     private InvitationAcceptedResult accepted(Team team, AccountTeamMembership membership) {
         var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(WorkspaceNotFoundException::team);

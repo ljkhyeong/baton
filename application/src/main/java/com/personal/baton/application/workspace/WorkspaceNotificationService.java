@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
-import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
@@ -27,20 +25,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WorkspaceNotificationService implements WorkspaceNotificationUseCase {
     private final WorkspaceScopeAuthorizer authorizer;
+    private final TeamAccountAccessPolicy accountAccess;
     private final WorkspaceOperationsRepository operations;
-    private final RoundAuthorizationRepository memberships;
     private final WorkspacePeopleRepository people;
     private final NotificationReadReceiptPort receipts;
     private final Clock clock;
     private final NotificationPreferencesRepository preferences;
 
-    public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceOperationsRepository operations,
-            RoundAuthorizationRepository memberships, WorkspacePeopleRepository people,
+    public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, TeamAccountAccessPolicy accountAccess,
+            WorkspaceOperationsRepository operations, WorkspacePeopleRepository people,
             NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences) {
         this.preferences = preferences;
         this.authorizer = authorizer;
+        this.accountAccess = accountAccess;
         this.operations = operations;
-        this.memberships = memberships;
         this.people = people;
         this.receipts = receipts;
         this.clock = clock;
@@ -49,10 +47,7 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
     @Override
     public NotificationInboxResult getInbox(UUID teamId, UUID seasonId, String accessKey, UUID accountId) {
         WorkspaceScope scope = authorizer.authorizeRead(teamId, seasonId, accessKey);
-        Member member = memberships.findMembership(accountId, teamId)
-                .flatMap(value -> people.findMemberById(value.getMemberId()))
-                .filter(value -> value.getTeamId().equals(teamId)).filter(Member::isActive)
-                .orElseThrow(WorkspaceAccessDeniedException::new);
+        Member member = accountAccess.requireActiveAccountMember(teamId, accountId);
         if (scope.season().isEnded()) return new NotificationInboxResult(accountId, teamId, seasonId, List.of());
         Instant now = clock.instant();
         var settings = preferences.find(accountId).orElseGet(() -> NotificationPreferences.defaults(accountId));
