@@ -29,8 +29,6 @@ public interface BriefServiceClient {
     enum Outcome {
         COMPLETED,
         NOT_FOUND,
-        INVALID_REQUEST,
-        AUTHENTICATION_FAILURE,
         RETRYABLE_FAILURE,
         PERMANENT_FAILURE
     }

@@ -201,8 +201,9 @@ class RestClientBriefServiceClientTest {
         server.expect(requestTo(BASE_URL + latestPath()))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
-        assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
-                .isEqualTo(Outcome.AUTHENTICATION_FAILURE);
+        var authenticationFailure = client.findLatestEdition(TEAM_ID, SEASON_ID);
+        assertThat(authenticationFailure.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(authenticationFailure.code()).isEqualTo("HTTP_401");
         assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
                 .isEqualTo(Outcome.RETRYABLE_FAILURE);
         server.verify();
@@ -221,12 +222,14 @@ class RestClientBriefServiceClientTest {
 
         assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
                 .isEqualTo(Outcome.NOT_FOUND);
-        assertThat(client.generateEdition(
+        var generationFailure = client.generateEdition(
                 TEAM_ID,
                 SEASON_ID,
                 LocalDate.parse("2026-08-24"),
                 ZoneId.of("Asia/Seoul")
-        ).outcome()).isEqualTo(generationStatus == 400 ? Outcome.INVALID_REQUEST : Outcome.PERMANENT_FAILURE);
+        );
+        assertThat(generationFailure.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(generationFailure.code()).isEqualTo("HTTP_" + generationStatus);
         server.verify();
     }
 

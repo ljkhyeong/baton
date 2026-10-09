@@ -317,12 +317,6 @@ public final class RestClientBriefServiceClient
         if (query && code == 404) {
             return Result.failure(Outcome.NOT_FOUND, "HTTP_404");
         }
-        if (code == 400) {
-            return Result.failure(Outcome.INVALID_REQUEST, "HTTP_400");
-        }
-        if (code == 401 || code == 403) {
-            return Result.failure(Outcome.AUTHENTICATION_FAILURE, "HTTP_" + code);
-        }
         if (code == 429 || status.is5xxServerError()) {
             return Result.failure(Outcome.RETRYABLE_FAILURE, "HTTP_" + code);
         }

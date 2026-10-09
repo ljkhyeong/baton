@@ -1,5 +1,7 @@
 package com.personal.baton.adapter.out.persistence;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -13,5 +15,11 @@ public final class JdbcTimestamps {
 
     public static LocalDateTime utc(Instant instant) {
         return LocalDateTime.ofInstant(Objects.requireNonNull(instant, "저장할 시각은 필수입니다"), ZoneOffset.UTC);
+    }
+
+    // UTC로 저장한 DATETIME 열을 읽는다. SQL NULL이면 null을 돌려준다.
+    public static Instant instant(ResultSet resultSet, String column) throws SQLException {
+        LocalDateTime value = resultSet.getObject(column, LocalDateTime.class);
+        return value == null ? null : value.toInstant(ZoneOffset.UTC);
     }
 }

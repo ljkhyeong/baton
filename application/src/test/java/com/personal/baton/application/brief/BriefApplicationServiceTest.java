@@ -379,7 +379,7 @@ class BriefApplicationServiceTest {
                 org.mockito.ArgumentMatchers.eq(false),
                 org.mockito.ArgumentMatchers.eq(NOW),
                 org.mockito.ArgumentMatchers.any()
-        )).thenReturn(new ClaimResult.DeliveryIncomplete(EXECUTION_ID));
+        )).thenReturn(new ClaimResult.DeliveryIncomplete());
 
         assertThatThrownBy(() -> service.generateEdition(command()))
                 .isInstanceOf(BriefGenerationBlockedException.class);

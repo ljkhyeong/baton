@@ -89,7 +89,6 @@ class BriefContinuityOutboxDispatchServiceTest {
                         NOW,
                         BriefContinuityEvent.State.ACTIVE
                 ),
-                1,
                 UUID.randomUUID()
         );
     }
