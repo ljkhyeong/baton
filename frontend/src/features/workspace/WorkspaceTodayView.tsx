@@ -27,6 +27,14 @@ const continuitySeverityCopy = {
   WARNING: '주의',
 } satisfies Record<ContinuitySignal['severity'], string>
 
+const timingPriority: Record<RoutineTimingStatus, number> = {
+  OVERDUE: 0,
+  IN_PROGRESS: 1,
+  PLANNED: 2,
+  UNSCHEDULED: 3,
+  COMPLETED: 4,
+}
+
 export type TodayMode = 'mine' | 'team'
 
 export function TodayView({
@@ -96,13 +104,6 @@ export function TodayView({
   const mode: TodayMode = me ? chosenMode ?? 'mine' : 'team'
   const mine = me && mode === 'mine' ? findPersonalWork(workspace, me.id) : undefined
   const { roles, routines, members, season } = workspace
-  const timingPriority: Record<RoutineTimingStatus, number> = {
-    OVERDUE: 0,
-    IN_PROGRESS: 1,
-    PLANNED: 2,
-    UNSCHEDULED: 3,
-    COMPLETED: 4,
-  }
   const orderedRoutines = routineTimelineItems(routines, selectedRound).sort((left, right) => {
     return timingPriority[left.execution?.timingStatus ?? 'UNSCHEDULED']
       - timingPriority[right.execution?.timingStatus ?? 'UNSCHEDULED']
@@ -251,14 +252,12 @@ export function TodayView({
         progress={handoffProgress}
         onOpenHandoff={onOpenRoleHandoff}
       />
-      {workspace.continuitySignals.length > 0 && (
+      {signalCount > 0 && (
         <div className="today-lower">
           <section className="plain-section" aria-labelledby="continuity-radar-title" ref={signalSectionRef} tabIndex={-1}>
             <div className="section-heading compact">
               <h2 id="continuity-radar-title">조치할 항목</h2>
-              <span className="continuity-count">
-                {workspace.continuitySignals.length}개
-              </span>
+              <span className="continuity-count">{signalCount}개</span>
             </div>
             <div className="signal-list" role="list">
               {workspace.continuitySignals.map((signal) => (

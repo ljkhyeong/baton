@@ -438,10 +438,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   } = workspace
   const seasons = workspace.seasons
   const seasonEnded = Boolean(workspace.season.endedAt)
-  const accountAccessEnabled = workspace?.team.accountAccessEnabled ?? false
-  const canAdminister = !accountAccessEnabled || workspace?.team.permission === 'ADMIN'
+  const accountAccessEnabled = workspace.team.accountAccessEnabled
+  const canAdminister = !accountAccessEnabled || workspace.team.permission === 'ADMIN'
   const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
-    || (accountAccessEnabled && workspace?.team.permission === 'VIEWER')
+    || (accountAccessEnabled && workspace.team.permission === 'VIEWER')
   const activeRoutines = routines.filter((routine) => !routine.archivedAt)
   const archivedRoutines = [...routines]
     .filter((routine) => routine.archivedAt)
@@ -459,6 +459,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     decisions: activeDecisions,
     handoffItems: activeHandoffItems,
   }
+  const me = activeMember(members, currentMemberId)
   const orderedActiveRounds = sortedSeasonRounds(activeRounds)
   const orderedArchivedRounds = sortedArchivedSeasonRounds(archivedRounds)
   const selectedRound = orderedActiveRounds.find((round) => round.id === selectedRoundId)
@@ -535,6 +536,11 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       target?.scrollIntoView({ block: 'center' })
       focusWorkspaceElement(target)
     })
+  }
+
+  const openHandoffView = (roleId?: string) => {
+    if (roleId) selectRole(roleId, { showInspector: false })
+    openView('handoff')
   }
 
   const openPersonalHandoff = (roleId: string) => {
@@ -667,6 +673,33 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return Math.round((completedItemCount / itemCount) * 100)
   }
 
+  const contentCommands = {
+    memberCreation: memberCreationCommand,
+    roleCreation: roleCreationCommand,
+    roleResourceCreation: roleResourceCreationCommand,
+    routineCreation: routineCreationCommand,
+    roundCreation: roundCreationCommand,
+    decisionCreation: decisionCreationCommand,
+    handoffItemCreation: handoffItemCreationCommand,
+  }
+  const contentMutations = {
+    memberUpdate: updateMemberMutation,
+    memberDeactivation: updateMemberDeactivationMutation,
+    roleUpdate: updateRoleMutation,
+    roleResourceUpdate: updateRoleResourceMutation,
+    roleResourceArchive: roleResourceArchiveMutation,
+    routineUpdate: updateRoutineMutation,
+    routineArchive: routineArchiveMutation,
+    roundUpdate: updateSeasonRoundMutation,
+    roundArchive: seasonRoundArchiveMutation,
+    routineExecutionCompletion: routineExecutionCompletionMutation,
+    decisionUpdate: updateDecisionMutation,
+    decisionArchive: decisionArchiveMutation,
+    handoffItemUpdate: updateHandoffItemMutation,
+    handoffCompletion: handoffCompletionMutation,
+    handoffItemArchive: handoffItemArchiveMutation,
+  }
+
   const editorActions = createWorkspaceEditorActions({
     roles,
     members,
@@ -682,25 +715,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setSelectedRoleId,
     openModal,
     notify: showToast,
-    commands: {
-      memberCreation: memberCreationCommand,
-      roleCreation: roleCreationCommand,
-      roleResourceCreation: roleResourceCreationCommand,
-      routineCreation: routineCreationCommand,
-      roundCreation: roundCreationCommand,
-      decisionCreation: decisionCreationCommand,
-      handoffItemCreation: handoffItemCreationCommand,
-    },
-    mutations: {
-      memberUpdate: updateMemberMutation,
-      memberDeactivation: updateMemberDeactivationMutation,
-      roleUpdate: updateRoleMutation,
-      roleResourceUpdate: updateRoleResourceMutation,
-      routineUpdate: updateRoutineMutation,
-      roundUpdate: updateSeasonRoundMutation,
-      decisionUpdate: updateDecisionMutation,
-      handoffItemUpdate: updateHandoffItemMutation,
-    },
+    commands: contentCommands,
+    mutations: contentMutations,
   })
   const {
     openDecision: openDecisionModal,
@@ -746,32 +762,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     editingHandoffItem,
     ensureFreshWorkspace,
     preserveConflictDraft,
-    commands: {
-      memberCreation: memberCreationCommand,
-      roleCreation: roleCreationCommand,
-      roleResourceCreation: roleResourceCreationCommand,
-      routineCreation: routineCreationCommand,
-      roundCreation: roundCreationCommand,
-      decisionCreation: decisionCreationCommand,
-      handoffItemCreation: handoffItemCreationCommand,
-    },
-    mutations: {
-      memberUpdate: updateMemberMutation,
-      memberDeactivation: updateMemberDeactivationMutation,
-      roleUpdate: updateRoleMutation,
-      roleResourceUpdate: updateRoleResourceMutation,
-      roleResourceArchive: roleResourceArchiveMutation,
-      routineUpdate: updateRoutineMutation,
-      routineArchive: routineArchiveMutation,
-      roundUpdate: updateSeasonRoundMutation,
-      roundArchive: seasonRoundArchiveMutation,
-      routineExecutionCompletion: routineExecutionCompletionMutation,
-      decisionUpdate: updateDecisionMutation,
-      decisionArchive: decisionArchiveMutation,
-      handoffItemUpdate: updateHandoffItemMutation,
-      handoffCompletion: handoffCompletionMutation,
-      handoffItemArchive: handoffItemArchiveMutation,
-    },
+    commands: contentCommands,
+    mutations: contentMutations,
     setEditor,
     setView,
     setSelectedRoleId,
@@ -822,6 +814,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoutineArchive,
     updateSeasonRoundArchive,
   } = contentActions
+  // 계정 권한 팀은 구성원 관리, 공유 키 팀은 공유 링크 관리를 연다.
+  const manageAccess = () => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')
   // 넓은 화면에서는 역할 화면에만 상세를 고정하고, 다른 화면에서는 역할을 눌러 연 경우에만 표시한다.
   const roleInspectorPinned = view === 'roles'
   const showRoleInspector = Boolean(selectedRole) && view !== 'today'
@@ -835,10 +829,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <WorkspaceHeader workspace={activeWorkspace} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+        <WorkspaceHeader workspace={activeWorkspace} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={manageAccess} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={manageAccess} />
         <div className="workspace-toolbar">
           <button type="button" className="workspace-search-button" onClick={() => openView('records')}>
             <Icon name="search" size={16} />기록 검색
@@ -887,7 +881,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
-              me={activeMember(members, currentMemberId)}
+              me={me}
               meResolved={currentMemberResolved}
               chosenMode={todayMode}
               onChooseMode={setTodayMode}
@@ -920,7 +914,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onSelectRole={(roleId) => { setView('roles'); selectRole(roleId) }}
               onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
-              onOpenRoleHandoff={(roleId) => { selectRole(roleId, { showInspector: false }); openView('handoff') }}
+              onOpenRoleHandoff={openHandoffView}
               onOpenContinuitySignal={openContinuitySignal}
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
@@ -938,7 +932,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           )}
           {view === 'roles' && (
             <RolesView
-              me={activeMember(members, currentMemberId)}
+              me={me}
               roles={roles}
               roleHandoffs={roleHandoffs}
               members={members}
@@ -949,10 +943,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onManageMembers={openMemberManagementModal}
               onAddRole={openRoleModal}
               onEditRole={openRoleEditModal}
-              onOpenHandoff={(roleId) => {
-                if (roleId) selectRole(roleId, { showInspector: false })
-                openView('handoff')
-              }}
+              onOpenHandoff={openHandoffView}
               handoffProgress={handoffProgress}
               changesDisabled={contentChangesDisabled}
               memberManagementDisabled={Boolean(conflictRecoveryStatus)}

@@ -9,7 +9,7 @@ function relayDueCopy(days: number) {
 }
 
 // 담당 기간이 끝나는 날이 가장 가까운 역할을 고른다. 다가오는 날을 지난 날보다 먼저 본다.
-export function nearestRelayRole(roles: Role[], today: string) {
+function nearestRelayRole(roles: Role[], today: string) {
   return roles
     .flatMap((role) => role.currentMemberId && role.assignmentEndDate
       ? [{ role, days: daysUntil(role.assignmentEndDate, today) }]
