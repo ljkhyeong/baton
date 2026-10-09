@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
-    private static final String PROCESSING = "PROCESSING";
     private static final String SELECT_CANDIDATE = """
             SELECT
                 BIN_TO_UUID(resource_record.id) AS resource_id,
@@ -105,7 +104,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 """
                 SELECT
                     candidate.id,
-                    BIN_TO_UUID(candidate.event_id) AS event_id,
                     BIN_TO_UUID(candidate.resource_id) AS resource_id,
                     candidate.resource_reference,
                     candidate.monitoring_state,
@@ -132,7 +130,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 """,
                 (resultSet, rowNumber) -> new ClaimCandidate(
                         resultSet.getLong("id"),
-                        UUID.fromString(resultSet.getString("event_id")),
                         UUID.fromString(resultSet.getString("resource_id")),
                         resultSet.getString("resource_reference"),
                         WatchMonitoringState.valueOf(resultSet.getString("monitoring_state")),
@@ -196,7 +193,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
             UUID compensationEventId,
             Instant failedAt
     ) {
-        requiredLeaseToken(leaseToken);
+        Objects.requireNonNull(leaseToken, "WATCH lease token은 필수입니다");
         Objects.requireNonNull(compensationEventId, "WATCH 보상 eventId는 필수입니다");
         Objects.requireNonNull(failedAt, "WATCH 유효하지 않은 대상 처리 시각은 필수입니다");
 
@@ -206,30 +203,9 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         }
         lockRoleResource(resourceId.get());
         Optional<InvalidTargetSource> source = findInvalidTargetSourceForUpdate(sourceRevision);
+        // 조건부 갱신이 처리 중 상태와 임대 토큰을 함께 확인한다.
         if (source.isEmpty()
-                || !PROCESSING.equals(source.get().deliveryStatus())
-                || !leaseToken.equals(source.get().leaseToken())) {
-            return false;
-        }
-
-        int marked = jdbcTemplate.update(
-                """
-                UPDATE watch_monitor_outbox
-                SET delivery_status = 'FAILED',
-                    lease_token = NULL,
-                    lease_expires_at = NULL,
-                    completed_at = ?,
-                    result_code = NULL,
-                    last_error_code = 'INVALID_TARGET_URL'
-                WHERE id = ?
-                AND delivery_status = 'PROCESSING'
-                AND lease_token = UUID_TO_BIN(?)
-                """,
-                utc(failedAt),
-                sourceRevision,
-                leaseToken.toString()
-        );
-        if (marked != 1) {
+                || !outbox.markFailed(sourceRevision, leaseToken, failedAt, "INVALID_TARGET_URL")) {
             return false;
         }
 
@@ -425,9 +401,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 SELECT
                     BIN_TO_UUID(resource_id) AS resource_id,
                     resource_reference,
-                    monitoring_state,
-                    delivery_status,
-                    BIN_TO_UUID(lease_token) AS lease_token
+                    monitoring_state
                 FROM watch_monitor_outbox
                 WHERE id = ?
                 FOR UPDATE
@@ -435,9 +409,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 (resultSet, rowNumber) -> new InvalidTargetSource(
                         UUID.fromString(resultSet.getString("resource_id")),
                         resultSet.getString("resource_reference"),
-                        WatchMonitoringState.valueOf(resultSet.getString("monitoring_state")),
-                        resultSet.getString("delivery_status"),
-                        uuidOrNull(resultSet.getString("lease_token"))
+                        WatchMonitoringState.valueOf(resultSet.getString("monitoring_state"))
                 ),
                 sourceRevision
         ));
@@ -458,14 +430,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                 sourceRevision
         );
         return Boolean.TRUE.equals(newerSnapshotExists);
-    }
-
-    private static UUID requiredLeaseToken(UUID leaseToken) {
-        return Objects.requireNonNull(leaseToken, "WATCH lease token은 필수입니다");
-    }
-
-    private static UUID uuidOrNull(String value) {
-        return value == null ? null : UUID.fromString(value);
     }
 
     private record Snapshot(
@@ -491,7 +455,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
 
     private record ClaimCandidate(
             long sourceRevision,
-            UUID eventId,
             UUID resourceId,
             String resourceReference,
             WatchMonitoringState monitoringState,
@@ -502,7 +465,6 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         private WatchMonitorDelivery toDelivery(UUID leaseToken) {
             return new WatchMonitorDelivery(
                     sourceRevision,
-                    eventId,
                     resourceId,
                     resourceReference,
                     monitoringState,
@@ -516,9 +478,7 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     private record InvalidTargetSource(
             UUID resourceId,
             String resourceReference,
-            WatchMonitoringState monitoringState,
-            String deliveryStatus,
-            UUID leaseToken
+            WatchMonitoringState monitoringState
     ) {
     }
 }

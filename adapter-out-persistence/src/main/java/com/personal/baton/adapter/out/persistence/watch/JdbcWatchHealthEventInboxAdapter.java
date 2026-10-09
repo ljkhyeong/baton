@@ -33,7 +33,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
         Objects.requireNonNull(event, "WATCH health event는 필수입니다");
         Objects.requireNonNull(acceptedAt, "WATCH health event 접수 시각은 필수입니다");
 
-        UUID resourceId = event.resourceId();
         Instant persistedAcceptedAt = acceptedAt.truncatedTo(ChronoUnit.MICROS);
         jdbcTemplate.update(
                 """
@@ -66,7 +65,7 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                     event_id = watch_health_event_inbox.event_id
                 """,
                 event.eventId().toString(),
-                resourceId.toString(),
+                event.resourceId().toString(),
                 event.eventType(),
                 event.resourceReference(),
                 event.sourceRevision(),
@@ -79,7 +78,7 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
         );
 
         StoredEnvelope stored = findForUpdate(event.eventId());
-        WatchHealthEventInboxStatus status = stored.matches(event, resourceId)
+        WatchHealthEventInboxStatus status = stored.matches(event)
                 ? WatchHealthEventInboxStatus.ACCEPTED
                 : WatchHealthEventInboxStatus.CONFLICT;
         return new WatchHealthEventInboxResult(status, stored.acceptedAt());
@@ -89,7 +88,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
         return jdbcTemplate.queryForObject(
                 """
                 SELECT
-                    BIN_TO_UUID(event_id) AS event_id,
                     BIN_TO_UUID(resource_id) AS resource_id,
                     event_type,
                     resource_reference,
@@ -105,7 +103,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
                 FOR UPDATE
                 """,
                 (resultSet, rowNumber) -> new StoredEnvelope(
-                        UUID.fromString(resultSet.getString("event_id")),
                         UUID.fromString(resultSet.getString("resource_id")),
                         resultSet.getString("event_type"),
                         resultSet.getString("resource_reference"),
@@ -138,7 +135,6 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
     }
 
     private record StoredEnvelope(
-            UUID eventId,
             UUID resourceId,
             String eventType,
             String resourceReference,
@@ -150,9 +146,8 @@ public class JdbcWatchHealthEventInboxAdapter implements WatchHealthEventInboxPo
             Instant acceptedAt
     ) {
 
-        private boolean matches(WatchHealthChangedEvent event, UUID expectedResourceId) {
-            return eventId.equals(event.eventId())
-                    && resourceId.equals(expectedResourceId)
+        private boolean matches(WatchHealthChangedEvent event) {
+            return resourceId.equals(event.resourceId())
                     && eventType.equals(event.eventType())
                     && resourceReference.equals(event.resourceReference())
                     && sourceRevision == event.sourceRevision()

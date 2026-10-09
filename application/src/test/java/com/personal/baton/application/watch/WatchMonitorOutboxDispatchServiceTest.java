@@ -120,7 +120,6 @@ class WatchMonitorOutboxDispatchServiceTest {
         return new WatchMonitorDelivery(
                 revision,
                 UUID.randomUUID(),
-                UUID.randomUUID(),
                 "baton-manager:study-pilot:role-resource:" + UUID.randomUUID(),
                 state,
                 state == WatchMonitoringState.ACTIVE ? "https://docs.example.com/study" : null,

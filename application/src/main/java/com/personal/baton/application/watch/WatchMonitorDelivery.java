@@ -5,7 +5,6 @@ import java.util.UUID;
 
 public record WatchMonitorDelivery(
         long sourceRevision,
-        UUID eventId,
         UUID resourceId,
         String resourceReference,
         WatchMonitoringState monitoringState,
@@ -18,7 +17,6 @@ public record WatchMonitorDelivery(
         if (sourceRevision < 0) {
             throw new IllegalArgumentException("WATCH sourceRevision은 음수일 수 없습니다");
         }
-        Objects.requireNonNull(eventId, "WATCH eventId는 필수입니다");
         Objects.requireNonNull(resourceId, "WATCH resourceId는 필수입니다");
         Objects.requireNonNull(resourceReference, "WATCH resourceReference는 필수입니다");
         Objects.requireNonNull(monitoringState, "WATCH monitoringState는 필수입니다");

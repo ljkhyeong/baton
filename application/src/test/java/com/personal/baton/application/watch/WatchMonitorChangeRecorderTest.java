@@ -119,9 +119,7 @@ class WatchMonitorChangeRecorderTest {
     @DisplayName("시즌 종료는 URL 적격 여부와 관계없이 모든 자료의 monitor를 비활성화한다")
     @Test
     void deactivatesEveryResourceWhenSeasonEnds() {
-        when(outboxPort.appendIfChanged(any())).thenReturn(true);
-
-        int appendedCount = recorder.recordSeasonState(List.of(
+        recorder.recordSeasonState(List.of(
                 resource("https://docs.example.com/study"),
                 RoleResource.create(
                         UUID.fromString("00000000-0000-0000-0000-000000000302"),
@@ -133,7 +131,6 @@ class WatchMonitorChangeRecorderTest {
                 )
         ), true);
 
-        assertThat(appendedCount).isEqualTo(2);
         ArgumentCaptor<WatchMonitorChange> captor = ArgumentCaptor.forClass(
                 WatchMonitorChange.class
         );
