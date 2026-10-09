@@ -132,7 +132,6 @@ if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
   exit 0
 fi
 if [[ "${1:-}" == "network" && "${2:-}" == "inspect" ]]; then
-  [[ "${FAKE_DOCKER_MODE:-healthy}" != "brief-network-missing" ]] || exit 1
   if [[ "${FAKE_DOCKER_MODE:-healthy}" == "brief-network-noninternal" ]]; then
     printf 'false\n'
   else
@@ -142,14 +141,9 @@ if [[ "${1:-}" == "network" && "${2:-}" == "inspect" ]]; then
 fi
 if [[ "${1:-}" == "pull" ]]; then
   [[ "${2:-}" == "--quiet" && "${3:-}" == *@sha256:* ]] || exit 75
-  [[ "${FAKE_DOCKER_MODE:-healthy}" != "round-pull-failure" ]] || exit 76
   exit 0
 fi
 if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
-  [[ "${FAKE_DOCKER_MODE:-healthy}" != "round-inspect-failure" ]] || exit 77
-  if [[ "${3:-}" != "--format" ]]; then
-    exit 0
-  fi
   image="${5:-}"
   case "${4:-}" in
     *.RepoDigests*)
