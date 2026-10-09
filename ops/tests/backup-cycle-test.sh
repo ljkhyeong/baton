@@ -432,14 +432,20 @@ assert_count 0 "$invalid_env_backup_artifact_count" \
 
 missing_checksum_root="$test_root/missing-checksum-restore"
 mkdir -p -- "$missing_checksum_root"
+write_valid_production_env "$missing_checksum_root/production.env"
 missing_checksum_backup="$missing_checksum_root/baton-20200101T000000Z-missing.sql.gz"
 write_valid_dump "$missing_checksum_backup"
-if PATH="$fake_bin:$PATH" \
+if missing_checksum_output="$(
+  PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$missing_checksum_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   BATON_BACKUP_STATE_DIR="$missing_checksum_root/state" \
-  "$fixture_restore_script" "$missing_checksum_backup" >/dev/null 2>&1; then
+  "$fixture_restore_script" "$missing_checksum_backup" 2>&1
+)"; then
   fail 'restore without checksum unexpectedly succeeded'
 fi
+[[ "$missing_checksum_output" == *'Backup checksum is required'* ]] \
+  || fail 'restore without checksum failed before the checksum check'
 
 running_guard_root="$test_root/running-container-restore"
 mkdir -p -- "$running_guard_root"
