@@ -96,10 +96,6 @@ if ! flock -n 9; then
   exit 1
 fi
 
-if [[ ! -r "$env_file" ]]; then
-  printf 'Production env file is not readable: %s\n' "$env_file" >&2
-  exit 1
-fi
 if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
   exit 1
 fi
@@ -140,7 +136,6 @@ done
 compose=(
   env
   BATON_PRODUCTION_ENV_FILE="$env_file"
-  BATON_PRODUCTION_LIFECYCLE_LOCK_FD="$BATON_PRODUCTION_LIFECYCLE_LOCK_FD"
   "$script_dir/production-compose.sh"
 )
 
