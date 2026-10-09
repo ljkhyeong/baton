@@ -1,13 +1,18 @@
 package com.personal.baton.application.workspace;
 
 import com.personal.baton.bootstrap.config.ProductionDatasourceEnvironmentPostProcessor;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 
 @Tag("usecase")
 class ProductionDatasourceEnvironmentPostProcessorTest {
@@ -60,69 +65,49 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                 });
     }
 
-    @DisplayName("운영 프로필은 데이터베이스 주소가 없으면 시작을 거절한다")
-    @Test
-    void rejectsMissingDatabaseUrlInProduction() {
+    @DisplayName("운영 프로필은 데이터베이스 주소·사용자·비밀번호가 없으면 시작을 거절한다")
+    @ParameterizedTest
+    @MethodSource("missingDatabaseSettings")
+    void rejectsMissingDatabaseSettingInProduction(
+            String databaseUrl,
+            String databaseUsername,
+            String databasePassword,
+            String missingSetting
+    ) {
         productionContextRunner
                 .withPropertyValues(
-                        "DB_URL=",
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD
+                        "DB_URL=" + databaseUrl,
+                        "DB_USERNAME=" + databaseUsername,
+                        "DB_PASSWORD=" + databasePassword
                 )
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
-                                    "운영 프로필에는 DB_URL 설정이 필요합니다"
+                                    "운영 프로필에는 " + missingSetting + " 설정이 필요합니다"
                             );
                 });
     }
 
-    @DisplayName("운영 프로필은 데이터베이스 사용자가 없으면 시작을 거절한다")
-    @Test
-    void rejectsMissingDatabaseUsernameInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필에는 DB_USERNAME 설정이 필요합니다"
-                            );
-                });
+    static Stream<Arguments> missingDatabaseSettings() {
+        return Stream.of(
+                argumentSet("데이터베이스 주소 없음",
+                        "", "baton", DATABASE_PASSWORD, "DB_URL"),
+                argumentSet("데이터베이스 사용자 없음",
+                        SECURE_DATABASE_URL, "", DATABASE_PASSWORD, "DB_USERNAME"),
+                argumentSet("데이터베이스 비밀번호 없음",
+                        SECURE_DATABASE_URL, "baton", "", "DB_PASSWORD")
+        );
     }
 
-    @DisplayName("운영 프로필은 데이터베이스 비밀번호가 없으면 시작을 거절한다")
-    @Test
-    void rejectsMissingDatabasePasswordInProduction() {
+    @DisplayName("운영 프로필은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정하지 않은 데이터베이스 주소를 거절한다")
+    @ParameterizedTest
+    @MethodSource("databaseUrlsWithoutSingleRequiredTls")
+    void rejectsDatabaseUrlWithoutSingleRequiredTlsInProduction(String databaseUrl) {
         productionContextRunner
                 .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD="
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필에는 DB_PASSWORD 설정이 필요합니다"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 TLS를 강제하지 않는 데이터베이스 주소를 거절한다")
-    @Test
-    void rejectsInsecureDatabaseUrlInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=jdbc:mysql://mysql:3306/baton?useSSL=false",
+                        "DB_URL=" + databaseUrl,
                         "DB_USERNAME=baton",
                         "DB_PASSWORD=" + DATABASE_PASSWORD
                 )
@@ -136,64 +121,17 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                 });
     }
 
-    @DisplayName("운영 프로필은 URL 조각 뒤의 가짜 TLS 설정을 거절한다")
-    @Test
-    void rejectsTlsModeHiddenBehindUrlFragmentInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=jdbc:mysql://mysql:3306/baton"
-                                + "?sslMode=DISABLED#?sslMode=REQUIRED",
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 중복된 TLS 설정을 거절한다")
-    @Test
-    void rejectsDuplicateTlsModesInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=jdbc:mysql://mysql:3306/baton"
-                                + "?sslMode=REQUIRED&sslMode=DISABLED",
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 공백으로 숨긴 중복 TLS 설정을 거절한다")
-    @Test
-    void rejectsWhitespaceHiddenDuplicateTlsModeInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=jdbc:mysql://mysql:3306/baton"
-                                + "?sslMode=REQUIRED& sslMode=DISABLED",
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필의 DB_URL은 sslMode=REQUIRED 이상의 TLS를 정확히 한 번 지정해야 합니다"
-                            );
-                });
+    static Stream<Arguments> databaseUrlsWithoutSingleRequiredTls() {
+        return Stream.of(
+                argumentSet("TLS를 강제하지 않는 주소",
+                        "jdbc:mysql://mysql:3306/baton?useSSL=false"),
+                argumentSet("URL 조각 뒤의 가짜 TLS 설정",
+                        "jdbc:mysql://mysql:3306/baton?sslMode=DISABLED#?sslMode=REQUIRED"),
+                argumentSet("중복된 TLS 설정",
+                        "jdbc:mysql://mysql:3306/baton?sslMode=REQUIRED&sslMode=DISABLED"),
+                argumentSet("공백으로 숨긴 중복 TLS 설정",
+                        "jdbc:mysql://mysql:3306/baton?sslMode=REQUIRED& sslMode=DISABLED")
+        );
     }
 
     @DisplayName("운영 프로필은 호스트별 TLS 덮어쓰기가 있는 주소를 거절한다")
@@ -216,15 +154,16 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                 });
     }
 
-    @DisplayName("운영 프로필은 Hikari 드라이버 속성의 TLS 덮어쓰기를 거절한다")
-    @Test
-    void rejectsHikariDriverPropertyTlsOverrideInProduction() {
+    @DisplayName("운영 프로필은 Hikari·Flyway의 대체 DB 연결 속성을 거절한다")
+    @ParameterizedTest
+    @MethodSource("alternativeConnectionProperties")
+    void rejectsAlternativeConnectionPropertyInProduction(String overrideProperty, String reportedProperty) {
         productionContextRunner
                 .withPropertyValues(
                         "DB_URL=" + SECURE_DATABASE_URL,
                         "DB_USERNAME=baton",
                         "DB_PASSWORD=" + DATABASE_PASSWORD,
-                        "spring.datasource.hikari.data-source-properties.sslMode=DISABLED"
+                        overrideProperty
                 )
                 .run(context -> {
                     assertThat(context).hasFailed();
@@ -232,116 +171,34 @@ class ProductionDatasourceEnvironmentPostProcessorTest {
                             .isInstanceOf(IllegalStateException.class)
                             .hasMessage(
                                     "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
-                                            + "spring.datasource.hikari.data-source-properties"
+                                            + reportedProperty
                             );
                 });
     }
 
-    @DisplayName("운영 프로필은 Hikari JDBC 주소 덮어쓰기를 거절한다")
-    @Test
-    void rejectsHikariJdbcUrlOverrideInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD,
+    static Stream<Arguments> alternativeConnectionProperties() {
+        return Stream.of(
+                argumentSet("Hikari 드라이버 속성의 TLS 덮어쓰기",
+                        "spring.datasource.hikari.data-source-properties.sslMode=DISABLED",
+                        "spring.datasource.hikari.data-source-properties"),
+                argumentSet("Hikari JDBC 주소 덮어쓰기",
                         "spring.datasource.hikari.jdbc-url="
-                                + "jdbc:mysql://mysql:3306/baton?sslMode=DISABLED"
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
-                                            + "spring.datasource.hikari.jdbc-url"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 완화된 별칭으로 지정한 Hikari JNDI를 거절한다")
-    @Test
-    void rejectsRelaxedHikariJndiOverrideInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD,
-                        "spring.datasource.hikari.dataSourceJNDI=java:comp/env/jdbc/baton"
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
-                                            + "spring.datasource.hikari.data-source-jndi"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 빈 Hikari 비밀번호 덮어쓰기도 거절한다")
-    @Test
-    void rejectsBlankHikariPasswordOverrideInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD,
-                        "spring.datasource.hikari.password="
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
-                                            + "spring.datasource.hikari.password"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 Flyway 전용 JDBC 주소를 거절한다")
-    @Test
-    void rejectsFlywaySpecificDatabaseUrlInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD,
+                                + "jdbc:mysql://mysql:3306/baton?sslMode=DISABLED",
+                        "spring.datasource.hikari.jdbc-url"),
+                argumentSet("완화된 별칭으로 지정한 Hikari JNDI",
+                        "spring.datasource.hikari.dataSourceJNDI=java:comp/env/jdbc/baton",
+                        "spring.datasource.hikari.data-source-jndi"),
+                argumentSet("빈 Hikari 비밀번호 덮어쓰기",
+                        "spring.datasource.hikari.password=",
+                        "spring.datasource.hikari.password"),
+                argumentSet("Flyway 전용 JDBC 주소",
                         "spring.flyway.url="
-                                + "jdbc:mysql://mysql:3306/baton?sslMode=DISABLED"
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
-                                            + "spring.flyway.url"
-                            );
-                });
-    }
-
-    @DisplayName("운영 프로필은 Flyway JDBC 속성의 TLS 덮어쓰기를 거절한다")
-    @Test
-    void rejectsFlywayJdbcPropertyTlsOverrideInProduction() {
-        productionContextRunner
-                .withPropertyValues(
-                        "DB_URL=" + SECURE_DATABASE_URL,
-                        "DB_USERNAME=baton",
-                        "DB_PASSWORD=" + DATABASE_PASSWORD,
-                        "spring.flyway.jdbc-properties.sslMode=DISABLED"
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage(
-                                    "운영 프로필은 대체 DB 연결 속성을 허용하지 않습니다: "
-                                            + "spring.flyway.jdbc-properties"
-                            );
-                });
+                                + "jdbc:mysql://mysql:3306/baton?sslMode=DISABLED",
+                        "spring.flyway.url"),
+                argumentSet("Flyway JDBC 속성의 TLS 덮어쓰기",
+                        "spring.flyway.jdbc-properties.sslMode=DISABLED",
+                        "spring.flyway.jdbc-properties")
+        );
     }
 
     @DisplayName("운영 프로필은 잠금 대기 제한이 아닌 DB 세션 초기화 SQL을 거절한다")
