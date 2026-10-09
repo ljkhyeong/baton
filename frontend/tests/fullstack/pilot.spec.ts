@@ -1,9 +1,20 @@
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 const creationKey = process.env.BATON_FULLSTACK_CREATION_KEY
 
 if (!creationKey) {
   throw new Error('BATON_FULLSTACK_CREATION_KEY가 필요합니다.')
+}
+
+function mainMenu(target: Page) {
+  return target.getByRole('navigation', { name: '주 메뉴' })
+}
+
+// 인수인계는 역할 메뉴 안의 화면이다.
+async function openHandoff(target: Page) {
+  await mainMenu(target).getByRole('button', { name: '역할' }).click()
+  await target.getByRole('button', { name: '인수인계', exact: true }).click()
 }
 
 test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라우저와 공유한다', async ({ browser, context, page }) => {
@@ -25,7 +36,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.locator('.workspace-switcher')).toContainText('풀스택 검증 스터디')
   const workspacePath = new URL(page.url()).pathname
 
-  await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+  await mainMenu(page).getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '구성원 관리' }).click()
   const memberManagementDialog = page.getByRole('dialog', { name: '구성원 관리' })
   await memberManagementDialog.getByRole('button', { name: '구성원 추가' }).click()
@@ -79,7 +90,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(inspector.getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))
     .toHaveAttribute('href', 'https://docs.example.com/questions')
 
-  await page.locator('.sidebar').getByRole('button', { name: '일정' }).click()
+  await mainMenu(page).getByRole('button', { name: '일정' }).click()
   await page.getByRole('button', { name: '반복 업무 추가' }).click()
   const routineDialog = page.getByRole('dialog', { name: '반복 업무 만들기' })
   await routineDialog.getByLabel('반복 업무 이름').fill('회고 질문 준비')
@@ -111,7 +122,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.getByLabel('회차', { exact: true }).locator('option:checked')).toContainText('첫 파일럿 모임')
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 
-  await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+  await mainMenu(page).getByRole('button', { name: '기록' }).click()
   await page.getByRole('button', { name: '결정 남기기', exact: true }).click()
   const decisionDialog = page.getByRole('dialog', { name: '결정과 이유 남기기' })
   await decisionDialog.getByLabel('무엇을 결정했나요?').fill('질문 정리를 모임 전날에 마친다')
@@ -141,12 +152,12 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
 
   await page.reload()
-  await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+  await mainMenu(page).getByRole('button', { name: '기록' }).click()
   const reloadedDecision = page.locator('.decision-entry').filter({ hasText: revisedDecisionTitle })
   await expect(reloadedDecision.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
   await expect(reloadedDecision.getByText('김준호', { exact: true })).toBeVisible()
 
-  await page.locator('.sidebar').getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoff(page)
   await page.getByRole('button', { name: '항목 추가', exact: true }).click()
   const handoffDialog = page.getByRole('dialog', { name: '인수인계 항목 추가' })
   await handoffDialog.getByLabel('역할').selectOption({ label: '질문 큐레이터' })
@@ -176,10 +187,10 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
   await page.reload()
-  await page.locator('.sidebar').getByRole('button', { name: /^인수인계/ }).click()
+  await openHandoff(page)
   await expect(page.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
-  await page.locator('.sidebar').getByRole('button', { name: '공유' }).click()
+  await page.locator('.workspace-header').getByRole('button', { name: '공유', exact: true }).click()
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toMatch(/#accessKey=.+/)
   const shareUrl = await page.evaluate(() => navigator.clipboard.readText())
@@ -191,7 +202,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     const peerPage = await peerContext.newPage()
     await peerPage.goto(shareUrl)
     await expect(peerPage.locator('.workspace-switcher')).toContainText('풀스택 검증 스터디')
-    await peerPage.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+    await mainMenu(peerPage).getByRole('button', { name: '역할' }).click()
     const peerRoleRow = peerPage.locator('.role-row-open').filter({ hasText: '질문 큐레이터' })
     await expect(peerRoleRow).toBeVisible()
     await expect(peerRoleRow).toContainText('이서준')
@@ -200,13 +211,13 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
       .getByRole('link', { name: '질문 정리 가이드 새 창에서 열기' }))
       .toHaveAttribute('href', 'https://docs.example.com/questions')
 
-    await peerPage.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+    await mainMenu(peerPage).getByRole('button', { name: '기록' }).click()
     await expect(peerPage.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
-    await peerPage.locator('.sidebar').getByRole('button', { name: /^인수인계/ }).click()
+    await openHandoff(peerPage)
     await expect(peerPage.getByRole('checkbox', { name: revisedHandoffLabel })).toBeChecked()
 
-    await page.locator('.sidebar').getByRole('button', { name: '일정' }).click()
-    await peerPage.locator('.sidebar').getByRole('button', { name: '일정' }).click()
+    await mainMenu(page).getByRole('button', { name: '일정' }).click()
+    await mainMenu(peerPage).getByRole('button', { name: '일정' }).click()
     await expect(peerPage.getByLabel('회차', { exact: true }).locator('option:checked')).toContainText('첫 파일럿 모임')
     await expect(peerPage.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
     await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
@@ -259,14 +270,14 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     teamId,
   )).toBe(accessKeyBeforeSeasonChange)
 
-  await page.locator('.sidebar').getByRole('button', { name: '역할' }).click()
+  await mainMenu(page).getByRole('button', { name: '역할' }).click()
   const copiedRoleRow = page.locator('.role-row-open').filter({
     hasText: '질문 큐레이터',
   })
   await expect(copiedRoleRow).toBeVisible()
   await expect(copiedRoleRow).toContainText('담당자 미정')
 
-  await page.locator('.sidebar').getByRole('button', { name: '일정' }).click()
+  await mainMenu(page).getByRole('button', { name: '일정' }).click()
   await expect(page.getByText('회고 질문 준비', { exact: true }).first()).toBeVisible()
   await expect(page.getByLabel('회차', { exact: true })).toHaveValue('')
 
@@ -277,7 +288,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
 
   await expect(page).toHaveURL(workspacePath)
   await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
-  await page.locator('.sidebar').getByRole('button', { name: '일정' }).click()
+  await mainMenu(page).getByRole('button', { name: '일정' }).click()
   await expect(page.getByLabel('회차', { exact: true }).locator('option:checked'))
     .toContainText('첫 파일럿 모임')
   await expect(page.getByRole('button', {
@@ -285,7 +296,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
   })).toBeDisabled()
   await expect(page.getByRole('button', { name: '반복 업무 추가' })).toBeDisabled()
 
-  await page.locator('.sidebar').getByRole('button', { name: '기록' }).click()
+  await mainMenu(page).getByRole('button', { name: '기록' }).click()
   await expect(page.getByRole('heading', { name: revisedDecisionTitle })).toBeVisible()
   await expect(page.getByRole('button', {
     name: `${revisedDecisionTitle} 수정`,
@@ -312,10 +323,10 @@ test('시작 템플릿으로 만든 역할과 반복 업무를 실제 DB에서 �
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page).toHaveURL(/\/teams\/[0-9a-f-]+\/seasons\/[0-9a-f-]+$/)
   await page.reload()
-  await page.locator('.sidebar').getByRole('button', { name: '역할', exact: true }).click()
+  await mainMenu(page).getByRole('button', { name: '역할', exact: true }).click()
   await expect(page.locator('.role-row-open')).toHaveCount(3)
   await expect(page.locator('.role-row-open').filter({ hasText: '학습 준비 담당' })).toBeVisible()
-  await page.locator('.sidebar').getByRole('button', { name: '일정', exact: true }).click()
+  await mainMenu(page).getByRole('button', { name: '일정', exact: true }).click()
   await expect(page.getByText('학습 자료 준비', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('회고와 결정 정리', { exact: true }).first()).toBeVisible()
 })
