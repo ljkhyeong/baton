@@ -166,13 +166,6 @@ if ! production_validation_parse_literal_env "$env_file"; then
   exit 1
 fi
 
-env_value() {
-  local wanted_key="$1"
-
-  production_validation_read_env_value "$wanted_key"
-  printf '%s' "$PRODUCTION_VALIDATION_VALUE"
-}
-
 case "$compose_command" in
   up|create|pull)
     if ! "$script_dir/verify-production-round-images.sh" "$env_file"; then
@@ -203,30 +196,38 @@ read_secret_or_placeholder() {
   printf '%s' "$(< "$target")"
 }
 
-brevo_webhook_secret_file="$(env_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE)"
-turnstile_secret_file="$(env_value BATON_TURNSTILE_SECRET_KEY_FILE)"
-google_secret_file="$(env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
-naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
-cal_bearer_token_file="$(env_value BATON_CAL_BEARER_TOKEN_FILE)"
-holidays_service_key_file="$(env_value BATON_HOLIDAYS_SERVICE_KEY_FILE)"
-smtp_password_file="$(env_value BATON_SMTP_PASSWORD_FILE)"
-email_outbox_encryption_key_file="$(env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)"
-brief_bearer_token_file="$(env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
-round_private_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE)"
-round_public_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE)"
-round_previous_public_key_file="$(
-  env_value BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE
+brevo_webhook_secret_file="$(production_validation_env_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE)"
+turnstile_secret_file="$(production_validation_env_value BATON_TURNSTILE_SECRET_KEY_FILE)"
+google_secret_file="$(production_validation_env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
+naver_secret_file="$(production_validation_env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
+cal_bearer_token_file="$(production_validation_env_value BATON_CAL_BEARER_TOKEN_FILE)"
+holidays_service_key_file="$(production_validation_env_value BATON_HOLIDAYS_SERVICE_KEY_FILE)"
+smtp_password_file="$(production_validation_env_value BATON_SMTP_PASSWORD_FILE)"
+email_outbox_encryption_key_file="$(
+  production_validation_env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE
 )"
-round_runtime_enabled="$(env_value BATON_ROUND_RUNTIME_ENABLED)"
+brief_bearer_token_file="$(production_validation_env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
+round_private_key_file="$(
+  production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE
+)"
+round_public_key_file="$(
+  production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE
+)"
+round_previous_public_key_file="$(
+  production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE
+)"
+round_runtime_enabled="$(production_validation_env_value BATON_ROUND_RUNTIME_ENABLED)"
 round_runtime_enabled="${round_runtime_enabled:-false}"
-oauth2_enabled="$(env_value BATON_AUTH_OAUTH2_ENABLED)"
+oauth2_enabled="$(production_validation_env_value BATON_AUTH_OAUTH2_ENABLED)"
 oauth2_enabled="${oauth2_enabled:-false}"
-brief_service_api_enabled="$(env_value BATON_BRIEF_SERVICE_API_ENABLED)"
+brief_service_api_enabled="$(production_validation_env_value BATON_BRIEF_SERVICE_API_ENABLED)"
 brief_service_api_enabled="${brief_service_api_enabled:-false}"
-round_turn_shared_secret_file="$(env_value BATON_ROUND_TURN_SHARED_SECRET_FILE)"
+round_turn_shared_secret_file="$(
+  production_validation_env_value BATON_ROUND_TURN_SHARED_SECRET_FILE
+)"
 round_runtime_uid="$(id -u)"
 round_runtime_gid="$(id -g)"
-email_delivery="$(env_value BATON_EMAIL_VERIFICATION_DELIVERY)"
+email_delivery="$(production_validation_env_value BATON_EMAIL_VERIFICATION_DELIVERY)"
 email_delivery="${email_delivery:-disabled}"
 
 if [[ "$round_runtime_enabled" == "true" \

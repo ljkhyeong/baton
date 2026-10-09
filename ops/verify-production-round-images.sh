@@ -28,22 +28,15 @@ if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
 
-env_value() {
-  local wanted_key="$1"
-
-  production_validation_read_env_value "$wanted_key"
-  printf '%s' "$PRODUCTION_VALIDATION_VALUE"
-}
-
-round_runtime_enabled="$(env_value BATON_ROUND_RUNTIME_ENABLED)"
+round_runtime_enabled="$(production_validation_env_value BATON_ROUND_RUNTIME_ENABLED)"
 round_runtime_enabled="${round_runtime_enabled:-false}"
 if [[ "$round_runtime_enabled" != "true" ]]; then
   exit 0
 fi
 
-round_web_image="$(env_value BATON_ROUND_WEB_IMAGE)"
-round_signaling_image="$(env_value BATON_ROUND_SIGNALING_IMAGE)"
-round_release_revision="$(env_value BATON_ROUND_RELEASE_REVISION)"
+round_web_image="$(production_validation_env_value BATON_ROUND_WEB_IMAGE)"
+round_signaling_image="$(production_validation_env_value BATON_ROUND_SIGNALING_IMAGE)"
+round_release_revision="$(production_validation_env_value BATON_ROUND_RELEASE_REVISION)"
 
 command -v docker >/dev/null 2>&1 || fail "docker is required"
 docker_command=(

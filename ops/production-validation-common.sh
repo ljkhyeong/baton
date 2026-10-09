@@ -10,9 +10,8 @@ esac
 PRODUCTION_VALIDATION_ERROR=""
 PRODUCTION_VALIDATION_ENV_KEYS=()
 PRODUCTION_VALIDATION_ENV_VALUES=()
-# shellcheck disable=SC2034
-PRODUCTION_VALIDATION_VALUE=""
 
+# shellcheck disable=SC2034  # 함수 반환 후 호출자가 PRODUCTION_VALIDATION_ERROR를 읽는다.
 production_validation_parse_literal_env() {
   local env_file="$1"
   local key
@@ -54,18 +53,14 @@ production_validation_parse_literal_env() {
   return 0
 }
 
-production_validation_read_env_value() {
+# 해석한 환경 파일의 값을 출력한다. 키가 없으면 아무것도 출력하지 않는다.
+production_validation_env_value() {
   local index
   local wanted_key="$1"
 
-  # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 오류를 읽는다.
-  PRODUCTION_VALIDATION_ERROR=""
-  PRODUCTION_VALIDATION_VALUE=""
-
   for ((index = 0; index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; index += 1)); do
     if [[ "${PRODUCTION_VALIDATION_ENV_KEYS[$index]}" == "$wanted_key" ]]; then
-      # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 결과를 읽는다.
-      PRODUCTION_VALIDATION_VALUE="${PRODUCTION_VALIDATION_ENV_VALUES[$index]}"
+      printf '%s' "${PRODUCTION_VALIDATION_ENV_VALUES[$index]}"
       return 0
     fi
   done

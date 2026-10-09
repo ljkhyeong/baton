@@ -49,13 +49,10 @@ docker_command=(
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
-production_validation_read_env_value BATON_BRIEF_SERVICE_API_ENABLED \
-  || fail "$PRODUCTION_VALIDATION_ERROR"
-brief_service_api_enabled="${PRODUCTION_VALIDATION_VALUE:-false}"
+brief_service_api_enabled="$(production_validation_env_value BATON_BRIEF_SERVICE_API_ENABLED)"
+brief_service_api_enabled="${brief_service_api_enabled:-false}"
 if [[ "$brief_service_api_enabled" == "true" ]]; then
-  production_validation_read_env_value BATON_BRIEF_PRIVATE_NETWORK \
-    || fail "$PRODUCTION_VALIDATION_ERROR"
-  brief_private_network="$PRODUCTION_VALIDATION_VALUE"
+  brief_private_network="$(production_validation_env_value BATON_BRIEF_PRIVATE_NETWORK)"
   brief_network_internal="$(
     "${docker_command[@]}" network inspect \
       --format '{{.Internal}}' "$brief_private_network" 2>/dev/null
