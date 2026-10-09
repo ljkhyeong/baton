@@ -16,7 +16,7 @@ import org.springframework.web.client.RestClientException;
 
 public final class RestClientWatchMonitorClient implements WatchMonitorClient {
 
-    private static final String MONITOR_PATH = "/api/v1/resource-monitors/{resourceReference}";
+    static final String MONITOR_PATH = "/api/v1/resource-monitors/{resourceReference}";
 
     private final RestClient restClient;
 

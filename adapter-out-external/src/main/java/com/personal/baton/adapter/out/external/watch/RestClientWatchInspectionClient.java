@@ -5,6 +5,7 @@ import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.WatchCheckOutcome;
 import com.personal.baton.application.watch.WatchResourceHealth;
 import com.personal.baton.application.watch.port.out.WatchMonitorInspectionPort;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,6 +14,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.DeserializationFeature;
@@ -20,7 +22,6 @@ import tools.jackson.databind.MapperFeature;
 import tools.jackson.databind.cfg.EnumFeature;
 
 public final class RestClientWatchInspectionClient implements WatchMonitorInspectionPort {
-    private static final String PATH = "/api/v1/resource-monitors/{resourceReference}";
     private static final int MAX_RESPONSE_BYTES = 8_192;
     private static final JsonMapper JSON = JsonMapper.builder()
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
@@ -63,14 +64,13 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
     private Inspection inspectOnce(String resourceReference) throws InterruptedException {
         if (!lookupConnections.tryAcquire(1, TimeUnit.SECONDS)) return Inspection.unavailable();
         try {
-            return client.get().uri(PATH, resourceReference).accept(MediaType.APPLICATION_JSON)
+            return client.get().uri(RestClientWatchMonitorClient.MONITOR_PATH, resourceReference)
+                    .accept(MediaType.APPLICATION_JSON)
                     .exchange((request, response) -> {
                         int status = response.getStatusCode().value();
                         if (status == 404) return Inspection.missing();
                         if (status != 200) return Inspection.unavailable();
-                        byte[] body = response.getBody().readNBytes(MAX_RESPONSE_BYTES + 1);
-                        if (body.length > MAX_RESPONSE_BYTES) return Inspection.unavailable();
-                        MonitorResponse monitor = JSON.readValue(body, MonitorResponse.class);
+                        MonitorResponse monitor = readBody(response, MonitorResponse.class);
                         if (monitor == null || !resourceReference.equals(monitor.resourceReference())
                                 || monitor.sourceRevision() == null || monitor.sourceRevision() < 1
                                 || monitor.monitoringState() == null || monitor.health() == null
@@ -94,7 +94,7 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
     public CheckRequest requestCheck(String resourceReference) {
         if (!checkConnection.tryAcquire()) return CheckRequest.unavailable();
         try {
-            return client.post().uri(PATH + "/check-requests", resourceReference)
+            return client.post().uri(RestClientWatchMonitorClient.MONITOR_PATH + "/check-requests", resourceReference)
                     .accept(MediaType.APPLICATION_JSON).exchange((request, response) -> {
                         int status = response.getStatusCode().value();
                         if (status == 429) {
@@ -103,9 +103,7 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
                         }
                         if (status == 404 || status == 409) return new CheckRequest(CheckStatus.INACTIVE, null);
                         if (status != 202) return CheckRequest.unavailable();
-                        byte[] body = response.getBody().readNBytes(MAX_RESPONSE_BYTES + 1);
-                        if (body.length > MAX_RESPONSE_BYTES) return CheckRequest.unavailable();
-                        CheckResponse receipt = JSON.readValue(body, CheckResponse.class);
+                        CheckResponse receipt = readBody(response, CheckResponse.class);
                         if (receipt == null || receipt.status() == null) return CheckRequest.unavailable();
                         return switch (receipt.status()) {
                             case SCHEDULED, ALREADY_SCHEDULED, IN_PROGRESS -> new CheckRequest(receipt.status(), null);
@@ -117,6 +115,12 @@ public final class RestClientWatchInspectionClient implements WatchMonitorInspec
         } finally {
             checkConnection.release();
         }
+    }
+
+    // 8 KiB를 넘는 응답은 해석하지 않고 null로 돌려 호출자가 조회 불가로 처리하게 한다.
+    private static <T> T readBody(ClientHttpResponse response, Class<T> type) throws IOException {
+        byte[] body = response.getBody().readNBytes(MAX_RESPONSE_BYTES + 1);
+        return body.length > MAX_RESPONSE_BYTES ? null : JSON.readValue(body, type);
     }
 
     private long retryAfter(String value) {
