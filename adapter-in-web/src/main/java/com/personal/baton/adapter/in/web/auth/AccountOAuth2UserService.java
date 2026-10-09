@@ -1,9 +1,9 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
-import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
+import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.Map;
 import java.util.Objects;
@@ -50,14 +50,14 @@ public final class AccountOAuth2UserService {
                 providerUser.getPreferredUsername(),
                 email
         );
-        AccountView account = resolveIdentity(
+        ExternalLoginResult login = resolveIdentity(
                 IdentityProvider.GOOGLE,
                 subject,
                 email,
                 Boolean.TRUE.equals(providerUser.getEmailVerified()),
                 displayName
         );
-        return new OidcAccountPrincipal(account.accountId(), account.sessionVersion(), providerUser);
+        return new OidcAccountPrincipal(login.accountId(), login.sessionVersion(), providerUser);
     }
 
     public OAuth2User loadOAuth2User(OAuth2UserRequest request) {
@@ -74,17 +74,17 @@ public final class AccountOAuth2UserService {
                 optionalText(profile.get("nickname")),
                 email
         );
-        AccountView account = resolveIdentity(
+        ExternalLoginResult login = resolveIdentity(
                 IdentityProvider.NAVER,
                 subject,
                 email,
                 false,
                 displayName
         );
-        return new OAuthAccountPrincipal(account.accountId(), account.sessionVersion(), providerUser);
+        return new OAuthAccountPrincipal(login.accountId(), login.sessionVersion(), providerUser);
     }
 
-    private AccountView resolveIdentity(
+    private ExternalLoginResult resolveIdentity(
             IdentityProvider provider,
             String providerSubject,
             String email,
@@ -98,7 +98,7 @@ public final class AccountOAuth2UserService {
                     email,
                     emailVerified,
                     displayName
-            )).account();
+            ));
         } catch (AccountDeactivatedException exception) {
             throw new OAuth2AuthenticationException(new OAuth2Error("account_deactivated"), exception.getMessage(), exception);
         } catch (RuntimeException exception) {

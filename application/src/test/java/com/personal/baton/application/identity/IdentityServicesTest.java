@@ -267,10 +267,7 @@ class IdentityServicesTest {
                 true,
                 "동시 사용자"
         );
-        var winner = new ExternalLoginResult(
-                new AccountView(UUID.randomUUID(), "동시 사용자", List.of(), 0),
-                false
-        );
+        var winner = new ExternalLoginResult(UUID.randomUUID(), 0, false);
         when(transaction.resolve(command)).thenThrow(new IdentityConcurrentModificationException(
                         "stale identity",
                         new RuntimeException("optimistic conflict")
@@ -289,11 +286,9 @@ class IdentityServicesTest {
     void verifiesLocalEmailWithOneTimeChallenge() {
         IdentityRepository repository = mock(IdentityRepository.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        UUID accountId = UUID.randomUUID();
-        Account account = Account.create(accountId, "로컬 사용자", NOW.minusSeconds(60));
         AccountIdentity identity = AccountIdentity.createLocal(
                 UUID.randomUUID(),
-                accountId,
+                UUID.randomUUID(),
                 "local@example.com",
                 NOW.minusSeconds(60)
         );
@@ -310,8 +305,6 @@ class IdentityServicesTest {
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
         when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
                 .thenReturn(Optional.empty());
-        when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
-        when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(PASSWORD_HASH);
         LocalAccountRegistrationService service = service(
                 repository,
@@ -321,9 +314,8 @@ class IdentityServicesTest {
         );
 
         var command = new VerifyLocalEmailCommand(VERIFICATION_TOKEN, RAW_PASSWORD);
-        var result = service.verifyLocalEmail(command);
+        service.verifyLocalEmail(command);
 
-        assertThat(result.verifiedAt()).isEqualTo(NOW);
         assertThat(identity.isEmailVerified()).isTrue();
         assertThat(challenge.getConsumedAt()).isEqualTo(NOW);
         assertThat(command.toString()).doesNotContain(VERIFICATION_TOKEN, RAW_PASSWORD);

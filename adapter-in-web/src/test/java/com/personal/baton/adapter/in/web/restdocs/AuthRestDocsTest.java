@@ -487,8 +487,8 @@ class AuthRestDocsTest {
     @DisplayName("자체 이메일 검증 API는 일시적인 신원 저장 실패를 재시도 가능한 503으로 반환한다")
     @Test
     void documentsLocalEmailVerificationTemporarilyUnavailable() throws Exception {
-        when(verifyUseCase.verifyLocalEmail(any()))
-                .thenThrow(identityOperationUnavailable());
+        doThrow(identityOperationUnavailable())
+                .when(verifyUseCase).verifyLocalEmail(any());
 
         mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_EMAIL_VERIFICATIONS_PATH))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -868,8 +868,7 @@ class AuthSessionRestDocsTest {
                                 EMAIL,
                                 true
                         )
-                ),
-                0
+                )
         ));
 
         mockMvc.perform(get(AccountSecurityController.ACCOUNT_PATH)

@@ -1,12 +1,10 @@
 package com.personal.baton.adapter.in.web.auth;
 
-import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.domain.identity.IdentityProvider;
-import java.util.List;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -77,7 +75,7 @@ class AccountOAuth2UserServiceTest {
         when(providerUser.getUserInfo()).thenReturn(userInfo);
         when(oidcDelegate.loadUser(userRequest)).thenReturn(providerUser);
         when(resolveUseCase.resolveExternalLogin(any())).thenReturn(
-                new ExternalLoginResult(accountView(), true)
+                new ExternalLoginResult(ACCOUNT_ID, 0, true)
         );
 
         OidcUser principal = service.loadOidcUser(userRequest);
@@ -129,7 +127,7 @@ class AccountOAuth2UserServiceTest {
         );
         when(oauth2Delegate.loadUser(userRequest)).thenReturn(providerUser);
         when(resolveUseCase.resolveExternalLogin(any())).thenReturn(
-                new ExternalLoginResult(accountView(), true)
+                new ExternalLoginResult(ACCOUNT_ID, 0, true)
         );
 
         OAuth2User principal = service.loadOAuth2User(userRequest);
@@ -173,7 +171,7 @@ class AccountOAuth2UserServiceTest {
         when(providerUser.getIdToken()).thenReturn(mock(OidcIdToken.class));
         when(oidcDelegate.loadUser(userRequest)).thenReturn(providerUser);
         when(resolveUseCase.resolveExternalLogin(any())).thenReturn(
-                new ExternalLoginResult(accountView(), true)
+                new ExternalLoginResult(ACCOUNT_ID, 0, true)
         );
 
         service.loadOidcUser(userRequest);
@@ -312,10 +310,6 @@ class AccountOAuth2UserServiceTest {
                 oidcDelegate,
                 oauth2Delegate
         );
-    }
-
-    private AccountView accountView() {
-        return new AccountView(ACCOUNT_ID, "Member", List.of(), 0);
     }
 
     private ClientRegistration googleRegistration() {

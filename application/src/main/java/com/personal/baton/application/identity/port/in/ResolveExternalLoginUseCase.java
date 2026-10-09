@@ -1,7 +1,7 @@
 package com.personal.baton.application.identity.port.in;
 
-import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.domain.identity.IdentityProvider;
+import java.util.UUID;
 
 public interface ResolveExternalLoginUseCase {
 
@@ -24,7 +24,8 @@ public interface ResolveExternalLoginUseCase {
     }
 
     record ExternalLoginResult(
-            AccountView account,
+            UUID accountId,
+            long sessionVersion,
             boolean created
     ) {
     }

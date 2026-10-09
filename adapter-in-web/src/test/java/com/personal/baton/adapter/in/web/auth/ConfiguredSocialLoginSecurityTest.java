@@ -9,7 +9,6 @@ import com.personal.baton.application.identity.port.in.ValidateAccountSessionUse
 import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
-import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
@@ -226,10 +225,7 @@ class ConfiguredSocialLoginSecurityTest {
         when(oidcUserService.loadUser(any(OidcUserRequest.class)))
                 .thenAnswer(invocation -> providerUser(invocation.getArgument(0)));
         when(resolveExternalLoginUseCase.resolveExternalLogin(any())).thenReturn(
-                new ExternalLoginResult(
-                        new AccountView(ACCOUNT_ID, "Google Member", List.of(), 5),
-                        true
-                )
+                new ExternalLoginResult(ACCOUNT_ID, 5, true)
         );
 
         MvcResult callbackResult = mockMvc.perform(get("/login/oauth2/code/google")

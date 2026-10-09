@@ -84,14 +84,14 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
 
     @Override
     @Transactional
-    public int supersedePending(UUID identityId, Instant supersededAt) {
+    public void supersedePending(UUID identityId, Instant supersededAt) {
         Objects.requireNonNull(identityId, "이메일 인증 identity ID는 필수입니다");
         Objects.requireNonNull(supersededAt, "이메일 인증 supersede 시각은 필수입니다");
-        return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
+        IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "이메일 인증 전달 요청을 일시적으로 갱신할 수 없습니다",
                 () -> {
                     lockIdentityAccount(identityId);
-                    return supersedePendingAfterIdentityLock(identityId, supersededAt);
+                    supersedePendingAfterIdentityLock(identityId, supersededAt);
                 }
         );
     }
@@ -332,8 +332,8 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
         return accountId;
     }
 
-    private int supersedePendingAfterIdentityLock(UUID identityId, Instant supersededAt) {
-        return jdbcTemplate.update(
+    private void supersedePendingAfterIdentityLock(UUID identityId, Instant supersededAt) {
+        jdbcTemplate.update(
                 """
                 UPDATE email_verification_delivery_outbox
                 SET delivery_status = 'SUPERSEDED',

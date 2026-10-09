@@ -83,10 +83,7 @@ public class AccountSecurityService implements
         Instant now = clock.instant();
         Account account = repository.findAccountByIdForUpdate(command.accountId())
                 .orElseThrow(AccountNotFoundException::new);
-        credential.replacePasswordHash(passwordEncoder.encode(command.newRawPassword()), now);
-        account.invalidateSessions(now);
-        repository.saveLocalCredential(credential);
-        repository.saveAccount(account);
+        replacePassword(credential, account, command.newRawPassword(), now);
         if (challenge != null
                 && challenge.getPurpose() == EmailChallengePurpose.PASSWORD_RESET
                 && challenge.consume(now)) {
@@ -182,12 +179,21 @@ public class AccountSecurityService implements
         }
         Account account = repository.findAccountByIdForUpdate(identity.getAccountId())
                 .filter(Account::isActive).orElseThrow(PasswordResetException::new);
-        credential.replacePasswordHash(passwordEncoder.encode(command.rawPassword()), now);
+        replacePassword(credential, account, command.rawPassword(), now);
+        repository.saveEmailVerificationChallenge(challenge);
+        outboxPort.supersedePending(identity.getId(), now);
+    }
+
+    private void replacePassword(
+            LocalCredential credential,
+            Account account,
+            String rawPassword,
+            Instant now
+    ) {
+        credential.replacePasswordHash(passwordEncoder.encode(rawPassword), now);
         account.invalidateSessions(now);
         repository.saveLocalCredential(credential);
         repository.saveAccount(account);
-        repository.saveEmailVerificationChallenge(challenge);
-        outboxPort.supersedePending(identity.getId(), now);
     }
 
     private Account findAccount(UUID accountId) {

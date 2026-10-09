@@ -10,8 +10,7 @@ import java.util.UUID;
 public record AccountView(
         UUID accountId,
         String displayName,
-        List<LinkedIdentityView> identities,
-        long sessionVersion
+        List<LinkedIdentityView> identities
 ) {
 
     public AccountView {
@@ -27,8 +26,7 @@ public record AccountView(
                         identity.isEmailVerified()
                 ))
                 .toList();
-        return new AccountView(account.getId(), account.getDisplayName(), linkedIdentities,
-                account.getSessionVersion());
+        return new AccountView(account.getId(), account.getDisplayName(), linkedIdentities);
     }
 
     public record LinkedIdentityView(

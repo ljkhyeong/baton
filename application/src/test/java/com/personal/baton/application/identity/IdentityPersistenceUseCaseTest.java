@@ -228,7 +228,7 @@ class IdentityPersistenceUseCaseTest {
                 "SELECT provider_subject FROM account_identities",
                 String.class
         )).isEqualTo("study.user@example.com");
-        var verification = verifyLocalEmailUseCase.verifyLocalEmail(
+        verifyLocalEmailUseCase.verifyLocalEmail(
                 new VerifyLocalEmailCommand(verificationToken, RAW_PASSWORD)
         );
         var credential = loadLocalCredentialUseCase
@@ -239,8 +239,6 @@ class IdentityPersistenceUseCaseTest {
                 String.class
         );
 
-        assertThat(verification.account().accountId())
-                .isEqualTo(registration.account().accountId());
         assertThat(credential.accountId()).isEqualTo(registration.account().accountId());
         assertThat(credential.emailVerified()).isTrue();
         assertThat(storedPasswordHash).startsWith("{").doesNotContain(RAW_PASSWORD);
@@ -484,7 +482,7 @@ class IdentityPersistenceUseCaseTest {
 
         assertThat(google.created()).isTrue();
         assertThat(naver.created()).isTrue();
-        assertThat(google.account().accountId()).isNotEqualTo(naver.account().accountId());
+        assertThat(google.accountId()).isNotEqualTo(naver.accountId());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(DISTINCT account_id) FROM account_identities "
                         + "WHERE email_snapshot = 'same@example.com'",
@@ -532,8 +530,7 @@ class IdentityPersistenceUseCaseTest {
             var firstResult = first.get(10, TimeUnit.SECONDS);
             var secondResult = second.get(10, TimeUnit.SECONDS);
 
-            assertThat(firstResult.account().accountId())
-                    .isEqualTo(secondResult.account().accountId());
+            assertThat(firstResult.accountId()).isEqualTo(secondResult.accountId());
             assertThat(List.of(firstResult.created(), secondResult.created()))
                     .containsExactlyInAnyOrder(true, false);
             assertThat(jdbcTemplate.queryForObject(
@@ -681,17 +678,17 @@ class IdentityPersistenceUseCaseTest {
     @Test
     @DisplayName("소셜 로그인 전용 계정은 자체 이메일 비밀번호 변경을 제공하지 않는다")
     void rejectsLocalPasswordChangeForExternalAccount() {
-        var account = resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
+        var accountId = resolveExternalLoginUseCase.resolveExternalLogin(new ExternalLoginCommand(
                 IdentityProvider.GOOGLE,
                 "social-security-user",
                 "social-security@example.com",
                 true,
                 "소셜 사용자"
-        )).account();
+        )).accountId();
 
         assertThatThrownBy(() -> accountSecurityUseCase.changeLocalPassword(
                 new ChangeLocalPasswordCommand(
-                        account.accountId(),
+                        accountId,
                         RAW_PASSWORD,
                         REPLACEMENT_PASSWORD
                 )
