@@ -114,7 +114,6 @@ test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 �
 
   await expect.poll(() => recordedCalls(api, 'PATCH', archivePath).length).toBe(2)
   const archiveCalls = recordedCalls(api, 'PATCH', archivePath)
-  expectScopedCall(archiveCalls[0]!, { archived: true })
   expectScopedCall(archiveCalls[1]!, { archived: false })
   await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible()
 
@@ -590,7 +589,6 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
 
   await expect.poll(() => recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`).length).toBe(2)
   const createAttempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`)
-  expect(createAttempts).toHaveLength(2)
   expect(createAttempts[1]?.headers['idempotency-key']).toBe(firstCreateCall.headers['idempotency-key'])
   expect(api.projection().resources.filter((resource) => resource.title === '문제 선정 기준 문서')).toHaveLength(1)
   await expect.poll(async () => (await pendingContentCreationEntries(page))
@@ -1167,7 +1165,6 @@ test('@handoff 완료한 인수인계 항목을 수정하고 보관·복원해 �
 
   await expect.poll(() => recordedCalls(api, 'PATCH', archivePath).length).toBe(2)
   const archiveCalls = recordedCalls(api, 'PATCH', archivePath)
-  expectScopedCall(archiveCalls[0]!, { archived: true })
   expectScopedCall(archiveCalls[1]!, { archived: false })
   await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
 

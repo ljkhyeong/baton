@@ -263,7 +263,7 @@ test('@operations 내 담당 업무는 활동 종료된 구성원의 업무를 �
 test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 뒤 상태를 복구한다', async ({ page }, testInfo) => {
   test.slow()
   await installApi(page)
-  const membershipApi = await installMembershipApi(page)
+  const membershipApi = await installMembershipApi(page, { additiveResponseFields: true })
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name)
     .getByRole('button', { name: '역할' })
@@ -370,30 +370,6 @@ test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 �
   } finally {
     lookupResponse.resolve()
   }
-})
-
-test('구성원 연결 응답의 추가 필드를 무시한다', async ({ page }, testInfo) => {
-  await installApi(page)
-  await installMembershipApi(page, { additiveResponseFields: true })
-  await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  let dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
-  page.once('dialog', async (confirmation) => confirmation.accept())
-  await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
-  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
-
-  await page.reload()
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-  dialog = page.getByRole('dialog', { name: '구성원 관리' })
-  await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 })
 
 test('익명 사용자는 접근 키를 URL에 복제하지 않는 로그인 복귀 경로를 받는다', async ({ page }, testInfo) => {

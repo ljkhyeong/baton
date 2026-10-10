@@ -244,7 +244,7 @@ async function openRoundResource(page: Page, projectName: string) {
 
 test('@webkit 역할 자료에서 ROUND 방을 시작하고 같은 기기에서 종료한다', async ({ page }, testInfo) => {
   await installApi(page, projectionWithRoundResource())
-  const roundApi = await installRoundProductApi(page)
+  const roundApi = await installRoundProductApi(page, { additiveResponseFields: true })
   await openSharedWorkspace(page)
   let inspector = await openRoundResource(page, testInfo.project.name)
 
@@ -332,24 +332,6 @@ test('@smoke ROUND 시작 중 화면을 떠나면 자동 입장하지 않고 돌
   } finally {
     creationResponse.resolve()
   }
-})
-
-test('ROUND 응답의 추가 필드를 무시한다', async ({ page }, testInfo) => {
-  await installApi(page, projectionWithRoundResource())
-  await installRoundProductApi(page, {
-    additiveResponseFields: true,
-  })
-  await openSharedWorkspace(page)
-  let inspector = await openRoundResource(page, testInfo.project.name)
-
-  await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
-  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
-  await page.goto(WORKSPACE_PATH)
-  inspector = await openRoundResource(page, testInfo.project.name)
-  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeVisible()
-  page.once('dialog', async (dialog) => dialog.accept())
-  await inspector.getByRole('button', { name: 'ROUND 종료' }).click()
-  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeVisible()
 })
 
 test('현재 ROUND 목록의 종료·중복 상태는 서버 응답으로 수용한다', async ({ page }, testInfo) => {

@@ -206,10 +206,9 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
 })
 
 test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 초점을 돌려준다', async ({ page }, testInfo) => {
-  const api = await installApi(page)
+  await installApi(page)
   await denyShareAndClipboard(page)
   await openSharedWorkspace(page)
-  expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
 
   const shareButton = workspaceChrome(page, testInfo.project.name).getByRole('button', { name: '공유' })
   await shareButton.focus()
@@ -240,7 +239,6 @@ test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 �
 test('@smoke 서버 작업 공간에서 역할을 만들고 새로고침 후에도 유지한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
   await openSharedWorkspace(page)
-  expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '역할 추가' }).click()

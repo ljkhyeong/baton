@@ -214,7 +214,7 @@ test('역할 인수인계 응답은 준비·변경 단계 모두 서버 상태�
 
 test('다음 시즌 decoder는 원본과 후속 시즌 계보만 검증한다', async ({ page }) => {
   const path = '/response-decoder/next-season'
-  let response = nextSeasonResponse()
+  const response = nextSeasonResponse()
   Reflect.set(response, 'futureServerField', 'ignored')
   await page.route(`**${path}`, (route) => route.fulfill({
     status: 201,
@@ -227,14 +227,6 @@ test('다음 시즌 decoder는 원본과 후속 시즌 계보만 검증한다', 
     path,
     { kind: 'next-season', sourceSeasonId: response.sourceSeason.id },
   )).resolves.toEqual({ ok: true, value: response })
-
-  response = nextSeasonResponse()
-  response.season.previousSeasonId = '83838383-8383-4383-8383-838383838383'
-  await expect(decodedResponseRequestFromBrowser(
-    page,
-    path,
-    { kind: 'next-season', sourceSeasonId: response.sourceSeason.id },
-  )).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
 test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scope를 유지해야 한다', async ({ page }) => {

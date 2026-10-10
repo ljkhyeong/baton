@@ -1555,9 +1555,7 @@ export function recordedCalls(api: ApiHarness, method: string, path: string) {
 
 export async function recordedCall(api: ApiHarness, method: string, path: string) {
   await expect.poll(() => recordedCalls(api, method, path).length).toBeGreaterThan(0)
-  const call = recordedCalls(api, method, path).at(-1)
-  expect(call, `${method} ${path} 요청 기록`).toBeTruthy()
-  return call!
+  return recordedCalls(api, method, path).at(-1)!
 }
 
 export function expectScopedCall(call: RecordedCall, body?: unknown) {
@@ -1598,8 +1596,7 @@ export async function expectPendingCreationDialogLocked({
       })
     await expect(dialog).toBeVisible()
     await expect.poll(callCount).toBe(callsBeforeSubmit + 1)
-    const createCall = recordedCalls(api, 'POST', path).at(-1)
-    expect(createCall).toBeTruthy()
+    const createCall = recordedCalls(api, 'POST', path).at(-1)!
 
     await expect(dialog).toHaveAttribute('aria-busy', 'true')
     const closeButton = dialog.getByRole('button', { name: '닫기' })
@@ -1619,7 +1616,7 @@ export async function expectPendingCreationDialogLocked({
       .filter((entry) => entry.operation === operation)
     expect(pendingEntries).toEqual([
       expect.objectContaining({
-        idempotencyKey: createCall?.headers['idempotency-key'],
+        idempotencyKey: createCall.headers['idempotency-key'],
       }),
     ])
   } finally {

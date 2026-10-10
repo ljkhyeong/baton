@@ -206,7 +206,7 @@ test('@operations @responsive 점검 실패 원인과 횟수를 최신 결과에
     } else {
       await expect(health).toContainText('연결 정상')
       await expect(health).not.toContainText('연속 연결 실패')
-      await expect(health).not.toContainText('점검 서비스에서 오류가 발생했습니다.')
+      await expect(health).not.toContainText('점검 서비스 오류로 연결 상태를 확인하지 못했습니다.')
     }
   }
 })

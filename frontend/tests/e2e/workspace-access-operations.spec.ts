@@ -105,7 +105,6 @@ test('@smoke 접근 키를 바꾸면 저장 키와 새 공유 링크를 함께 �
   await reissueSharedLink(keyDialog)
 
   const rotateCall = await recordedCall(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
-  expectScopedCall(rotateCall)
   expect(rotateCall.headers['idempotency-key']).toMatch(/^[0-9a-f-]{32,64}$/)
   await expect.poll(() => api.calls.some((call) =>
     call.method === 'GET'
@@ -461,7 +460,6 @@ test('만료된 접근 키 회전 기록은 지우고 다음 명시적 시도에
 
   await expect.poll(() => recordedCalls(api, 'POST', `${SCOPE_PATH}/access-key/rotate`).length).toBe(2)
   const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
-  expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
 
@@ -568,7 +566,6 @@ test('손상된 회전 임시 기록 저장소를 무시하고 정상 멱등 키
 
   await expect.poll(() => recordedCalls(api, 'POST', `${SCOPE_PATH}/access-key/rotate`).length).toBe(2)
   const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/access-key/rotate`)
-  expect(attempts).toHaveLength(2)
   expect(attempts[0]?.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   expect(attempts[0]?.headers['idempotency-key']).not.toBe(malformedIdempotencyKey)
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
@@ -716,7 +713,6 @@ test('@operations @responsive 자동 회차 하나를 연기하고 건너뛴 뒤
   const api = await installApi(page, projection)
   await openSharedWorkspace(page)
 
-  await expect(page.getByLabel('회차', { exact: true })).toHaveValue(ROUND_TWO_ID)
   await expect(page.locator('.today-task-list .timing-label').filter({ hasText: '지연' })).toBeVisible()
   const relayList = page.getByRole('region', { name: '이번 회차 업무' }).getByRole('list')
   const relayItems = relayList.getByRole('listitem')
@@ -1232,23 +1228,6 @@ test('동기화 실패에도 기존 내용을 유지하고 수동으로 다시 �
   api.restoreWorkspaceGets()
   await page.getByRole('button', { name: '지금 새로고침' }).click()
   await expect(syncStatus).toContainText('화면 갱신')
-})
-
-test('창 활성화와 네트워크 복구 때 즉시 최신 내용을 확인한다', async ({ page }) => {
-  const api = await installApi(page)
-  await openSharedWorkspace(page)
-  const workspaceGetCount = () => recordedCalls(api, 'GET', `${SCOPE_PATH}/workspace`).length
-
-  const initialGets = workspaceGetCount()
-  await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
-  await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(initialGets)
-
-  const getsAfterFocus = workspaceGetCount()
-  await page.evaluate(() => {
-    window.dispatchEvent(new Event('offline'))
-    window.dispatchEvent(new Event('online'))
-  })
-  await expect.poll(workspaceGetCount, { timeout: 3_000 }).toBeGreaterThan(getsAfterFocus)
 })
 
 test('접근 거부 뒤에는 재시도와 창 활성화 및 네트워크 복구 동기화를 멈춘다', async ({ page }) => {

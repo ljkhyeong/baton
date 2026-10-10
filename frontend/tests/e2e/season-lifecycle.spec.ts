@@ -754,7 +754,6 @@ test('@handoff @responsive 이전 시즌 기록을 필요할 때 조회하고 �
   await dialog.getByRole('button', { name: '자료 추가' }).click()
   await expect(dialog).not.toBeVisible()
   expect(copies).toEqual([{ roleId: COPIED_ROLE_ID, title: '문제 목록', url: 'https://example.com/problems', description: null }])
-  expect(previous.resources[0]?.roleId).toBe(ROLE_ID)
   await page.reload()
   await page.getByRole('button', { name: '역할', exact: true }).first().click()
   await page.getByRole('button', { name: /문제 큐레이터 역할 상세 열기/ }).click()

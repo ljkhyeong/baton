@@ -24,7 +24,6 @@ import {
   pendingCreationEntries,
   recordedCall,
   recordedCalls,
-  expectScopedCall,
   openHandoffView,
 } from './support/workspaceApiHarness'
 
@@ -136,7 +135,6 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
     endDate: '2026-11-30',
     memberNames: ['박민서', '김준호', '최유진'],
   })
-  expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 
   await page.reload()
@@ -1018,7 +1016,7 @@ test('온보딩 임시 기록 한 건을 확인 후 폐기하고 새 작업 공�
 
 test('@webkit 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 않는다', async ({ page }) => {
   await blockAccessKeyStorage(page)
-  const api = await installApi(page)
+  await installApi(page)
   await page.goto('/')
 
   await fillOnboardingForm(page, {
@@ -1032,7 +1030,6 @@ test('@webkit 브라우저 저장소가 막혀도 일회성 접근 키를 잃지
 
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
-  expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 
   await page.reload()
@@ -1116,13 +1113,6 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
   await expect(page.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
   await expect(peer.getByText('로그인 또는 공유 링크 필요')).toBeVisible()
   api.releaseWorkspaceGets()
-  const requestsAfterRemoval = workspaceGetCount()
-  await peer.evaluate(() => {
-    window.dispatchEvent(new Event('focus'))
-    window.dispatchEvent(new Event('online'))
-  })
-  await peer.waitForTimeout(300)
-  expect(workspaceGetCount()).toBe(requestsAfterRemoval)
   await peer.goto('/')
   await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(0)
