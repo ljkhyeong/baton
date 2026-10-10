@@ -118,20 +118,15 @@ export function prepareSeasonSuccessor(
     : { status: 'blocked', reason: 'storageUnavailable' }
 }
 
-export function clearPendingSeasonSuccessor(
-  teamId: string,
-  sourceSeasonId: string,
-  request: CreateNextSeasonRequest,
-  idempotencyKey: string,
-) {
-  const payload = normalizedRequest(request)
+export function clearPendingSeasonSuccessor(retry: SeasonSuccessorCleanupRetry) {
+  const payload = normalizedRequest(retry.request)
   return clearMatchingJsonItem(
-    storageKey(teamId),
+    storageKey(retry.teamId),
     isPendingSeasonSuccessor,
-    (pending) => pending.teamId === teamId
-      && pending.sourceSeasonId === sourceSeasonId
+    (pending) => pending.teamId === retry.teamId
+      && pending.sourceSeasonId === retry.sourceSeasonId
       && pending.normalizedPayload === payload
-      && pending.idempotencyKey === idempotencyKey,
+      && pending.idempotencyKey === retry.idempotencyKey,
   )
 }
 

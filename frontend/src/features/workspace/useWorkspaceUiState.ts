@@ -10,15 +10,13 @@ type WorkspaceModal = 'decision' | 'members' | 'member' | 'role' | 'roleResource
 export type OpenWorkspaceModal = Exclude<WorkspaceModal, null>
 type Toast = { message: string; tone: 'success' | 'error' }
 
-function useMediaQuery(query: string, onBeforeChange?: (matches: boolean) => void) {
+function useMediaQuery(query: string, onBeforeChange: () => void) {
   const [matches, setMatches] = useState(false)
-  const notifyBeforeChange = useEffectEvent((matches: boolean) => {
-    onBeforeChange?.(matches)
-  })
+  const notifyBeforeChange = useEffectEvent(onBeforeChange)
   useLayoutEffect(() => {
     const mediaQuery = window.matchMedia(query)
     const updateMatches = () => {
-      notifyBeforeChange(mediaQuery.matches)
+      notifyBeforeChange()
       setMatches(mediaQuery.matches)
     }
     updateMatches()

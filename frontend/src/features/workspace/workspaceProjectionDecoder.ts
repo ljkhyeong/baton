@@ -293,7 +293,6 @@ function isCreateNextSeasonResponse(value: unknown, sourceSeasonId: string) {
     && isSeasonSummary(value.sourceSeason)
     && isInstant(value.sourceSeason.endedAt)
     && isSeasonSummary(value.season)
-    && isUuid(value.season.previousSeasonId)
     && isSameUuid(value.season.previousSeasonId, value.sourceSeason.id)
     && isSameUuid(value.sourceSeason.id, sourceSeasonId)
     && isArrayOf(value.copiedRoles, isCopiedRole)
@@ -337,7 +336,7 @@ function decodeForExpectedId<T extends { id: string }>(
   return decoded
 }
 
-export function decodeSeasonSummary(value: unknown, expectedId?: string): SeasonSummary {
+export function decodeSeasonSummary(value: unknown, expectedId: string): SeasonSummary {
   return decodeForExpectedId<SeasonSummary>(value, isSeasonSummary, 'Season summary', expectedId)
 }
 
@@ -381,15 +380,15 @@ export function decodeSeasonRound(value: unknown, expectedId?: string): SeasonRo
 
 export function decodeRoutineExecution(
   value: unknown,
-  expected?: { executionId: string; roundId: string },
+  expected: { executionId: string; roundId: string },
 ): RoutineExecution {
   const execution = decodeForExpectedId<RoutineExecution>(
     value,
     isRoutineExecution,
     'Routine execution response',
-    expected?.executionId,
+    expected.executionId,
   )
-  if (expected !== undefined && !isSameUuid(execution.roundId, expected.roundId)) {
+  if (!isSameUuid(execution.roundId, expected.roundId)) {
     throw new TypeError('Routine execution response does not match its requested round.')
   }
   return execution
@@ -401,15 +400,15 @@ export function decodeDecision(value: unknown, expectedId?: string): Decision {
 
 export function decodeHandoffItem(
   value: unknown,
-  expected?: { itemId?: string; roleId?: string },
+  expected: { itemId?: string; roleId?: string },
 ): HandoffItem {
   const item = decodeForExpectedId<HandoffItem>(
     value,
     isHandoffItem,
     'Handoff item response',
-    expected?.itemId,
+    expected.itemId,
   )
-  if (expected?.roleId !== undefined && !isSameUuid(item.roleId, expected.roleId)) {
+  if (expected.roleId !== undefined && !isSameUuid(item.roleId, expected.roleId)) {
     throw new TypeError('Handoff item response does not match its requested role.')
   }
   return item
@@ -417,15 +416,15 @@ export function decodeHandoffItem(
 
 export function decodeRoleResource(
   value: unknown,
-  expected?: { resourceId?: string; roleId?: string },
+  expected: { resourceId?: string; roleId?: string },
 ): RoleResource {
   const resource = decodeForExpectedId<RoleResource>(
     value,
     isRoleResource,
     'Role resource response',
-    expected?.resourceId,
+    expected.resourceId,
   )
-  if (expected?.roleId !== undefined && !isSameUuid(resource.roleId, expected.roleId)) {
+  if (expected.roleId !== undefined && !isSameUuid(resource.roleId, expected.roleId)) {
     throw new TypeError('Role resource response does not match its requested role.')
   }
   return resource

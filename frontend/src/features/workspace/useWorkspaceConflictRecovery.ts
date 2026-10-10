@@ -43,27 +43,23 @@ export function useWorkspaceConflictRecovery({
     if (discardCurrentEditors) discardEditors()
     setRecovery({ generation, status: 'refreshing', successMessage })
 
-    let refreshed: RefetchResult
+    let refreshed = false
     try {
-      refreshed = await refetchWorkspace()
+      refreshed = (await refetchWorkspace()).isSuccess
     } catch {
-      if (generationRef.current !== generation) return false
-      setRecovery({ generation, status: 'failed', successMessage })
-      notify(refreshFailureMessage, 'error')
-      return false
+      // 다시 불러오기 예외도 실패 결과와 같이 처리한다.
     }
 
-    if (generationRef.current !== generation) return false
+    if (generationRef.current !== generation) return
 
-    if (refreshed.isSuccess) {
+    if (refreshed) {
       setRecovery(null)
       notify(successMessage, 'error')
-      return true
+      return
     }
 
     setRecovery({ generation, status: 'failed', successMessage })
     notify(refreshFailureMessage, 'error')
-    return false
   }
 
   const beginRecovery = (successMessage: string) => {

@@ -276,6 +276,7 @@ export function forgetWorkspaceCapabilityAndRecents(
 
 export function clearAllWorkspaceCapabilitiesAndRecents() {
   const affectedTeamIds = new Set(workspaceCapabilityListeners.keys())
+  let cleared = false
   try {
     const storage = window.localStorage
     const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
@@ -284,18 +285,14 @@ export function clearAllWorkspaceCapabilitiesAndRecents() {
     keys.forEach((key) => affectedTeamIds.add(key.slice(ACCESS_KEY_STORAGE_PREFIX.length)))
     keys.forEach((key) => storage.removeItem(key))
     storage.removeItem(RECENT_WORKSPACES_STORAGE_KEY)
-    affectedTeamIds.forEach((teamId) => {
-      recordWorkspaceCapabilityRemoval(teamId)
-      notifyWorkspaceCapabilityChange(teamId)
-    })
-    notifyRecentWorkspacesChange()
-    return true
+    cleared = true
   } catch {
-    affectedTeamIds.forEach((teamId) => {
-      recordWorkspaceCapabilityRemoval(teamId)
-      notifyWorkspaceCapabilityChange(teamId)
-    })
-    notifyRecentWorkspacesChange()
-    return false
+    // 일부만 지웠을 수 있으므로 실패해도 아래 알림은 보낸다.
   }
+  affectedTeamIds.forEach((teamId) => {
+    recordWorkspaceCapabilityRemoval(teamId)
+    notifyWorkspaceCapabilityChange(teamId)
+  })
+  notifyRecentWorkspacesChange()
+  return cleared
 }

@@ -133,7 +133,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
         const cleanupResult = clearPendingContentCreationCleanup(cleanupRetry)
         return isJsonCleanupComplete(cleanupResult)
           ? { status: 'cleanupCompleted' as const }
-          : { status: 'cleanupBlocked' as const }
+          : { status: 'blocked' as const, reason: 'cleanupRequired' as const }
       }
 
       const preparation = prepareContentCreation(scope, operation, request)
@@ -171,11 +171,6 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
       if (lockResult.value.status === 'blocked') {
         mutation.reset()
         setStorageError(preparationError(lockResult.value.reason))
-        return false
-      }
-      if (lockResult.value.status === 'cleanupBlocked') {
-        mutation.reset()
-        setStorageError(contentCreationCleanupRequiredMessage)
         return false
       }
       if (lockResult.value.status === 'cleanupCompleted') {
@@ -239,7 +234,6 @@ export function usePendingContentCreationCleanupCommand() {
       }
 
       setCleanupRetry(null)
-      setMessage(contentCreationCleanupCompletedMessage)
       return true
     }).finally(() => setPending(false))
   }

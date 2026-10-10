@@ -85,27 +85,18 @@ export function useSeasonSuccessorCommand(
 
     return runWithSeasonSuccessorLock(
       scope.teamId,
-      async () => isJsonCleanupComplete(
-        clearPendingSeasonSuccessor(
-          cleanupRetry.teamId,
-          cleanupRetry.sourceSeasonId,
-          cleanupRetry.request,
-          cleanupRetry.idempotencyKey,
-        ),
-      ),
+      async () => isJsonCleanupComplete(clearPendingSeasonSuccessor(cleanupRetry)),
     ).then((lockResult) => {
+      mutation.reset()
       if (lockResult.status !== 'completed') {
-        mutation.reset()
         setStorageError(lockMessages[lockResult.status])
         return false
       }
       if (!lockResult.value) {
-        mutation.reset()
         setStorageError(cleanupRequiredMessage)
         return false
       }
 
-      mutation.reset()
       setCleanupRetry(null)
       setStorageError(cleanupCompletedMessage)
       return true
@@ -132,12 +123,7 @@ export function useSeasonSuccessorCommand(
         idempotencyKey,
       }
       const clearPendingRequest = () => {
-        const cleanup = clearPendingSeasonSuccessor(
-          scope.teamId,
-          scope.seasonId,
-          request,
-          idempotencyKey,
-        )
+        const cleanup = clearPendingSeasonSuccessor(retry)
         if (!isJsonCleanupComplete(cleanup)) {
           setCleanupRetry(retry)
           setStorageError(cleanupRequiredMessage)
