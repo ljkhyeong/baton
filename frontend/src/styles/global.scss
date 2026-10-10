@@ -2875,7 +2875,6 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .decision-heading .record-actions { margin: -8px 0 18px; }
   .decision-reason,
   .decision-alternative { grid-template-columns: 1fr; gap: 5px; }
-  .handoff-workspace { grid-template-columns: 1fr; }
   .handoff-summary { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 0; }
   .handoff-summary h2 { font-size: 18px; }
   .handoff-checklist { padding: 16px 0; }
@@ -2934,7 +2933,6 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .record-search-footer button { width: 100%; }
   .record-search-card-meta { align-items: flex-start; flex-wrap: wrap; }
   .relay-board { margin-right: -1px; margin-left: -1px; }
-  .round-control { grid-template-columns: 1fr; }
   .round-schedule-card { padding: 16px; }
   .round-schedule-card .secondary-button { flex: 0 0 auto; }
   .round-archive-shelf .archive-row,
