@@ -132,6 +132,26 @@ production_validation_is_url_safe_secret() {
   [[ ${#value} -ge 32 && ${#value} -le 200 && "$value" =~ ^[A-Za-z0-9._~-]+$ ]]
 }
 
+# 백업 파일 이름의 UTC 스냅샷 시각을 epoch 초로 출력한다. 실패 문구는 호출자가 출력한다.
+production_validation_backup_epoch_from_name() {
+  local backup_name="$1"
+  local timestamp
+  local formatted
+
+  if [[ ! "$backup_name" =~ ^baton-([0-9]{8}T[0-9]{6}Z)-[A-Za-z0-9]+\.sql\.gz$ ]]; then
+    return 1
+  fi
+  timestamp="${BASH_REMATCH[1]}"
+  formatted="${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2} ${timestamp:9:2}:${timestamp:11:2}:${timestamp:13:2} UTC"
+  if date --version >/dev/null 2>&1; then
+    date -u -d "$formatted" '+%s'
+  elif date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s' >/dev/null 2>&1; then
+    date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s'
+  else
+    return 1
+  fi
+}
+
 production_validation_portable_mode() {
   local fail_callback="$1"
   local target="$2"
