@@ -2,7 +2,6 @@
 .calendar-panel[open] { padding-bottom: 16px; }
 .calendar-panel > summary { padding: 16px 0; cursor: pointer; }
 .calendar-panel h2 { display: inline; margin: 0 12px 0 4px; font-size: 14px; }
-.calendar-panel > summary > span { color: var(--muted); font-size: 12px; }
 .calendar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .calendar-confirm, .calendar-address { margin-top: 18px; padding: 16px; border: 1px solid var(--rule); border-radius: var(--radius); }
 .calendar-confirm button + button { margin-left: 10px; }
@@ -32,7 +31,6 @@
 .calendar-search-inputs input { min-width: 0; flex: 1; padding: 10px 12px; }
 .calendar-filter { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .calendar-filter input { width: 18px; height: 18px; }
-.calendar-search > button { justify-self: start; }
 .calendar-subscription-status { display: flex; flex-direction: column; max-width: 120px; color: var(--muted); font-size: 12px; text-align: right; }
 .calendar-subscription-status time { display: block; font-size: 12px; }
 .calendar-polling-note { color: var(--muted); font-size: 12px; }
