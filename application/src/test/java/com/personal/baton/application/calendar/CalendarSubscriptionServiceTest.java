@@ -78,8 +78,7 @@ class CalendarSubscriptionServiceTest {
         jdbc.update("DELETE FROM calendar_subscriptions");
         var created = workspace.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
                 new CreateWorkspaceCommand("구독 검증 팀", "가을 시즌", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), List.of("담당자")));
-        UUID account = UUID.randomUUID();
-        jdbc.update("INSERT INTO accounts (id, display_name, created_at, updated_at) VALUES (UUID_TO_BIN(?), '구독 계정', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))", account.toString());
+        UUID account = insertAccount("구독 계정");
         jdbc.update("""
                 INSERT INTO account_team_memberships (id,account_id,team_id,member_id,claimed_at)
                 SELECT UUID_TO_BIN(?),UUID_TO_BIN(?),team_id,id,CURRENT_TIMESTAMP(6) FROM members WHERE team_id=UUID_TO_BIN(?)
@@ -109,8 +108,7 @@ class CalendarSubscriptionServiceTest {
             var claim = store.claim(new Owner(scope.accountId(), scope.teamId(), seasonId), true, false, NOW);
             store.release(claim, false);
         }
-        UUID otherAccount = UUID.randomUUID();
-        jdbc.update("INSERT INTO accounts (id,display_name,created_at,updated_at) VALUES (UUID_TO_BIN(?),'다른 계정',CURRENT_TIMESTAMP(6),CURRENT_TIMESTAMP(6))", otherAccount.toString());
+        UUID otherAccount = insertAccount("다른 계정");
         var other = store.claim(new Owner(otherAccount, scope.teamId(), scope.seasonId()), true, false, NOW);
         store.release(other, false);
         jdbc.update("DELETE FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", scope.accountId().toString());
@@ -239,7 +237,7 @@ class CalendarSubscriptionServiceTest {
     @DisplayName("활동 중지를 취소해도 같은 트랜잭션에 남긴 폐기 요청은 유지한다")
     void persistsDeactivationIntentAcrossReactivation() {
         UUID id = service.create(scope).subscriptionId();
-        UUID memberId = UUID.fromString(jdbc.queryForObject("SELECT BIN_TO_UUID(member_id) FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", String.class, scope.accountId().toString()));
+        UUID memberId = memberId();
         people.updateMemberDeactivation(scope.teamId(), scope.seasonId(), memberId, scope.accessKey(), true);
         people.updateMemberDeactivation(scope.teamId(), scope.seasonId(), memberId, scope.accessKey(), false);
         assertThat(store.find(owner()).orElseThrow().revocationPending()).isTrue();
@@ -251,7 +249,7 @@ class CalendarSubscriptionServiceTest {
     @DisplayName("활동 중지 원본 트랜잭션이 취소되면 구독 폐기 요청도 취소된다")
     void rollsBackRevocationWithMembershipChange() {
         service.create(scope);
-        UUID memberId = UUID.fromString(jdbc.queryForObject("SELECT BIN_TO_UUID(member_id) FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", String.class, scope.accountId().toString()));
+        UUID memberId = memberId();
         new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(transaction -> {
             people.updateMemberDeactivation(scope.teamId(), scope.seasonId(), memberId, scope.accessKey(), true);
             transaction.setRollbackOnly();
@@ -463,8 +461,7 @@ class CalendarSubscriptionServiceTest {
     private void enableAccountAccess() {
         var member = people.createMember(scope.teamId(), scope.seasonId(), UUID.randomUUID().toString(),
                 scope.accessKey(), new CreateMemberCommand("관리자"));
-        administrator = UUID.randomUUID();
-        jdbc.update("INSERT INTO accounts (id, display_name, created_at, updated_at) VALUES (UUID_TO_BIN(?), '관리 계정', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))", administrator.toString());
+        administrator = insertAccount("관리 계정");
         jdbc.update("""
                 INSERT INTO account_team_memberships (id,account_id,team_id,member_id,claimed_at)
                 VALUES (UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),UUID_TO_BIN(?),CURRENT_TIMESTAMP(6))
@@ -473,7 +470,7 @@ class CalendarSubscriptionServiceTest {
         teamAccess.activate(scope.teamId(), administrator, member.id(), "pilot-recovery-key-0000000000000002");
     }
     private void grant(TeamPermission permission) {
-        UUID memberId = UUID.fromString(jdbc.queryForObject("SELECT BIN_TO_UUID(member_id) FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)", String.class, scope.accountId().toString()));
+        UUID memberId = memberId();
         when(currentAccount.currentAccountId()).thenReturn(Optional.of(administrator));
         teamAccess.changePermission(scope.teamId(), administrator, memberId, permission);
         when(currentAccount.currentAccountId()).thenReturn(Optional.of(scope.accountId()));
@@ -481,6 +478,16 @@ class CalendarSubscriptionServiceTest {
 
     private int feedStatus(String baseUrl, URI feed) {
         return RestClient.create(baseUrl).get().uri(feed.getRawPath()).exchange((request, response) -> response.getStatusCode().value());
+    }
+    private UUID insertAccount(String displayName) {
+        UUID accountId = UUID.randomUUID();
+        jdbc.update("INSERT INTO accounts (id, display_name, created_at, updated_at) VALUES (UUID_TO_BIN(?), ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))",
+                accountId.toString(), displayName);
+        return accountId;
+    }
+    private UUID memberId() {
+        return UUID.fromString(jdbc.queryForObject("SELECT BIN_TO_UUID(member_id) FROM account_team_memberships WHERE account_id=UUID_TO_BIN(?)",
+                String.class, scope.accountId().toString()));
     }
     private void deactivate() { jdbc.update("UPDATE members SET deactivated_at=CURRENT_TIMESTAMP(6) WHERE team_id=UUID_TO_BIN(?)", scope.teamId().toString()); }
     private Owner owner() { return new Owner(scope.accountId(), scope.teamId(), scope.seasonId()); }

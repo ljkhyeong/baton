@@ -73,14 +73,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.groups.Tuple.tuple;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-
-
 
 @Tag("usecase")
 @Testcontainers(disabledWithoutDocker = true)
@@ -503,7 +495,6 @@ class BriefContinuitySignalPersistenceTest {
             assertThat(renamed.name()).isEqualTo("수정한 모임 이름");
             verifyNoInteractions(recorder);
 
-            clearInvocations(recorder);
             var rescheduled = operationsUseCase.updateSeasonRound(
                     teamId, seasonId, sources.roundId(), key,
                     new UpdateSeasonRoundCommand(renamed.name(), LocalDate.of(2026, 7, 21)));
@@ -537,16 +528,9 @@ class BriefContinuitySignalPersistenceTest {
                     teamId, seasonId, idempotencyKey, key,
                     new CreateRoleResourceCommand(sources.roleId(), "새 자료", "https://example.com/new", null));
             case ROLE_HANDOFF -> {
-                MemberResult nextMember = peopleUseCase.createMember(
-                        teamId, seasonId, UUID.randomUUID().toString(), key, new CreateMemberCommand("박민서"));
-                peopleUseCase.updateRole(
-                        teamId, seasonId, sources.roleId(), key,
-                        new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
-                                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
+                MemberResult nextMember = assignRoleForHandoff(sources);
                 yield () -> peopleUseCase.prepareRoleHandoff(
-                        teamId, seasonId, sources.roleId(), idempotencyKey, key,
-                        new PrepareRoleHandoffCommand(
-                                nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
+                        teamId, seasonId, sources.roleId(), idempotencyKey, key, handoffTo(nextMember));
             }
         };
         Object created = null;
@@ -578,16 +562,9 @@ class BriefContinuitySignalPersistenceTest {
         UUID seasonId = workspace.seasonId();
         UUID roleId = sources.roleId();
         String key = workspace.accessKey();
-        MemberResult nextMember = peopleUseCase.createMember(
-                teamId, seasonId, UUID.randomUUID().toString(), key, new CreateMemberCommand("박민서"));
-        peopleUseCase.updateRole(
-                teamId, seasonId, roleId, key,
-                new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
-                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
+        MemberResult nextMember = assignRoleForHandoff(sources);
         var prepared = peopleUseCase.prepareRoleHandoff(
-                teamId, seasonId, roleId, UUID.randomUUID().toString(), key,
-                new PrepareRoleHandoffCommand(
-                        nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30)));
+                teamId, seasonId, roleId, UUID.randomUUID().toString(), key, handoffTo(nextMember));
         UUID handoffId = prepared.handoff().id();
         ConfirmRoleHandoffCommand cancellation = new ConfirmRoleHandoffCommand(sources.memberId());
         Supplier<RoleHandoffTransitionResult> transfer = () -> peopleUseCase.transferRoleHandoff(
@@ -694,6 +671,23 @@ class BriefContinuitySignalPersistenceTest {
         );
         return new SignalSources(workspace, member.id(), role.id(), routine.id(), round.id(),
                 round.routineExecutions().getFirst().id(), item.id(), resource.id());
+    }
+
+    // 기존 구성원에게 기록자 역할을 맡기고 인수인계를 받을 새 구성원을 만든다.
+    private MemberResult assignRoleForHandoff(SignalSources sources) {
+        CreatedWorkspaceResult workspace = sources.workspace();
+        MemberResult nextMember = peopleUseCase.createMember(
+                workspace.teamId(), workspace.seasonId(), UUID.randomUUID().toString(), workspace.accessKey(),
+                new CreateMemberCommand("박민서"));
+        peopleUseCase.updateRole(
+                workspace.teamId(), workspace.seasonId(), sources.roleId(), workspace.accessKey(),
+                new UpdateRoleCommand("기록자", "기록 담당", sources.memberId(), null,
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("회의 기록"), null));
+        return nextMember;
+    }
+
+    private PrepareRoleHandoffCommand handoffTo(MemberResult nextMember) {
+        return new PrepareRoleHandoffCommand(nextMember.id(), LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30));
     }
 
     private enum SignalCreation {

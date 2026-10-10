@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -68,7 +70,7 @@ class CalendarRecoveryCompletionServiceTest {
         var result = service.complete(recovery);
         assertThat(result.status()).isEqualTo(Status.WAITING);
         assertThat(result.code()).isEqualTo("CAL_RECOVERY_METADATA_MISMATCH");
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).complete(any(), any());
+        verify(client, never()).complete(any(), any());
     }
 
     @Test
@@ -85,7 +87,7 @@ class CalendarRecoveryCompletionServiceTest {
         assertThat(result.code()).isEqualTo("CAL_RECOVERY_COMPLETION_RECHECK_REQUIRED");
         when(client.complete(eq(recovery), any())).thenReturn(DeliveryResult.delivered("COMPLETED"));
         assertThat(service.complete(recovery).status()).isEqualTo(Status.COMPLETED);
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.times(2)).verifySeason(eq(recovery), any());
+        verify(client, times(2)).verifySeason(eq(recovery), any());
     }
 
     private RecoveryState state() {

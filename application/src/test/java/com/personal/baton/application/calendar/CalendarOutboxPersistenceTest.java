@@ -176,19 +176,7 @@ class CalendarOutboxPersistenceTest {
     @DisplayName("같은 원본의 다음 개정 번호는 원본 수정 시각도 1마이크로초 전진시킨다")
     @Test
     void keepsSourceUpdatedAtMonotonic() {
-        UUID sourceItemId = UUID.randomUUID();
-        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-
-        transaction.executeWithoutResult(status -> {
-            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
-                    LocalDate.of(2026, 8, 28),
-                    LocalDate.of(2026, 8, 29)
-            )));
-            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
-                    LocalDate.of(2026, 8, 29),
-                    LocalDate.of(2026, 8, 30)
-            )));
-        });
+        appendTwoRevisions(UUID.randomUUID());
 
         assertThat(jdbcTemplate.queryForList(
                 "SELECT source_updated_at FROM calendar_snapshot_outbox ORDER BY id",
@@ -202,18 +190,7 @@ class CalendarOutboxPersistenceTest {
     @DisplayName("만료된 CAL 임대는 같은 행을 재선점하고 이전 작업자의 완료를 막는다")
     @Test
     void reclaimsExpiredLeaseWithFencing() {
-        UUID sourceItemId = UUID.randomUUID();
-        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
-        transaction.executeWithoutResult(status -> {
-            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
-                    LocalDate.of(2026, 8, 28),
-                    LocalDate.of(2026, 8, 29)
-            )));
-            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
-                    LocalDate.of(2026, 8, 29),
-                    LocalDate.of(2026, 8, 30)
-            )));
-        });
+        appendTwoRevisions(UUID.randomUUID());
         List<Integer> revisions = jdbcTemplate.queryForList(
                 "SELECT id FROM calendar_snapshot_outbox ORDER BY id",
                 Integer.class
@@ -475,6 +452,20 @@ class CalendarOutboxPersistenceTest {
                 "WAITING",
                 "자료를 제출합니다"
         );
+    }
+
+    // 같은 원본에 날짜만 다른 개정 두 개를 한 트랜잭션으로 쌓는다.
+    private void appendTwoRevisions(UUID sourceItemId) {
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+                    LocalDate.of(2026, 8, 28),
+                    LocalDate.of(2026, 8, 29)
+            )));
+            outboxPort.appendIfChanged(snapshot(sourceItemId, new CalendarSnapshot.AllDay(
+                    LocalDate.of(2026, 8, 29),
+                    LocalDate.of(2026, 8, 30)
+            )));
+        });
     }
 
     private CalendarSnapshotDraft snapshot(CalendarSnapshot.Time time) {
