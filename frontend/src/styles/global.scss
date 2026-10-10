@@ -2679,7 +2679,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 .today-more > details > summary span { color: var(--muted); font-size: 12px; font-weight: 500; }
 
 @media (max-width: 1240px) {
-  .app-shell { grid-template-columns: 232px minmax(0, 1fr); }
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
   .inspector {
     position: fixed;
     z-index: 20;
