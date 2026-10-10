@@ -312,6 +312,12 @@ test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scop
         projection.seasons.push(structuredClone(projection.seasons[0]!))
       },
     },
+    {
+      name: '문자열이 아닌 계정 권한',
+      mutate: (projection: WorkspaceProjection) => {
+        Object.assign(projection.team, { accountAccessEnabled: true, permission: ['ADMIN'] })
+      },
+    },
   ]) {
     await test.step(scenario.name, async () => {
       response = scopedProjection({

@@ -111,9 +111,9 @@ function decodeTransitions(value: unknown): AttentionTransitions {
       if (!isJsonObject(entry) || !isUuid(entry.eventId) || !isPositiveInteger(entry.aggregateRevision)
         || (entry.state !== 'ACTIVE' && entry.state !== 'RESOLVED') || !isInstant(entry.observedAt)
         || typeof entry.detectedRevisionGap !== 'boolean'
-        || (entry.sourceSeverity != null && entry.sourceSeverity !== 'CRITICAL' && entry.sourceSeverity !== 'WARNING')) throw new Error('변경 기록을 확인할 수 없습니다.')
+        || (entry.sourceSeverity !== null && entry.sourceSeverity !== 'CRITICAL' && entry.sourceSeverity !== 'WARNING')) throw new Error('변경 기록을 확인할 수 없습니다.')
       return { eventId: entry.eventId, aggregateRevision: entry.aggregateRevision, state: entry.state,
-        observedAt: entry.observedAt, detectedRevisionGap: entry.detectedRevisionGap, sourceSeverity: entry.sourceSeverity ?? null }
+        observedAt: entry.observedAt, detectedRevisionGap: entry.detectedRevisionGap, sourceSeverity: entry.sourceSeverity }
     }) }
 }
 
@@ -138,14 +138,14 @@ function decodeEditionItem(item: unknown): BriefEdition['items'][number] {
       || (item.status !== 'ACTIVE' && item.status !== 'RESOLVED')
       || typeof item.sourceReference !== 'string' || !item.sourceReference.length
       || !isInstant(item.observedAt) || !isPositiveInteger(item.ruleVersion)
-      || (item.section != null && item.section !== 'CURRENT_WEEK' && item.section !== 'CARRY_OVER')
+      || (item.section !== null && item.section !== 'CURRENT_WEEK' && item.section !== 'CARRY_OVER')
       || !((item.aggregateRevision === null && item.revisionGap === null)
         || (isPositiveInteger(item.aggregateRevision) && typeof item.revisionGap === 'boolean'))) {
       throw new Error('저장된 주간 요약 항목을 확인할 수 없습니다.')
     }
     return { reasonCode: item.reasonCode, severity: item.severity, status: item.status, sourceReference: item.sourceReference,
       observedAt: item.observedAt, ruleVersion: item.ruleVersion, aggregateRevision: item.aggregateRevision,
-      revisionGap: item.revisionGap, section: item.section ?? null }
+      revisionGap: item.revisionGap, section: item.section }
 }
 
 function decodeEdition(value: unknown, scope: BriefScope): BriefEdition {

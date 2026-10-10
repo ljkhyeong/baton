@@ -112,7 +112,7 @@ function isTeamSummary(value: unknown) {
     && typeof value.name === 'string'
     && typeof value.accountAccessEnabled === 'boolean'
     && (value.accountAccessEnabled
-      ? ['ADMIN', 'MEMBER', 'VIEWER'].includes(String(value.permission))
+      ? isOneOf(value.permission, ['ADMIN', 'MEMBER', 'VIEWER'])
       : value.permission === null)
 }
 
