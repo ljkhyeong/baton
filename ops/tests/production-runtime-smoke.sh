@@ -1697,9 +1697,7 @@ grep -Fxq -- "$TEAM_ID_B"$'\t'"$SEASON_ID_B" "$RECOVERY_TARGETS" \
   }
 
 "${COMPOSE[@]}" start app web
-HTTP_PORT="$(published_port 80)"
 HTTPS_PORT="$(published_port 443)"
-HTTP_BASE_URL="http://localhost:$HTTP_PORT"
 HTTPS_BASE_URL="https://localhost:$HTTPS_PORT"
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
 
