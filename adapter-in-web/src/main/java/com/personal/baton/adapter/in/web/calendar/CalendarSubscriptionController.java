@@ -1,6 +1,7 @@
 package com.personal.baton.adapter.in.web.calendar;
 
 import com.personal.baton.adapter.in.web.AccessKeyHeader;
+import com.personal.baton.adapter.in.web.AccountIdHeader;
 import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase;
 import com.personal.baton.application.calendar.CalendarSubscriptionException;
@@ -40,7 +41,7 @@ public class CalendarSubscriptionController {
             @RequestParam(required = false) UUID afterSeasonId,
             @RequestParam(defaultValue = "") @Size(max = 100) String query,
             @RequestParam(defaultValue = "true") boolean includeRevoked,
-            @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
+            @RequestHeader(AccountIdHeader.NAME) UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
         var result = subscriptions.list(principal.accountId(), afterSeasonId, query, includeRevoked);
@@ -54,7 +55,7 @@ public class CalendarSubscriptionController {
     public ResponseEntity<SubscriptionResponse> find(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
             @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
-            @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
+            @RequestHeader(AccountIdHeader.NAME) UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
         var result = subscriptions.find(new Scope(principal.accountId(), teamId, seasonId, accessKey));
@@ -66,7 +67,7 @@ public class CalendarSubscriptionController {
     public ResponseEntity<CredentialResponse> create(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
             @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
-            @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
+            @RequestHeader(AccountIdHeader.NAME) UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
         var result = subscriptions.create(new Scope(principal.accountId(), teamId, seasonId, accessKey));
@@ -77,7 +78,7 @@ public class CalendarSubscriptionController {
     public ResponseEntity<CredentialResponse> rotate(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
             @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
-            @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
+            @RequestHeader(AccountIdHeader.NAME) UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
         var result = subscriptions.rotate(new Scope(principal.accountId(), teamId, seasonId, accessKey));
@@ -88,7 +89,7 @@ public class CalendarSubscriptionController {
     public ResponseEntity<Void> revoke(
             @PathVariable UUID teamId, @PathVariable UUID seasonId,
             @RequestHeader(value = AccessKeyHeader.NAME, defaultValue = "") String accessKey,
-            @RequestHeader("X-Baton-Account-Id") UUID expectedAccountId,
+            @RequestHeader(AccountIdHeader.NAME) UUID expectedAccountId,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal) {
         verifyAccount(principal, expectedAccountId);
         subscriptions.revoke(new Scope(principal.accountId(), teamId, seasonId, accessKey));

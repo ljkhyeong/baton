@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import com.personal.baton.adapter.in.web.AccountIdHeader;
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
@@ -18,7 +19,7 @@ public final class WorkspaceAccountMutationFilter extends OncePerRequestFilter {
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String expected = request.getHeader("X-Baton-Account-Id");
+        String expected = request.getHeader(AccountIdHeader.NAME);
         if (CurrentAuthenticatedAccount.accountId().filter(id -> id.toString().equalsIgnoreCase(expected)).isEmpty()) {
             errors.write(response, HttpServletResponse.SC_FORBIDDEN,
                     new ErrorResponse("ACCOUNT_CHANGED", "로그인 계정이 바뀌었거나 확인되지 않았습니다. 새로고침한 뒤 다시 시도해 주세요"));

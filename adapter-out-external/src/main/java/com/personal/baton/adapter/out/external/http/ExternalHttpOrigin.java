@@ -53,7 +53,6 @@ public final class ExternalHttpOrigin {
     private static boolean isLoopback(String host) {
         return "localhost".equalsIgnoreCase(host)
                 || "127.0.0.1".equals(host)
-                || "::1".equals(host)
                 || "[::1]".equals(host);
     }
 }
