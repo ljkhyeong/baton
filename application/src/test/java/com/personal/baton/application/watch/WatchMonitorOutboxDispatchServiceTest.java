@@ -86,12 +86,6 @@ class WatchMonitorOutboxDispatchServiceTest {
                 .thenReturn(List.of(delivery));
         when(client.synchronize(delivery))
                 .thenReturn(WatchMonitorClient.SynchronizationResult.invalidTarget());
-        when(outboxPort.markInvalidTargetAndAppendInactive(
-                eq(30L),
-                eq(delivery.leaseToken()),
-                any(),
-                eq(NOW)
-        )).thenReturn(true);
 
         var result = service(outboxPort, client).dispatchPending();
 

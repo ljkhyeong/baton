@@ -61,7 +61,6 @@ import org.testcontainers.mysql.MySQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.ArgumentMatchers.any;
@@ -145,7 +144,6 @@ class IdentityPersistenceUseCaseTest {
         jdbcTemplate.update("DELETE FROM local_credentials");
         jdbcTemplate.update("DELETE FROM account_identities");
         jdbcTemplate.update("DELETE FROM accounts");
-        reset(emailVerificationDeliveryPort);
     }
 
     @DisplayName("자체 이메일 가입부터 일회성 검증과 로그인 자격 조회까지 실제 MySQL 트랜잭션으로 이어진다")

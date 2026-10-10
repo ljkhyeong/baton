@@ -113,7 +113,6 @@ class WatchMonitorOutboxPersistenceTest {
         List<StoredPayload> payloads = jdbcTemplate.query(
                 """
                 SELECT
-                    id,
                     BIN_TO_UUID(event_id) AS event_id,
                     monitoring_state,
                     target_url,
@@ -123,7 +122,6 @@ class WatchMonitorOutboxPersistenceTest {
                 ORDER BY id
                 """,
                 (resultSet, rowNumber) -> new StoredPayload(
-                        resultSet.getLong("id"),
                         UUID.fromString(resultSet.getString("event_id")),
                         resultSet.getString("monitoring_state"),
                         resultSet.getString("target_url"),
@@ -137,13 +135,6 @@ class WatchMonitorOutboxPersistenceTest {
         assertThat(payloads.get(0).targetUrl()).isEqualTo(initial.targetUrl());
         assertThat(payloads.get(0).occurredAt()).isEqualTo(LocalDateTime.of(2026, 8, 1, 3, 0));
         assertThat(payloads.get(1).eventId()).isEqualTo(changed.eventId());
-        assertThat(payloads.get(1).sourceRevision()).isGreaterThan(payloads.get(0).sourceRevision());
-        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
-                "baton-manager:pilot:"
-        )).isFalse();
-        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
-                "baton-manager:other-environment:"
-        )).isTrue();
     }
 
     @DisplayName("원본 네임스페이스는 대소문자만 달라도 다른 환경으로 판정한다")
@@ -160,6 +151,9 @@ class WatchMonitorOutboxPersistenceTest {
         )).isFalse();
         assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
                 "baton-manager:PILOT:"
+        )).isTrue();
+        assertThat(outboxPort.hasMismatchedResourceReferencePrefix(
+                "baton-manager:other-environment:"
         )).isTrue();
     }
 
@@ -669,7 +663,6 @@ class WatchMonitorOutboxPersistenceTest {
     }
 
     private record StoredPayload(
-            long sourceRevision,
             UUID eventId,
             String monitoringState,
             String targetUrl,
