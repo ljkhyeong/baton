@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, WORKSPACE_PATH, SCOPE_PATH,
+import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, WORKSPACE_PATH,
   installApi, makeProjection } from './support/workspaceApiHarness'
 
 const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
@@ -20,7 +20,6 @@ test('@smoke @responsive 내 팀에서 공유 키 없이 이동하고 계정을 
     teams: accountId === ACCOUNT ? [{ teamId: TEAM_ID, teamName: projection.team.name, memberId: MEMBER_ONE_ID,
       memberName: '민서', permission: 'MEMBER', seasonId: SEASON_ID, seasonName: projection.season.name, seasonEnded: false }] : [],
   } }))
-  await page.route(`**${SCOPE_PATH}/workspace`, route => route.fulfill({ json: projection }))
   await page.goto('/my-teams')
   const pendingInvitation = page.getByRole('complementary', { name: '수락 대기 중인 팀 초대' })
   await expect(pendingInvitation).toContainText('확인하지 않은 팀 초대가 있습니다.')

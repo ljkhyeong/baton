@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
+import type { WorkspaceProjection } from '../../src/features/workspace/types'
 import {
   ACCESS_KEY,
   MEMBER_ONE_ID,
@@ -19,6 +20,44 @@ const ACCOUNT_ID = '8e448211-66ae-44ab-9888-c4960648c22b'
 const CSRF_HEADER_NAME = 'X-CSRF-TOKEN'
 const CSRF_TOKEN = 'membership-csrf-token'
 const CLAIMED_AT = '2026-08-08T12:34:56Z'
+const MEMBER_ONE_MEMBERSHIP = {
+  claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
+}
+
+async function openMemberManagement(page: Page, projectName: string) {
+  await navigation(page, projectName).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '구성원 관리' }).click()
+  return page.getByRole('dialog', { name: '구성원 관리' })
+}
+
+// 김준호가 박민서에게 넘긴 '진행 담당' 인수인계를 더한다.
+function addIncomingHandoff(projection: WorkspaceProjection) {
+  projection.roles.push({
+    ...projection.roles[0]!, id: SECOND_ROLE_ID, name: '진행 담당',
+    currentMemberId: MEMBER_TWO_ID, nextMemberId: MEMBER_ONE_ID,
+  })
+  projection.roleHandoffs.push({
+    id: ROLE_HANDOFF_ID, roleId: SECOND_ROLE_ID,
+    fromMemberId: MEMBER_TWO_ID, toMemberId: MEMBER_ONE_ID,
+    outgoingAssignmentStartDate: '2026-07-02', outgoingAssignmentEndDate: '2026-09-17',
+    incomingAssignmentStartDate: '2026-08-01', incomingAssignmentEndDate: '2026-09-17',
+    status: 'TRANSFERRED', preparedAt: '2026-07-22T09:00:00Z', transferredAt: '2026-07-22T09:10:00Z',
+    acceptedAt: null, cancelledAt: null, transferredByMemberId: MEMBER_TWO_ID,
+    acceptedByMemberId: null, cancelledByMemberId: null,
+    activeItemCount: 0, incompleteItemCount: 0, resourceCount: 0, warningAcknowledged: true,
+  })
+}
+
+// 첫 회차 첫 업무의 기한 지남 알림
+function overdueNotification(projection: WorkspaceProjection, read: boolean) {
+  const round = projection.rounds[0]!
+  const execution = round.routineExecutions[0]!
+  return {
+    id: '00000000-0000-4000-8000-000000000205', kind: 'OVERDUE', sourceId: execution.id,
+    roleId: execution.ownerRoleId, roundId: round.id, title: execution.title,
+    occurredAt: '2026-09-05T03:00:00Z', read,
+  }
+}
 
 type MembershipCall = {
   body: unknown
@@ -157,28 +196,13 @@ async function installMembershipApi(
 test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자를 제외하고 회차와 인수인계로 이동한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.rounds[1]!.archivedAt = '2026-07-20T00:00:00Z'
-  projection.roles.push({
-    ...projection.roles[0]!, id: SECOND_ROLE_ID, name: '진행 담당',
-    currentMemberId: MEMBER_TWO_ID, nextMemberId: MEMBER_ONE_ID,
-  })
+  addIncomingHandoff(projection)
   projection.rounds[0]!.routineExecutions.push({
     ...projection.rounds[0]!.routineExecutions[1]!,
     id: 'f7770000-0000-4000-8000-000000000099', ownerRoleId: SECOND_ROLE_ID, title: '다른 사람의 업무',
   })
-  projection.roleHandoffs.push({
-    id: ROLE_HANDOFF_ID, roleId: SECOND_ROLE_ID,
-    fromMemberId: MEMBER_TWO_ID, toMemberId: MEMBER_ONE_ID,
-    outgoingAssignmentStartDate: '2026-07-02', outgoingAssignmentEndDate: '2026-09-17',
-    incomingAssignmentStartDate: '2026-08-01', incomingAssignmentEndDate: '2026-09-17',
-    status: 'TRANSFERRED', preparedAt: '2026-07-22T09:00:00Z', transferredAt: '2026-07-22T09:10:00Z',
-    acceptedAt: null, cancelledAt: null, transferredByMemberId: MEMBER_TWO_ID,
-    acceptedByMemberId: null, cancelledByMemberId: null,
-    activeItemCount: 0, incompleteItemCount: 0, resourceCount: 0, warningAcknowledged: true,
-  })
   await installApi(page, projection)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   await openSharedWorkspace(page)
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
@@ -201,24 +225,9 @@ test('@operations @webkit 내 담당 업무는 완료·보관·다른 담당자�
 
 test('@operations @responsive 로그인한 구성원은 할 일과 역할 화면에서 내 업무와 받을 바통을 먼저 본다', async ({ page }, testInfo) => {
   const projection = makeProjection()
-  projection.roles.push({
-    ...projection.roles[0]!, id: SECOND_ROLE_ID, name: '진행 담당',
-    currentMemberId: MEMBER_TWO_ID, nextMemberId: MEMBER_ONE_ID,
-  })
-  projection.roleHandoffs.push({
-    id: ROLE_HANDOFF_ID, roleId: SECOND_ROLE_ID,
-    fromMemberId: MEMBER_TWO_ID, toMemberId: MEMBER_ONE_ID,
-    outgoingAssignmentStartDate: '2026-07-02', outgoingAssignmentEndDate: '2026-09-17',
-    incomingAssignmentStartDate: '2026-08-01', incomingAssignmentEndDate: '2026-09-17',
-    status: 'TRANSFERRED', preparedAt: '2026-07-22T09:00:00Z', transferredAt: '2026-07-22T09:10:00Z',
-    acceptedAt: null, cancelledAt: null, transferredByMemberId: MEMBER_TWO_ID,
-    acceptedByMemberId: null, cancelledByMemberId: null,
-    activeItemCount: 0, incompleteItemCount: 0, resourceCount: 0, warningAcknowledged: true,
-  })
+  addIncomingHandoff(projection)
   await installApi(page, projection)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   await openSharedWorkspace(page)
 
   const modeGroup = page.getByRole('group', { name: '할 일 보기' })
@@ -250,9 +259,7 @@ test('@operations 내 담당 업무는 활동 종료된 구성원의 업무를 �
   const projection = makeProjection()
   projection.members[0]!.deactivatedAt = '2026-07-20T00:00:00Z'
   await installApi(page, projection)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   await openSharedWorkspace(page)
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   const panel = page.getByRole('region', { name: '내 담당 업무' })
@@ -265,12 +272,7 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   await installApi(page)
   const membershipApi = await installMembershipApi(page, { additiveResponseFields: true })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await expect(dialog.getByText('내 이름 선택', { exact: true })).toBeVisible()
   await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => {
@@ -303,12 +305,8 @@ test('@smoke 로그인 계정을 기존 구성원과 연결하고 새로고침 �
   })
 
   await page.reload()
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-  await expect(page.getByRole('dialog', { name: '구성원 관리' })
-    .getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
+  const reopenedDialog = await openMemberManagement(page, testInfo.project.name)
+  await expect(reopenedDialog.getByText('이 팀에서 사용하는 내 이름')).toBeVisible()
 })
 
 test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동으로 전환한다', async ({ page }, testInfo) => {
@@ -317,12 +315,7 @@ test('@smoke 구성원 연결 중 세션 만료를 확인하면 로그인 행동
     claimAuthenticationRequired: true,
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => confirmation.accept())
   await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
@@ -339,9 +332,7 @@ test('@smoke 구성원 연결 뒤 이전 조회가 늦게 도착해도 연결 �
   await installApi(page)
   await installMembershipApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
 
   const lookupStarted = Promise.withResolvers<void>()
@@ -376,10 +367,7 @@ test('익명 사용자는 접근 키를 URL에 복제하지 않는 로그인 복
   await installApi(page)
   await installMembershipApi(page, { authenticated: false })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
+  await openMemberManagement(page, testInfo.project.name)
 
   const loginLink = page.getByRole('link', { name: '로그인하고 연결하기' })
   const href = await loginLink.getAttribute('href')
@@ -394,12 +382,7 @@ test('로그인 상태 조회 실패를 익명으로 추측하지 않고 재시�
   await openSharedWorkspace(page)
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
   await expect(page.getByRole('region', { name: '내 담당 업무' })).toContainText('로그인 상태를 확인하지 못했습니다')
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await expect(dialog.getByText(/로그인 상태를 확인하지 못했습니다/)).toBeVisible()
   await expect(dialog.getByRole('link', { name: '로그인하고 연결하기' })).toHaveCount(0)
   membershipApi.restoreAuthSession()
@@ -414,9 +397,7 @@ test('@smoke 기존 계정 정보가 있어도 세션 재조회 실패 중에는
   await installApi(page)
   const membershipApi = await installMembershipApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await expect(dialog.getByRole('button', { name: '이 이름으로 연결' })).toBeEnabled()
 
   await page.route('**/api/v1/auth/session', (route) => route.fulfill({
@@ -450,12 +431,7 @@ test('다른 계정 범위의 현재 구성원 연결 응답은 연결 상태로
     },
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await expect(dialog.getByText(/서버 응답을 확인할 수 없습니다/)).toBeVisible()
   await expect(dialog.getByText('이 팀에서 사용하는 내 이름')).toHaveCount(0)
 })
@@ -464,12 +440,7 @@ test('활동이 끝난 선택값은 남은 활동 구성원으로 바꿔 연결�
   await installApi(page)
   const membershipApi = await installMembershipApi(page)
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   const memberSelect = dialog.getByLabel('내 이름')
   await memberSelect.selectOption(MEMBER_ONE_ID)
   await dialog.getByRole('button', { name: '박민서 활동 종료' }).click()
@@ -525,12 +496,7 @@ test('연결 응답의 구성원 범위가 다르면 연결 정보를 갱신하�
     },
   })
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name)
-    .getByRole('button', { name: '역할' })
-    .click()
-  await page.getByRole('button', { name: '구성원 관리' }).click()
-
-  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  const dialog = await openMemberManagement(page, testInfo.project.name)
   await dialog.getByLabel('내 이름').selectOption(MEMBER_ONE_ID)
   page.once('dialog', async (confirmation) => confirmation.accept())
   await dialog.getByRole('button', { name: '이 이름으로 연결' }).click()
@@ -543,12 +509,8 @@ test('연결 응답의 구성원 범위가 다르면 연결 정보를 갱신하�
 test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유지되고 업무 원본으로 이동한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   await installApi(page, projection)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
-  const round = projection.rounds[0]!
-  const execution = round.routineExecutions[0]!
-  const notificationId = '00000000-0000-4000-8000-000000000205'
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
+  const execution = projection.rounds[0]!.routineExecutions[0]!
   let read = false
   await page.route('**/api/v1/teams/*/seasons/*/notifications**', route => {
     if (route.request().method() === 'POST') {
@@ -557,8 +519,7 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
       read = true
     }
     return route.fulfill({ json: { accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
-      notifications: [{ id: notificationId, kind: 'OVERDUE', sourceId: execution.id, roleId: execution.ownerRoleId,
-        roundId: round.id, title: execution.title, occurredAt: '2026-09-05T03:00:00Z', read }],
+      notifications: [overdueNotification(projection, read)],
     } })
   })
   await openSharedWorkspace(page)
@@ -587,11 +548,7 @@ test('@smoke @responsive 내 알림의 읽음 상태는 재조회 후에도 유�
 test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 다시 켜도 읽음 상태가 남는다', async ({ page }) => {
   const projection = makeProjection()
   await installApi(page, projection)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
-  const round = projection.rounds[0]!
-  const execution = round.routineExecutions[0]!
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   let preferences = { accountId: ACCOUNT_ID, version: -1, deadlineSoonEnabled: true,
     overdueEnabled: true, handoffEnabled: true, deadlineLeadHours: 24 }
   await page.route('**/api/v1/notification-preferences', route => {
@@ -608,9 +565,7 @@ test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 �
   })
   await page.route('**/api/v1/teams/*/seasons/*/notifications**', route => route.fulfill({ json: {
     accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
-    notifications: preferences.overdueEnabled ? [{ id: '00000000-0000-4000-8000-000000000205', kind: 'OVERDUE',
-      sourceId: execution.id, roleId: execution.ownerRoleId, roundId: round.id, title: execution.title,
-      occurredAt: '2026-09-05T03:00:00Z', read: true }] : [],
+    notifications: preferences.overdueEnabled ? [overdueNotification(projection, true)] : [],
   } }))
   await openSharedWorkspace(page)
   await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
@@ -638,20 +593,14 @@ test('@smoke @responsive 접힌 알림과 권한 오류는 자동 조회를 멈�
   await page.clock.install()
   const projection = makeProjection()
   await installApi(page, projection)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
-  const round = projection.rounds[0]!
-  const execution = round.routineExecutions[0]!
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   let requests = 0
   let allowed = true
   await page.route('**/api/v1/teams/*/seasons/*/notifications', route => {
     requests++
     return route.fulfill(allowed ? { json: {
       accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
-      notifications: [{ id: '00000000-0000-4000-8000-000000000205', kind: 'OVERDUE',
-        sourceId: execution.id, roleId: execution.ownerRoleId, roundId: round.id, title: execution.title,
-        occurredAt: '2026-09-05T03:00:00Z', read: false }],
+      notifications: [overdueNotification(projection, false)],
     } } : { status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '알림을 조회할 권한이 없습니다.' } })
   })
   await openSharedWorkspace(page)
@@ -688,9 +637,7 @@ test('@smoke @responsive 접힌 알림과 권한 오류는 자동 조회를 멈�
 
 test('@smoke 알림 조회 중 패널을 닫으면 진행 중인 요청을 취소한다', async ({ page }) => {
   await installApi(page)
-  await installMembershipApi(page, { currentMembershipResponse: {
-    claimed: true, accountId: ACCOUNT_ID, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: CLAIMED_AT,
-  } })
+  await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   let pendingRoute: Route | undefined
   await page.route('**/api/v1/teams/*/seasons/*/notifications', route => { pendingRoute = route })
   await openSharedWorkspace(page)

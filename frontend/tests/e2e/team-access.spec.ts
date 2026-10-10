@@ -10,9 +10,6 @@ const instant = '2026-09-05T03:00:00Z'
 const expiresAt = '2026-09-12T03:00:00Z'
 async function accountApi(page: Page) {
   await installAccountSession(page, { csrfToken: 'team-access-csrf', claimedMemberId: MEMBER_ONE_ID })
-  await page.route('**/api/v1/teams/*/seasons/*/notifications', route => route.fulfill({ json: {
-    accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID, memberId: MEMBER_ONE_ID, unreadCount: 0, items: [],
-  } }))
 }
 
 test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 둔 목록에서 만료 상태를 확인한다', async ({ page }, testInfo) => {
