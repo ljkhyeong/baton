@@ -7,7 +7,6 @@
 .playwright-cli
 .vscode
 .env*
-!.env.production.example
 **/build
 dist
 frontend/dist
