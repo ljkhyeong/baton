@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, CREATED_ROLE_RESOURCE_ID,
-  installApi, makeProjection, navigation, openSharedWorkspace } from './support/workspaceApiHarness'
+import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, CREATED_ROLE_RESOURCE_ID, ACCOUNT_ID,
+  installAccountSession, installApi, makeProjection, navigation, openSharedWorkspace } from './support/workspaceApiHarness'
 
-const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 확인 후 다음 날짜를 갱신한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내', url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
   await installApi(page, projection)
-  await page.route('**/api/v1/auth/**', route => route.fulfill({ json: { authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'csrf' } }))
-  await page.route('**/api/v1/account-memberships/current?*', route => route.fulfill({ json: {
-    claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-09-05T00:00:00Z',
-  } }))
+  await installAccountSession(page, { csrfToken: 'csrf', claimedMemberId: MEMBER_ONE_ID })
   const schedule = { teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, version: -1,
     intervalDays: null as number | null, nextReviewOn: null as string | null, today: '2026-09-05', reviewDue: false }
   await page.route('**/resource-reviews', route => route.fulfill({ json: {
@@ -21,7 +17,7 @@ test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 
   await page.route('**/role-resources/*/verifications/schedule', route => {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON()
-      expect(body.expectedAccountId).toBe(ACCOUNT)
+      expect(body.expectedAccountId).toBe(ACCOUNT_ID)
       expect(body.expectedVersion).toBe(schedule.version)
       expect(route.request().headers()['x-csrf-token']).toBe('csrf')
       schedule.intervalDays = body.intervalDays ?? null

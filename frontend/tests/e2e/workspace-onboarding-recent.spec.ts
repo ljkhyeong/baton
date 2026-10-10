@@ -14,12 +14,16 @@ import {
   openSharedWorkspace,
   navigation,
   blockBrowserStorage,
+  blockAccessKeyStorage,
+  disableWebLocks,
+  storedAccessKey,
   failNextJournalCleanup,
   pendingWorkspaceCreationEntry,
   seedPendingWorkspaceCreations,
   fillOnboardingForm,
   pendingCreationEntries,
   recordedCall,
+  recordedCalls,
   expectScopedCall,
   openHandoffView,
 } from './support/workspaceApiHarness'
@@ -119,7 +123,7 @@ test('@smoke 온보딩으로 실제 작업 공간을 만든다', async ({ page }
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
+  expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
 
   const createCall = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect(createCall.headers['x-baton-access-key']).toBeUndefined()
@@ -152,8 +156,7 @@ test("@smoke 작업 공간 생성 화면을 떠난 뒤 늦은 성공 응답이 �
   await page.goto("/")
   await fillOnboardingForm(page, request)
   await page.getByRole("button", { name: "작업 공간 만들기" }).click()
-  await expect.poll(() => api.calls.filter((call) =>
-    call.method === "POST" && call.path === "/api/v1/workspaces").length).toBe(1)
+  await expect.poll(() => recordedCalls(api, "POST", "/api/v1/workspaces").length).toBe(1)
 
   await page.getByRole("link", { name: "계정 로그인" }).click()
   await expect(page).toHaveURL(/\/login/)
@@ -161,10 +164,7 @@ test("@smoke 작업 공간 생성 화면을 떠난 뒤 늦은 성공 응답이 �
   const response = page.waitForResponse("**/api/v1/workspaces")
   api.releaseWorkspaceCreation()
   await (await response).finished()
-  await expect.poll(() => page.evaluate(
-    (teamId) => localStorage.getItem("baton-access-key:" + teamId),
-    TEAM_ID,
-  )).toBe(ACCESS_KEY)
+  await expect.poll(() => storedAccessKey(page)).toBe(ACCESS_KEY)
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
   await expect(page).toHaveURL(/\/login/)
 })
@@ -193,25 +193,24 @@ test('온보딩 자격 증명 응답이 손상되면 생성 임시 기록과 현
       idempotencyKey: createCall.headers['idempotency-key'],
     }),
   ])
-  expect(await page.evaluate(
-    (key) => localStorage.getItem(key),
-    `baton-access-key:${TEAM_ID}`,
-  )).toBeNull()
+  expect(await storedAccessKey(page)).toBeNull()
 })
 
 test('같은 구성원 이름은 구분해서 입력하도록 안내하고 API를 호출하지 않는다', async ({ page }) => {
   const api = await installApi(page)
   await page.goto('/')
 
-  await page.getByLabel('팀 이름').fill('이름 구분 스터디')
-  await page.getByLabel('시즌 이름').fill('2027 봄 시즌')
-  await page.getByLabel('시작일').fill('2027-03-01')
-  await page.getByLabel('종료일').fill('2027-05-31')
-  await page.getByLabel('구성원 이름').fill('박민서\n 박민서 ')
+  await fillOnboardingForm(page, {
+    teamName: '이름 구분 스터디',
+    seasonName: '2027 봄 시즌',
+    startDate: '2027-03-01',
+    endDate: '2027-05-31',
+    memberNames: ['박민서', ' 박민서 '],
+  })
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByRole('alert')).toContainText('같은 이름은 구분할 수 있게 다르게 입력해 주세요.')
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(0)
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
@@ -243,14 +242,14 @@ test('온보딩 입력 한도를 서버 호출 전에 안내한다', async ({ pa
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByRole('alert')).toContainText('구성원은 최대 100명까지 입력해 주세요.')
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(0)
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 
   await page.getByLabel('구성원 이름').fill('가'.repeat(101))
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByRole('alert')).toContainText('구성원 이름은 각각 100자 이하로 입력해 주세요.')
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(0)
   expect(await pendingCreationEntries(page)).toHaveLength(0)
 })
 
@@ -259,11 +258,13 @@ test('생성 임시 기록을 안전하게 저장할 수 없으면 새로고침 
   const api = await installApi(page)
 
   const submitWorkspace = async () => {
-    await page.getByLabel('팀 이름').fill('저장 필수 스터디')
-    await page.getByLabel('시즌 이름').fill('2027 여름 시즌')
-    await page.getByLabel('시작일').fill('2027-06-01')
-    await page.getByLabel('종료일').fill('2027-08-31')
-    await page.getByLabel('구성원 이름').fill('박민서\n김준호')
+    await fillOnboardingForm(page, {
+      teamName: '저장 필수 스터디',
+      seasonName: '2027 여름 시즌',
+      startDate: '2027-06-01',
+      endDate: '2027-08-31',
+      memberNames: ['박민서', '김준호'],
+    })
     await page.getByRole('button', { name: '작업 공간 만들기' }).click()
     await expect(page.getByRole('alert')).toContainText('일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')
   }
@@ -273,7 +274,7 @@ test('생성 임시 기록을 안전하게 저장할 수 없으면 새로고침 
   await page.reload()
   await submitWorkspace()
 
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(0)
 })
 
 test('구성원 순서가 바뀐 온보딩 재시도는 새로고침 후에도 같은 멱등 키를 사용한다', async ({ page }) => {
@@ -281,26 +282,27 @@ test('구성원 순서가 바뀐 온보딩 재시도는 새로고침 후에도 �
   api.failNextWorkspaceCreation()
   await page.goto('/')
 
-  const fillWorkspace = async (memberNames: string) => {
-    await page.getByLabel('팀 이름').fill(' 재시도 스터디 ')
-    await page.getByLabel('시즌 이름').fill(' 2026 겨울 시즌 ')
-    await page.getByLabel('시작일').fill('2026-12-01')
-    await page.getByLabel('종료일').fill('2027-02-28')
-    await page.getByLabel('구성원 이름').fill(memberNames)
+  const request: CreateWorkspaceRequest = {
+    teamName: ' 재시도 스터디 ',
+    seasonName: ' 2026 겨울 시즌 ',
+    startDate: '2026-12-01',
+    endDate: '2027-02-28',
+    memberNames: ['박민서', '김준호', '최유진'],
   }
 
-  await fillWorkspace('박민서\n김준호\n최유진')
+  await fillOnboardingForm(page, request)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('alert')).toContainText('작업 공간을 잠시 만들 수 없습니다.')
   const firstAttempt = await recordedCall(api, 'POST', '/api/v1/workspaces')
   expect((firstAttempt.body as CreateWorkspaceRequest).memberNames).toEqual(['박민서', '김준호', '최유진'])
 
   await page.reload()
-  await fillWorkspace(' 최유진, 박민서, 김준호 ')
+  // 쉼표로 구분하고 순서를 바꾼 같은 구성원
+  await fillOnboardingForm(page, { ...request, memberNames: [' 최유진, 박민서, 김준호 '] })
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect((attempts[1]?.body as CreateWorkspaceRequest).memberNames).toEqual(['최유진', '박민서', '김준호'])
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
@@ -312,11 +314,13 @@ test('서버 입력 오류 뒤 온보딩 임시 기록을 지우고 다음 시�
   api.rejectNextWorkspaceCreationAsInvalidInput()
   await page.goto('/')
 
-  await page.getByLabel('팀 이름').fill('입력 수정 스터디')
-  await page.getByLabel('시즌 이름').fill('2027 겨울 시즌')
-  await page.getByLabel('시작일').fill('2027-12-01')
-  await page.getByLabel('종료일').fill('2028-02-29')
-  await page.getByLabel('구성원 이름').fill('박민서\n김준호')
+  await fillOnboardingForm(page, {
+    teamName: '입력 수정 스터디',
+    seasonName: '2027 겨울 시즌',
+    startDate: '2027-12-01',
+    endDate: '2028-02-29',
+    memberNames: ['박민서', '김준호'],
+  })
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page.getByRole('alert')).toContainText('입력한 작업 공간 정보를 확인해 주세요.')
@@ -326,7 +330,7 @@ test('서버 입력 오류 뒤 온보딩 임시 기록을 지우고 다음 시�
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.body).toEqual(firstAttempt.body)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
@@ -365,9 +369,7 @@ test('불러온 온보딩 복구 요청이 입력 오류로 거절되면 새 요
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  const attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(pendingEntry.idempotencyKey)
 })
@@ -403,15 +405,11 @@ test('온보딩 종료 요청의 임시 기록을 삭제하지 못하면 재전�
 
   await expect(page.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  const attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
@@ -441,17 +439,13 @@ test('온보딩 성공 기록을 삭제하지 못하면 삭제 재시도 후 한
   )).toBeVisible()
   await expect(page.getByRole('button', { name: '임시 기록 삭제 필요' })).toBeDisabled()
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(1)
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   await page.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 })
 
 test('다른 탭이 생성 결과를 확인하는 동안 임시 기록 삭제 재시도를 막는다', async ({ page, context }) => {
@@ -489,8 +483,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 임시 기록 삭제 �
 
   api.holdNextWorkspaceCreation()
   await peerPage.getByRole('button', { name: '생성 결과 다시 확인' }).click()
-  await expect.poll(() => api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces').length).toBe(2)
+  await expect.poll(() => recordedCalls(api, 'POST', '/api/v1/workspaces').length).toBe(2)
 
   await cleanupButton.click()
   await expect(page.getByRole('alert')).toContainText(
@@ -504,8 +497,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 임시 기록 삭제 �
 
   await cleanupButton.click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  expect(api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(2)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(2)
 })
 
 test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청을 막는다', async ({ page }) => {
@@ -530,18 +522,14 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
   expect(firstAttempt.headers['idempotency-key']).toBe(pendingEntry.idempotencyKey)
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   await page.getByLabel('팀 이름').fill(`${request.teamName} 수정`)
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(page.getByText(
     '저장된 공유 링크가 만료됐습니다.',
   )).toBeVisible()
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   await page.getByRole('button', {
     name: '확인 후 새로 만들기',
@@ -551,7 +539,7 @@ test('만료된 온보딩 멱등 기록은 기존 결과 확인 전 새 요청�
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
@@ -596,9 +584,7 @@ test('만료된 온보딩 결과 확인은 다른 항목의 저장된 입력을 
   await expect(page.getByText(
     '저장된 공유 링크가 만료됐습니다.',
   )).toBeVisible()
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 })
 
 test('서로 다른 탭의 생성 임시 기록을 순서대로 보존하고 응답 유실 뒤 같은 키로 복구한다', async ({ page, context }) => {
@@ -606,27 +592,26 @@ test('서로 다른 탭의 생성 임시 기록을 순서대로 보존하고 응
   apiA.failNextWorkspaceCreation()
   await page.goto('/')
 
-  const fillWorkspaceA = async () => {
-    await page.getByLabel('팀 이름').fill('A 탭 스터디')
-    await page.getByLabel('시즌 이름').fill('2027 A 시즌')
-    await page.getByLabel('시작일').fill('2027-01-01')
-    await page.getByLabel('종료일').fill('2027-03-31')
-    await page.getByLabel('구성원 이름').fill('박민서')
-  }
-  await fillWorkspaceA()
+  await fillOnboardingForm(page, {
+    teamName: 'A 탭 스터디',
+    seasonName: '2027 A 시즌',
+    startDate: '2027-01-01',
+    endDate: '2027-03-31',
+    memberNames: ['박민서'],
+  })
 
   const pageB = await context.newPage()
   const apiB = await installApi(pageB)
   apiB.commitNextWorkspaceCreationThenTimeout()
   await pageB.goto('/')
-  const fillWorkspaceB = async () => {
-    await pageB.getByLabel('팀 이름').fill('B 탭 스터디')
-    await pageB.getByLabel('시즌 이름').fill('2027 B 시즌')
-    await pageB.getByLabel('시작일').fill('2027-04-01')
-    await pageB.getByLabel('종료일').fill('2027-06-30')
-    await pageB.getByLabel('구성원 이름').fill('김준호')
+  const requestB: CreateWorkspaceRequest = {
+    teamName: 'B 탭 스터디',
+    seasonName: '2027 B 시즌',
+    startDate: '2027-04-01',
+    endDate: '2027-06-30',
+    memberNames: ['김준호'],
   }
-  await fillWorkspaceB()
+  await fillOnboardingForm(pageB, requestB)
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('alert')).toContainText('작업 공간을 잠시 만들 수 없습니다.')
   await pageB.getByRole('button', { name: '작업 공간 만들기' }).click()
@@ -649,11 +634,11 @@ test('서로 다른 탭의 생성 임시 기록을 순서대로 보존하고 응
   expect(pendingAfterAClear[0]?.idempotencyKey).toBe(firstAttemptB.headers['idempotency-key'])
 
   await pageB.reload()
-  await fillWorkspaceB()
+  await fillOnboardingForm(pageB, requestB)
   await pageB.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(pageB.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attemptsB = apiB.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attemptsB = recordedCalls(apiB, 'POST', '/api/v1/workspaces')
   expect(attemptsB).toHaveLength(2)
   expect(attemptsB[1]?.headers['idempotency-key']).toBe(firstAttemptB.headers['idempotency-key'])
   await expect.poll(async () => (await pendingCreationEntries(pageB)).length).toBe(0)
@@ -668,18 +653,20 @@ test('손상된 온보딩 임시 기록 저장소를 무시하고 정상 멱등 
   const api = await installApi(page)
   api.failNextWorkspaceCreation()
   await page.goto('/')
-  await page.getByLabel('팀 이름').fill('저장소 복구 스터디')
-  await page.getByLabel('시즌 이름').fill('2027 봄 시즌')
-  await page.getByLabel('시작일').fill('2027-03-01')
-  await page.getByLabel('종료일').fill('2027-05-31')
-  await page.getByLabel('구성원 이름').fill('박민서')
+  await fillOnboardingForm(page, {
+    teamName: '저장소 복구 스터디',
+    seasonName: '2027 봄 시즌',
+    startDate: '2027-03-01',
+    endDate: '2027-05-31',
+    memberNames: ['박민서'],
+  })
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('alert')).toContainText('작업 공간을 잠시 만들 수 없습니다.')
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect(attempts[0]?.headers['idempotency-key']).toMatch(/^[A-Za-z0-9._~-]{32,200}$/)
   expect(attempts[0]?.headers['idempotency-key']).not.toBe(malformedIdempotencyKey)
@@ -714,17 +701,19 @@ test('생성 계약을 벗어난 v3 온보딩 임시 기록을 삭제하고 정�
 
   const api = await installApi(page)
   await page.goto('/')
-  await page.getByLabel('팀 이름').fill('저장소 정리 스터디')
-  await page.getByLabel('시즌 이름').fill('2028 봄 시즌')
-  await page.getByLabel('시작일').fill('2028-03-01')
-  await page.getByLabel('종료일').fill('2028-05-31')
-  await page.getByLabel('구성원 이름').fill('박민서')
+  await fillOnboardingForm(page, {
+    teamName: '저장소 정리 스터디',
+    seasonName: '2028 봄 시즌',
+    startDate: '2028-03-01',
+    endDate: '2028-05-31',
+    memberNames: ['박민서'],
+  })
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(1)
   expect(invalidEntries.map((entry) => entry.idempotencyKey))
     .not.toContain(attempts[0]?.headers['idempotency-key'])
@@ -732,12 +721,7 @@ test('생성 계약을 벗어난 v3 온보딩 임시 기록을 삭제하고 정�
 })
 
 test('탭 간 생성 잠금을 지원하지 않으면 온보딩 요청을 전송하지 않는다', async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'locks', {
-      configurable: true,
-      value: undefined,
-    })
-  })
+  await disableWebLocks(page)
   const api = await installApi(page)
   await page.goto('/')
   await fillOnboardingForm(page, {
@@ -798,7 +782,7 @@ test('@smoke 저장된 온보딩 입력으로 같은 멱등 생성 결과를 확
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
 
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(1)
   expect(attempts[0]?.headers['idempotency-key']).toBe(pendingEntry.idempotencyKey)
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
@@ -839,9 +823,7 @@ test('불러온 온보딩 입력이 바뀌면 명시적 확인 전 새 요청으
   await expect(page.getByRole('alert')).toContainText('다른 탭에서 임시 기록을 변경했습니다.')
   await expect(page.getByRole('status').filter({ hasText: '다른 탭에서 임시 기록을 변경했습니다.' })).toBeVisible()
   await expect(page.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === '/api/v1/workspaces',
-  )).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(0)
 
   await page.getByRole('button', {
     name: '확인 후 새로 만들기',
@@ -878,7 +860,7 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 임시 기록
   }).click()
   await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
   await expect.poll(() =>
-    api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces').length,
+    recordedCalls(api, 'POST', '/api/v1/workspaces').length,
   ).toBe(1)
 
   const peerRegion = peerPage.getByRole('region', {
@@ -907,15 +889,13 @@ test('다른 탭이 생성 결과를 확인하는 동안 온보딩 임시 기록
   })).toBeVisible()
   await expect(peerPage.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(peerPage.getByRole('link', { name: new RegExp(pendingRequest.teamName) })).toBeVisible()
-  expect(api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
     name: '확인 후 새로 만들기',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
-  expect(api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 })
 
 test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제출을 막는다', async ({ page, context }) => {
@@ -938,25 +918,22 @@ test('같은 신규 온보딩 요청의 탭 경합은 결과 확인 전 재제�
 
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
   await expect.poll(() =>
-    api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces').length,
+    recordedCalls(api, 'POST', '/api/v1/workspaces').length,
   ).toBe(1)
   await peerPage.getByRole('button', { name: '작업 공간 만들기' }).click()
-  expect(api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   api.releaseWorkspaceCreation()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(peerPage.getByRole('button', { name: '기존 작업 공간 확인 필요' })).toBeDisabled()
   await expect(peerPage.getByRole('link', { name: new RegExp(request.teamName) })).toBeVisible()
-  expect(api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 
   await peerPage.getByRole('button', {
     name: '확인 후 새로 만들기',
   }).click()
   await expect(peerPage.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
-  expect(api.calls.filter((call) =>
-    call.method === 'POST' && call.path === '/api/v1/workspaces')).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', '/api/v1/workspaces')).toHaveLength(1)
 })
 
 test('온보딩 임시 기록 한 건을 확인 후 폐기하고 새 작업 공간을 만든다', async ({ page }) => {
@@ -1029,7 +1006,7 @@ test('온보딩 임시 기록 한 건을 확인 후 폐기하고 새 작업 공�
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: '남은 업무 0개' })).toBeVisible()
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === '/api/v1/workspaces')
+  const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(1)
   expect(seededKeys).not.toContain(attempts[0]?.headers['idempotency-key'])
   await expect.poll(async () =>
@@ -1040,21 +1017,17 @@ test('온보딩 임시 기록 한 건을 확인 후 폐기하고 새 작업 공�
 })
 
 test('@webkit 브라우저 저장소가 막혀도 일회성 접근 키를 잃지 않는다', async ({ page }) => {
-  await page.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
-      originalSetItem.call(this, key, value)
-    }
-  })
+  await blockAccessKeyStorage(page)
   const api = await installApi(page)
   await page.goto('/')
 
-  await page.getByLabel('팀 이름').fill('저장소 제한 스터디')
-  await page.getByLabel('시즌 이름').fill('2026 가을 시즌')
-  await page.getByLabel('시작일').fill('2026-09-01')
-  await page.getByLabel('종료일').fill('2026-11-30')
-  await page.getByLabel('구성원 이름').fill('박민서')
+  await fillOnboardingForm(page, {
+    teamName: '저장소 제한 스터디',
+    seasonName: '2026 가을 시즌',
+    startDate: '2026-09-01',
+    endDate: '2026-11-30',
+    memberNames: ['박민서'],
+  })
   await page.getByRole('button', { name: '작업 공간 만들기' }).click()
 
   await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
@@ -1078,12 +1051,12 @@ test('@smoke 잘못된 URL 접근 키가 저장된 정상 키를 덮지 않고 �
   await expect(page.getByText('워크스페이스 접근 권한이 없습니다.')).toBeVisible()
   const call = await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)
   expect(call.headers['x-baton-access-key']).toBe('wrong-access-key')
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBe(ACCESS_KEY)
+  expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
 
   await page.getByRole('button', { name: '저장된 공유 링크로 열기' }).click()
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
-  const successfulGet = [...api.calls].reverse().find((candidate) => candidate.method === 'GET' && candidate.path === `${SCOPE_PATH}/workspace`)
+  const successfulGet = recordedCalls(api, 'GET', `${SCOPE_PATH}/workspace`).at(-1)
   expect(successfulGet?.headers['x-baton-access-key']).toBe(ACCESS_KEY)
 })
 
@@ -1126,9 +1099,7 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
   await api.attachPage(peer)
   await peer.goto(WORKSPACE_PATH)
   await expect(peer.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
-  const workspaceGetCount = () => api.calls.filter((call) =>
-    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
-  ).length
+  const workspaceGetCount = () => recordedCalls(api, 'GET', `${SCOPE_PATH}/workspace`).length
 
   const requestsBeforeRefresh = workspaceGetCount()
   api.holdWorkspaceGets()
@@ -1155,8 +1126,7 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
   await peer.goto('/')
   await expect(peer.getByRole('region', { name: '최근 작업 공간' })).toHaveCount(0)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(0)
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBeNull()
+  expect(await storedAccessKey(page)).toBeNull()
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
     key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
   )))).toEqual([])
@@ -1195,8 +1165,7 @@ test('최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록�
 
   await expect(forgetButton).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('공유 링크는 삭제했지만 최근 방문 목록은 남아 있습니다.')
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBeNull()
+  expect(await storedAccessKey(page)).toBeNull()
   expect(await page.evaluate(() =>
     JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
 })
@@ -1235,8 +1204,7 @@ test('접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다
 
   await expect(forgetButton).toBeVisible()
   await expect(page.getByRole('alert')).toContainText('이 기기의 공유 링크를 삭제하지 못했습니다.')
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBe(ACCESS_KEY)
+  expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
   expect(await page.evaluate(() =>
     JSON.parse(localStorage.getItem('baton-recent-workspaces:v1') ?? '[]'))).toHaveLength(1)
 })

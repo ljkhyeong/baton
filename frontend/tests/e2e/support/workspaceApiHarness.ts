@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test'
-import type { Locator, Page, Route } from '@playwright/test'
+import type { BrowserContext, Locator, Page, Route } from '@playwright/test'
 import type {
   ConfirmRoleHandoffRequest,
   CreateDecisionRequest,
@@ -71,6 +71,7 @@ const CREATED_ROUND_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(76)
 export const CREATED_ROUND_NEW_ROUTINE_EXECUTION_ID = fixtureUuid(77)
 export const AUTOMATIC_ROUND_ROUTINE_ONE_EXECUTION_ID = fixtureUuid(78)
 export const AUTOMATIC_ROUND_ROUTINE_TWO_EXECUTION_ID = fixtureUuid(79)
+export const ACCOUNT_ID = '8e448211-66ae-44ab-9888-c4960648c22b'
 export const ACCESS_KEY = 'e2e-access-key'
 export const ROTATED_ACCESS_KEY = 'e2e-rotated-access-key'
 export const SECOND_ROTATED_ACCESS_KEY = 'e2e-second-rotated-access-key'
@@ -1280,6 +1281,28 @@ export function navigation(page: Page, projectName: string) {
   return page.getByRole('navigation', { name: projectName === 'mobile' ? '모바일 주 메뉴' : '주 메뉴' })
 }
 
+// 공유·링크 관리 버튼이 있는 상단 영역. 모바일은 별도 상단 막대를 쓴다.
+export function workspaceChrome(page: Page, projectName: string) {
+  return page.locator(projectName === 'mobile' ? '.mobile-topbar' : '.workspace-header')
+}
+
+// 로그인한 계정의 세션·CSRF 응답을 고정하고, 구성원을 넘기면 현재 팀의 구성원 연결도 응답한다.
+export async function installAccountSession(page: Page, {
+  accountId = ACCOUNT_ID,
+  csrfToken = 'test-token',
+  claimedMemberId,
+}: { accountId?: string; csrfToken?: string; claimedMemberId?: string } = {}) {
+  const csrf = { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken }
+  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: {
+    authenticated: true, accountId, ...csrf,
+  } }))
+  await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: csrf }))
+  if (!claimedMemberId) return
+  await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
+    claimed: true, accountId, teamId: TEAM_ID, memberId: claimedMemberId, claimedAt: '2026-08-31T00:00:00Z',
+  } }))
+}
+
 // 인수인계는 역할 메뉴 안의 화면이다.
 export async function openHandoffView(page: Page, projectName: string) {
   await navigation(page, projectName).getByRole('button', { name: '역할' }).click()
@@ -1298,6 +1321,48 @@ export async function blockBrowserStorage(page: Page) {
     Storage.prototype.setItem = unavailable
     Storage.prototype.removeItem = unavailable
   })
+}
+
+export async function blockAccessKeyStorage(target: Page | BrowserContext) {
+  await target.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem
+    Storage.prototype.setItem = function setItem(key, value) {
+      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
+      originalSetItem.call(this, key, value)
+    }
+  })
+}
+
+export async function disableWebLocks(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: undefined,
+    })
+  })
+}
+
+export async function denyShareAndClipboard(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+    })
+  })
+}
+
+export function storedAccessKey(page: Page) {
+  return page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)
+}
+
+// 접근 키 변경 임시 기록이 없으면 null, 있으면 그 기록의 멱등 키를 돌려준다.
+export async function pendingRotationIdempotencyKey(page: Page) {
+  const pending = await page.evaluate(
+    (key) => localStorage.getItem(key),
+    PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  )
+  return pending === null ? null : JSON.parse(pending)?.idempotencyKey
 }
 
 export async function blockContentCreationStorage(page: Page) {
@@ -1484,9 +1549,13 @@ export function pendingContentCreationEntries(page: Page) {
   return journalEntries<PendingContentCreationEntry>(page, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
 }
 
+export function recordedCalls(api: ApiHarness, method: string, path: string) {
+  return api.calls.filter((call) => call.method === method && call.path === path)
+}
+
 export async function recordedCall(api: ApiHarness, method: string, path: string) {
-  await expect.poll(() => api.calls.filter((call) => call.method === method && call.path === path).length).toBeGreaterThan(0)
-  const call = [...api.calls].reverse().find((candidate) => candidate.method === method && candidate.path === path)
+  await expect.poll(() => recordedCalls(api, method, path).length).toBeGreaterThan(0)
+  const call = recordedCalls(api, method, path).at(-1)
   expect(call, `${method} ${path} 요청 기록`).toBeTruthy()
   return call!
 }
@@ -1511,9 +1580,7 @@ export async function expectPendingCreationDialogLocked({
   submitLabel: string
 }) {
   const path = CONTENT_CREATION_PATHS[operation]
-  const callCount = () => api.calls.filter(
-    (call) => call.method === 'POST' && call.path === path,
-  ).length
+  const callCount = () => recordedCalls(api, 'POST', path).length
   const callsBeforeSubmit = callCount()
   api.holdNextContentCreation(operation)
 
@@ -1531,9 +1598,7 @@ export async function expectPendingCreationDialogLocked({
       })
     await expect(dialog).toBeVisible()
     await expect.poll(callCount).toBe(callsBeforeSubmit + 1)
-    const createCall = [...api.calls].reverse().find(
-      (call) => call.method === 'POST' && call.path === path,
-    )
+    const createCall = recordedCalls(api, 'POST', path).at(-1)
     expect(createCall).toBeTruthy()
 
     await expect(dialog).toHaveAttribute('aria-busy', 'true')

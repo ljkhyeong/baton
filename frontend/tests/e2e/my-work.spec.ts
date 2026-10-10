@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, makeProjection, installApi, navigation } from './support/workspaceApiHarness'
+import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, makeProjection, installAccountSession, installApi, navigation } from './support/workspaceApiHarness'
 
 const ACCOUNT = '00000000-0000-4000-8000-000000000901'
 const OTHER_TEAM = '00000000-0000-4000-8000-000000000902'
@@ -26,9 +26,7 @@ test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본�
   active.rounds[0]!.routineExecutions[1]!.title = '다른 진행 시즌의 회고'
   const api = await installApi(page, current)
   await page.route(`**/teams/${TEAM_ID}/seasons/${ACTIVE_SEASON}/workspace`, route => route.fulfill({ json: active }))
-  await page.route('**/api/v1/auth/session', route => route.fulfill({ json: {
-    authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'csrf',
-  } }))
+  await installAccountSession(page, { accountId: ACCOUNT, csrfToken: 'csrf' })
   await page.route('**/api/v1/team-access/mine', route => route.fulfill({ json: { accountId: ACCOUNT,
     teams: [current, other].map(workspace => ({ teamId: workspace.team.id, teamName: workspace.team.name,
       memberId: MEMBER_ONE_ID, memberName: '박민서', permission: 'MEMBER', seasonId: workspace.season.id,

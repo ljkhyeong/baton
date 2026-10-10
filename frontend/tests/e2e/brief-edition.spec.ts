@@ -1,19 +1,14 @@
 import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
-import { installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY, WORKSPACE_PATH } from './support/workspaceApiHarness'
+import { installAccountSession, installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY, ACCOUNT_ID, WORKSPACE_PATH } from './support/workspaceApiHarness'
 
-const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const EDITION = '8e448211-66ae-44ab-9888-c4960648c22c'
 
 test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한 거부를 구분한다 @smoke', async ({ page }, testInfo) => {
   await installApi(page)
-  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: {
-    authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token',
-  } }))
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  // 생성 요청은 세션과 다른 이름·값의 새 CSRF를 받아 써야 한다.
   await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: { csrfHeaderName: 'X-BRIEF-CSRF', csrfToken: 'fresh-token' } }))
-  await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
-    claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z',
-  } }))
   let generations = 0
   let latestCalls = 0
   const relatedReads = { summary: 0, items: 0, resolutions: 0 }
@@ -35,7 +30,7 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
       expect(request.headers()['x-brief-csrf']).toBe('fresh-token')
       if (generations === 1) return route.fulfill({ status: 409, json: { code: 'BRIEF_DELIVERY_INCOMPLETE', message: '원본 이벤트 전달이 끝난 뒤 다시 생성해 주세요.' } })
       return route.fulfill({ status: generations === 2 ? 201 : 200, json: {
-        executionId: ACCOUNT, editionId: EDITION, generation: 1, deliveryWatermark: 4, sourceCursor: 4, created: generations === 2,
+        executionId: ACCOUNT_ID, editionId: EDITION, generation: 1, deliveryWatermark: 4, sourceCursor: 4, created: generations === 2,
       } })
     }
     latestCalls += 1
@@ -98,12 +93,7 @@ for (const access of ['ended', 'viewer'] as const) {
       projection.team.permission = 'VIEWER'
     }
     await installApi(page, projection)
-    await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: {
-      authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token',
-    } }))
-    await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
-      claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z',
-    } }))
+    await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
     await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
       const path = new URL(route.request().url()).pathname
       expect(route.request().method()).toBe('GET')

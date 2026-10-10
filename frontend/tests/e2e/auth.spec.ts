@@ -3,13 +3,17 @@ import type { BrowserContext, Page, Route } from '@playwright/test'
 import {
   contrastRatio,
   ACCESS_KEY,
+  blockAccessKeyStorage,
   installApi,
   navigation,
   openSharedWorkspace,
+  recordedCalls,
   SEASON_ID,
+  storedAccessKey,
   SCOPE_PATH,
   TEAM_ID,
   WORKSPACE_PATH,
+  workspaceChrome,
 } from './support/workspaceApiHarness'
 
 const ACCOUNT_ID = '8e448211-66ae-44ab-9888-c4960648c22b'
@@ -345,8 +349,7 @@ test('@smoke 로그인한 이메일 계정은 비밀번호를 바꾸고 모든 �
     currentPassword: PASSWORD,
     newPassword: 'new correct horse battery staple',
   })
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBe(ACCESS_KEY)
+  expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
 })
 
 test('현재 비밀번호가 다르면 계정 세션과 입력 화면을 유지한다', async ({ page }) => {
@@ -968,9 +971,7 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
 
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
   await expect(peer.getByText('로그인 또는 공유 링크 필요')).toBeVisible()
-  const workspaceGetCount = () => workspaceApi.calls.filter((call) =>
-    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
-  ).length
+  const workspaceGetCount = () => recordedCalls(workspaceApi, 'GET', `${SCOPE_PATH}/workspace`).length
   const requestsAfterLogout = workspaceGetCount()
   await peer.evaluate(() => {
     window.dispatchEvent(new Event('focus'))
@@ -1008,8 +1009,7 @@ for (const otherTab of [false, true]) {
       await logoutPage.goto('/login')
       await expect(logoutPage.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible()
     }
-    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
-    await chrome.getByRole('button', { name: '링크 관리' }).click()
+    await workspaceChrome(page, testInfo.project.name).getByRole('button', { name: '링크 관리' }).click()
     workspaceApi.holdAccessKeyRotations()
     try {
       const rotationStarted = page.waitForRequest(`**${SCOPE_PATH}/access-key/rotate`)
@@ -1030,9 +1030,9 @@ for (const otherTab of [false, true]) {
       await (await rotationResponse).finished()
       await page.evaluate((teamId) => navigator.locks.request(`baton-access-key-rotation:${teamId}`, () => {}), TEAM_ID)
 
-      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+      expect(await storedAccessKey(page)).toBeNull()
       await page.reload()
-      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+      expect(await storedAccessKey(page)).toBeNull()
     } finally {
       workspaceApi.releaseAccessKeyRotations()
       if (otherTab) await logoutPage.close()
@@ -1148,8 +1148,7 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   await expect(page.getByRole('alert')).toContainText(
     '팀 접속 정보를 모두 삭제하지 못했습니다.',
   )
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBe('device-cleanup-capability')
+  expect(await storedAccessKey(page)).toBe('device-cleanup-capability')
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
 
   await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
@@ -1177,13 +1176,7 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
 })
 
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
-  await context.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
-      originalSetItem.call(this, key, value)
-    }
-  })
+  await blockAccessKeyStorage(context)
   const sessionState = { authenticated: false }
   await installApi(page)
   await installAuthApi(page, { sessionState })
@@ -1220,7 +1213,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   await expect(personalPanel).toContainText('먼저 이 팀에서 사용할 내 이름을 선택하세요.')
   await expect(page).toHaveURL(originalUrl)
   expect(originalUrl).toContain(`#accessKey=${ACCESS_KEY}`)
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
+  expect(await storedAccessKey(page)).toBeNull()
 })
 
 test('로그인은 검증된 내부 작업 공간 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {

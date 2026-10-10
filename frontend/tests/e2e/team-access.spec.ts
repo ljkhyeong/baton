@@ -1,8 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
-import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, MEMBER_TWO_ID, WORKSPACE_PATH, SCOPE_PATH,
-  installApi, makeProjection, navigation, openSharedWorkspace, recordedCall } from './support/workspaceApiHarness'
+import { TEAM_ID, SEASON_ID, MEMBER_ONE_ID, MEMBER_TWO_ID, WORKSPACE_PATH, SCOPE_PATH, ACCOUNT_ID,
+  installAccountSession, installApi, makeProjection, navigation, openSharedWorkspace, recordedCall, workspaceChrome } from './support/workspaceApiHarness'
 
-const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const OTHER_ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22c'
 const TOKEN = 'a'.repeat(43)
 const INVITATION = '00000000-0000-4000-8000-000000000099'
@@ -10,14 +9,9 @@ const SECOND_INVITATION = '00000000-0000-4000-8000-000000000100'
 const instant = '2026-09-05T03:00:00Z'
 const expiresAt = '2026-09-12T03:00:00Z'
 async function accountApi(page: Page) {
-  await page.route('**/api/v1/auth/**', route => route.fulfill({ json: new URL(route.request().url()).pathname.endsWith('/csrf')
-    ? { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'team-access-csrf' }
-    : { authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'team-access-csrf' } }))
-  await page.route('**/api/v1/account-memberships/current**', route => route.fulfill({ json: {
-    claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: instant,
-  } }))
+  await installAccountSession(page, { csrfToken: 'team-access-csrf', claimedMemberId: MEMBER_ONE_ID })
   await page.route('**/api/v1/teams/*/seasons/*/notifications', route => route.fulfill({ json: {
-    accountId: ACCOUNT, teamId: TEAM_ID, seasonId: SEASON_ID, memberId: MEMBER_ONE_ID, unreadCount: 0, items: [],
+    accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID, memberId: MEMBER_ONE_ID, unreadCount: 0, items: [],
   } }))
 }
 
@@ -39,10 +33,10 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
   await page.route(`**${SCOPE_PATH}/workspace`, route => route.fulfill({ json: projection }))
   await accountApi(page)
   const state = {
-    teamId: TEAM_ID, accountId: ACCOUNT, accountAccessEnabled: false, memberId: MEMBER_ONE_ID,
+    teamId: TEAM_ID, accountId: ACCOUNT_ID, accountAccessEnabled: false, memberId: MEMBER_ONE_ID,
     permission: null as 'ADMIN' | null,
     members: projection.members.map(member => ({ memberId: member.id, memberName: member.name, active: true,
-      accountId: member.id === MEMBER_ONE_ID ? ACCOUNT : OTHER_ACCOUNT,
+      accountId: member.id === MEMBER_ONE_ID ? ACCOUNT_ID : OTHER_ACCOUNT,
       permission: null as 'ADMIN' | 'MEMBER' | 'VIEWER' | null })),
     invitations: [] as { id: string; memberId: string; permission: 'VIEWER'; createdAt: string; expiresAt: string; acceptedAt: null; revokedAt: string | null }[], audit: [],
   }
@@ -52,7 +46,7 @@ test('@operations @webkit 관리자가 초대를 만들고 취소하며 열어 �
     const path = new URL(request.url()).pathname
     if (request.method() !== 'GET') {
       expect(request.headers()['x-csrf-token']).toBe('team-access-csrf')
-      expect(request.postDataJSON().expectedAccountId).toBe(ACCOUNT)
+      expect(request.postDataJSON().expectedAccountId).toBe(ACCOUNT_ID)
     }
     if (path.endsWith('/activate')) {
       expect(request.headers()['x-baton-recovery-key']).toBe('operator-recovery-key')
@@ -173,10 +167,10 @@ test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람�
   await page.route('**/api/v1/team-invitations/**', route => {
     const request = route.request()
     expect(request.headers()['x-csrf-token']).toBe('team-access-csrf')
-    expect(request.postDataJSON()).toEqual({ expectedAccountId: ACCOUNT, token: TOKEN })
+    expect(request.postDataJSON()).toEqual({ expectedAccountId: ACCOUNT_ID, token: TOKEN })
     return route.fulfill({ json: request.url().endsWith('/preview')
       ? { teamId: TEAM_ID, teamName: projection.team.name, memberId: MEMBER_ONE_ID, memberName: '박민서', permission: 'VIEWER', expiresAt }
-      : { accountId: ACCOUNT, teamId: TEAM_ID, seasonId: SEASON_ID, memberId: MEMBER_ONE_ID, permission: 'VIEWER' } })
+      : { accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID, memberId: MEMBER_ONE_ID, permission: 'VIEWER' } })
   })
   await page.goto(`/join#invite=${TOKEN}`)
   await expect(page.getByText('박민서 구성원으로 참여합니다. 권한은 열람자입니다.')).toBeVisible()
@@ -188,8 +182,7 @@ test('@operations @webkit 초대 수락 후 공유 키 없이 접속한 열람�
   await expect(page.getByRole('button', { name: '결정 남기기' })).toBeDisabled()
   expect((await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`)).headers['x-baton-access-key'] ?? '').toBe('')
   expect(await page.evaluate(() => sessionStorage.getItem('baton:team-invitation:v1'))).toBeNull()
-  const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
-  await chrome.getByRole('button', { name: '공유', exact: true }).click()
+  await workspaceChrome(page, testInfo.project.name).getByRole('button', { name: '공유', exact: true }).click()
   const shared = await page.evaluate(() => JSON.parse(document.documentElement.dataset.sharedWorkspace ?? 'null'))
   expect(shared).toEqual({ url: new URL(WORKSPACE_PATH, page.url()).href })
 })
@@ -210,7 +203,7 @@ test('@memory @webkit 구성원은 공유 키 없이 현재 계정과 CSRF를 �
   await dialog.getByRole('button', { name: '결정 기록하기' }).click()
   await expect(page.getByRole('heading', { name: '계정 권한으로 기록한다' })).toBeVisible()
   const call = await recordedCall(api, 'POST', `${SCOPE_PATH}/decisions`)
-  expect(call.headers['x-baton-account-id']).toBe(ACCOUNT)
+  expect(call.headers['x-baton-account-id']).toBe(ACCOUNT_ID)
   expect(call.headers['x-csrf-token']).toBe('team-access-csrf')
 })
 

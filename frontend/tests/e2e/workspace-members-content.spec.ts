@@ -21,6 +21,8 @@ import {
   openSharedWorkspace,
   openMemberCreationDialog,
   navigation,
+  workspaceChrome,
+  denyShareAndClipboard,
   blockContentCreationStorage,
   failNextJournalCleanup,
   CONTENT_CREATION_CLEANUP_RELEASE_KEY,
@@ -29,6 +31,7 @@ import {
   failContentCreationMarkerAndCleanupUntilReleased,
   pendingContentCreationEntries,
   recordedCall,
+  recordedCalls,
   expectScopedCall,
   expectPendingCreationDialogLocked,
   openHandoffView,
@@ -52,8 +55,7 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
   await expect(dialog.getByRole('alert')).toContainText(
     '이미 등록된 구성원 이름입니다. 같은 이름이면 구분할 별칭을 붙여 주세요.',
   )
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === memberPath))
-    .toHaveLength(0)
+  expect(recordedCalls(api, 'POST', memberPath)).toHaveLength(0)
 
   api.rejectNextMemberAsConflict()
   await nameInput.fill('서버 충돌 구성원')
@@ -205,19 +207,11 @@ test('구성원 표시 이름과 활동 상태를 관리하고 기존 기록만 
 
 test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 초점을 돌려준다', async ({ page }, testInfo) => {
   const api = await installApi(page)
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined })
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText: () => Promise.reject(new Error('denied')) },
-    })
-  })
+  await denyShareAndClipboard(page)
   await openSharedWorkspace(page)
   expectScopedCall(await recordedCall(api, 'GET', `${SCOPE_PATH}/workspace`))
 
-  const shareButton = testInfo.project.name === 'mobile'
-    ? page.locator('.mobile-topbar').getByRole('button', { name: '공유' })
-    : page.locator('.workspace-header').getByRole('button', { name: '공유' })
+  const shareButton = workspaceChrome(page, testInfo.project.name).getByRole('button', { name: '공유' })
   await shareButton.focus()
   await shareButton.press('Enter')
   await expect(page.locator('.toast[role="status"]')).toHaveText(/직접 복사할 링크를 열었습니다/)
@@ -230,9 +224,7 @@ test('@smoke 공유 링크 직접 복사 창을 닫으면 열기 버튼으로 �
   await shareDialog.getByRole('button', { name: '확인' }).click()
   await expect(shareButton).toBeFocused()
 
-  const manageAccessButton = testInfo.project.name === 'mobile'
-    ? page.locator('.mobile-topbar').getByRole('button', { name: '링크 관리' })
-    : page.locator('.workspace-header').getByRole('button', { name: '링크 관리' })
+  const manageAccessButton = workspaceChrome(page, testInfo.project.name).getByRole('button', { name: '링크 관리' })
   await manageAccessButton.focus()
   await manageAccessButton.press('Enter')
   const accessKeyDialog = page.getByRole('dialog', { name: '공유 링크 관리' })
@@ -446,12 +438,8 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   await expect(reopenedRoutineDialog.getByLabel('세부 설명'))
     .toHaveValue('서버에서 먼저 갱신한 최신 반복 업무 설명입니다.')
 
-  expect(api.calls.filter(
-    (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/roles/${ROLE_ID}`,
-  )).toHaveLength(1)
-  expect(api.calls.filter(
-    (call) => call.method === 'PUT' && call.path === `${SCOPE_PATH}/routines/${ROUTINE_ID}`,
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)).toHaveLength(1)
+  expect(recordedCalls(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)).toHaveLength(1)
   const browserStorage = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))
   expect(browserStorage).not.toContain('내 화면의 낡은')
   await page.reload()
@@ -539,12 +527,8 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
 
   const roleUpdatePath = `${SCOPE_PATH}/roles/${ROLE_ID}`
   const workspacePath = `${SCOPE_PATH}/workspace`
-  const rolePutCount = () => api.calls.filter(
-    (call) => call.method === 'PUT' && call.path === roleUpdatePath,
-  ).length
-  const workspaceGetCount = () => api.calls.filter(
-    (call) => call.method === 'GET' && call.path === workspacePath,
-  ).length
+  const rolePutCount = () => recordedCalls(api, 'PUT', roleUpdatePath).length
+  const workspaceGetCount = () => recordedCalls(api, 'GET', workspacePath).length
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
   await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
@@ -749,7 +733,7 @@ test('모든 콘텐츠 생성은 서버 응답 전 대화 상자 종료와 재�
 
   for (const operation of Object.keys(CONTENT_CREATION_PATHS) as ContentCreationOperation[]) {
     const path = CONTENT_CREATION_PATHS[operation]
-    expect(api.calls.filter((call) => call.method === 'POST' && call.path === path)).toHaveLength(1)
+    expect(recordedCalls(api, 'POST', path)).toHaveLength(1)
   }
   expect(api.projection().roles.filter((role) => role.name === '생성 잠금 역할')).toHaveLength(1)
 })
@@ -855,15 +839,11 @@ test('콘텐츠 생성 성공 뒤 임시 기록을 삭제하지 못하면 다음
 
   await expect(secondDialog.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/roles`)).toHaveLength(1)
 
   await secondDialog.getByRole('button', { name: '역할 만들기' }).click()
   await expect(secondDialog).toHaveCount(0)
-  const attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
-  )
+  const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/roles`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
@@ -991,9 +971,7 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
   await expect(otherOperationDialog.getByRole('alert')).toContainText(
     '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다.',
   )
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
-  )).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/roles`)).toHaveLength(0)
   expect(await pendingContentCreationEntries(page)).toEqual([
     expect.objectContaining({
       idempotencyKey: firstAttempt.headers['idempotency-key'],
@@ -1005,9 +983,7 @@ test('콘텐츠 요청 잠금은 완료 표시와 기록 삭제가 모두 실패
   await retryDialog.getByRole('button', { name: '항목 추가하기' }).click()
   await expect(retryDialog).toHaveCount(0)
 
-  const replayAttempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-  )
+  const replayAttempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(replayAttempts).toHaveLength(2)
   expect(replayAttempts[1]?.headers['idempotency-key'])
     .toBe(firstAttempt.headers['idempotency-key'])
@@ -1048,9 +1024,7 @@ test('콘텐츠 생성 성공 응답이 손상되면 임시 기록을 유지하�
   await dialog.getByRole('button', { name: '역할 만들기' }).click()
 
   await expect(dialog).toHaveCount(0)
-  const attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/roles`,
-  )
+  const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/roles`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
   expect(api.projection().roles.filter((role) => role.name === '손상 응답 복구 역할'))
@@ -1090,9 +1064,7 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
     '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다.',
   )
 
-  let attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/routines`,
-  )
+  let attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/routines`)
   expect(attempts).toHaveLength(1)
   const pendingAfterChangedRequest = await pendingContentCreationEntries(page)
   expect(pendingAfterChangedRequest).toHaveLength(1)
@@ -1106,9 +1078,7 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
   await firstDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(firstDialog).toHaveCount(0)
 
-  attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/routines`,
-  )
+  attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/routines`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
@@ -1117,9 +1087,7 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
   await changedRequestDialog.getByRole('button', { name: '반복 업무 만들기' }).click()
   await expect(changedRequestDialog).toHaveCount(0)
 
-  attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/routines`,
-  )
+  attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/routines`)
   expect(attempts).toHaveLength(3)
   expect(attempts[2]?.headers['idempotency-key'])
     .not.toBe(firstAttempt.headers['idempotency-key'])
