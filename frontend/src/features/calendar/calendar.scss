@@ -1,25 +1,23 @@
-.calendar-panel { scroll-margin-top: 90px; margin: 0 0 26px; padding: 0; border-block: 1px solid var(--rule); color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-panel { scroll-margin-top: 90px; margin: 0 0 26px; border-block: 1px solid var(--rule); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .calendar-panel[open] { padding-bottom: 16px; }
-.calendar-panel > summary { padding: 16px 0; cursor: pointer; }
+.calendar-panel > summary { padding: 16px 0; }
 .calendar-panel h2 { display: inline; margin: 0 12px 0 4px; font-size: 14px; }
 .calendar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .calendar-confirm, .calendar-address { margin-top: 18px; padding: 16px; border: 1px solid var(--rule); border-radius: var(--radius); }
 .calendar-confirm button + button { margin-left: 10px; }
 .calendar-address label { display: block; font-weight: 600; }
 .calendar-address input { display: block; width: 100%; margin: 8px 0 12px; padding: 10px 12px; }
-.calendar-address p, .calendar-guide { color: var(--muted); font-size: 12px; }
-.calendar-guide { margin-top: 18px; }
-.calendar-guide summary { cursor: pointer; }
+.calendar-guide { margin-top: 18px; color: var(--muted); font-size: 12px; }
 .calendar-guide > label { display: grid; gap: 6px; margin-top: 12px; max-width: 280px; }
 .calendar-guide select { min-width: 0; }
 .calendar-panel [role="alert"] { color: var(--warning); }
 
-.calendar-subscription-list { margin-top: 0; min-width: 0; color: var(--ink); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-subscription-list { min-width: 0; font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
 .calendar-subscription-list [role="alert"] { color: var(--warning); }
 .calendar-subscription-rows { margin: 0; padding: 0; list-style: none; }
 .calendar-subscription-rows > li { border-top: 1px solid var(--rule); }
 .calendar-subscription-rows > li:last-child { border-bottom: 1px solid var(--rule); }
-.calendar-subscription-rows summary { display: flex; align-items: center; gap: 10px; padding: 16px 0; cursor: pointer; }
+.calendar-subscription-rows summary { display: flex; align-items: center; gap: 10px; padding: 16px 0; }
 .calendar-subscription-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .calendar-subscription-name > span { color: var(--muted); font-size: 12px; }
 .calendar-subscription-management { padding-bottom: 18px; }
@@ -32,7 +30,6 @@
 .calendar-filter { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .calendar-filter input { width: 18px; height: 18px; }
 .calendar-subscription-status { display: flex; flex-direction: column; max-width: 120px; color: var(--muted); font-size: 12px; text-align: right; }
-.calendar-subscription-status time { display: block; font-size: 12px; }
 .calendar-polling-note { color: var(--muted); font-size: 12px; }
 
 .calendar-search-fields { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
