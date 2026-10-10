@@ -1272,7 +1272,7 @@ CSRF 없이 조회한다.
 
 ## 10. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`, `BriefEditionRestDocsTest`와 `BriefAttentionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
+`adapter-in-web`의 `restdocs` 패키지에서 `restdocs` 태그를 단 `*RestDocsTest` 클래스가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
