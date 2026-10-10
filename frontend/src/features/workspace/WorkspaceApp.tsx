@@ -20,14 +20,12 @@ import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/featur
 import { useBriefNavigation } from '@/features/brief/useBriefNavigation'
 import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
 import type { BriefSource } from '@/features/brief/types'
-import {
-  initialRecordSearchFilters,
-} from './records/RecordSearchView'
 import { SeasonRecordSearch } from './records/SeasonRecordSearch'
 import { RecordSearchTarget } from './records/RecordSearchTarget'
-import type {
-  RecordSearchFilters,
-  RecordSearchResult,
+import {
+  initialRecordSearchFilters,
+  type RecordSearchFilters,
+  type RecordSearchResult,
 } from './records/recordSearch'
 import type { WorkspaceScope } from './api'
 import {

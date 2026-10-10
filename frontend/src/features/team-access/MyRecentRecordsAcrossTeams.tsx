@@ -1,7 +1,12 @@
 import { generatePath, Link } from 'react-router-dom'
 import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
-import { compareRecordSearchResults, searchWorkspaceRecords, type RecordSearchResult } from '@/features/workspace/records/recordSearch'
+import {
+  compareRecordSearchResults,
+  initialRecordSearchFilters,
+  searchWorkspaceRecords,
+  type RecordSearchResult,
+} from '@/features/workspace/records/recordSearch'
 import type { WorkspaceProjection } from '@/features/workspace/types'
 
 const kindLabel = {
@@ -15,8 +20,8 @@ export function MyRecentRecordsAcrossTeams({ workspaces, partial }: {
   partial: boolean
 }) {
   const records = workspaces.flatMap(workspace => searchWorkspaceRecords(workspace, {
-    query: '', type: 'all', roleId: '', state: 'active', fromDate: '', toDate: '',
-  }, workspace.season.timeZone).map(record => ({
+    ...initialRecordSearchFilters, state: 'active',
+  }).map(record => ({
     ...record,
     teamId: workspace.team.id,
     teamName: workspace.team.name,

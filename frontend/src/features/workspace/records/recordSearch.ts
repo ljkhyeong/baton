@@ -6,6 +6,7 @@ import type {
   HandoffItem,
   Role,
   RoleResource,
+  Season,
 } from '../types'
 
 type RecordSearchType = 'all' | 'decision' | 'handoff' | 'resource'
@@ -18,6 +19,15 @@ export type RecordSearchFilters = {
   state: RecordSearchState
   fromDate: string
   toDate: string
+}
+
+export const initialRecordSearchFilters: RecordSearchFilters = {
+  query: '',
+  type: 'all',
+  roleId: '',
+  state: 'all',
+  fromDate: '',
+  toDate: '',
 }
 
 export type RecordSearchResult = {
@@ -40,6 +50,7 @@ export type RecordSearchResult = {
 }
 
 type RecordSearchSource = {
+  season: Pick<Season, 'timeZone'>
   decisions: Decision[]
   handoffItems: HandoffItem[]
   resources: RoleResource[]
@@ -149,7 +160,6 @@ export function isRecordSearchDateRangeValid(filters: RecordSearchFilters) {
 export function searchWorkspaceRecords(
   source: RecordSearchSource,
   filters: RecordSearchFilters,
-  timeZone: string,
 ) {
   if (!isRecordSearchDateRangeValid(filters)) return []
 
@@ -166,7 +176,7 @@ export function searchWorkspaceRecords(
     .filter((result) => tokens.every((token) => result.searchableText.includes(token)))
     .filter((result) => {
       if (!filters.fromDate && !filters.toDate) return true
-      const calendarDate = pilotCalendarDate(new Date(result.createdAt), timeZone)
+      const calendarDate = pilotCalendarDate(new Date(result.createdAt), source.season.timeZone)
       return (!filters.fromDate || calendarDate >= filters.fromDate)
         && (!filters.toDate || calendarDate <= filters.toDate)
     })
