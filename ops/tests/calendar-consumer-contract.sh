@@ -51,7 +51,6 @@ actual_contract_version="$(<"$CAL_ROOT/contracts/VERSION")"
 [[ "$actual_contract_version" == "$CAL_CONTRACT_VERSION" ]] \
   || fail "CAL 계약 버전이 다릅니다: $actual_contract_version"
 case "$CAL_CONTRACT_VERSION" in
-  1.1.0-rc.1) log '게시된 1.1.0-rc.1 사전 릴리스 계약을 검증합니다.' ;;
   1.1.0-rc.2)
     log '1.1.0-rc.2의 구독·복구 진단 계약을 검증합니다.'
     CONTRACT_TEST_OPTIONS+=( :application:calendarSubscriptionContractTest )
