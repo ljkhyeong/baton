@@ -22,11 +22,9 @@ type SeasonLifecycleModal =
 type SeasonLifecycleFlowOptions = {
   scope: WorkspaceScope
   workspace: WorkspaceProjection | undefined
-  currentAccessKey: string
   onOpenModal: (modal: SeasonLifecycleModal) => void
   onCloseModal: () => void
-  onSelectSeason: (seasonId: string, accessKey: string) => void
-  onSeasonCreated: (seasonId: string, accessKey: string) => void
+  onOpenSeason: (seasonId: string, accessKey: string) => void
   notify: (message: string, tone?: 'success' | 'error') => void
   preserveConflictDraft: PreserveConflictDraft
 }
@@ -34,11 +32,9 @@ type SeasonLifecycleFlowOptions = {
 export function useWorkspaceSeasonLifecycleFlow({
   scope,
   workspace,
-  currentAccessKey,
   onOpenModal,
   onCloseModal,
-  onSelectSeason,
-  onSeasonCreated,
+  onOpenSeason,
   notify,
   preserveConflictDraft,
 }: SeasonLifecycleFlowOptions) {
@@ -55,7 +51,7 @@ export function useWorkspaceSeasonLifecycleFlow({
     const result = successorCommand.successResult
     successorCommand.resetSuccess()
     notify('다음 시즌을 만들었습니다.')
-    onSeasonCreated(result.season.id, currentAccessKey)
+    onOpenSeason(result.season.id, scope.accessKey)
   }, [successorCommand.successResult])
 
   const openSwitcher = () => {
@@ -103,7 +99,7 @@ export function useWorkspaceSeasonLifecycleFlow({
   const selectSeason = (seasonId: string) => {
     if (!workspace || seasonId === workspace.season.id) return
     onCloseModal()
-    onSelectSeason(seasonId, currentAccessKey)
+    onOpenSeason(seasonId, scope.accessKey)
   }
 
   const saveSeason = (request: UpdateSeasonRequest) => {

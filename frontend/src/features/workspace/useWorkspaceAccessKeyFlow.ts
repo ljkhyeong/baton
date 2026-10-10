@@ -18,7 +18,6 @@ type ToastTone = 'success' | 'error'
 
 type WorkspaceAccessKeyFlowOptions = {
   scope: WorkspaceScope
-  currentAccessKey: string
   accountAccessEnabled?: boolean
   onAccessKeyChange: (accessKey: string) => void
   onCloseModal: () => void
@@ -29,9 +28,12 @@ type WorkspaceAccessKeyFlowOptions = {
 const rotationCleanupErrorMessage = '새 공유 링크를 발급했지만 임시 기록을 삭제하지 못했습니다. 새 링크를 보관하고 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const rotationJournalCleanupErrorMessage = '이전 공유 링크의 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const staleRotationReplayMessage = '임시 기록을 지웠습니다. 새 링크는 아직 발급하지 않았습니다. ‘공유 링크 재발급’을 다시 누르세요.'
-const rotationBusyMessage = '다른 탭에서 새 공유 링크를 확인하고 있습니다. 그 탭에서 끝낸 뒤 다시 시도하세요.'
-const rotationLockUnsupportedMessage = '이 브라우저에서는 공유 링크를 재발급할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
-const rotationLockFailedMessage = '공유 링크를 재발급할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
+// 탭 사이 잠금을 얻지 못한 이유별 안내
+const rotationLockMessages = {
+  busy: '다른 탭에서 새 공유 링크를 확인하고 있습니다. 그 탭에서 끝낸 뒤 다시 시도하세요.',
+  unsupported: '이 브라우저에서는 공유 링크를 재발급할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.',
+  failed: '공유 링크를 재발급할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.',
+}
 const accessKeyRotationJournalPolicy = {
   startNewRequestCodes: new Set(['INVALID_INPUT', 'IDEMPOTENCY_KEY_REUSED']),
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
@@ -48,7 +50,6 @@ function replaceAccessKeyFragment(accessKey?: string) {
 
 export function useWorkspaceAccessKeyFlow({
   scope,
-  currentAccessKey,
   accountAccessEnabled = false,
   onAccessKeyChange,
   onCloseModal,
@@ -63,7 +64,7 @@ export function useWorkspaceAccessKeyFlow({
   const rotationRequestInFlightRef = useRef(false)
   const shareRequestInFlightRef = useRef(false)
   const pendingRotationIdempotencyKey = pendingAccessKeyRotation(teamId)
-  const shareUrl = `${window.location.origin}${generatePath(WORKSPACE_ROUTE, { teamId, seasonId })}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(currentAccessKey)}`}`
+  const shareUrl = `${window.location.origin}${generatePath(WORKSPACE_ROUTE, { teamId, seasonId })}${accountAccessEnabled ? '' : `#accessKey=${encodeURIComponent(scope.accessKey)}`}`
 
   const clearRotationJournal = (idempotencyKey: string) => {
     const cleanupResult = clearPendingAccessKeyRotation(teamId, idempotencyKey)
@@ -84,13 +85,9 @@ export function useWorkspaceAccessKeyFlow({
     return true
   }
 
-  const reportRotationLockFailure = (status: 'busy' | 'unsupported' | 'failed') => {
+  const reportRotationLockFailure = (status: keyof typeof rotationLockMessages) => {
     rotateAccessKeyMutation.reset()
-    setRotationStorageError(status === 'busy'
-      ? rotationBusyMessage
-      : status === 'unsupported'
-        ? rotationLockUnsupportedMessage
-        : rotationLockFailedMessage)
+    setRotationStorageError(rotationLockMessages[status])
   }
 
   const retryRotationJournalCleanup = async () => {
@@ -117,7 +114,7 @@ export function useWorkspaceAccessKeyFlow({
 
   const finishAccessKeyRotation = (rotatedAccessKey: string, idempotencyKey: string) => {
     const pendingCleared = clearRotationJournal(idempotencyKey)
-    if (rotatedAccessKey === currentAccessKey) {
+    if (rotatedAccessKey === scope.accessKey) {
       const message = pendingCleared
         ? staleRotationReplayMessage
         : '임시 기록을 삭제하지 못해 새 링크를 발급하지 않았습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'

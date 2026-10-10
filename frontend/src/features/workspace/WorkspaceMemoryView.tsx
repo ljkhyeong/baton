@@ -21,7 +21,7 @@ export function MemoryView({
   onEditDecision,
   onUpdateArchive,
   archivePending,
-  changesDisabled = false,
+  changesDisabled,
 }: {
   scope: WorkspaceScope
   decisions: Decision[]
@@ -35,7 +35,7 @@ export function MemoryView({
   onEditDecision: (decision: Decision) => void
   onUpdateArchive: (decision: Decision, archived: boolean) => void
   archivePending: boolean
-  changesDisabled?: boolean
+  changesDisabled: boolean
 }) {
   const canCreateDecision = roles.length > 0 && members.some(isActiveMember)
   return (

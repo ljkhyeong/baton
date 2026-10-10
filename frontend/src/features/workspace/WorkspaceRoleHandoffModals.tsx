@@ -43,7 +43,7 @@ function roleHandoffIdentityCopy(member: Member | undefined, action: string, acc
 }
 
 export function RoleHandoffModal({
-  accountAccessEnabled = false,
+  accountAccessEnabled,
   mode,
   role,
   handoff,
@@ -61,7 +61,7 @@ export function RoleHandoffModal({
   onAccept,
   onCancel,
 }: {
-  accountAccessEnabled?: boolean
+  accountAccessEnabled: boolean
   mode: RoleHandoffModalMode
   role: Role
   handoff?: RoleHandoff
@@ -96,7 +96,7 @@ export function RoleHandoffModal({
   const [incomingStartDate, setIncomingStartDate] = useState(suggestedStartDate)
   const [incomingEndDate, setIncomingEndDate] = useState(season.endDate)
   const [warningAcknowledged, setWarningAcknowledged] = useState(false)
-  const activeItems = items.filter((item) => item.roleId === role.id && !item.archivedAt)
+  const activeItems = items.filter((item) => item.roleId === role.id)
   const activeResources = resources.filter((resource) => resource.roleId === role.id)
   const incompleteItemCount = activeItems.filter((item) => !item.completed).length
   const warnings = [
@@ -179,7 +179,6 @@ export function RoleHandoffModal({
               <span>다음 담당자</span>
               <select
                 required
-                autoFocus
                 value={toMemberId}
                 onChange={(event) => setToMemberId(event.target.value)}
               >

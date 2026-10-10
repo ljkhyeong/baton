@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import '@/features/team-access/my-teams.scss'
 import { Icon } from '@/shared/ui/Icon'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { PageHeader, PrimaryButton } from './WorkspaceViews'
@@ -151,20 +150,18 @@ export function WorkspaceHeader({
 }
 
 export function MobileTopbar({
-  accountAccessEnabled = false,
-  teamName,
-  seasonName,
+  workspace,
   onSwitchSeason,
   onShare,
   onManageAccess,
 }: {
-  accountAccessEnabled?: boolean
-  teamName: string
-  seasonName: string
+  workspace: WorkspaceProjection
   onSwitchSeason: () => void
   onShare: () => void
   onManageAccess: () => void
 }) {
+  const teamName = workspace.team.name
+  const seasonName = workspace.season.name
   return (
     <header className="mobile-topbar">
       <div className="brand"><span className="brand-mark" />BATON</div>
@@ -180,7 +177,7 @@ export function MobileTopbar({
       <span className="mobile-workspace-actions">
         <Link className="team-list-link" to="/my-teams">내 팀</Link>
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
-        <button type="button" className="mobile-share" onClick={onManageAccess}>{accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
+        <button type="button" className="mobile-share" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
       </span>
     </header>
   )
@@ -307,11 +304,16 @@ export function WorkspaceSyncStatus({
   )
 }
 
-export function ContentCreationCleanupBanner({
+// 요청 결과를 확인하지 못해 브라우저에 남은 임시 기록을 지우도록 안내한다.
+export function CleanupRequiredBanner({
+  label,
+  title,
   message,
   pending,
   onRetry,
 }: {
+  label: string
+  title: string
   message: string
   pending: boolean
   onRetry: () => void
@@ -320,12 +322,12 @@ export function ContentCreationCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="임시 기록 삭제 필요"
+      aria-label={label}
     >
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>새 항목을 추가하려면 남아 있는 임시 기록을 먼저 삭제하세요.</strong>
+          <strong>{title}</strong>
           <small>{message}</small>
         </span>
       </div>

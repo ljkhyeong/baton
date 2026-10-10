@@ -30,7 +30,6 @@ import type {
 } from './types'
 
 export type RoutineFormRequest = CreateRoutineRequest & UpdateRoutineRequest
-type RoundScheduleFormRequest = UpdateRoundScheduleRequest
 export type SeasonRoundFormRequest = CreateSeasonRoundRequest & UpdateSeasonRoundRequest
 
 export function RoutineModal({
@@ -96,7 +95,6 @@ export function RoutineModal({
         <label>
           <span>반복 업무 이름</span>
           <input
-            autoFocus
             required
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -209,7 +207,7 @@ export function RoundScheduleModal({
   pending: boolean
   error: unknown
   onClose: () => void
-  onSave: (request: RoundScheduleFormRequest) => SaveResult
+  onSave: (request: UpdateRoundScheduleRequest) => SaveResult
 }) {
   const schedule = season.roundSchedule
   const submission = useSubmissionLock(pending)
@@ -254,7 +252,6 @@ export function RoundScheduleModal({
         <label>
           <span>시즌 시간대</span>
           <input
-            autoFocus
             required
             maxLength={64}
             autoCapitalize="none"
@@ -385,7 +382,6 @@ export function SeasonRoundModal({
         <label>
           <span>회차 이름</span>
           <input
-            autoFocus
             required
             maxLength={100}
             value={name}

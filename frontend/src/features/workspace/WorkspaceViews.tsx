@@ -64,19 +64,19 @@ export function routineTimelineItems(routines: Routine[], selectedRound?: Season
   return items
 }
 
-export function PageHeader({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: ReactNode }) {
+export function PageHeader({ eyebrow, title, action }: { eyebrow: string; title: string; action?: ReactNode }) {
   return (
     <header className="page-header">
-      <div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{title}</h1></div>
+      <div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1></div>
       {action && <div className="page-action">{action}</div>}
     </header>
   )
 }
-export function PrimaryButton({ children, onClick, icon = true, disabled = false }: { children: ReactNode; onClick: () => void; icon?: boolean; disabled?: boolean }) {
-  return <button type="button" className="primary-button" onClick={onClick} disabled={disabled}>{icon && <Icon name="plus" size={16} />}{children}</button>
+export function PrimaryButton({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled: boolean }) {
+  return <button type="button" className="primary-button" onClick={onClick} disabled={disabled}><Icon name="plus" size={16} />{children}</button>
 }
 
-export function ActionableEmpty({ title, description, actionLabel, onAction, disabled = false, icon = 'memory' }: { title: string; description: string; actionLabel: string; onAction: () => void; disabled?: boolean; icon?: Parameters<typeof Icon>[0]['name'] }) {
+export function ActionableEmpty({ title, description, actionLabel, onAction, disabled, icon = 'memory' }: { title: string; description: string; actionLabel: string; onAction: () => void; disabled: boolean; icon?: Parameters<typeof Icon>[0]['name'] }) {
   return (
     <div className="empty-state actionable-empty">
       <Icon name={icon} size={24} /><strong>{title}</strong><p>{description}</p>
@@ -89,7 +89,7 @@ export function RoundControl({
   compact = false,
   rounds,
   selectedRound,
-  archivedRoundCount = 0,
+  archivedRoundCount,
   hasRoutines,
   onSelect,
   onCreate,
@@ -101,7 +101,7 @@ export function RoundControl({
   compact?: boolean
   rounds: SeasonRound[]
   selectedRound?: SeasonRound
-  archivedRoundCount?: number
+  archivedRoundCount: number
   hasRoutines: boolean
   onSelect: (roundId: string) => void
   onCreate: () => void
@@ -174,7 +174,7 @@ export function RoundControl({
   )
 }
 
-export function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, operationPending = false, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; operationPending?: boolean; archivePending?: boolean }) {
+export function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, operationPending, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; operationPending: boolean; archivePending?: boolean }) {
   const displayRoutine = execution ?? routine
   if (!displayRoutine) return null
   const member = getMember(members, role?.currentMemberId)

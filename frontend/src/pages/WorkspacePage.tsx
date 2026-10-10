@@ -149,8 +149,7 @@ export default function WorkspacePage() {
         accessKey={accessKey}
         accessDeniedAction={storedKeyFallback}
         onWorkspaceLoaded={handleWorkspaceLoaded}
-        onSelectSeason={navigateToSeason}
-        onSeasonCreated={navigateToSeason}
+        onOpenSeason={navigateToSeason}
       />
     </>
   )

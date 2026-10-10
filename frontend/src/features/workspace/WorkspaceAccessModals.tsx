@@ -25,7 +25,6 @@ export function ShareLinkFallback({
         <label htmlFor="share-link-value">공유 링크</label>
         <input
           id="share-link-value"
-          autoFocus
           readOnly
           value={shareUrl}
           onFocus={(event) => event.currentTarget.select()}

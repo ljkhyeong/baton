@@ -94,8 +94,8 @@ export function RolesView({
   onEditRole,
   onOpenHandoff,
   handoffProgress,
-  changesDisabled = false,
-  memberManagementDisabled = changesDisabled,
+  changesDisabled,
+  memberManagementDisabled,
 }: {
   me?: Member
   roles: Role[]
@@ -110,8 +110,8 @@ export function RolesView({
   onEditRole: (role: Role) => void
   onOpenHandoff: (roleId?: string) => void
   handoffProgress: (id: string) => number
-  changesDisabled?: boolean
-  memberManagementDisabled?: boolean
+  changesDisabled: boolean
+  memberManagementDisabled: boolean
 }) {
   return (
     <>

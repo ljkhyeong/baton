@@ -3,9 +3,7 @@ import { calendarDayNumber } from '@/shared/lib/calendarDate'
 
 const DAYS_PER_WEEK = 7
 
-const PILOT_CALENDAR_TIME_ZONE = 'Asia/Seoul'
-
-export function pilotCalendarDate(now = new Date(), timeZone = PILOT_CALENDAR_TIME_ZONE) {
+export function pilotCalendarDate(now: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     calendar: 'gregory',
@@ -24,7 +22,7 @@ export function pilotCalendarDate(now = new Date(), timeZone = PILOT_CALENDAR_TI
   return `${year}-${month}-${day}`
 }
 
-export function formatPilotToday(now = new Date(), timeZone = PILOT_CALENDAR_TIME_ZONE) {
+export function formatPilotToday(now: Date, timeZone: string) {
   return new Intl.DateTimeFormat('ko-KR', {
     timeZone,
     calendar: 'gregory',

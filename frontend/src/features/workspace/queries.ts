@@ -1,6 +1,5 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UseMutationOptions } from '@tanstack/react-query'
-import { ApiError } from '@/shared/api/ApiError'
 import {
   acceptRoleHandoff,
   cancelRoleHandoff,
@@ -14,6 +13,7 @@ import {
   createSeasonRound,
   getWorkspace,
   isWorkspaceAccessDenied,
+  isWorkspaceContentConflict,
   prepareRoleHandoff,
   rotateAccessKey,
   setDecisionArchived,
@@ -79,7 +79,7 @@ type ArchiveCommand = {
   archived: boolean
 }
 
-type RoleHandoffTransitionCommand<TRequest> = {
+export type RoleHandoffTransitionCommand<TRequest> = {
   roleId: string
   handoffId: string
   request: TRequest
@@ -138,10 +138,7 @@ export function workspaceQueryOptions(scope: WorkspaceScope, refetchInterval = W
 }
 
 export function useWorkspaceQuery(scope: WorkspaceScope) {
-  return useQuery({
-    ...workspaceQueryOptions(scope),
-    enabled: Boolean(scope.teamId && scope.seasonId),
-  })
+  return useQuery(workspaceQueryOptions(scope))
 }
 
 function useInvalidateWorkspace(scope: WorkspaceScope) {
@@ -160,7 +157,7 @@ function useInvalidateWorkspace(scope: WorkspaceScope) {
 
 function invalidateUnlessContentConflict(invalidate: () => Promise<void>) {
   return (_data: unknown, error: unknown) => {
-    if (error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT') return
+    if (isWorkspaceContentConflict(error)) return
     return invalidate()
   }
 }

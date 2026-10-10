@@ -76,7 +76,7 @@ export function TeamBatonNotice({
   )
 }
 
-// 내 할 일 보기: 나에게 넘어온 바통만 보여 준다.
+// 나에게 넘어온 바통을 보여 준다. 내 할 일 보기와 역할 화면의 내 역할에서 쓴다.
 export function ReceivedBatonNotice({
   role,
   handoff,

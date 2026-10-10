@@ -51,10 +51,10 @@ export function MemberManagementModal({
   onClose,
 }: {
   members: Member[]
-  accountMembershipPanel?: ReactNode
+  accountMembershipPanel: ReactNode
   pendingMemberId: string | null
   error: unknown
-  changesDisabled?: boolean
+  changesDisabled: boolean
   onAdd: () => void
   onEdit: (member: Member) => void
   onToggleDeactivation: (member: Member) => void
@@ -152,7 +152,7 @@ export function MemberModal({
   members: Member[]
   member?: Member
   onClose: () => void
-  onCancel?: () => void
+  onCancel: () => void
   onSave: (request: MemberFormRequest) => SaveResult
 }) {
   const editing = Boolean(member)
@@ -195,7 +195,6 @@ export function MemberModal({
         <label>
           <span>구성원 이름</span>
           <input
-            autoFocus
             required
             maxLength={100}
             value={name}
@@ -227,18 +226,25 @@ export function MemberModal({
           closeGuardRef={submission.closeGuardRef}
           submitLabel={editing ? '변경 저장' : '구성원 추가하기'}
           pendingLabel={editing ? '이름 저장하는 중…' : '구성원 추가하는 중…'}
-          onClose={onCancel ?? onClose}
+          onClose={onCancel}
         />
       </form>
     </ModalShell>
   )
 }
 
+// 활동을 종료한 기존 담당자는 선택지에 남기되 새로 고를 수 없게 한다.
+const memberOption = (member: Member) => (
+  <option key={member.id} value={member.id} disabled={!isActiveMember(member)}>
+    {isActiveMember(member) ? member.name : `${member.name} (활동 종료 · 기존 선택)`}
+  </option>
+)
+
 export function RoleModal({
   members,
   season,
   role,
-  assignmentLocked = false,
+  assignmentLocked,
   pending,
   error,
   storageError,
@@ -249,7 +255,7 @@ export function RoleModal({
   members: Member[]
   season: Season
   role?: Role
-  assignmentLocked?: boolean
+  assignmentLocked: boolean
   onClose: () => void
   onSave: (request: RoleFormRequest) => SaveResult
 }) {
@@ -309,7 +315,6 @@ export function RoleModal({
         <label>
           <span>역할 이름</span>
           <input
-            autoFocus
             required
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -335,17 +340,7 @@ export function RoleModal({
               onChange={(event) => setCurrentMemberId(event.target.value)}
             >
               <option value="">담당자 미정</option>
-              {currentMemberOptions.map((member) => (
-                <option
-                  key={member.id}
-                  value={member.id}
-                  disabled={!isActiveMember(member)}
-                >
-                  {isActiveMember(member)
-                    ? member.name
-                    : `${member.name} (활동 종료 · 기존 선택)`}
-                </option>
-              ))}
+              {currentMemberOptions.map(memberOption)}
             </select>
           </label>
           <label>
@@ -356,21 +351,11 @@ export function RoleModal({
               onChange={(event) => setNextMemberId(event.target.value)}
             >
               <option value="">다음 담당자 미정</option>
-              {nextMemberOptions.map((member) => (
-                <option
-                  key={member.id}
-                  value={member.id}
-                  disabled={!isActiveMember(member)}
-                >
-                  {isActiveMember(member)
-                    ? member.name
-                    : `${member.name} (활동 종료 · 기존 선택)`}
-                </option>
-              ))}
+              {nextMemberOptions.map(memberOption)}
             </select>
           </label>
         </div>
-        {role && (currentMemberOptions.some((member) => !isActiveMember(member))
+        {(currentMemberOptions.some((member) => !isActiveMember(member))
           || nextMemberOptions.some((member) => !isActiveMember(member))) && (
           <small className="form-hint">
             활동을 종료한 기존 담당자는 유지할 수 있지만 다른 역할에 새로 배정할 수는 없습니다.
