@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
+import com.personal.baton.application.delivery.DeliveryResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,9 +41,9 @@ class CalendarOutboxDispatchServiceTest {
         var second = new CalendarDelivery(metadata, 1, UUID.randomUUID());
         when(outbox.claimPending(anyInt(), eq(NOW), any(), eq(false))).thenReturn(List.of(first));
         when(outbox.claimPending(anyInt(), eq(NOW), any(), eq(true))).thenReturn(List.of(second));
-        when(schedules.deliver(schedule)).thenReturn(CalendarSnapshotClient.DeliveryResult.delivered("APPLIED"));
+        when(schedules.deliver(schedule)).thenReturn(DeliveryResult.delivered("APPLIED"));
         when(metadataClient.deliver(metadata))
-                .thenReturn(CalendarSnapshotClient.DeliveryResult.delivered("SEASON_METADATA_ACCEPTED"));
+                .thenReturn(DeliveryResult.delivered("SEASON_METADATA_ACCEPTED"));
         when(outbox.markDelivered(eq(schedule), any(), eq(NOW), any())).thenReturn(true);
         when(outbox.markDelivered(eq(metadata), any(), eq(NOW), any())).thenReturn(true);
 
@@ -69,8 +70,8 @@ class CalendarOutboxDispatchServiceTest {
                 .thenReturn(List.of(first))
                 .thenReturn(List.of(retry));
         when(client.deliver(snapshot))
-                .thenReturn(CalendarSnapshotClient.DeliveryResult.retryable("CAL_NETWORK_FAILURE"))
-                .thenReturn(CalendarSnapshotClient.DeliveryResult.delivered("DUPLICATE"));
+                .thenReturn(DeliveryResult.retryable("CAL_NETWORK_FAILURE"))
+                .thenReturn(DeliveryResult.delivered("DUPLICATE"));
         when(outboxPort.markDelivered(snapshot, retry.leaseToken(), NOW, "DUPLICATE"))
                 .thenReturn(true);
 
@@ -98,7 +99,7 @@ class CalendarOutboxDispatchServiceTest {
         when(outboxPort.claimPending(anyInt(), eq(NOW), any(), eq(false)))
                 .thenReturn(List.of(delivery));
         when(client.deliver((CalendarSnapshot) delivery.payload()))
-                .thenReturn(CalendarSnapshotClient.DeliveryResult.permanentFailure(
+                .thenReturn(DeliveryResult.permanentFailure(
                         "SOURCE_REVISION_CONFLICT"
                 ));
 

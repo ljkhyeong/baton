@@ -4,8 +4,8 @@ import com.personal.baton.application.calendar.port.in.DispatchCalendarOutboxUse
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
 import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.DeliveryResult;
 import com.personal.baton.application.delivery.DispatchResult;
 import com.personal.baton.application.delivery.RetryBackoff;
 import java.time.Clock;

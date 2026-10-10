@@ -5,7 +5,7 @@ import com.personal.baton.application.calendar.port.out.CalendarRecoveryClient;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort.RecoveryState;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort.SeasonState;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryResult;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;

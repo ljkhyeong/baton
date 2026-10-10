@@ -10,7 +10,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.personal.baton.application.brief.BriefContinuityDelivery;
 import com.personal.baton.application.brief.BriefContinuityEvent;
-import com.personal.baton.application.brief.port.out.BriefContinuityClient.Outcome;
+import com.personal.baton.application.delivery.DeliveryResult.Outcome;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import java.io.IOException;

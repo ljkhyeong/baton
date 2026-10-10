@@ -1,7 +1,7 @@
 package com.personal.baton.application.calendar.port.out;
 
 import com.personal.baton.application.calendar.CalendarRecoveryManifest;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryResult;
 import java.util.UUID;
 import java.util.Optional;
 
