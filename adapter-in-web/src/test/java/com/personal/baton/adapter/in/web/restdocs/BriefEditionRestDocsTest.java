@@ -4,7 +4,7 @@ import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.application.brief.BriefAttentionPage;
@@ -443,7 +443,7 @@ class BriefEditionRestDocsTest {
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {
         return UsernamePasswordAuthenticationToken.authenticated(
-                new TestAccountPrincipal(ACCOUNT_ID),
+                new AccountSessionPrincipal(ACCOUNT_ID, 0),
                 null,
                 List.of()
         );
@@ -475,13 +475,5 @@ class BriefEditionRestDocsTest {
                 ), new BriefEditionSnapshot.Item("routine:carry-over", "ROUTINE_MISSED", "MEDIUM", "ACTIVE",
                         Instant.parse("2026-08-21T03:00:00Z"), 1, 1L, false, BriefEditionSnapshot.Section.CARRY_OVER))
         );
-    }
-
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
     }
 }

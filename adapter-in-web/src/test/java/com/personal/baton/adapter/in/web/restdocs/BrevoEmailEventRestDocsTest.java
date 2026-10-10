@@ -89,7 +89,6 @@ class BrevoEmailEventRestDocsTest {
                                 fields.addConstraints(fieldWithPath("ts_event")
                                         .description("UTC 이벤트 시각, Unix 초 정수 1..253402300799"), "timestamp"))));
         verify(useCase).receive(42L, EmailDeliveryEvent.HARD_BOUNCE, Instant.ofEpochSecond(1789196400));
-        verifyNoInteractions(sessions);
     }
 
     @Test

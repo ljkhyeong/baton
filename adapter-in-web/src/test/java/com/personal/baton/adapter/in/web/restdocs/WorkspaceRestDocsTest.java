@@ -124,6 +124,7 @@ import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuild
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.put;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
+import static org.springframework.restdocs.payload.PayloadDocumentation.applyPathPrefix;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
@@ -948,8 +949,7 @@ class WorkspaceRestDocsTest {
                         "createNextSeasonAccessDenied",
                         CREATE_NEXT_SEASON,
                         workspacePathParameters(),
-                        requestHeaders(headerWithName("Idempotency-Key")
-                                .description("같은 생성 요청을 안전하게 재시도할 멱등 키")),
+                        contentCreationHeaders(),
                         responseFields(errorResponseFields())));
 
         when(lifecycleUseCase.createNextSeason(
@@ -1511,24 +1511,7 @@ class WorkspaceRestDocsTest {
                         CREATE_ROLE,
                         workspacePathParameters(),
                         contentCreationHeaders(),
-                        requestFields(
-                                requestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "name", "팀에서 유일한 역할 이름"),
-                                requestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "purpose", "역할의 목적"),
-                                optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "currentMemberId", "현재 담당 구성원 UUID"),
-                                optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "nextMemberId", "다음 담당 구성원 UUID"),
-                                optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "assignmentStartDate", "배정 시작일"),
-                                optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "assignmentEndDate", "배정 종료일"),
-                                requestStringArrayField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "responsibilities", "responsibilities[]", "담당 업무 목록"),
-                                optionalRequestField(WorkspaceRequests.CreateRoleRequest.class,
-                                        "risk", "역할 주의사항")
-                        ),
+                        roleRequestFields(WorkspaceRequests.CreateRoleRequest.class),
                         responseFields(roleResponseFields())));
     }
 
@@ -1563,24 +1546,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_ROLE,
                         rolePathParameters(),
                         accessKeyHeader(),
-                        requestFields(
-                                requestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "name", "팀에서 유일한 역할 이름"),
-                                requestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "purpose", "역할의 목적"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "currentMemberId", "현재 담당 구성원 UUID"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "nextMemberId", "다음 담당 구성원 UUID"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "assignmentStartDate", "배정 시작일"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "assignmentEndDate", "배정 종료일"),
-                                requestStringArrayField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "responsibilities", "responsibilities[]", "담당 업무 목록"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoleRequest.class,
-                                        "risk", "역할 주의사항")
-                        ),
+                        roleRequestFields(WorkspaceRequests.UpdateRoleRequest.class),
                         responseFields(roleResponseFields())));
     }
 
@@ -2068,22 +2034,7 @@ class WorkspaceRestDocsTest {
                         CREATE_ROUTINE,
                         workspacePathParameters(),
                         contentCreationHeaders(),
-                        requestFields(
-                                requestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "title", "반복 업무 제목"),
-                                requestEnumField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
-                                requestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "dueLabel", "사용자에게 보일 기한 문구"),
-                                optionalRequestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "deadlineDayOffset", "모임 날짜 기준 마감일 오프셋"),
-                                optionalRequestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "deadlineTime", "시즌 시간대 기준 마감 시각"),
-                                requestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "ownerRoleId", "담당 역할 UUID"),
-                                requestField(WorkspaceRequests.CreateRoutineRequest.class,
-                                        "detail", "실행 방법")
-                        ),
+                        routineRequestFields(WorkspaceRequests.CreateRoutineRequest.class),
                         responseFields(routineResponseFields())));
     }
 
@@ -2118,22 +2069,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_ROUTINE,
                         routinePathParameters(),
                         accessKeyHeader(),
-                        requestFields(
-                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "title", "반복 업무 제목"),
-                                requestEnumField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
-                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "dueLabel", "사용자에게 보일 기한 문구"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "deadlineDayOffset", "모임 날짜 기준 마감일 오프셋"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "deadlineTime", "시즌 시간대 기준 마감 시각"),
-                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "ownerRoleId", "담당 역할 UUID"),
-                                requestField(WorkspaceRequests.UpdateRoutineRequest.class,
-                                        "detail", "실행 방법")
-                        ),
+                        routineRequestFields(WorkspaceRequests.UpdateRoutineRequest.class),
                         responseFields(routineResponseFields())));
     }
 
@@ -2161,11 +2097,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_ROUTINE_ARCHIVE,
                         routinePathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(
-                                WorkspaceRequests.ArchiveRequest.class,
-                                "archived",
-                                "true면 보관, false면 복원"
-                        )),
+                        archiveRequestFields(),
                         responseFields(routineResponseFields())));
     }
 
@@ -2178,7 +2110,7 @@ class WorkspaceRestDocsTest {
                 eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY),
                 any(CreateSeasonRoundCommand.class)
-        )).thenReturn(seasonRoundResult(RoutineStatus.WAITING));
+        )).thenReturn(seasonRoundResult());
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/rounds", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -2277,11 +2209,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_SEASON_ROUND_ARCHIVE,
                         seasonRoundPathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(
-                                WorkspaceRequests.ArchiveRequest.class,
-                                "archived",
-                                "true면 보관, false면 복원"
-                        )),
+                        archiveRequestFields(),
                         responseFields(seasonRoundResponseFields())));
     }
 
@@ -2313,11 +2241,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_SEASON_ROUND_ARCHIVE,
                         seasonRoundPathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(
-                                WorkspaceRequests.ArchiveRequest.class,
-                                "archived",
-                                "true면 보관, false면 복원"
-                        )),
+                        archiveRequestFields(),
                         responseFields(seasonRoundResponseFields())));
     }
 
@@ -2658,20 +2582,7 @@ class WorkspaceRestDocsTest {
                         CREATE_DECISION,
                         workspacePathParameters(),
                         contentCreationHeaders(),
-                        requestFields(
-                                requestField(WorkspaceRequests.CreateDecisionRequest.class,
-                                        "title", "결정 제목"),
-                                requestField(WorkspaceRequests.CreateDecisionRequest.class,
-                                        "reason", "결정 이유"),
-                                optionalRequestField(WorkspaceRequests.CreateDecisionRequest.class,
-                                        "alternative", "검토한 대안"),
-                                enumField(DecisionTextFormat.class, "textFormat",
-                                        "이유와 대안 형식. 생성 시 누락하면 일반 텍스트, 수정 시 누락하면 기존 형식 유지").optional(),
-                                requestField(WorkspaceRequests.CreateDecisionRequest.class,
-                                        "authorMemberId", "작성자 구성원 UUID"),
-                                requestStringArrayField(WorkspaceRequests.CreateDecisionRequest.class,
-                                        "roleIds", "roleIds[]", "중복 없는 관련 역할 UUID 목록")
-                        ),
+                        decisionRequestFields(WorkspaceRequests.CreateDecisionRequest.class),
                         responseFields(decisionResponseFields())));
         verify(recordsUseCase).createDecision(eq(TEAM_ID), eq(SEASON_ID), eq(CONTENT_IDEMPOTENCY_KEY),
                 eq(ACCESS_KEY), argThat(command -> command.textFormat() == DecisionTextFormat.MARKDOWN));
@@ -2705,20 +2616,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_DECISION,
                         decisionPathParameters(),
                         accessKeyHeader(),
-                        requestFields(
-                                requestField(WorkspaceRequests.UpdateDecisionRequest.class,
-                                        "title", "결정 제목"),
-                                requestField(WorkspaceRequests.UpdateDecisionRequest.class,
-                                        "reason", "결정 이유"),
-                                optionalRequestField(WorkspaceRequests.UpdateDecisionRequest.class,
-                                        "alternative", "검토한 대안"),
-                                enumField(DecisionTextFormat.class, "textFormat",
-                                        "이유와 대안 형식. 생성 시 누락하면 일반 텍스트, 수정 시 누락하면 기존 형식 유지").optional(),
-                                requestField(WorkspaceRequests.UpdateDecisionRequest.class,
-                                        "authorMemberId", "작성자 구성원 UUID"),
-                                requestStringArrayField(WorkspaceRequests.UpdateDecisionRequest.class,
-                                        "roleIds", "roleIds[]", "중복 없는 관련 역할 UUID 목록")
-                        ),
+                        decisionRequestFields(WorkspaceRequests.UpdateDecisionRequest.class),
                         responseFields(decisionResponseFields())));
     }
 
@@ -2744,11 +2642,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_DECISION_ARCHIVE,
                         decisionPathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(
-                                WorkspaceRequests.ArchiveRequest.class,
-                                "archived",
-                                "true면 보관, false면 복원"
-                        )),
+                        archiveRequestFields(),
                         responseFields(decisionResponseFields())));
     }
 
@@ -2783,17 +2677,7 @@ class WorkspaceRestDocsTest {
                         CREATE_HANDOFF_ITEM,
                         workspacePathParameters(),
                         contentCreationHeaders(),
-                        requestFields(
-                                requestField(WorkspaceRequests.CreateHandoffItemRequest.class,
-                                        "roleId", "소유 역할 UUID"),
-                                requestField(WorkspaceRequests.CreateHandoffItemRequest.class,
-                                        "label", "인수인계할 내용"),
-                                requestEnumField(
-                                        WorkspaceRequests.CreateHandoffItemRequest.class,
-                                        HandoffCategory.class,
-                                        "category",
-                                        "분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE")
-                        ),
+                        handoffItemRequestFields(WorkspaceRequests.CreateHandoffItemRequest.class),
                         responseFields(handoffItemResponseFields())));
     }
 
@@ -2825,17 +2709,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_HANDOFF_ITEM,
                         handoffItemPathParameters(),
                         accessKeyHeader(),
-                        requestFields(
-                                requestField(WorkspaceRequests.UpdateHandoffItemRequest.class,
-                                        "roleId", "소유 역할 UUID"),
-                                requestField(WorkspaceRequests.UpdateHandoffItemRequest.class,
-                                        "label", "인수인계할 내용"),
-                                requestEnumField(
-                                        WorkspaceRequests.UpdateHandoffItemRequest.class,
-                                        HandoffCategory.class,
-                                        "category",
-                                        "분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE")
-                        ),
+                        handoffItemRequestFields(WorkspaceRequests.UpdateHandoffItemRequest.class),
                         responseFields(handoffItemResponseFields())));
     }
 
@@ -2857,11 +2731,7 @@ class WorkspaceRestDocsTest {
                 .andDo(document(
                         "updateHandoffItemCompletion",
                         UPDATE_HANDOFF_ITEM_COMPLETION,
-                        pathParameters(
-                                parameterWithName("teamId").description("팀 UUID"),
-                                parameterWithName("seasonId").description("시즌 UUID"),
-                                parameterWithName("itemId").description("인수인계 항목 UUID")
-                        ),
+                        handoffItemPathParameters(),
                         accessKeyHeader(),
                         requestFields(requestField(WorkspaceRequests.CompletionRequest.class,
                                 "completed", "완료 여부")),
@@ -2896,11 +2766,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_HANDOFF_ITEM_ARCHIVE,
                         handoffItemPathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(
-                                WorkspaceRequests.ArchiveRequest.class,
-                                "archived",
-                                "true면 보관, false면 복원"
-                        )),
+                        archiveRequestFields(),
                         responseFields(handoffItemResponseFields())));
     }
 
@@ -3193,16 +3059,7 @@ class WorkspaceRestDocsTest {
                         CREATE_ROLE_RESOURCE,
                         workspacePathParameters(),
                         contentCreationHeaders(),
-                        requestFields(
-                                requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "roleId", "자료를 소유하는 역할 UUID"),
-                                requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "title", "자료 제목"),
-                                requestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
-                                optionalRequestField(WorkspaceRequests.CreateRoleResourceRequest.class,
-                                        "description", "자료 설명")
-                        ),
+                        roleResourceRequestFields(WorkspaceRequests.CreateRoleResourceRequest.class),
                         responseFields(roleResourceResponseFields())));
     }
 
@@ -3242,16 +3099,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_ROLE_RESOURCE,
                         roleResourcePathParameters(),
                         accessKeyHeader(),
-                        requestFields(
-                                requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "roleId", "자료를 소유하는 역할 UUID"),
-                                requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "title", "자료 제목"),
-                                requestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
-                                optionalRequestField(WorkspaceRequests.UpdateRoleResourceRequest.class,
-                                        "description", "자료 설명")
-                        ),
+                        roleResourceRequestFields(WorkspaceRequests.UpdateRoleResourceRequest.class),
                         responseFields(roleResourceResponseFields())));
     }
 
@@ -3282,11 +3130,7 @@ class WorkspaceRestDocsTest {
                         UPDATE_ROLE_RESOURCE_ARCHIVE,
                         roleResourcePathParameters(),
                         accessKeyHeader(),
-                        requestFields(requestField(
-                                WorkspaceRequests.ArchiveRequest.class,
-                                "archived",
-                                "true면 보관, false면 복원"
-                        )),
+                        archiveRequestFields(),
                         responseFields(roleResourceResponseFields())));
     }
 
@@ -4089,23 +3933,14 @@ class WorkspaceRestDocsTest {
         return new WorkspaceContract.WorkspaceResult(
                 new WorkspaceContract.TeamResult(TEAM_ID, "알고리즘 한 바퀴", false, null),
                 seasonResult(),
-                List.of(new WorkspaceContract.SeasonResult(
-                        SEASON_ID,
-                        "2026 여름 시즌",
-                        LocalDate.of(2026, 7, 2),
-                        LocalDate.of(2026, 9, 17),
-                        null,
-                        null,
-                        "Asia/Seoul",
-                        roundScheduleResult()
-                )),
+                List.of(seasonResult()),
                 List.of(
                         new MemberResult(MEMBER_ID, "박민서", "박", "#d9e4da", null),
                         new MemberResult(NEXT_MEMBER_ID, "김준호", "김", "#f1d6cc", null)
                 ),
                 List.of(roleResult()),
                 List.of(routineResult()),
-                List.of(seasonRoundResult(RoutineStatus.WAITING)),
+                List.of(seasonRoundResult()),
                 List.of(decisionResult()),
                 List.of(handoffItemResult(false)),
                 List.of(roleResourceResult()),
@@ -4482,19 +4317,17 @@ class WorkspaceRestDocsTest {
         );
     }
 
-    private SeasonRoundResult seasonRoundResult(RoutineStatus status) {
+    private SeasonRoundResult seasonRoundResult() {
         return new SeasonRoundResult(
                 ROUND_ID,
                 "3회차",
                 LocalDate.of(2026, 7, 27),
-                List.of(routineExecutionResult(status)),
+                List.of(routineExecutionResult(RoutineStatus.WAITING)),
                 null,
                 RoundOrigin.MANUAL,
                 null,
                 null,
-                status == RoutineStatus.DONE
-                        ? RoundTimingStatus.COMPLETED
-                        : RoundTimingStatus.IN_PROGRESS
+                RoundTimingStatus.IN_PROGRESS
         );
     }
 
@@ -4731,93 +4564,20 @@ class WorkspaceRestDocsTest {
     }
 
     private FieldDescriptor[] workspaceResponseFields() {
-        return new FieldDescriptor[]{
+        List<FieldDescriptor> fields = new ArrayList<>(List.of(
                 fieldWithPath("team").type(JsonFieldType.OBJECT).description("팀 정보"),
                 fieldWithPath("team.id").description("팀 UUID"),
                 fieldWithPath("team.name").description("팀 이름"),
                 fieldWithPath("team.accountAccessEnabled").description("계정 권한 전환 여부"),
                 enumField(TeamPermission.class, "team.permission", "현재 계정 권한").optional(),
-                fieldWithPath("season").type(JsonFieldType.OBJECT).description("현재 시즌 정보"),
-                fieldWithPath("season.id").description("시즌 UUID"),
-                fieldWithPath("season.name").description("시즌 이름"),
-                fieldWithPath("season.startDate").description("시즌 시작일"),
-                fieldWithPath("season.endDate").description("시즌 종료일"),
-                fieldWithPath("season.endedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("명시적으로 종료한 UTC 시각"),
-                fieldWithPath("season.previousSeasonId")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("이 시즌을 시작한 원본 시즌 UUID"),
-                fieldWithPath("season.timeZone").description("시즌의 IANA 시간대 식별자"),
-                fieldWithPath("season.roundSchedule")
-                        .type(JsonFieldType.OBJECT)
-                        .optional()
-                        .description("시즌당 하나인 자동 회차 일정"),
-                fieldWithPath("season.roundSchedule.firstMeetingDate")
-                        .optional()
-                        .description("첫 자동 회차 날짜"),
-                fieldWithPath("season.roundSchedule.meetingTime")
-                        .optional()
-                        .description("시즌 시간대 기준 모임 시각"),
-                enumField(RoundRecurrence.class,
-                        "season.roundSchedule.recurrence",
-                        "주간 또는 격주 반복 주기").optional(),
-                fieldWithPath("season.roundSchedule.generationLeadDays")
-                        .optional()
-                        .description("회차 선행 생성 기간"),
-                fieldWithPath("season.roundSchedule.enabled")
-                        .optional()
-                        .description("자동 생성 활성 여부"),
-                fieldWithPath("season.roundSchedule.nextOccurrenceDate")
-                        .optional()
-                        .description("다음 생성 대상 발생일"),
-                fieldWithPath("seasons").type(JsonFieldType.ARRAY).description("팀의 서버에서 관리하는 시즌 목록"),
-                fieldWithPath("seasons[].id").description("시즌 UUID"),
-                fieldWithPath("seasons[].name").description("시즌 이름"),
-                fieldWithPath("seasons[].startDate").description("시즌 시작일"),
-                fieldWithPath("seasons[].endDate").description("시즌 종료일"),
-                fieldWithPath("seasons[].endedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("명시적으로 종료한 UTC 시각"),
-                fieldWithPath("seasons[].previousSeasonId")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("이 시즌을 시작한 원본 시즌 UUID"),
-                fieldWithPath("seasons[].timeZone").description("시즌의 IANA 시간대 식별자"),
-                fieldWithPath("seasons[].roundSchedule")
-                        .type(JsonFieldType.OBJECT)
-                        .optional()
-                        .description("시즌당 하나인 자동 회차 일정"),
-                fieldWithPath("seasons[].roundSchedule.firstMeetingDate")
-                        .optional()
-                        .description("첫 자동 회차 날짜"),
-                fieldWithPath("seasons[].roundSchedule.meetingTime")
-                        .optional()
-                        .description("시즌 시간대 기준 모임 시각"),
-                enumField(RoundRecurrence.class,
-                        "seasons[].roundSchedule.recurrence",
-                        "주간 또는 격주 반복 주기").optional(),
-                fieldWithPath("seasons[].roundSchedule.generationLeadDays")
-                        .optional()
-                        .description("회차 선행 생성 기간"),
-                fieldWithPath("seasons[].roundSchedule.enabled")
-                        .optional()
-                        .description("자동 생성 활성 여부"),
-                fieldWithPath("seasons[].roundSchedule.nextOccurrenceDate")
-                        .optional()
-                        .description("다음 생성 대상 발생일"),
-                fieldWithPath("members").type(JsonFieldType.ARRAY).description("팀 구성원 목록"),
-                fieldWithPath("members[].id").description("구성원 UUID"),
-                fieldWithPath("members[].name").description("구성원 이름"),
-                fieldWithPath("members[].initials").description("표시용 이니셜"),
-                fieldWithPath("members[].tone").description("표시용 색상"),
-                fieldWithPath("members[].deactivatedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("활동 종료 UTC 시각"),
+                fieldWithPath("season").type(JsonFieldType.OBJECT).description("현재 시즌 정보")
+        ));
+        fields.addAll(applyPathPrefix("season.", List.of(seasonResponseFields())));
+        fields.add(fieldWithPath("seasons").type(JsonFieldType.ARRAY).description("팀의 서버에서 관리하는 시즌 목록"));
+        fields.addAll(applyPathPrefix("seasons[].", List.of(seasonResponseFields())));
+        fields.add(fieldWithPath("members").type(JsonFieldType.ARRAY).description("팀 구성원 목록"));
+        fields.addAll(applyPathPrefix("members[].", List.of(memberResponseFields())));
+        fields.addAll(List.of(
                 fieldWithPath("roles").type(JsonFieldType.ARRAY).description("역할 목록"),
                 fieldWithPath("roles[].id").description("역할 UUID"),
                 fieldWithPath("roles[].name").description("역할 이름"),
@@ -4886,105 +4646,18 @@ class WorkspaceRestDocsTest {
                 enumField(RoutineTimingStatus.class,
                         "rounds[].routineExecutions[].timingStatus",
                         "실행의 미설정, 예정, 진행, 지연 또는 완료 상태"),
-                fieldWithPath("decisions").type(JsonFieldType.ARRAY).description("결정 기록 목록"),
-                fieldWithPath("decisions[].id").description("결정 UUID"),
-                fieldWithPath("decisions[].title").description("결정 제목"),
-                fieldWithPath("decisions[].reason").description("결정 이유"),
-                fieldWithPath("decisions[].alternative").description("검토한 대안"),
-                enumField(DecisionTextFormat.class, "decisions[].textFormat", "이유와 대안 형식"),
-                fieldWithPath("decisions[].createdAt").description("서버가 기록한 UTC 시각"),
-                fieldWithPath("decisions[].authorMemberId").description("작성자 구성원 UUID"),
-                fieldWithPath("decisions[].authorName").description("작성자 이름"),
-                stringArrayField("decisions[].roleIds[]", "관련 역할 UUID 목록"),
-                fieldWithPath("decisions[].archivedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("보관한 UTC 시각"),
-                fieldWithPath("handoffItems").type(JsonFieldType.ARRAY).description("인수인계 항목 목록"),
-                fieldWithPath("handoffItems[].id").description("인수인계 항목 UUID"),
-                fieldWithPath("handoffItems[].roleId").description("소유 역할 UUID"),
-                fieldWithPath("handoffItems[].label").description("항목 내용"),
-                enumField(HandoffCategory.class, "handoffItems[].category", "항목 분류"),
-                fieldWithPath("handoffItems[].completed").description("완료 여부"),
-                fieldWithPath("handoffItems[].createdAt")
-                        .description("서버가 기록한 UTC 생성 시각"),
-                fieldWithPath("handoffItems[].archivedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("보관한 UTC 시각"),
-                fieldWithPath("resources").type(JsonFieldType.ARRAY).description("역할별 참고 자료 목록"),
-                fieldWithPath("resources[].id").description("자료 UUID"),
-                fieldWithPath("resources[].roleId").description("소유 역할 UUID"),
-                fieldWithPath("resources[].title").description("자료 제목"),
-                fieldWithPath("resources[].url").description("http 또는 https 외부 링크"),
-                fieldWithPath("resources[].description").optional().description("자료 설명"),
-                fieldWithPath("resources[].createdAt")
-                        .description("서버가 기록한 UTC 생성 시각"),
-                fieldWithPath("resources[].archivedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("보관한 UTC 시각"),
-                fieldWithPath("roleHandoffs")
-                        .type(JsonFieldType.ARRAY)
-                        .description("역할별 인수인계 준비·전달·수락·취소 이력"),
-                fieldWithPath("roleHandoffs[].id").description("역할 인수인계 UUID"),
-                fieldWithPath("roleHandoffs[].roleId").description("대상 역할 UUID"),
-                fieldWithPath("roleHandoffs[].fromMemberId").description("이전 담당자 UUID"),
-                fieldWithPath("roleHandoffs[].toMemberId").description("다음 담당자 UUID"),
-                fieldWithPath("roleHandoffs[].outgoingAssignmentStartDate")
-                        .description("준비 시점의 이전 담당 시작일"),
-                fieldWithPath("roleHandoffs[].outgoingAssignmentEndDate")
-                        .optional()
-                        .description("준비 시점의 이전 담당 종료일"),
-                fieldWithPath("roleHandoffs[].incomingAssignmentStartDate")
-                        .description("수락 뒤 적용할 다음 담당 시작일"),
-                fieldWithPath("roleHandoffs[].incomingAssignmentEndDate")
-                        .optional()
-                        .description("수락 뒤 적용할 다음 담당 종료일"),
-                enumField(
-                        RoleHandoffStatus.class,
-                        "roleHandoffs[].status",
-                        "PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED"
-                ),
-                fieldWithPath("roleHandoffs[].preparedAt").description("준비한 UTC 시각"),
-                fieldWithPath("roleHandoffs[].transferredAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("전달한 UTC 시각"),
-                fieldWithPath("roleHandoffs[].acceptedAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("수락한 UTC 시각"),
-                fieldWithPath("roleHandoffs[].cancelledAt")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("취소한 UTC 시각"),
-                fieldWithPath("roleHandoffs[].transferredByMemberId")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("전달을 확인했다고 선언한 구성원 UUID"),
-                fieldWithPath("roleHandoffs[].acceptedByMemberId")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("수락을 확인했다고 선언한 구성원 UUID"),
-                fieldWithPath("roleHandoffs[].cancelledByMemberId")
-                        .type(JsonFieldType.STRING)
-                        .optional()
-                        .description("취소를 확인했다고 선언한 구성원 UUID"),
-                fieldWithPath("roleHandoffs[].activeItemCount")
-                        .type(JsonFieldType.NUMBER)
-                        .optional()
-                        .description("전달 시점의 활성 인수인계 항목 수"),
-                fieldWithPath("roleHandoffs[].incompleteItemCount")
-                        .type(JsonFieldType.NUMBER)
-                        .optional()
-                        .description("전달 시점의 미완료 항목 수"),
-                fieldWithPath("roleHandoffs[].resourceCount")
-                        .type(JsonFieldType.NUMBER)
-                        .optional()
-                        .description("전달 시점의 역할 자료 수"),
-                fieldWithPath("roleHandoffs[].warningAcknowledged")
-                        .description("준비도 경고를 명시적으로 확인했는지 여부"),
+                fieldWithPath("decisions").type(JsonFieldType.ARRAY).description("결정 기록 목록")
+        ));
+        fields.addAll(applyPathPrefix("decisions[].", List.of(decisionResponseFields())));
+        fields.add(fieldWithPath("handoffItems").type(JsonFieldType.ARRAY).description("인수인계 항목 목록"));
+        fields.addAll(applyPathPrefix("handoffItems[].", List.of(handoffItemResponseFields())));
+        fields.add(fieldWithPath("resources").type(JsonFieldType.ARRAY).description("역할별 참고 자료 목록"));
+        fields.addAll(applyPathPrefix("resources[].", List.of(roleResourceResponseFields())));
+        fields.add(fieldWithPath("roleHandoffs")
+                .type(JsonFieldType.ARRAY)
+                .description("역할별 인수인계 준비·전달·수락·취소 이력"));
+        fields.addAll(applyPathPrefix("roleHandoffs[].", List.of(roleHandoffResponseFields())));
+        fields.addAll(List.of(
                 fieldWithPath("continuitySignals")
                         .type(JsonFieldType.ARRAY)
                         .description("담당자 공백과 업무 지연 등 조치가 필요한 항목"),
@@ -5014,7 +4687,8 @@ class WorkspaceRestDocsTest {
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("담당 종료일 또는 새 담당 시작일 같은 관련 날짜")
-        };
+        ));
+        return fields.toArray(FieldDescriptor[]::new);
     }
 
     private FieldDescriptor[] seasonResponseFields() {
@@ -5157,81 +4831,73 @@ class WorkspaceRestDocsTest {
     }
 
     private FieldDescriptor[] roleHandoffTransitionResponseFields() {
+        List<FieldDescriptor> fields = new ArrayList<>();
+        fields.add(fieldWithPath("role").type(JsonFieldType.OBJECT).description("전이 뒤 역할"));
+        fields.addAll(applyPathPrefix("role.", List.of(roleResponseFields())));
+        fields.add(fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 인수인계"));
+        fields.addAll(applyPathPrefix("handoff.", List.of(roleHandoffResponseFields())));
+        return fields.toArray(FieldDescriptor[]::new);
+    }
+
+    private FieldDescriptor[] roleHandoffResponseFields() {
         return new FieldDescriptor[]{
-                fieldWithPath("role").type(JsonFieldType.OBJECT).description("전이 뒤 역할"),
-                fieldWithPath("role.id").description("역할 UUID"),
-                fieldWithPath("role.name").description("역할 이름"),
-                fieldWithPath("role.purpose").description("역할 목적"),
-                fieldWithPath("role.currentMemberId").type(JsonFieldType.STRING).optional()
-                        .description("현재 담당자 UUID"),
-                fieldWithPath("role.nextMemberId").type(JsonFieldType.STRING).optional()
-                        .description("다음 담당자 UUID"),
-                fieldWithPath("role.assignmentStartDate").type(JsonFieldType.STRING).optional()
-                        .description("배정 시작일"),
-                fieldWithPath("role.assignmentEndDate").type(JsonFieldType.STRING).optional()
-                        .description("배정 종료일"),
-                stringArrayField("role.responsibilities[]", "담당 업무 목록"),
-                fieldWithPath("role.previousRoleId").type(JsonFieldType.STRING).optional()
-                        .description("복사·이관 원본 역할 UUID. 원본 연결이 없으면 null"),
-                fieldWithPath("role.risk").type(JsonFieldType.STRING).optional().description("주의사항"),
-                fieldWithPath("handoff").type(JsonFieldType.OBJECT).description("전이 뒤 역할 인수인계"),
-                fieldWithPath("handoff.id").description("역할 인수인계 UUID"),
-                fieldWithPath("handoff.roleId").description("대상 역할 UUID"),
-                fieldWithPath("handoff.fromMemberId").description("이전 담당자 UUID"),
-                fieldWithPath("handoff.toMemberId").description("다음 담당자 UUID"),
-                fieldWithPath("handoff.outgoingAssignmentStartDate")
+                fieldWithPath("id").description("역할 인수인계 UUID"),
+                fieldWithPath("roleId").description("대상 역할 UUID"),
+                fieldWithPath("fromMemberId").description("이전 담당자 UUID"),
+                fieldWithPath("toMemberId").description("다음 담당자 UUID"),
+                fieldWithPath("outgoingAssignmentStartDate")
                         .description("준비 시점의 이전 담당 시작일"),
-                fieldWithPath("handoff.outgoingAssignmentEndDate")
+                fieldWithPath("outgoingAssignmentEndDate")
                         .optional()
                         .description("준비 시점의 이전 담당 종료일"),
-                fieldWithPath("handoff.incomingAssignmentStartDate")
+                fieldWithPath("incomingAssignmentStartDate")
                         .description("수락 뒤 적용할 다음 담당 시작일"),
-                fieldWithPath("handoff.incomingAssignmentEndDate")
+                fieldWithPath("incomingAssignmentEndDate")
                         .optional()
                         .description("수락 뒤 적용할 다음 담당 종료일"),
                 enumField(
                         RoleHandoffStatus.class,
-                        "handoff.status",
+                        "status",
                         "PREPARING, TRANSFERRED, ACCEPTED 또는 CANCELLED"
                 ),
-                fieldWithPath("handoff.preparedAt").description("준비한 UTC 시각"),
-                fieldWithPath("handoff.transferredAt")
+                fieldWithPath("preparedAt").description("준비한 UTC 시각"),
+                fieldWithPath("transferredAt")
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("전달한 UTC 시각"),
-                fieldWithPath("handoff.acceptedAt")
+                fieldWithPath("acceptedAt")
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("수락한 UTC 시각"),
-                fieldWithPath("handoff.cancelledAt")
+                fieldWithPath("cancelledAt")
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("취소한 UTC 시각"),
-                fieldWithPath("handoff.transferredByMemberId")
+                fieldWithPath("transferredByMemberId")
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("전달을 확인했다고 선언한 구성원 UUID"),
-                fieldWithPath("handoff.acceptedByMemberId")
+                fieldWithPath("acceptedByMemberId")
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("수락을 확인했다고 선언한 구성원 UUID"),
-                fieldWithPath("handoff.cancelledByMemberId")
+                fieldWithPath("cancelledByMemberId")
                         .type(JsonFieldType.STRING)
                         .optional()
                         .description("취소를 확인했다고 선언한 구성원 UUID"),
-                fieldWithPath("handoff.activeItemCount")
+                fieldWithPath("activeItemCount")
                         .type(JsonFieldType.NUMBER)
                         .optional()
                         .description("전달 시점의 활성 인수인계 항목 수"),
-                fieldWithPath("handoff.incompleteItemCount")
+                fieldWithPath("incompleteItemCount")
                         .type(JsonFieldType.NUMBER)
                         .optional()
                         .description("전달 시점의 미완료 항목 수"),
-                fieldWithPath("handoff.resourceCount")
+                fieldWithPath("resourceCount")
                         .type(JsonFieldType.NUMBER)
                         .optional()
                         .description("전달 시점의 역할 자료 수"),
-                fieldWithPath("handoff.warningAcknowledged")
+                fieldWithPath("warningAcknowledged")
                         .description("준비도 경고를 명시적으로 확인했는지 여부")
         };
     }
@@ -5387,6 +5053,69 @@ class WorkspaceRestDocsTest {
                 fieldWithPath("code").description("안정적인 오류 코드"),
                 fieldWithPath("message").description("사용자에게 표시할 오류 설명")
         };
+    }
+
+    private Snippet archiveRequestFields() {
+        return requestFields(requestField(
+                WorkspaceRequests.ArchiveRequest.class,
+                "archived",
+                "true면 보관, false면 복원"
+        ));
+    }
+
+    private Snippet roleRequestFields(Class<?> requestType) {
+        return requestFields(
+                requestField(requestType, "name", "팀에서 유일한 역할 이름"),
+                requestField(requestType, "purpose", "역할의 목적"),
+                optionalRequestField(requestType, "currentMemberId", "현재 담당 구성원 UUID"),
+                optionalRequestField(requestType, "nextMemberId", "다음 담당 구성원 UUID"),
+                optionalRequestField(requestType, "assignmentStartDate", "배정 시작일"),
+                optionalRequestField(requestType, "assignmentEndDate", "배정 종료일"),
+                requestStringArrayField(requestType, "responsibilities", "responsibilities[]", "담당 업무 목록"),
+                optionalRequestField(requestType, "risk", "역할 주의사항")
+        );
+    }
+
+    private Snippet routineRequestFields(Class<?> requestType) {
+        return requestFields(
+                requestField(requestType, "title", "반복 업무 제목"),
+                requestEnumField(requestType, RoutinePhase.class, "phase", "실행 단계: BEFORE, DURING, AFTER"),
+                requestField(requestType, "dueLabel", "사용자에게 보일 기한 문구"),
+                optionalRequestField(requestType, "deadlineDayOffset", "모임 날짜 기준 마감일 오프셋"),
+                optionalRequestField(requestType, "deadlineTime", "시즌 시간대 기준 마감 시각"),
+                requestField(requestType, "ownerRoleId", "담당 역할 UUID"),
+                requestField(requestType, "detail", "실행 방법")
+        );
+    }
+
+    private Snippet decisionRequestFields(Class<?> requestType) {
+        return requestFields(
+                requestField(requestType, "title", "결정 제목"),
+                requestField(requestType, "reason", "결정 이유"),
+                optionalRequestField(requestType, "alternative", "검토한 대안"),
+                enumField(DecisionTextFormat.class, "textFormat",
+                        "이유와 대안 형식. 생성 시 누락하면 일반 텍스트, 수정 시 누락하면 기존 형식 유지").optional(),
+                requestField(requestType, "authorMemberId", "작성자 구성원 UUID"),
+                requestStringArrayField(requestType, "roleIds", "roleIds[]", "중복 없는 관련 역할 UUID 목록")
+        );
+    }
+
+    private Snippet handoffItemRequestFields(Class<?> requestType) {
+        return requestFields(
+                requestField(requestType, "roleId", "소유 역할 UUID"),
+                requestField(requestType, "label", "인수인계할 내용"),
+                requestEnumField(requestType, HandoffCategory.class, "category",
+                        "분류: RESPONSIBILITY, ROUTINE, RESOURCE, ADVICE")
+        );
+    }
+
+    private Snippet roleResourceRequestFields(Class<?> requestType) {
+        return requestFields(
+                requestField(requestType, "roleId", "자료를 소유하는 역할 UUID"),
+                requestField(requestType, "title", "자료 제목"),
+                requestField(requestType, "url", "사용자 정보가 없는 http 또는 https 외부 링크"),
+                optionalRequestField(requestType, "description", "자료 설명")
+        );
     }
 
     private FieldDescriptor requestField(Class<?> requestType, String path, String description) {

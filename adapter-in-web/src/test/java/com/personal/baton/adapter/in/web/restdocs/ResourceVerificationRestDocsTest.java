@@ -4,7 +4,7 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController.VerifyResourceRequest;
 import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
@@ -27,6 +27,7 @@ import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.payload.ResponseFieldsSnippet;
+import org.springframework.restdocs.request.PathParametersSnippet;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.DefaultSecurityFilterChain;
@@ -105,9 +106,7 @@ class ResourceVerificationRestDocsTest {
                 .andExpect(jsonPath("$.verifications[0].current").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document("getResourceVerifications",
                         "자료 버전과 최근 20건의 수동 확인 이력을 반환한다.", "자료 확인 이력 조회",
-                        pathParameters(parameterWithName("teamId").description("팀 식별자"),
-                                parameterWithName("seasonId").description("시즌 식별자"),
-                                parameterWithName("resourceId").description("자료 식별자")),
+                        resourcePath(),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
                         responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
     }
@@ -116,7 +115,7 @@ class ResourceVerificationRestDocsTest {
     @DisplayName("자료 확인은 로그인 계정과 확인한 버전 및 메모를 전달한다")
     void documentsVerification() throws Exception {
         when(useCase.verify(any(), any(), any(), any(), any(), any())).thenReturn(history());
-        AuthenticatedAccountPrincipal principal = new TestPrincipal(ACCOUNT, 0);
+        var principal = new AccountSessionPrincipal(ACCOUNT, 0);
         mvc.perform(post(ResourceVerificationController.PATH, TEAM, SEASON, RESOURCE)
                         .header("X-Baton-Access-Key", "key")
                         .with(authentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of())))
@@ -126,9 +125,7 @@ class ResourceVerificationRestDocsTest {
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("verifyResource",
                         "로그인한 활성 구성원의 수동 확인을 남긴다. 자료 버전이 달라졌거나 보관되었으면 409를 반환한다.", "자료 확인 기록",
-                        pathParameters(parameterWithName("teamId").description("팀 식별자"),
-                                parameterWithName("seasonId").description("시즌 식별자"),
-                                parameterWithName("resourceId").description("자료 식별자")),
+                        resourcePath(),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
                         requestFields(new ConstrainedFields(VerifyResourceRequest.class).withPath("expectedAccountId").description("화면에서 확인한 로그인 계정"),
                                 new ConstrainedFields(VerifyResourceRequest.class).withPath("resourceVersion").description("확인한 자료 버전"),
@@ -146,7 +143,7 @@ class ResourceVerificationRestDocsTest {
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.today").value("2026-09-05")).andExpect(jsonPath("$.reviewDue").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document("getResourceReviewSchedule", "자료별 재확인 주기와 시즌 시간대의 확인 기한을 조회한다.", "자료 재확인 일정 조회",
-                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자"), parameterWithName("resourceId").description("자료 식별자")),
+                        resourcePath(),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀의 접근 키").optional()),
                         responseHeaders(headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
     }
@@ -155,13 +152,13 @@ class ResourceVerificationRestDocsTest {
         when(useCase.configureSchedule(any(), any(), any(), any(), any(), any())).thenReturn(schedule());
         var fields = new ConstrainedFields(ResourceReviewScheduleRequest.class);
         mvc.perform(post(ResourceVerificationController.SCHEDULE_PATH, TEAM, SEASON, RESOURCE).header("X-Baton-Access-Key", "key")
-                        .with(authentication(UsernamePasswordAuthenticationToken.authenticated(new TestPrincipal(ACCOUNT, 0), null, List.of())))
+                        .with(authentication(UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of())))
                         .contentType(MediaType.APPLICATION_JSON).content("""
                                 {"expectedAccountId":"%s","expectedVersion":-1,"intervalDays":30,"nextReviewOn":"2026-09-05"}
                                 """.formatted(ACCOUNT)))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("configureResourceReviewSchedule", "연결된 활성 구성원이 재확인 주기와 첫 확인일을 지정하거나 함께 해제한다.", "자료 재확인 일정 설정",
-                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자"), parameterWithName("resourceId").description("자료 식별자")),
+                        resourcePath(),
                         requestFields(fields.withPath("expectedAccountId").description("현재 로그인 계정"), fields.withPath("expectedVersion").description("조회한 일정 버전. 미설정은 -1"),
                                 fields.withPath("intervalDays").type(JsonFieldType.NUMBER).optional().description("확인 간격 1~365일. 해제는 null"),
                                 fields.withPath("nextReviewOn").type(JsonFieldType.STRING).optional().description("시즌 달력 기준 다음 확인일. 해제는 null")),
@@ -177,7 +174,11 @@ class ResourceVerificationRestDocsTest {
                 fieldWithPath("today").description("시즌 시간대의 오늘 날짜"), fieldWithPath("reviewDue").description("다음 확인일 당일 또는 지났는지 여부"));
     }
 
-    private record TestPrincipal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
+    private PathParametersSnippet resourcePath() {
+        return pathParameters(parameterWithName("teamId").description("팀 식별자"),
+                parameterWithName("seasonId").description("시즌 식별자"),
+                parameterWithName("resourceId").description("자료 식별자"));
+    }
 
     private VerificationHistoryResult history() {
         return new VerificationHistoryResult(TEAM, SEASON, RESOURCE, 2, List.of(new VerificationResult(

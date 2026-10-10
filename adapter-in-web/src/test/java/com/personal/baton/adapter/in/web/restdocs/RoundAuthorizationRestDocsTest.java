@@ -4,7 +4,7 @@ import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.roundauth.ParticipationGrantController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationController;
 import com.personal.baton.adapter.in.web.roundauth.RoundAdministrationRequests;
@@ -171,10 +171,7 @@ class RoundAuthorizationRestDocsTest {
                         "getCurrentAccountMembership",
                         CURRENT_MEMBERSHIP_DESCRIPTION,
                         CURRENT_MEMBERSHIP_SUMMARY,
-                        queryParameters(
-                                parameterWithName("teamId")
-                                        .description("연결 상태를 확인할 팀 UUID")
-                        ),
+                        currentMembershipQueryParameters(),
                         membershipReadHeaders(),
                         noStoreResponseHeaders(),
                         responseFields(
@@ -213,10 +210,7 @@ class RoundAuthorizationRestDocsTest {
                         "getCurrentAccountMembershipClaimed",
                         CURRENT_MEMBERSHIP_DESCRIPTION,
                         CURRENT_MEMBERSHIP_SUMMARY,
-                        queryParameters(
-                                parameterWithName("teamId")
-                                        .description("연결 상태를 확인할 팀 UUID")
-                        ),
+                        currentMembershipQueryParameters(),
                         membershipReadHeaders(),
                         noStoreResponseHeaders(),
                         responseFields(
@@ -641,8 +635,7 @@ class RoundAuthorizationRestDocsTest {
     }
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {
-        TestAccountPrincipal principal = new TestAccountPrincipal(ACCOUNT_ID);
-        return UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
+        return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT_ID, 0), null, List.of());
     }
 
     private Snippet administrationMutationHeaders() {
@@ -669,6 +662,12 @@ class RoundAuthorizationRestDocsTest {
         return requestHeaders(
                 headerWithName("X-Baton-Access-Key")
                         .description("ROUND 방 매핑을 확인할 팀의 워크스페이스 접근 키").optional()
+        );
+    }
+
+    private Snippet currentMembershipQueryParameters() {
+        return queryParameters(
+                parameterWithName("teamId").description("연결 상태를 확인할 팀 UUID")
         );
     }
 
@@ -740,14 +739,6 @@ class RoundAuthorizationRestDocsTest {
                         .optional()
                         .description("활성 매핑에서는 항상 null인 종료 UTC 시각")
         };
-    }
-
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
     }
 
 }

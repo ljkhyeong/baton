@@ -16,7 +16,7 @@ import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.brief.BriefAttentionController;
 import com.personal.baton.adapter.in.web.brief.BriefEditionExceptionHandler;
 import com.personal.baton.application.brief.BriefAttentionPage;
@@ -61,6 +61,9 @@ class BriefAttentionRestDocsTest {
     private static final UUID REQUEST = UUID.fromString("00000000-0000-0000-0000-000000002704");
     private static final BriefAttentionUseCase.Scope SCOPE =
             new BriefAttentionUseCase.Scope(ACCOUNT, TEAM, SEASON, "access-key");
+    private static final String ATTENTION_SUMMARY_DESCRIPTION =
+            "권한을 확인한 팀·시즌의 미해결 항목을 심각도별로 집계하고 담당 공백 항목 수를 반환한다.";
+    private static final String ATTENTION_SUMMARY_TITLE = "BRIEF 점검 항목 요약";
     private final BriefAttentionUseCase useCase = mock(BriefAttentionUseCase.class);
     private MockMvc mvc;
 
@@ -93,7 +96,7 @@ class BriefAttentionRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefWeeklyResolutions",
                         "시즌 시간대의 이번 주에 연속된 활성·해소 전환을 확인했고 현재도 해소 상태인 항목 수와 상세 목록을 중계한다.", "BRIEF 이번 주 해소 요약",
-                        paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()), headers(),
+                        paths(), accessKeyHeader(), headers(),
                         queryParameters(parameterWithName("afterEventType").optional().description("다음 페이지 커서 이벤트 타입. afterSourceReference와 함께 사용")
                                         .attributes(key("enumValues").value(Arrays.stream(EventType.values()).map(Enum::name).toList())),
                                 parameterWithName("afterSourceReference").optional().description("다음 페이지 커서 원본 참조"),
@@ -122,9 +125,8 @@ class BriefAttentionRestDocsTest {
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.highCount").value(2))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionSummary",
-                        "권한을 확인한 팀·시즌의 미해결 항목을 심각도별로 집계하고 담당 공백 항목 수를 반환한다.", "BRIEF 점검 항목 요약",
-                        paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()),
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionSummary", ATTENTION_SUMMARY_DESCRIPTION, ATTENTION_SUMMARY_TITLE,
+                        paths(), accessKeyHeader(),
                         headers(), responseFields(
                                 fieldWithPath("highCount").description("활성 HIGH 항목 수"),
                                 fieldWithPath("mediumCount").description("활성 MEDIUM 항목 수"),
@@ -133,8 +135,7 @@ class BriefAttentionRestDocsTest {
         mvc.perform(get(BriefAttentionController.SUMMARY_PATH, TEAM, SEASON)
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account())))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("BRIEF_UNAVAILABLE"))
-                .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionSummaryUnavailable",
-                        "권한을 확인한 팀·시즌의 미해결 항목을 심각도별로 집계하고 담당 공백 항목 수를 반환한다.", "BRIEF 점검 항목 요약",
+                .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionSummaryUnavailable", ATTENTION_SUMMARY_DESCRIPTION, ATTENTION_SUMMARY_TITLE,
                         paths(), headers(), responseFields(fieldWithPath("code").description("오류 코드"),
                                 fieldWithPath("message").description("사용자 안내"))));
     }
@@ -157,7 +158,7 @@ class BriefAttentionRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionItems",
                         "상태·심각도·담당 공백 조건으로 현재 점검 항목을 페이지 단위 조회한다. 조건을 바꾸면 첫 페이지부터 조회한다.", "BRIEF 점검 항목 목록",
-                        paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()), headers(),
+                        paths(), accessKeyHeader(), headers(),
                         queryParameters(
                                 parameterWithName("status").optional().description("ACTIVE(기본) 또는 RESOLVED")
                                         .attributes(key("enumValues").value(List.of("ACTIVE", "RESOLVED"))),
@@ -210,7 +211,7 @@ class BriefAttentionRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionTransitions",
                         "같은 점검 항목의 상태 변경 이력을 원본 변경 번호 역순으로 조회한다.", "BRIEF 점검 항목 상태 변경 이력",
-                        paths(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional()), headers(),
+                        paths(), accessKeyHeader(), headers(),
                         queryParameters(parameterWithName("eventType").description("점검 항목의 원본 신호 종류"),
                                 parameterWithName("sourceReference").description("점검 항목의 원본 참조 문자열"),
                                 parameterWithName("beforeAggregateRevision").optional().description("이 리비전보다 작은 과거 전이"),
@@ -245,17 +246,16 @@ class BriefAttentionRestDocsTest {
         return pathParameters(parameterWithName("teamId").description("팀 UUID"), parameterWithName("seasonId").description("시즌 UUID"));
     }
 
+    private Snippet accessKeyHeader() {
+        return requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 방식의 팀에서 사용하는 접근 키").optional());
+    }
+
     private Snippet headers() {
         return responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL).description("민감 응답 캐시 금지"));
     }
 
     private UsernamePasswordAuthenticationToken account() {
-        return UsernamePasswordAuthenticationToken.authenticated(new Principal(ACCOUNT), null, List.of());
-    }
-
-    private record Principal(UUID accountId) implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() { return 0; }
+        return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of());
     }
 }

@@ -4,7 +4,7 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController.ReadNotificationRequest;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
@@ -103,9 +103,8 @@ class WorkspaceNotificationRestDocsTest {
     }
 
     private UsernamePasswordAuthenticationToken auth() {
-        return UsernamePasswordAuthenticationToken.authenticated(new Principal(ACCOUNT, 0), null, List.of());
+        return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of());
     }
-    private record Principal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
     private NotificationInboxResult inbox(boolean read) {
         return new NotificationInboxResult(ACCOUNT, TEAM, SEASON, List.of(new NotificationResult(RESOURCE,
                 WorkspaceNotificationKind.OVERDUE, RESOURCE, RESOURCE, SEASON, "운영 자료 준비",
