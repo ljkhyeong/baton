@@ -775,8 +775,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   열람자도 조회 권한으로 주소를 발급하며 팀 접근이 끊겨도 본인 구독을 해지할 수 있다.
   구성원 활동 중지·권한 회수·계정 전환과 같은 트랜잭션에 폐기를 기록하며 연결 실패 뒤에도 같은 구독 ID로 재전달한다.
   운영 활성화·공개 HTTPS·외부 캘린더 앱 검증은 별도다. 상세 계약은 PRD-0006을 따른다.
-- CAL 과거 백업 복구: `BATON_CAL_RECOVERY_PREPARATION_ENABLED=false`와
-  `BATON_CAL_RECOVERY_RUN_ID=`가 기본값이다. CAL을 새 구독 세대와 복구 모드로 복원한 뒤 새 UUID를
+- CAL 과거 백업 복구: 기본값은 `BATON_CAL_RECOVERY_PREPARATION_ENABLED=false`이고
+  `BATON_CAL_RECOVERY_RUN_ID`는 설정하지 않는다(운영 환경 파일에 빈 값으로 두면 사전점검이 거부한다). CAL을 새 구독 세대와 복구 모드로 복원한 뒤 새 UUID를
   복구 ID로 고정한다. 첫 기동은 캡처·일정 보정·시즌 이름·복구 준비를 켜고 이름 보정은 `REPLAY`,
   전달은 끈다. 준비 완료 뒤 같은 복구 ID와 캡처·시즌 이름을 유지하면서 보정·준비는 끄고 전달을
   켠다. 모든 최신 아웃박스가 전달되면 BATON이 시즌별 상태와 전체 시즌 집합을 CAL에 대조한다.
