@@ -58,7 +58,7 @@ test('소스맵 정보는 보고할 코드 파일과 연결된 식별자만 남�
     }, {})
   })
   expect(result.debug_meta.images).toEqual([{
-    type: 'sourcemap', code_file: 'http://127.0.0.1:3100/assets/test.js',
+    type: 'sourcemap', code_file: new URL('/assets/test.js', page.url()).href,
     debug_id: '80c5f231-b215-4c90-9bb3-f06d9c479ace',
   }])
   expect(JSON.stringify(result)).not.toMatch(/secret|private|member@example|outside|unrelated|macho/)
