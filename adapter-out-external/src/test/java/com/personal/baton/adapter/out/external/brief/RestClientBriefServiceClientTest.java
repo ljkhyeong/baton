@@ -273,27 +273,15 @@ class RestClientBriefServiceClientTest {
         server.verify();
     }
 
-    @DisplayName("BRIEF가 잘못된 성공 상태·필수 필드·JSON 형식으로 응답하면 영구 실패로 처리한다")
+    @DisplayName("BRIEF가 잘못된 성공 상태로 응답하면 영구 실패로 처리한다")
     @ParameterizedTest(name = "생성 요청={0}")
     @ValueSource(booleans = {false, true})
-    void rejectsUnexpectedSuccessAndIncompleteResponse(boolean generation) {
-        String generationPath = "/api/v1/workspaces/" + TEAM_ID
-                + "/seasons/" + SEASON_ID + "/editions";
-        server.expect(requestTo(BASE_URL + (generation ? generationPath : latestPath())))
+    void rejectsUnexpectedSuccessStatus(boolean generation) {
+        server.expect(requestTo(BASE_URL + (generation ? generationPath() : latestPath())))
                 .andRespond(withStatus(generation ? HttpStatus.ACCEPTED : HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
                         .body(editionJson()));
-        server.expect(requestTo(BASE_URL + latestPath()))
-                .andRespond(withStatus(HttpStatus.OK)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
-                        .body(editionJson().replace("\"items\": []", "\"items\": null")));
-        server.expect(requestTo(BASE_URL + generationPath))
-                .andRespond(withStatus(HttpStatus.OK)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
-                        .body("{"));
 
         var unexpectedSuccess = generation ? client.generateEdition(
                 TEAM_ID,
@@ -301,6 +289,26 @@ class RestClientBriefServiceClientTest {
                 LocalDate.parse("2026-08-24"),
                 ZoneId.of("Asia/Seoul")
         ) : client.findLatestEdition(TEAM_ID, SEASON_ID);
+
+        assertThat(unexpectedSuccess.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(unexpectedSuccess.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
+        server.verify();
+    }
+
+    @DisplayName("BRIEF 성공 응답의 필수 필드가 없거나 JSON 형식이 잘못되면 영구 실패로 처리한다")
+    @Test
+    void rejectsIncompleteOrMalformedSuccessResponse() {
+        server.expect(requestTo(BASE_URL + latestPath()))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body(editionJson().replace("\"items\": []", "\"items\": null")));
+        server.expect(requestTo(BASE_URL + generationPath()))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body("{"));
+
         var incompleteResponse = client.findLatestEdition(TEAM_ID, SEASON_ID);
         var malformedResponse = client.generateEdition(
                 TEAM_ID,
@@ -309,13 +317,15 @@ class RestClientBriefServiceClientTest {
                 ZoneId.of("Asia/Seoul")
         );
 
-        assertThat(unexpectedSuccess.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
-        assertThat(unexpectedSuccess.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
         assertThat(incompleteResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
         assertThat(incompleteResponse.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
         assertThat(malformedResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
         assertThat(malformedResponse.code()).isEqualTo("BRIEF_RESPONSE_FAILURE");
         server.verify();
+    }
+
+    private String generationPath() {
+        return "/api/v1/workspaces/" + TEAM_ID + "/seasons/" + SEASON_ID + "/editions";
     }
 
     private String latestPath() {

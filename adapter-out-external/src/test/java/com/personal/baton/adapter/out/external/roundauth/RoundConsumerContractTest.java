@@ -545,7 +545,6 @@ class RoundConsumerContractTest {
                     || key.equals("PORT")
                     || key.equals("HOST")
                     || key.equals("ALLOWED_ORIGINS")
-                    || key.equals("JAVA_TOOL_OPTIONS")
                     || key.equals("_JAVA_OPTIONS"));
             environment.put("TZ", "UTC");
             environment.put("ROUND_AUTH_MODE", "baton");
