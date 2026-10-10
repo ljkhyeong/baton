@@ -18,7 +18,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.prettyPrint;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -57,7 +56,6 @@ class SystemStatusRestDocsTest {
                         RequestIdFilter.HEADER_NAME,
                         REQUEST_ID.toString()
                 ))
-                .alwaysDo(document("{class-name}/{method-name}"))
                 .build();
     }
 

@@ -3,7 +3,7 @@ package com.personal.baton.adapter.in.web.restdocs;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.auth.AccountDeactivationController;
 import com.personal.baton.adapter.in.web.auth.AccountDeactivationController.AccountDeactivationRequest;
 import com.personal.baton.application.identity.error.AccountDeactivationBlockedException;
@@ -40,6 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(RestDocumentationExtension.class)
 class AccountDeactivationRestDocsTest {
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final String DEACTIVATE_ACCOUNT_DESCRIPTION = "현재 계정을 비활성화하고 모든 세션과 계정 권한 접근을 중지한다. 조직 기록은 보존하며 마지막 관리자는 먼저 후임 관리자를 지정해야 한다.";
+    private static final String DEACTIVATE_ACCOUNT_SUMMARY = "계정 비활성화";
     private MockMvc mvc;
     private DeactivateAccountUseCase useCase;
     @BeforeEach void setUp(RestDocumentationContextProvider documentation) {
@@ -57,7 +59,7 @@ class AccountDeactivationRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\"}"))
                 .andExpect(status().isNoContent()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(cookie().maxAge("JSESSIONID", 0))
-                .andDo(MockMvcRestDocumentationWrapper.document("deactivateAccount", "현재 계정을 비활성화하고 모든 세션과 계정 권한 접근을 중지한다. 조직 기록은 보존하며 마지막 관리자는 먼저 후임 관리자를 지정해야 한다.", "계정 비활성화",
+                .andDo(MockMvcRestDocumentationWrapper.document("deactivateAccount", DEACTIVATE_ACCOUNT_DESCRIPTION, DEACTIVATE_ACCOUNT_SUMMARY,
                         requestHeaders(headerWithName("Origin").description("BATON 동일 출처"), headerWithName("Sec-Fetch-Site").description("same-origin"), headerWithName("X-CSRF-TOKEN").description("세션 CSRF 토큰")),
                         requestFields(new ConstrainedFields(AccountDeactivationRequest.class).withPath("expectedAccountId").description("화면에서 확인한 로그인 계정")),
                         responseHeaders(headerWithName("Cache-Control").description("캐시 금지"), headerWithName("Set-Cookie").description("현재 JSESSIONID 제거"))));
@@ -69,9 +71,8 @@ class AccountDeactivationRestDocsTest {
         mvc.perform(post(AccountDeactivationController.PATH).with(authentication(auth()))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ACCOUNT_DEACTIVATION_BLOCKED"))
-                .andDo(MockMvcRestDocumentationWrapper.document("deactivateAccountLastAdministrator", "현재 계정을 비활성화하고 모든 세션과 계정 권한 접근을 중지한다. 조직 기록은 보존하며 마지막 관리자는 먼저 후임 관리자를 지정해야 한다.", "계정 비활성화",
+                .andDo(MockMvcRestDocumentationWrapper.document("deactivateAccountLastAdministrator", DEACTIVATE_ACCOUNT_DESCRIPTION, DEACTIVATE_ACCOUNT_SUMMARY,
                         responseFields(fieldWithPath("code").description("ACCOUNT_DEACTIVATION_BLOCKED"), fieldWithPath("message").description("후임 관리자를 지정할 팀 안내"))));
     }
-    private UsernamePasswordAuthenticationToken auth() { return UsernamePasswordAuthenticationToken.authenticated(new Principal(ACCOUNT, 0), null, List.of()); }
-    private record Principal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
+    private UsernamePasswordAuthenticationToken auth() { return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of()); }
 }

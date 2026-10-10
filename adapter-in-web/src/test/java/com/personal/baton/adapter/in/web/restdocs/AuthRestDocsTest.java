@@ -5,12 +5,12 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.auth.AuthController;
 import com.personal.baton.adapter.in.web.auth.AccountSecurityController;
 import com.personal.baton.adapter.in.web.auth.AuthExceptionHandler;
 import com.personal.baton.adapter.in.web.auth.AuthRateLimiter;
 import com.personal.baton.adapter.in.web.auth.AuthRequests;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
@@ -82,7 +82,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
 import static org.springframework.restdocs.headers.HeaderDocumentation.responseHeaders;
-import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.documentationConfiguration;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.get;
 import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.post;
@@ -109,6 +108,18 @@ class AuthRestDocsTest {
     private static final String GET_SESSION_DESCRIPTION =
             "현재 BATON 브라우저 세션을 조회한다. 미인증과 인증 응답은 서로 다른 정확한 구조를 사용한다.";
     private static final String GET_SESSION_SUMMARY = "현재 인증 세션 조회";
+    private static final String REGISTER_LOCAL_ACCOUNT_DESCRIPTION =
+            "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.";
+    private static final String REGISTER_LOCAL_ACCOUNT_SUMMARY = "자체 이메일 계정 등록";
+    private static final String VERIFY_LOCAL_EMAIL_DESCRIPTION =
+            "일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.";
+    private static final String VERIFY_LOCAL_EMAIL_SUMMARY = "자체 이메일 검증과 자격 증명 생성";
+    private static final String REQUEST_PASSWORD_RESET_DESCRIPTION =
+            "인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.";
+    private static final String REQUEST_PASSWORD_RESET_SUMMARY = "비밀번호 재설정 메일 요청";
+    private static final String RESET_PASSWORD_DESCRIPTION =
+            "재설정 토큰을 소비하고 비밀번호와 계정 세션 버전을 변경한다. 기존 세션은 다음 요청부터 거부하며 자동 로그인하지 않는다.";
+    private static final String RESET_PASSWORD_SUMMARY = "비밀번호 재설정 완료";
 
     private static final UUID REQUEST_ID =
             UUID.fromString("11111111-2222-4333-8444-555555555555");
@@ -162,19 +173,12 @@ class AuthRestDocsTest {
                 ))
                 .apply(documentationConfiguration(restDocumentation)
                         .operationPreprocessors()
-                        .withRequestDefaults(
-                                prettyPrint(),
-                                modifyHeaders().set(
-                                        "X-CSRF-TOKEN",
-                                        "opaque-csrf-token"
-                                )
-                        )
+                        .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
                 .alwaysExpect(header().string(
                         RequestIdFilter.HEADER_NAME,
                         REQUEST_ID.toString()
                 ))
-                .alwaysDo(document("{class-name}/{method-name}"))
                 .build();
     }
 
@@ -191,12 +195,7 @@ class AuthRestDocsTest {
                         "getAuthCsrf",
                         "로그인·가입 등 쿠키 인증 변경 전에 사용할 CSRF 토큰을 준비한다.",
                         "인증 CSRF 토큰 준비",
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지")
-                        ),
+                        noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("csrfHeaderName")
                                         .description("변경 요청에 사용할 CSRF 헤더 이름"),
@@ -216,12 +215,7 @@ class AuthRestDocsTest {
                         "getAuthSession",
                         GET_SESSION_DESCRIPTION,
                         GET_SESSION_SUMMARY,
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지")
-                        ),
+                        noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("authenticated")
                                         .description("항상 false인 미인증 세션 표시")
@@ -231,10 +225,9 @@ class AuthRestDocsTest {
     @DisplayName("로그인 상태 API는 기준 계정 UUID와 현재 CSRF 토큰을 반환한다")
     @Test
     void documentsAuthenticatedSession() throws Exception {
-        TestAccountPrincipal principal = new TestAccountPrincipal(ACCOUNT_ID);
         UsernamePasswordAuthenticationToken authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
-                        principal,
+                        new AccountSessionPrincipal(ACCOUNT_ID, 0),
                         null,
                         List.of()
                 );
@@ -250,12 +243,7 @@ class AuthRestDocsTest {
                         "getAuthSessionAuthenticated",
                         GET_SESSION_DESCRIPTION,
                         GET_SESSION_SUMMARY,
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지")
-                        ),
+                        noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("authenticated")
                                         .description("BATON 계정 세션 인증 여부"),
@@ -324,32 +312,11 @@ class AuthRestDocsTest {
                 .andExpect(jsonPath("$.verificationRequired").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "registerLocalAccount",
-                        "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.",
-                        "자체 이메일 계정 등록",
+                        REGISTER_LOCAL_ACCOUNT_DESCRIPTION,
+                        REGISTER_LOCAL_ACCOUNT_SUMMARY,
                         sessionMutationHeaders(),
-                        requestFields(
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "email",
-                                        "등록할 이메일 주소"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "displayName",
-                                        "BATON에 표시할 계정 이름"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "turnstileToken",
-                                        "위젯이 발급한 일회용 자동 요청 방지 token"
-                                ).optional()
-                        ),
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지")
-                        ),
+                        localRegistrationRequestFields(),
+                        noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("verificationRequired")
                                         .description("이메일 검증이 필요한 일반화된 등록 결과")
@@ -379,27 +346,11 @@ class AuthRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "registerLocalAccountTemporarilyUnavailable",
-                        "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.",
-                        "자체 이메일 계정 등록",
+                        REGISTER_LOCAL_ACCOUNT_DESCRIPTION,
+                        REGISTER_LOCAL_ACCOUNT_SUMMARY,
                         sessionMutationHeaders(),
-                        requestFields(
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "email",
-                                        "등록할 이메일 주소"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "displayName",
-                                        "BATON에 표시할 계정 이름"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "turnstileToken",
-                                        "위젯이 발급한 일회용 자동 요청 방지 token"
-                                ).optional()
-                        ),
-                        errorResponseHeaders(),
+                        localRegistrationRequestFields(),
+                        noStoreResponseHeaders(),
                         errorResponseFields()
                 ));
     }
@@ -425,23 +376,11 @@ class AuthRestDocsTest {
                 .andExpect(jsonPath("$.message").value("자동 요청 방지 확인을 다시 완료해 주세요"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "registerLocalAccountHumanVerificationFailed",
-                        "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다.",
-                        "자체 이메일 계정 등록",
+                        REGISTER_LOCAL_ACCOUNT_DESCRIPTION,
+                        REGISTER_LOCAL_ACCOUNT_SUMMARY,
                         sessionMutationHeaders(),
-                        requestFields(
-                                requestField(AuthRequests.LocalRegistrationRequest.class, "email", "등록할 이메일 주소"),
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "displayName",
-                                        "BATON에 표시할 계정 이름"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalRegistrationRequest.class,
-                                        "turnstileToken",
-                                        "위젯이 발급한 일회용 자동 요청 방지 token"
-                                ).optional()
-                        ),
-                        errorResponseHeaders(),
+                        localRegistrationRequestFields(),
+                        noStoreResponseHeaders(),
                         errorResponseFields()
                 ));
     }
@@ -461,27 +400,11 @@ class AuthRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "verifyLocalEmail",
-                        "일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.",
-                        "자체 이메일 검증과 자격 증명 생성",
+                        VERIFY_LOCAL_EMAIL_DESCRIPTION,
+                        VERIFY_LOCAL_EMAIL_SUMMARY,
                         sessionMutationHeaders(),
-                        requestFields(
-                                requestField(
-                                        AuthRequests.LocalEmailVerificationRequest.class,
-                                        "token",
-                                        "메일 프래그먼트에서 전달한 일회성 검증 토큰"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalEmailVerificationRequest.class,
-                                        "password",
-                                        "최초 로그인에 사용할 비밀번호"
-                                )
-                        ),
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지")
-                        )));
+                        localEmailVerificationRequestFields(),
+                        noStoreResponseHeaders()));
     }
 
     @DisplayName("자체 이메일 검증 API는 일시적인 신원 저장 실패를 재시도 가능한 503으로 반환한다")
@@ -506,22 +429,11 @@ class AuthRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "verifyLocalEmailTemporarilyUnavailable",
-                        "일회성 이메일 검증 토큰을 소비하고 검증된 자체 이메일 계정의 최초 비밀번호 자격 증명을 만든다.",
-                        "자체 이메일 검증과 자격 증명 생성",
+                        VERIFY_LOCAL_EMAIL_DESCRIPTION,
+                        VERIFY_LOCAL_EMAIL_SUMMARY,
                         sessionMutationHeaders(),
-                        requestFields(
-                                requestField(
-                                        AuthRequests.LocalEmailVerificationRequest.class,
-                                        "token",
-                                        "메일 프래그먼트에서 전달한 일회성 검증 토큰"
-                                ),
-                                requestField(
-                                        AuthRequests.LocalEmailVerificationRequest.class,
-                                        "password",
-                                        "최초 로그인에 사용할 비밀번호"
-                                )
-                        ),
-                        errorResponseHeaders(),
+                        localEmailVerificationRequestFields(),
+                        noStoreResponseHeaders(),
                         errorResponseFields()
                 ));
     }
@@ -547,10 +459,12 @@ class AuthRestDocsTest {
                         ? "HUMAN_VERIFICATION_UNAVAILABLE" : "HUMAN_VERIFICATION_FAILED"))
                 .andDo(MockMvcRestDocumentationWrapper.document(operation + "HumanVerification" + statusCode,
                         operation.equals("registerLocalAccount")
-                                ? "이메일 존재 여부를 노출하지 않고 자체 이메일 계정 등록과 검증 메일 발송을 요청한다."
-                                : "인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.",
-                        operation.equals("registerLocalAccount") ? "자체 이메일 계정 등록" : "비밀번호 재설정 메일 요청",
-                        sessionMutationHeaders(), errorResponseHeaders(), errorResponseFields()));
+                                ? REGISTER_LOCAL_ACCOUNT_DESCRIPTION
+                                : REQUEST_PASSWORD_RESET_DESCRIPTION,
+                        operation.equals("registerLocalAccount")
+                                ? REGISTER_LOCAL_ACCOUNT_SUMMARY
+                                : REQUEST_PASSWORD_RESET_SUMMARY,
+                        sessionMutationHeaders(), noStoreResponseHeaders(), errorResponseFields()));
     }
 
     private MockHttpServletRequestBuilder sameOriginMutation(
@@ -572,8 +486,8 @@ class AuthRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().json("{\"accepted\":true}", true))
                 .andDo(MockMvcRestDocumentationWrapper.document(
-                        "requestPasswordReset", "인증된 자체 이메일 계정에 30분짜리 일회용 재설정 링크를 보낸다. 계정 존재 여부는 응답하지 않는다.",
-                        "비밀번호 재설정 메일 요청", sessionMutationHeaders(), errorResponseHeaders(),
+                        "requestPasswordReset", REQUEST_PASSWORD_RESET_DESCRIPTION,
+                        REQUEST_PASSWORD_RESET_SUMMARY, sessionMutationHeaders(), noStoreResponseHeaders(),
                         requestFields(
                                 requestField(PasswordResetRequest.class, "email", "가입한 이메일"),
                                 requestField(
@@ -595,8 +509,8 @@ class AuthRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(content().string(""))
                 .andDo(MockMvcRestDocumentationWrapper.document(
-                        "resetPassword", "재설정 토큰을 소비하고 비밀번호와 계정 세션 버전을 변경한다. 기존 세션은 다음 요청부터 거부하며 자동 로그인하지 않는다.",
-                        "비밀번호 재설정 완료", sessionMutationHeaders(), errorResponseHeaders(),
+                        "resetPassword", RESET_PASSWORD_DESCRIPTION,
+                        RESET_PASSWORD_SUMMARY, sessionMutationHeaders(), noStoreResponseHeaders(),
                         requestFields(
                                 requestField(PasswordResetCompletionRequest.class, "token", "메일 링크에서 읽은 일회용 재설정 토큰"),
                                 requestField(PasswordResetCompletionRequest.class, "password", "새 비밀번호"))));
@@ -613,11 +527,12 @@ class AuthRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.code").value("PASSWORD_RESET_INVALID"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
-                        "resetPasswordInvalidToken", "재설정 토큰을 소비하고 비밀번호와 계정 세션 버전을 변경한다. 기존 세션은 다음 요청부터 거부하며 자동 로그인하지 않는다.",
-                        "비밀번호 재설정 완료", errorResponseHeaders(), errorResponseFields()));
+                        "resetPasswordInvalidToken", RESET_PASSWORD_DESCRIPTION,
+                        RESET_PASSWORD_SUMMARY, noStoreResponseHeaders(), errorResponseFields()));
     }
 
-    private org.springframework.restdocs.snippet.Snippet sessionMutationHeaders() {
+    // AuthSessionRestDocsTest도 같은 헤더·필드 문서와 장애 예외를 쓴다.
+    static Snippet sessionMutationHeaders() {
         return requestHeaders(
                 headerWithName(HttpHeaders.ORIGIN)
                         .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
@@ -628,7 +543,7 @@ class AuthRestDocsTest {
         );
     }
 
-    private Snippet errorResponseHeaders() {
+    static Snippet noStoreResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
                         .description("서버가 생성한 요청 추적 ID"),
@@ -637,21 +552,14 @@ class AuthRestDocsTest {
         );
     }
 
-    private Snippet errorResponseFields() {
-        return responseFields(
-                fieldWithPath("code").description("안정적인 오류 코드"),
-                fieldWithPath("message").description("재시도를 안내하는 안전한 오류 설명")
-        );
-    }
-
-    private IdentityOperationUnavailableException identityOperationUnavailable() {
+    static IdentityOperationUnavailableException identityOperationUnavailable() {
         return new IdentityOperationUnavailableException(
                 "identity persistence is temporarily unavailable",
                 new RuntimeException("test transient persistence failure")
         );
     }
 
-    private FieldDescriptor requestField(
+    static FieldDescriptor requestField(
             Class<?> requestType,
             String path,
             String description
@@ -659,12 +567,46 @@ class AuthRestDocsTest {
         return new ConstrainedFields(requestType).withPath(path).description(description);
     }
 
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
+    private Snippet localRegistrationRequestFields() {
+        return requestFields(
+                requestField(
+                        AuthRequests.LocalRegistrationRequest.class,
+                        "email",
+                        "등록할 이메일 주소"
+                ),
+                requestField(
+                        AuthRequests.LocalRegistrationRequest.class,
+                        "displayName",
+                        "BATON에 표시할 계정 이름"
+                ),
+                requestField(
+                        AuthRequests.LocalRegistrationRequest.class,
+                        "turnstileToken",
+                        "위젯이 발급한 일회용 자동 요청 방지 token"
+                ).optional()
+        );
+    }
+
+    private Snippet localEmailVerificationRequestFields() {
+        return requestFields(
+                requestField(
+                        AuthRequests.LocalEmailVerificationRequest.class,
+                        "token",
+                        "메일 프래그먼트에서 전달한 일회성 검증 토큰"
+                ),
+                requestField(
+                        AuthRequests.LocalEmailVerificationRequest.class,
+                        "password",
+                        "최초 로그인에 사용할 비밀번호"
+                )
+        );
+    }
+
+    private Snippet errorResponseFields() {
+        return responseFields(
+                fieldWithPath("code").description("안정적인 오류 코드"),
+                fieldWithPath("message").description("재시도를 안내하는 안전한 오류 설명")
+        );
     }
 }
 
@@ -698,6 +640,12 @@ class AuthSessionRestDocsTest {
     private static final String EMAIL = "member@example.com";
     private static final String PASSWORD = "correct horse battery staple";
     private static final String ORIGIN = "http://localhost:8080";
+    private static final String CREATE_LOCAL_AUTH_SESSION_DESCRIPTION =
+            "검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.";
+    private static final String CREATE_LOCAL_AUTH_SESSION_SUMMARY = "자체 이메일 계정 세션 생성";
+    private static final String CHANGE_LOCAL_PASSWORD_DESCRIPTION =
+            "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.";
+    private static final String CHANGE_LOCAL_PASSWORD_SUMMARY = "자체 이메일 비밀번호 변경";
 
     @Autowired
     private WebApplicationContext applicationContext;
@@ -741,7 +689,6 @@ class AuthSessionRestDocsTest {
                         RequestIdFilter.HEADER_NAME,
                         REQUEST_ID.toString()
                 ))
-                .alwaysDo(document("{class-name}/{method-name}"))
                 .build();
     }
 
@@ -764,16 +711,11 @@ class AuthSessionRestDocsTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "createLocalAuthSession",
-                        "검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.",
-                        "자체 이메일 계정 세션 생성",
-                        sessionMutationHeaders(),
-                        formParameters(
-                                parameterWithName("email")
-                                        .description("검증된 자체 계정 이메일 주소"),
-                                parameterWithName("password")
-                                        .description("자체 계정 비밀번호")
-                        ),
-                        noStoreResponseHeaders()
+                        CREATE_LOCAL_AUTH_SESSION_DESCRIPTION,
+                        CREATE_LOCAL_AUTH_SESSION_SUMMARY,
+                        AuthRestDocsTest.sessionMutationHeaders(),
+                        localSessionFormParameters(),
+                        AuthRestDocsTest.noStoreResponseHeaders()
                 ));
     }
 
@@ -781,10 +723,7 @@ class AuthSessionRestDocsTest {
     @Test
     void documentsLocalSessionTemporarilyUnavailable() throws Exception {
         when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
-                .thenThrow(new IdentityOperationUnavailableException(
-                        "identity persistence is temporarily unavailable",
-                        new RuntimeException("test transient persistence failure")
-                ));
+                .thenThrow(AuthRestDocsTest.identityOperationUnavailable());
 
         mockMvc.perform(sameOriginMutation(post(AuthController.LOCAL_SESSION_PATH))
                         .with(csrf().asHeader())
@@ -800,16 +739,11 @@ class AuthSessionRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "createLocalAuthSessionTemporarilyUnavailable",
-                        "검증된 자체 이메일 자격 증명을 확인하고 세션 고정 공격 방지를 적용한 BATON 계정 세션을 만든다.",
-                        "자체 이메일 계정 세션 생성",
-                        sessionMutationHeaders(),
-                        formParameters(
-                                parameterWithName("email")
-                                        .description("검증된 자체 계정 이메일 주소"),
-                                parameterWithName("password")
-                                        .description("자체 계정 비밀번호")
-                        ),
-                        noStoreResponseHeaders(),
+                        CREATE_LOCAL_AUTH_SESSION_DESCRIPTION,
+                        CREATE_LOCAL_AUTH_SESSION_SUMMARY,
+                        AuthRestDocsTest.sessionMutationHeaders(),
+                        localSessionFormParameters(),
+                        AuthRestDocsTest.noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("code")
                                         .description("안정적인 오류 코드"),
@@ -837,7 +771,7 @@ class AuthSessionRestDocsTest {
                         "deleteAuthSession",
                         "현재 BATON 계정 세션을 종료하고 서버 세션과 브라우저 JSESSIONID를 무효화한다.",
                         "현재 계정 세션 종료",
-                        sessionMutationHeaders(),
+                        AuthRestDocsTest.sessionMutationHeaders(),
                         responseHeaders(
                                 headerWithName(RequestIdFilter.HEADER_NAME)
                                         .description("서버가 생성한 요청 추적 ID"),
@@ -885,7 +819,7 @@ class AuthSessionRestDocsTest {
                         "getAccountSecurity",
                         "현재 로그인 계정의 표시 이름과 연결된 로그인 방법을 조회한다. 공급자가 이메일을 제공하지 않으면 email은 null이다.",
                         "계정 보안 정보 조회",
-                        noStoreResponseHeaders(),
+                        AuthRestDocsTest.noStoreResponseHeaders(),
                         responseFields(
                                 fieldWithPath("accountId")
                                         .description("공급자와 무관한 BATON 계정 UUID"),
@@ -931,29 +865,22 @@ class AuthSessionRestDocsTest {
                 ))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "changeLocalPassword",
-                        "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.",
-                        "자체 이메일 비밀번호 변경",
-                        sessionMutationHeaders(),
+                        CHANGE_LOCAL_PASSWORD_DESCRIPTION,
+                        CHANGE_LOCAL_PASSWORD_SUMMARY,
+                        AuthRestDocsTest.sessionMutationHeaders(),
                         requestFields(
-                                requestField(
+                                AuthRestDocsTest.requestField(
                                         AuthRequests.LocalPasswordChangeRequest.class,
                                         "currentPassword",
                                         "현재 자체 이메일 비밀번호"
                                 ),
-                                requestField(
+                                AuthRestDocsTest.requestField(
                                         AuthRequests.LocalPasswordChangeRequest.class,
                                         "newPassword",
                                         "새 비밀번호"
                                 )
                         ),
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지"),
-                                headerWithName(HttpHeaders.SET_COOKIE)
-                                        .description("현재 JSESSIONID를 즉시 만료하는 쿠키")
-                        )
+                        currentSessionExpiryResponseHeaders()
                 ));
 
         assertThat(session.isInvalid()).isTrue();
@@ -985,9 +912,9 @@ class AuthSessionRestDocsTest {
                 .andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INVALID"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "changeLocalPasswordInvalidCurrentPassword",
-                        "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.",
-                        "자체 이메일 비밀번호 변경",
-                        errorResponseHeaders(),
+                        CHANGE_LOCAL_PASSWORD_DESCRIPTION,
+                        CHANGE_LOCAL_PASSWORD_SUMMARY,
+                        AuthRestDocsTest.noStoreResponseHeaders(),
                         errorResponseFields()
                 ));
 
@@ -1017,9 +944,9 @@ class AuthSessionRestDocsTest {
                 .andExpect(jsonPath("$.code").value("LOCAL_PASSWORD_UNAVAILABLE"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "changeLocalPasswordUnavailable",
-                        "현재 자체 이메일 비밀번호를 확인해 새 비밀번호로 바꾸고 계정의 모든 기존 세션을 종료한다. 진행 중인 재설정 링크도 무효화한다.",
-                        "자체 이메일 비밀번호 변경",
-                        errorResponseHeaders(),
+                        CHANGE_LOCAL_PASSWORD_DESCRIPTION,
+                        CHANGE_LOCAL_PASSWORD_SUMMARY,
+                        AuthRestDocsTest.noStoreResponseHeaders(),
                         errorResponseFields()
                 ));
     }
@@ -1044,15 +971,8 @@ class AuthSessionRestDocsTest {
                         "revokeAccountSessions",
                         "계정의 세션 버전을 변경해 모든 브라우저의 기존 계정 세션을 종료하고 현재 JSESSIONID도 즉시 무효화한다.",
                         "모든 계정 세션 종료",
-                        sessionMutationHeaders(),
-                        responseHeaders(
-                                headerWithName(RequestIdFilter.HEADER_NAME)
-                                        .description("서버가 생성한 요청 추적 ID"),
-                                headerWithName(HttpHeaders.CACHE_CONTROL)
-                                        .description("민감 응답 캐시 금지"),
-                                headerWithName(HttpHeaders.SET_COOKIE)
-                                        .description("현재 JSESSIONID를 즉시 만료하는 쿠키")
-                        )
+                        AuthRestDocsTest.sessionMutationHeaders(),
+                        currentSessionExpiryResponseHeaders()
                 ));
 
         assertThat(session.isInvalid()).isTrue();
@@ -1068,10 +988,9 @@ class AuthSessionRestDocsTest {
     }
 
     private MockHttpSession authenticatedSession() {
-        TestAccountPrincipal principal = new TestAccountPrincipal(ACCOUNT_ID);
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                principal,
+                new AccountSessionPrincipal(ACCOUNT_ID, 0),
                 null,
                 List.of()
         ));
@@ -1083,28 +1002,24 @@ class AuthSessionRestDocsTest {
         return session;
     }
 
-    private Snippet sessionMutationHeaders() {
-        return requestHeaders(
-                headerWithName(HttpHeaders.ORIGIN)
-                        .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
-                headerWithName("Sec-Fetch-Site")
-                        .description("브라우저가 보낸 same-origin Fetch Metadata"),
-                headerWithName("X-CSRF-TOKEN")
-                        .description("GET /api/v1/auth/csrf에서 받은 동적 CSRF 토큰")
+    private Snippet localSessionFormParameters() {
+        return formParameters(
+                parameterWithName("email")
+                        .description("검증된 자체 계정 이메일 주소"),
+                parameterWithName("password")
+                        .description("자체 계정 비밀번호")
         );
     }
 
-    private Snippet noStoreResponseHeaders() {
+    private Snippet currentSessionExpiryResponseHeaders() {
         return responseHeaders(
                 headerWithName(RequestIdFilter.HEADER_NAME)
                         .description("서버가 생성한 요청 추적 ID"),
                 headerWithName(HttpHeaders.CACHE_CONTROL)
-                        .description("민감 응답 캐시 금지")
+                        .description("민감 응답 캐시 금지"),
+                headerWithName(HttpHeaders.SET_COOKIE)
+                        .description("현재 JSESSIONID를 즉시 만료하는 쿠키")
         );
-    }
-
-    private Snippet errorResponseHeaders() {
-        return noStoreResponseHeaders();
     }
 
     private Snippet errorResponseFields() {
@@ -1112,22 +1027,6 @@ class AuthSessionRestDocsTest {
                 fieldWithPath("code").description("안정적인 오류 코드"),
                 fieldWithPath("message").description("사용자가 다음 행동을 판단할 수 있는 오류 설명")
         );
-    }
-
-    private FieldDescriptor requestField(
-            Class<?> requestType,
-            String path,
-            String description
-    ) {
-        return new ConstrainedFields(requestType).withPath(path).description(description);
-    }
-
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
     }
 
     @TestConfiguration(proxyBeanMethods = false)
