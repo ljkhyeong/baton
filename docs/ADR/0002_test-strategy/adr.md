@@ -41,7 +41,7 @@ BATON은 작은 실제 스터디에서 빠르게 사용하면서도 역할, 반�
 ### 기본 빌드 동작
 
 - 모든 서브모듈 테스트는 JUnit Platform을 사용한다.
-- `adapter-out-external:test`는 외부 런타임을 요구하는 `crossservice`와 `calendar-crossservice` 태그를 제외한다. 전용 `roundConsumerContractTest`는 명시한 signaling bootJar로, `calendarConsumerContractTest`는 `BATON_CAL_LIVE_BASE_URL`과 `BATON_CAL_LIVE_BEARER_TOKEN`을 제공했을 때만 실행한다.
+- `adapter-out-external:test`는 외부 런타임을 요구하는 `crossservice`, `calendar-crossservice`, `calendar-metadata-crossservice`, `calendar-recovery-crossservice` 태그를 제외한다. 전용 `roundConsumerContractTest`는 명시한 signaling bootJar로, `calendarConsumerContractTest`(일정·시즌 이름)와 `calendarRecoveryConsumerContractTest`(복구)는 `BATON_CAL_LIVE_BASE_URL`과 `BATON_CAL_LIVE_BEARER_TOKEN`을 제공했을 때만 실행한다.
 - `adapter-in-web:test`는 `restdocs` 태그를 제외한다.
 - `adapter-in-web:check`는 `restDocsTest`를 별도로 의존한다.
 - 따라서 `./gradlew --no-daemon build`에는 현재 REST Docs 계약 테스트가 포함된다.
