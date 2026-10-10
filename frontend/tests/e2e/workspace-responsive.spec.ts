@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import {
   ROLE_ID,
   ROUND_ONE_ID,
@@ -12,6 +13,28 @@ import {
   navigation,
   openHandoffView,
 } from './support/workspaceApiHarness'
+
+// 문서 배경과 화면이 쓰는 색상 토큰을 계산된 값으로 읽는다.
+function readPalette(page: Page) {
+  return page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement)
+    const color = (name: string) => style.getPropertyValue(name).trim()
+    return {
+      background: style.backgroundColor,
+      canvas: color('--canvas'),
+      paper: color('--paper'),
+      ink: color('--ink'),
+      muted: color('--muted'),
+      faint: color('--faint'),
+      nav: color('--nav'),
+      onInk: color('--on-ink'),
+      success: color('--success'),
+      warning: color('--warning'),
+      warningSoft: color('--warning-soft'),
+      focusRing: color('--focus-ring'),
+    }
+  })
+}
 
 test('@responsive 주 메뉴는 현재 화면과 작은 화면의 조작 영역을 전달한다', async ({ page }, testInfo) => {
   await installApi(page)
@@ -179,23 +202,7 @@ test('@responsive 어두운 화면 설정에서 색 토큰을 바꾸고 글자�
   await installApi(page)
   await openSharedWorkspace(page)
 
-  const palette = await page.evaluate(() => {
-    const style = getComputedStyle(document.documentElement)
-    const color = (name: string) => style.getPropertyValue(name).trim()
-    return {
-      background: style.backgroundColor,
-      canvas: color('--canvas'),
-      paper: color('--paper'),
-      ink: color('--ink'),
-      muted: color('--muted'),
-      faint: color('--faint'),
-      onInk: color('--on-ink'),
-      success: color('--success'),
-      warning: color('--warning'),
-      warningSoft: color('--warning-soft'),
-      focusRing: color('--focus-ring'),
-    }
-  })
+  const palette = await readPalette(page)
 
   expect(palette.background).toBe('rgb(15, 18, 22)')
   expect(contrastRatio(palette.ink, palette.paper)).toBeGreaterThanOrEqual(7)
@@ -213,19 +220,7 @@ test('@responsive 보조 문구와 경고 및 키보드 초점 대비를 유지�
   await installApi(page, initialProjection)
   await openSharedWorkspace(page)
 
-  const palette = await page.evaluate(() => {
-    const style = getComputedStyle(document.documentElement)
-    const color = (name: string) => style.getPropertyValue(name).trim()
-    return {
-      canvas: color('--canvas'),
-      faint: color('--faint'),
-      focusRing: color('--focus-ring'),
-      muted: color('--muted'),
-      nav: color('--nav'),
-      warning: color('--warning'),
-      warningSoft: color('--warning-soft'),
-    }
-  })
+  const palette = await readPalette(page)
 
   expect(contrastRatio(palette.faint, palette.canvas)).toBeGreaterThanOrEqual(4.5)
   expect(contrastRatio(palette.muted, palette.canvas)).toBeGreaterThanOrEqual(4.5)

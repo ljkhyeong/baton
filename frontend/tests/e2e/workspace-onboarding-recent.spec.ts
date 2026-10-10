@@ -9,6 +9,7 @@ import {
   WORKSPACE_PATH,
   SCOPE_PATH,
   PENDING_CREATION_STORAGE_PREFIX,
+  RECENT_WORKSPACE,
   makeProjection,
   installApi,
   openSharedWorkspace,
@@ -1136,13 +1137,7 @@ test('최근 목록 저장 실패 시 접근 키 제거 사실과 남은 목록�
     storageKey: 'baton-recent-workspaces:v1',
     accessKeyStorageKey: `baton-access-key:${TEAM_ID}`,
     accessKey: ACCESS_KEY,
-    recentWorkspace: {
-      teamId: TEAM_ID,
-      seasonId: SEASON_ID,
-      teamName: '알고리즘 한 바퀴',
-      seasonName: '2026 여름 시즌',
-      lastOpenedAt: '2026-07-24T00:00:00.000Z',
-    },
+    recentWorkspace: RECENT_WORKSPACE,
   })
   await page.goto('/')
 
@@ -1176,13 +1171,7 @@ test('접근 키 제거 실패 시 권한을 지웠다고 표시하지 않는다
     storageKey: 'baton-recent-workspaces:v1',
     accessKeyStorageKey: `baton-access-key:${TEAM_ID}`,
     accessKey: ACCESS_KEY,
-    recentWorkspace: {
-      teamId: TEAM_ID,
-      seasonId: SEASON_ID,
-      teamName: '알고리즘 한 바퀴',
-      seasonName: '2026 여름 시즌',
-      lastOpenedAt: '2026-07-24T00:00:00.000Z',
-    },
+    recentWorkspace: RECENT_WORKSPACE,
   })
   await page.goto('/')
 

@@ -1,6 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import {
+  INVALID_RESPONSE_ERROR,
+  callBrowserModule,
+  workspaceRequestFromBrowser,
+} from './support/workspaceApiHarness'
 
 type BrowserRequestResult =
   | {
@@ -51,92 +56,41 @@ async function apiRequestFromBrowser(
   }, { requestPath: path, requestOptions: options })
 }
 
-async function noContentRequestFromBrowser(
-  page: Page,
-  path: string,
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async (requestPath) => {
-    const { apiRequest } = await import('/src/shared/api/client.ts')
+const CLIENT_MODULE = '/src/shared/api/client.ts'
+const WORKSPACE_API_MODULE = '/src/features/workspace/api.ts'
 
-    try {
-      const value = await apiRequest(requestPath, { responseType: 'no-content' })
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, path)
+type WorkspaceScope = { teamId: string; seasonId: string; accessKey: string }
+
+function noContentRequestFromBrowser(page: Page, path: string) {
+  return callBrowserModule(page, CLIENT_MODULE, 'apiRequest', path, { responseType: 'no-content' })
 }
 
-async function acceptRoleHandoffRequestFromBrowser(
+function acceptRoleHandoffRequestFromBrowser(
   page: Page,
-  scope: { teamId: string; seasonId: string; accessKey: string },
+  scope: WorkspaceScope,
   roleId: string,
   handoffId: string,
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async ({ workspaceScope, requestedRoleId, requestedHandoffId }) => {
-    const { acceptRoleHandoff } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await acceptRoleHandoff(
-        workspaceScope,
-        requestedRoleId,
-        requestedHandoffId,
-        { confirmedByMemberId: '22222222-2222-4222-8222-222222222222' },
-      )
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, {
-    workspaceScope: scope,
-    requestedRoleId: roleId,
-    requestedHandoffId: handoffId,
+) {
+  return callBrowserModule(page, WORKSPACE_API_MODULE, 'acceptRoleHandoff', scope, roleId, handoffId, {
+    confirmedByMemberId: '22222222-2222-4222-8222-222222222222',
   })
 }
 
-async function updateRoutineExecutionRequestFromBrowser(
+function updateRoutineExecutionRequestFromBrowser(
   page: Page,
-  scope: { teamId: string; seasonId: string; accessKey: string },
+  scope: WorkspaceScope,
   roundId: string,
   executionId: string,
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async ({ workspaceScope, requestedRoundId, requestedExecutionId }) => {
-    const { setRoutineExecutionCompletion } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await setRoutineExecutionCompletion(
-        workspaceScope,
-        requestedRoundId,
-        requestedExecutionId,
-        true,
-      )
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, {
-    workspaceScope: scope,
-    requestedRoundId: roundId,
-    requestedExecutionId: executionId,
-  })
+) {
+  return callBrowserModule(
+    page,
+    WORKSPACE_API_MODULE,
+    'setRoutineExecutionCompletion',
+    scope,
+    roundId,
+    executionId,
+    true,
+  )
 }
 
 async function abortableApiRequestFromBrowser(
@@ -183,105 +137,28 @@ async function abortableApiRequestFromBrowser(
   }, path)
 }
 
-async function workspaceRequestFromBrowser(
-  page: Page,
-  scope: { teamId: string; seasonId: string; accessKey: string },
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async (workspaceScope) => {
-    const { getWorkspace } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await getWorkspace(workspaceScope)
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, scope)
+function createWorkspaceRequestFromBrowser(page: Page, idempotencyKey: string) {
+  return callBrowserModule(page, WORKSPACE_API_MODULE, 'createWorkspace', {
+    teamName: '응답 경계 스터디',
+    seasonName: '2026 가을 시즌',
+    startDate: '2026-09-01',
+    endDate: '2026-11-30',
+    memberNames: ['박민서'],
+  }, { idempotencyKey })
 }
 
-async function createWorkspaceRequestFromBrowser(
-  page: Page,
-  idempotencyKey: string,
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async (requestIdempotencyKey) => {
-    const { createWorkspace } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await createWorkspace({
-        teamName: '응답 경계 스터디',
-        seasonName: '2026 가을 시즌',
-        startDate: '2026-09-01',
-        endDate: '2026-11-30',
-        memberNames: ['박민서'],
-      }, { idempotencyKey: requestIdempotencyKey })
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, idempotencyKey)
+function rotateAccessKeyRequestFromBrowser(page: Page, scope: WorkspaceScope, idempotencyKey: string) {
+  return callBrowserModule(page, WORKSPACE_API_MODULE, 'rotateAccessKey', scope, idempotencyKey)
 }
 
-async function rotateAccessKeyRequestFromBrowser(
-  page: Page,
-  scope: { teamId: string; seasonId: string; accessKey: string },
-  idempotencyKey: string,
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async ({ workspaceScope, requestIdempotencyKey }) => {
-    const { rotateAccessKey } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await rotateAccessKey(workspaceScope, requestIdempotencyKey)
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, { workspaceScope: scope, requestIdempotencyKey: idempotencyKey })
-}
-
-async function createNextSeasonRequestFromBrowser(
-  page: Page,
-  scope: { teamId: string; seasonId: string; accessKey: string },
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async (workspaceScope) => {
-    const { createNextSeason } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await createNextSeason(workspaceScope, {
-        name: '다음 시즌',
-        startDate: '2026-10-01',
-        endDate: '2026-12-31',
-        copyRoleIds: [],
-        copyRoutineIds: [],
-      }, 'next-season-response-boundary-00000000000000000000000000000000')
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, scope)
+function createNextSeasonRequestFromBrowser(page: Page, scope: WorkspaceScope) {
+  return callBrowserModule(page, WORKSPACE_API_MODULE, 'createNextSeason', scope, {
+    name: '다음 시즌',
+    startDate: '2026-10-01',
+    endDate: '2026-12-31',
+    copyRoleIds: [],
+    copyRoutineIds: [],
+  }, 'next-season-response-boundary-00000000000000000000000000000000')
 }
 
 function acceptedRoleHandoffTransitionResponse() {
@@ -411,14 +288,8 @@ test('성공 응답이 JSON이 아니거나 손상되면 응답 오류로 분류
     body: '{"ready":',
   }))
 
-  const expectedError = {
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  }
-  await expect(apiRequestFromBrowser(page, '/api-client-test/plain-text')).resolves.toEqual(expectedError)
-  await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-json')).resolves.toEqual(expectedError)
+  await expect(apiRequestFromBrowser(page, '/api-client-test/plain-text')).resolves.toEqual(INVALID_RESPONSE_ERROR)
+  await expect(apiRequestFromBrowser(page, '/api-client-test/malformed-json')).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
 test('204는 명시한 no-content 계약에서만 성공한다', async ({ page }) => {
@@ -432,16 +303,10 @@ test('204는 명시한 no-content 계약에서만 성공한다', async ({ page }
   await expect(noContentRequestFromBrowser(page, '/api-client-test/no-content'))
     .resolves.toEqual({ ok: true, value: undefined })
 
-  const expectedError = {
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  }
   await expect(apiRequestFromBrowser(page, '/api-client-test/no-content'))
-    .resolves.toEqual(expectedError)
+    .resolves.toEqual(INVALID_RESPONSE_ERROR)
   await expect(noContentRequestFromBrowser(page, '/api-client-test/unexpected-content'))
-    .resolves.toEqual(expectedError)
+    .resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
 test('역할 인수인계 응답에 nextMemberId가 없으면 응답 오류로 분류한다', async ({ page }) => {
@@ -464,12 +329,7 @@ test('역할 인수인계 응답에 nextMemberId가 없으면 응답 오류로 �
     scope,
     response.role.id,
     response.handoff.id,
-  )).resolves.toEqual({
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  })
+  )).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
 test('역할 인수인계 응답은 서버 상태와 별개로 요청 경로의 식별자를 유지한다', async ({ page }) => {
@@ -546,12 +406,7 @@ test('역할 인수인계 응답은 서버 상태와 별개로 요청 경로의 
         scope,
         roleId,
         handoffId,
-      )).resolves.toEqual({
-        ok: false,
-        name: 'ApiClientError',
-        kind: 'invalid-response',
-        message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-      })
+      )).resolves.toEqual(INVALID_RESPONSE_ERROR)
     })
   }
 })
@@ -614,12 +469,7 @@ test('반복 업무 완료 응답은 요청한 회차와 실행 식별자를 유
         scope,
         roundId,
         executionId,
-      )).resolves.toEqual({
-        ok: false,
-        name: 'ApiClientError',
-        kind: 'invalid-response',
-        message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-      })
+      )).resolves.toEqual(INVALID_RESPONSE_ERROR)
     })
   }
 })
@@ -699,12 +549,7 @@ test('다음 시즌 응답은 요청한 원본 시즌과 직접 계보를 유지
     await test.step(scenario.name, async () => {
       response = validResponse()
       scenario.mutate()
-      await expect(createNextSeasonRequestFromBrowser(page, scope)).resolves.toEqual({
-        ok: false,
-        name: 'ApiClientError',
-        kind: 'invalid-response',
-        message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-      })
+      await expect(createNextSeasonRequestFromBrowser(page, scope)).resolves.toEqual(INVALID_RESPONSE_ERROR)
     })
   }
 })
@@ -740,17 +585,11 @@ test('워크스페이스 생성 응답에 자격 증명 필수 값이 없으면 
     })
   })
 
-  const expectedError = {
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  }
   for (let index = 0; index < responses.length; index += 1) {
     await expect(createWorkspaceRequestFromBrowser(
       page,
       `workspace-response-boundary-${String(index).padStart(32, '0')}`,
-    )).resolves.toEqual(expectedError)
+    )).resolves.toEqual(INVALID_RESPONSE_ERROR)
   }
   expect(responseIndex).toBe(responses.length)
 })
@@ -780,18 +619,12 @@ test('접근 키 변경 응답에 일회성 자격 증명이 없으면 응답 �
     },
   )
 
-  const expectedError = {
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  }
   for (let index = 0; index < responses.length; index += 1) {
     await expect(rotateAccessKeyRequestFromBrowser(
       page,
       scope,
       `rotation-response-boundary-${String(index).padStart(32, '0')}`,
-    )).resolves.toEqual(expectedError)
+    )).resolves.toEqual(INVALID_RESPONSE_ERROR)
   }
   expect(responseIndex).toBe(responses.length)
 })
@@ -811,12 +644,7 @@ test('워크스페이스 성공 응답에 필수 필드가 없으면 복구 가�
     }),
   )
 
-  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  })
+  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual(INVALID_RESPONSE_ERROR)
 
   await page.goto(
     `/teams/${scope.teamId}/seasons/${scope.seasonId}#accessKey=${scope.accessKey}`,
@@ -842,12 +670,7 @@ test('워크스페이스 배열에 잘못된 항목이 있으면 복구 가능�
     }),
   )
 
-  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
-    ok: false,
-    name: 'ApiClientError',
-    kind: 'invalid-response',
-    message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-  })
+  await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual(INVALID_RESPONSE_ERROR)
 })
 
 test('워크스페이스 일정은 ISO local time의 소수초를 보존한다', async ({ page }) => {

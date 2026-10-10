@@ -92,6 +92,13 @@ export const PENDING_CONTENT_CREATION_STORAGE_PREFIX = 'baton-pending-content-cr
 const CONTENT_CREATION_CLEANUP_MARKER_STORAGE_KEY =
   'baton-content-creation-cleanup-required:v1'
 export const PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY = `baton-pending-access-key-change:v1:${TEAM_ID}`
+export const RECENT_WORKSPACE = {
+  teamId: TEAM_ID,
+  seasonId: SEASON_ID,
+  teamName: '알고리즘 한 바퀴',
+  seasonName: '2026 여름 시즌',
+  lastOpenedAt: '2026-07-24T00:00:00.000Z',
+}
 
 function parseCssColor(value: string): [number, number, number] {
   const normalized = value.trim()
@@ -164,7 +171,7 @@ type RecordedCall = {
   body?: unknown
 }
 
-type ApiHarness = {
+export type ApiHarness = {
   calls: RecordedCall[]
   projection: () => WorkspaceProjection
   attachPage: (page: Page) => Promise<void>
@@ -1547,6 +1554,43 @@ export function pendingCreationEntries(page: Page) {
 
 export function pendingContentCreationEntries(page: Page) {
   return journalEntries<PendingContentCreationEntry>(page, PENDING_CONTENT_CREATION_STORAGE_PREFIX)
+}
+
+export const INVALID_RESPONSE_ERROR = {
+  ok: false,
+  name: 'ApiClientError',
+  kind: 'invalid-response',
+  message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+}
+
+// 앱 모듈의 export를 브라우저에서 호출하고, 실패하면 오류의 이름·메시지·분류만 돌려준다.
+export async function callBrowserModule(
+  page: Page,
+  modulePath: string,
+  exportName: string,
+  ...args: unknown[]
+) {
+  return page.evaluate(async ({ path, name, values }) => {
+    const loaded = await import(path)
+    try {
+      return { ok: true as const, value: await loaded[name](...values) as unknown }
+    } catch (error) {
+      const apiError = error as Error & { kind?: string }
+      return {
+        ok: false as const,
+        name: apiError.name,
+        message: apiError.message,
+        kind: apiError.kind,
+      }
+    }
+  }, { path: modulePath, name: exportName, values: args })
+}
+
+export function workspaceRequestFromBrowser(
+  page: Page,
+  scope: { teamId: string; seasonId: string; accessKey: string },
+) {
+  return callBrowserModule(page, '/src/features/workspace/api.ts', 'getWorkspace', scope)
 }
 
 export function recordedCalls(api: ApiHarness, method: string, path: string) {

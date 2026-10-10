@@ -5,7 +5,11 @@ import type {
   RoleHandoffTransitionResponse,
   WorkspaceProjection,
 } from '../../src/features/workspace/types'
-import { makeProjection } from './support/workspaceApiHarness'
+import {
+  INVALID_RESPONSE_ERROR,
+  makeProjection,
+  workspaceRequestFromBrowser,
+} from './support/workspaceApiHarness'
 
 type DecoderScope =
   | { kind: 'next-season'; sourceSeasonId: string }
@@ -14,13 +18,6 @@ type DecoderScope =
 type BrowserRequestResult =
   | { ok: true; value: unknown }
   | { ok: false; name: string; message: string; kind?: string }
-
-const INVALID_RESPONSE_ERROR = {
-  ok: false,
-  name: 'ApiClientError',
-  kind: 'invalid-response',
-  message: '서버 응답을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.',
-}
 
 async function decodedResponseRequestFromBrowser(
   page: Page,
@@ -57,34 +54,28 @@ async function decodedResponseRequestFromBrowser(
   }, { requestPath: path, scope: decoderScope })
 }
 
-async function workspaceRequestFromBrowser(
-  page: Page,
-  scope: { teamId: string; seasonId: string; accessKey: string },
-): Promise<BrowserRequestResult> {
-  return page.evaluate(async (workspaceScope) => {
-    const { getWorkspace } = await import('/src/features/workspace/api.ts')
-
-    try {
-      const value = await getWorkspace(workspaceScope)
-      return { ok: true as const, value }
-    } catch (error) {
-      const apiError = error as Error & { kind?: string }
-      return {
-        ok: false as const,
-        name: apiError.name,
-        message: apiError.message,
-        kind: apiError.kind,
-      }
-    }
-  }, scope)
-}
-
 function scopedProjection(scope: { teamId: string; seasonId: string }): WorkspaceProjection {
   const projection = makeProjection()
   projection.team = { ...projection.team, id: scope.teamId }
   projection.season = { ...projection.season, id: scope.seasonId }
   projection.seasons = [structuredClone(projection.season)]
   return projection
+}
+
+// 요청마다 현재 응답을 읽으므로 테스트가 응답 변수를 바꾸면 다음 조회에 반영된다.
+async function routeWorkspace(
+  page: Page,
+  scope: { teamId: string; seasonId: string },
+  response: () => WorkspaceProjection,
+) {
+  await page.route(
+    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
+    (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response()),
+    }),
+  )
 }
 
 function addContinuitySignal(
@@ -235,22 +226,22 @@ test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scop
     seasonId: 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB',
     accessKey: 'pilot-access-key',
   }
-  let response = scopedProjection({
+  const lowerCaseScope = {
     teamId: scope.teamId.toLowerCase(),
     seasonId: scope.seasonId.toLowerCase(),
-  })
-  await page.route(
-    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
-    (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(response),
-    }),
-  )
+  }
+  let response = scopedProjection(lowerCaseScope)
+  await routeWorkspace(page, scope, () => response)
 
   await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
     ok: true,
     value: response,
+  })
+
+  await test.step('시즌 연결 없이 이관한 기존 원본 역할', async () => {
+    response = scopedProjection({ teamId: scope.teamId, seasonId: scope.seasonId })
+    response.roles[0]!.previousRoleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({ ok: true, value: response })
   })
 
   for (const scenario of [
@@ -266,26 +257,6 @@ test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scop
         projection.season.id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
       },
     },
-  ]) {
-    await test.step(scenario.name, async () => {
-      response = scopedProjection({
-        teamId: scope.teamId.toLowerCase(),
-        seasonId: scope.seasonId.toLowerCase(),
-      })
-      scenario.mutate(response)
-      await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual(
-        INVALID_RESPONSE_ERROR,
-      )
-    })
-  }
-
-  await test.step('시즌 연결 없이 이관한 기존 원본 역할', async () => {
-    response = scopedProjection({ teamId: scope.teamId, seasonId: scope.seasonId })
-    response.roles[0]!.previousRoleId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-    await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({ ok: true, value: response })
-  })
-
-  for (const scenario of [
     {
       name: '자기 자신을 원본으로 연결한 역할',
       mutate: (projection: WorkspaceProjection) => {
@@ -312,10 +283,7 @@ test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scop
     },
   ]) {
     await test.step(scenario.name, async () => {
-      response = scopedProjection({
-        teamId: scope.teamId.toLowerCase(),
-        seasonId: scope.seasonId.toLowerCase(),
-      })
+      response = scopedProjection(lowerCaseScope)
       scenario.mutate(response)
       await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual(
         INVALID_RESPONSE_ERROR,
@@ -323,16 +291,12 @@ test('워크스페이스 응답은 요청한 최상위 팀과 현재 시즌 scop
     })
   }
 
-  response = scopedProjection({
-    teamId: scope.teamId.toLowerCase(),
-    seasonId: scope.seasonId.toLowerCase(),
-  })
+  response = scopedProjection(lowerCaseScope)
   response.seasons[0]!.name = '서버가 반환한 별도 요약 이름'
   await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
     ok: true,
     value: response,
   })
-
 })
 
 test('연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해야 한다', async ({ page }) => {
@@ -342,14 +306,7 @@ test('연속성 신호는 날짜와 동작 대상의 포함 관계를 유지해�
     accessKey: 'pilot-access-key',
   }
   let response = scopedProjection(scope)
-  await page.route(
-    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
-    (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(response),
-    }),
-  )
+  await routeWorkspace(page, scope, () => response)
 
   const scenarios: Array<{
     name: string
@@ -409,14 +366,7 @@ test('워크스페이스의 UTC instant와 달력 날짜 형식은 렌더 전에
     accessKey: 'pilot-access-key',
   }
   let response = scopedProjection(scope)
-  await page.route(
-    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
-    (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(response),
-    }),
-  )
+  await routeWorkspace(page, scope, () => response)
 
   const scenarios: Array<{
     name: string
@@ -542,14 +492,7 @@ test('decoder는 서버 상태 머신을 재계산하지 않는다', async ({ pa
   response.roles.push(handoffTransition.role)
   response.roleHandoffs.push(handoffTransition.handoff)
   Reflect.set(response, 'futureServerField', 'ignored')
-  await page.route(
-    `**/api/v1/teams/${scope.teamId}/seasons/${scope.seasonId}/workspace`,
-    (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(response),
-    }),
-  )
+  await routeWorkspace(page, scope, () => response)
 
   await expect(workspaceRequestFromBrowser(page, scope)).resolves.toEqual({
     ok: true,

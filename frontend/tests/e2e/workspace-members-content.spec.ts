@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import type {
   CreateMemberRequest,
 } from '../../src/features/workspace/types'
@@ -36,6 +36,35 @@ import {
   expectPendingCreationDialogLocked,
   openHandoffView,
 } from './support/workspaceApiHarness'
+import type { ApiHarness } from './support/workspaceApiHarness'
+
+// 다른 구성원이 먼저 저장한 최신 역할 내용
+const LATEST_ROLE = {
+  name: '다른 구성원이 갱신한 역할',
+  purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
+  responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
+  risk: '최신 기준이 구성원에게 아직 전파되지 않았습니다.',
+}
+
+async function expectLatestRoleForm(dialog: Locator) {
+  await expect(dialog.getByLabel('역할 이름')).toHaveValue(LATEST_ROLE.name)
+  await expect(dialog.getByLabel('역할 목적')).toHaveValue(LATEST_ROLE.purpose)
+  await expect(dialog.getByLabel('담당 업무')).toHaveValue(LATEST_ROLE.responsibilities.join('\n'))
+  await expect(dialog.getByLabel('주의사항')).toHaveValue(LATEST_ROLE.risk)
+}
+
+// 역할 수정 충돌로 저장하지 못한 입력 초안을 만든다.
+async function createRoleConflictDraft(page: Page, api: ApiHarness, projectName: string, roleName: string) {
+  await navigation(page, projectName).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 수정' })
+  await dialog.getByLabel('역할 이름').fill(roleName)
+  api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
+  await expect(draft).toHaveValue(new RegExp(roleName))
+  return draft
+}
 
 test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 안전하게 처리한다', async ({ page }, testInfo) => {
   const api = await installApi(page)
@@ -43,11 +72,7 @@ test('@smoke 기존 팀에 구성원을 추가하고 중복과 응답 유실을 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
 
   const memberPath = `${SCOPE_PATH}/members`
-  const openMemberDialog = async () => {
-    return openMemberCreationDialog(page)
-  }
-
-  const dialog = await openMemberDialog()
+  const dialog = await openMemberCreationDialog(page)
   const nameInput = dialog.getByLabel('구성원 이름')
   await expect(nameInput).toBeFocused()
   await nameInput.fill(' 박민서 ')
@@ -371,13 +396,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
   await roleDialog.getByLabel('역할 이름').fill('내 화면의 낡은 역할 수정')
 
-  api.conflictNextRoleUpdate({
-    ...api.projection().roles[0]!,
-    name: '다른 구성원이 갱신한 역할',
-    purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
-    responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
-    risk: '최신 기준이 구성원에게 아직 전파되지 않았습니다.',
-  })
+  api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, ...LATEST_ROLE })
   await roleDialog.getByRole('button', { name: '변경 저장' }).click()
 
   await expect(roleDialog).toBeHidden()
@@ -401,13 +420,7 @@ test('@operations @webkit 역할과 반복 업무 수정 충돌은 입력만 보
   })).toContain('내 화면의 낡은 역할 수정')
   await page.getByRole('button', { name: '다른 구성원이 갱신한 역할 역할 수정' }).click()
   const reopenedRoleDialog = page.getByRole('dialog', { name: '역할 수정' })
-  await expect(reopenedRoleDialog.getByLabel('역할 이름')).toHaveValue('다른 구성원이 갱신한 역할')
-  await expect(reopenedRoleDialog.getByLabel('역할 목적'))
-    .toHaveValue('서버에서 먼저 갱신한 최신 역할 목적입니다.')
-  await expect(reopenedRoleDialog.getByLabel('담당 업무'))
-    .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
-  await expect(reopenedRoleDialog.getByLabel('주의사항'))
-    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았습니다.')
+  await expectLatestRoleForm(reopenedRoleDialog)
   await reopenedRoleDialog.getByRole('button', { name: '닫기' }).click()
 
   await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
@@ -457,14 +470,7 @@ test('@operations @webkit 충돌 초안은 세션 조회 실패와 같은 계정
       csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'draft-test-csrf',
     } }))
   await openSharedWorkspace(page)
-  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
-  const dialog = page.getByRole('dialog', { name: '역할 수정' })
-  await dialog.getByLabel('역할 이름').fill('일시적인 오류에도 보존할 입력')
-  api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
-  await dialog.getByRole('button', { name: '변경 저장' }).click()
-  const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
-  await expect(draft).toHaveValue(/일시적인 오류에도 보존할 입력/)
+  const draft = await createRoleConflictDraft(page, api, testInfo.project.name, '일시적인 오류에도 보존할 입력')
 
   sessionFails = true
   await navigation(page, testInfo.project.name).getByRole('button', { name: '할 일' }).click()
@@ -491,14 +497,7 @@ for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
       } })
     })
     await openSharedWorkspace(page)
-    await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
-    await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
-    const dialog = page.getByRole('dialog', { name: '역할 수정' })
-    await dialog.getByLabel('역할 이름').fill('이 계정에서 작성한 초안')
-    api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, name: '최신 역할' })
-    await dialog.getByRole('button', { name: '변경 저장' }).click()
-    const draft = page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)')
-    await expect(draft).toHaveValue(/이 계정에서 작성한 초안/)
+    const draft = await createRoleConflictDraft(page, api, testInfo.project.name, '이 계정에서 작성한 초안')
     if (transition === '계정 변경') {
       accountId = '8e448211-66ae-44ab-9888-c4960648c22c'
       const readsBeforeChange = sessionReads
@@ -533,13 +532,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   const roleDialog = page.getByRole('dialog', { name: '역할 수정' })
   await roleDialog.getByLabel('역할 이름').fill('내 화면의 낡은 역할 수정')
 
-  api.conflictNextRoleUpdate({
-    ...api.projection().roles[0]!,
-    name: '다른 구성원이 갱신한 역할',
-    purpose: '서버에서 먼저 갱신한 최신 역할 목적입니다.',
-    responsibilities: ['최신 문제 기준 관리', '변경 내용 공유'],
-    risk: '최신 기준이 구성원에게 아직 전파되지 않았습니다.',
-  })
+  api.conflictNextRoleUpdate({ ...api.projection().roles[0]!, ...LATEST_ROLE })
   api.makeWorkspaceGetsUnavailable()
   const getsBeforeConflict = workspaceGetCount()
 
@@ -572,13 +565,7 @@ test('@operations 역할 수정 충돌 뒤 최신 조회가 실패하면 재편�
   await latestEditButton.click()
 
   const reopenedRoleDialog = page.getByRole('dialog', { name: '역할 수정' })
-  await expect(reopenedRoleDialog.getByLabel('역할 이름')).toHaveValue('다른 구성원이 갱신한 역할')
-  await expect(reopenedRoleDialog.getByLabel('역할 목적'))
-    .toHaveValue('서버에서 먼저 갱신한 최신 역할 목적입니다.')
-  await expect(reopenedRoleDialog.getByLabel('담당 업무'))
-    .toHaveValue('최신 문제 기준 관리\n변경 내용 공유')
-  await expect(reopenedRoleDialog.getByLabel('주의사항'))
-    .toHaveValue('최신 기준이 구성원에게 아직 전파되지 않았습니다.')
+  await expectLatestRoleForm(reopenedRoleDialog)
   await expect.poll(rolePutCount).toBe(1)
 })
 

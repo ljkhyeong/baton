@@ -26,6 +26,7 @@ import {
   WORKSPACE_PATH,
   SCOPE_PATH,
   PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  RECENT_WORKSPACE,
   makeProjection,
   installApi,
   openSharedWorkspace,
@@ -59,7 +60,6 @@ async function reissueSharedLink(keyDialog: Locator) {
 test('공유 링크의 URL 접근 키를 지울 때 React Router 이력을 보존한다', async ({ page }) => {
   const api = await installApi(page)
   api.holdWorkspaceGets()
-  let workspaceGetsReleased = false
 
   try {
     await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
@@ -74,7 +74,6 @@ test('공유 링크의 URL 접근 키를 지울 때 React Router 이력을 보�
     })
 
     api.releaseWorkspaceGets()
-    workspaceGetsReleased = true
     await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
     await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
     expect(await page.evaluate(() => window.history.state)).toEqual(expectedHistoryState)
@@ -86,7 +85,7 @@ test('공유 링크의 URL 접근 키를 지울 때 React Router 이력을 보�
     await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
     expect(await page.evaluate(() => window.history.state)).toEqual(expectedHistoryState)
   } finally {
-    if (!workspaceGetsReleased) api.releaseWorkspaceGets()
+    api.releaseWorkspaceGets()
   }
 })
 
@@ -352,13 +351,7 @@ test('@smoke 폐기된 접근 키 링크는 같은 앱 세션의 캐시를 재�
   }, {
     storageKey: `baton-access-key:${TEAM_ID}`,
     accessKey: ACCESS_KEY,
-    recentWorkspace: {
-      teamId: TEAM_ID,
-      seasonId: SEASON_ID,
-      teamName: '알고리즘 한 바퀴',
-      seasonName: '2026 여름 시즌',
-      lastOpenedAt: '2026-07-24T00:00:00.000Z',
-    },
+    recentWorkspace: RECENT_WORKSPACE,
   })
   await installApi(page)
   await page.goto('/')
