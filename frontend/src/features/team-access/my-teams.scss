@@ -17,7 +17,7 @@
 .account-topbar .brand { padding: 0; color: var(--ink); text-decoration: none; }
 .account-topbar nav { display: flex; gap: 4px; }
 .account-topbar nav a { display: inline-flex; min-height: 36px; align-items: center; padding: 0 10px; border-radius: var(--radius); color: var(--muted); font-size: 13px; font-weight: 600; text-decoration: none; }
-.account-topbar nav a:hover { color: var(--ink); background: var(--rule); }
+.account-topbar nav a:hover,
 .account-topbar nav a[aria-current="page"] { color: var(--ink); background: var(--rule); }
 
 .my-teams-content { width: min(100%, 960px); margin: 0 auto; padding: 40px 32px 72px; }
