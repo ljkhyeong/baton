@@ -109,33 +109,37 @@ require_command() {
   fi
 }
 
+# 실패 보고서로 복사하는 응답 자료다. 실행 전 보고서 정리도 같은 목록을 사용한다.
+RESPONSE_ARTIFACTS=(
+  http.headers
+  root.headers root.body asset.headers asset.body
+  spa.headers spa.body
+  round-room-disabled.headers round-room-disabled.body
+  round-ui-disabled.headers round-ui-disabled.body
+  round-signal-disabled.headers round-signal-disabled.body
+  round-turn-disabled.headers round-turn-disabled.body
+  round-internal-disabled.headers round-internal-disabled.body
+  round-room-enabled.headers round-room-enabled.body
+  round-signal-enabled.headers round-signal-enabled.body
+  round-turn-enabled.headers round-turn-enabled.body
+  round-signal-cookie-duplicate.headers round-signal-cookie-duplicate.body
+  round-signal-cookie-lowercase.headers round-signal-cookie-lowercase.body
+  round-signal-cookie-variant.headers round-signal-cookie-variant.body
+  round-turn-cookie-duplicate.headers round-turn-cookie-duplicate.body
+  round-turn-cookie-lowercase.headers round-turn-cookie-lowercase.body
+  round-turn-cookie-variant.headers round-turn-cookie-variant.body
+  round-rate-limit.headers round-rate-limit.body
+  health.headers health.body
+  integration-metrics.txt
+  status.headers status.body
+  edge-413.headers edge-413.body
+  edge-502.headers edge-502.body
+)
+
 copy_response_artifacts() {
   local artifact
 
-  for artifact in \
-    http.headers \
-    root.headers root.body asset.headers asset.body \
-    spa.headers spa.body \
-    round-room-disabled.headers round-room-disabled.body \
-    round-ui-disabled.headers round-ui-disabled.body \
-    round-signal-disabled.headers round-signal-disabled.body \
-    round-turn-disabled.headers round-turn-disabled.body \
-    round-internal-disabled.headers round-internal-disabled.body \
-    round-room-enabled.headers round-room-enabled.body \
-    round-signal-enabled.headers round-signal-enabled.body \
-    round-turn-enabled.headers round-turn-enabled.body \
-    round-signal-cookie-duplicate.headers round-signal-cookie-duplicate.body \
-    round-signal-cookie-lowercase.headers round-signal-cookie-lowercase.body \
-    round-signal-cookie-variant.headers round-signal-cookie-variant.body \
-    round-turn-cookie-duplicate.headers round-turn-cookie-duplicate.body \
-    round-turn-cookie-lowercase.headers round-turn-cookie-lowercase.body \
-    round-turn-cookie-variant.headers round-turn-cookie-variant.body \
-    round-rate-limit.headers round-rate-limit.body \
-    health.headers health.body \
-    integration-metrics.txt \
-    status.headers status.body \
-    edge-413.headers edge-413.body \
-    edge-502.headers edge-502.body; do
+  for artifact in "${RESPONSE_ARTIFACTS[@]}"; do
     if [[ -f "$RUN_DIR/$artifact" ]]; then
       cp "$RUN_DIR/$artifact" "$REPORT_DIR/$artifact" || true
     fi
@@ -731,31 +735,15 @@ printf '%s\n' "$RECOVERY_REHEARSAL_TOKEN" >"$RECOVERY_TOKEN_FILE"
 chmod 600 "$RECOVERY_TOKEN_FILE"
 
 mkdir -p "$REPORT_DIR"
-rm -f \
-  "$REPORT_DIR/compose-ps.txt" \
-  "$REPORT_DIR/compose.log" \
-  "$REPORT_DIR/mysql-inspect.json" \
-  "$REPORT_DIR/app-inspect.json" \
-  "$REPORT_DIR/web-inspect.json" \
-  "$REPORT_DIR/mysql-inspect.txt" \
-  "$REPORT_DIR/app-inspect.txt" \
-  "$REPORT_DIR/web-inspect.txt" \
-  "$REPORT_DIR/http.headers" \
-  "$REPORT_DIR/root.headers" "$REPORT_DIR/root.body" \
-  "$REPORT_DIR/spa.headers" "$REPORT_DIR/spa.body" \
-  "$REPORT_DIR/round-room-disabled.headers" "$REPORT_DIR/round-room-disabled.body" \
-  "$REPORT_DIR/round-ui-disabled.headers" "$REPORT_DIR/round-ui-disabled.body" \
-  "$REPORT_DIR/round-signal-disabled.headers" "$REPORT_DIR/round-signal-disabled.body" \
-  "$REPORT_DIR/round-turn-disabled.headers" "$REPORT_DIR/round-turn-disabled.body" \
-  "$REPORT_DIR/round-internal-disabled.headers" "$REPORT_DIR/round-internal-disabled.body" \
-  "$REPORT_DIR/round-room-enabled.headers" "$REPORT_DIR/round-room-enabled.body" \
-  "$REPORT_DIR/round-signal-enabled.headers" "$REPORT_DIR/round-signal-enabled.body" \
-  "$REPORT_DIR/round-turn-enabled.headers" "$REPORT_DIR/round-turn-enabled.body" \
-  "$REPORT_DIR/round-rate-limit.headers" "$REPORT_DIR/round-rate-limit.body" \
-  "$REPORT_DIR/health.headers" "$REPORT_DIR/health.body" \
-  "$REPORT_DIR/status.headers" "$REPORT_DIR/status.body" \
-  "$REPORT_DIR/edge-413.headers" "$REPORT_DIR/edge-413.body" \
-  "$REPORT_DIR/edge-502.headers" "$REPORT_DIR/edge-502.body"
+for report_file in \
+  compose-ps.txt \
+  compose.log \
+  mysql-inspect.txt \
+  app-inspect.txt \
+  web-inspect.txt \
+  "${RESPONSE_ARTIFACTS[@]}"; do
+  rm -f -- "$REPORT_DIR/$report_file"
+done
 
 log "고유 Compose project를 검증합니다: $COMPOSE_PROJECT"
 COMPOSE_SCOPE_INITIALIZED=true
