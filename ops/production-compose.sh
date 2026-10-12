@@ -184,13 +184,15 @@ fail() {
 read_secret_or_placeholder() {
   local target="$1"
   local placeholder="$2"
+  local value
 
   if [[ -z "$target" ]]; then
     printf '%s' "$placeholder"
     return 0
   fi
   target="$(production_validation_canonical_file fail "$target")" || exit 1
-  printf '%s' "$(< "$target")"
+  value="$(< "$target")" || fail "could not read secret file: $target"
+  printf '%s' "$value"
 }
 
 brevo_webhook_secret_file="$(production_validation_env_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE)"
@@ -322,6 +324,19 @@ elif [[ "$compose_command" == "down" ]]; then
   compose_arguments=("$compose_command" --remove-orphans "${@:2}")
 fi
 
+# 비밀값은 env 인자로 넘기면 잠시 프로세스 목록에 보이므로 명령 환경으로만 전달한다.
+BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
+BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
+BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
+BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
+BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
+BATON_SECRET_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
+BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
+BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
+BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
+BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
+BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY="$round_public_key" \
+BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \
 env \
   -u BATON_HOST \
   -u BATON_DB_NAME \
@@ -417,18 +432,6 @@ env \
   -u COMPOSE_REMOVE_ORPHANS \
   -u COMPOSE_CONVERT_WINDOWS_PATHS \
   COMPOSE_MENU=false \
-  BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
-  BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
-  BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
-  BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
-  BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
-  BATON_SECRET_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
-  BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
-  BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
-  BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
-  BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
-  BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY="$round_public_key" \
-  BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \
   BATON_EFFECTIVE_ROUND_UID="$round_runtime_uid" \
   BATON_EFFECTIVE_ROUND_GID="$round_runtime_gid" \
   BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE="$spring_profiles_active" \

@@ -485,7 +485,18 @@ fi
 exit "${FAKE_FLOCK_EXIT:-0}"
 SCRIPT
 
-chmod +x "$fake_bin/docker" "$fake_bin/curl" "$fake_bin/flock"
+cat > "$fake_bin/env" <<'SCRIPT'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# 비밀값이 env 인자로 프로세스 목록에 남는지 확인할 수 있게 인자를 기록하고 실제 env로 넘긴다.
+if [[ -n "${FAKE_ENV_ARGUMENT_LOG:-}" ]]; then
+  printf '%s\n' "$*" >> "$FAKE_ENV_ARGUMENT_LOG"
+fi
+exec /usr/bin/env "$@"
+SCRIPT
+
+chmod +x "$fake_bin/docker" "$fake_bin/curl" "$fake_bin/flock" "$fake_bin/env"
 
 db_password="1111111111111111111111111111111111111111111111111111111111111111"
 root_password="2222222222222222222222222222222222222222222222222222222222222222"
@@ -917,6 +928,7 @@ chmod 600 "$holidays_service_key_file"
 printf '%s\n' "BATON_HOLIDAYS_SERVICE_KEY_FILE=$holidays_service_key_file" >> "$holidays_enabled_env"
 holidays_preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/holidays-docker.log" \
+  FAKE_ENV_ARGUMENT_LOG="$test_root/holidays-env.log" \
   FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
   BATON_SECRET_HOLIDAYS_SERVICE_KEY=ambient-invalid-key \
   "$preflight_script" "$holidays_enabled_env" 2>&1)" \
@@ -925,6 +937,9 @@ assert_contains 'Production preflight passed' "$holidays_preflight_output" \
   'enabled holidays production preflight'
 assert_not_contains "$holidays_service_key" "$holidays_preflight_output" 'holidays key output'
 assert_not_contains "$holidays_service_key" "$(cat "$test_root/holidays-docker.log")" 'holidays Docker arguments'
+assert_contains '--project-name baton-production' "$(cat "$test_root/holidays-env.log")" \
+  'holidays env arguments recorded'
+assert_not_contains "$holidays_service_key" "$(cat "$test_root/holidays-env.log")" 'holidays env arguments'
 
 cal_enabled_env="$test_root/cal-enabled.env"
 write_valid_env "$cal_enabled_env"
