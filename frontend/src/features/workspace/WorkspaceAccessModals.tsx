@@ -1,3 +1,4 @@
+import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import {
   FormError,
@@ -5,6 +6,14 @@ import {
   useSubmissionLock,
 } from './WorkspaceModalPrimitives'
 import type { SaveResult } from './WorkspaceModalPrimitives'
+import { mutationError } from './workspacePresentation'
+
+function accessKeyRotationError(error: unknown) {
+  if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
+    return '공유 링크가 다시 변경되어 이전 링크를 받을 수 없습니다. 최신 공유 링크를 확인한 뒤 다시 시도하세요.'
+  }
+  return mutationError(error)
+}
 
 export function ShareLinkFallback({
   shareUrl,
@@ -80,7 +89,7 @@ export function AccessKeyModal({
           </p>
         </div>
         {storageError && <p className="form-error" role="alert">{storageError}</p>}
-        <FormError error={error} />
+        <FormError error={error} formatError={accessKeyRotationError} />
         <div className="form-actions">
           <button type="button" className="secondary-button" onClick={shareCurrentLink} disabled={submission.pending}>
             현재 링크 복사

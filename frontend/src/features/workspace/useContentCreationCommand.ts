@@ -76,7 +76,7 @@ const contentCreationJournalPolicy = {
   confirmBeforeNewRequestCodes: new Set(['IDEMPOTENCY_REPLAY_EXPIRED']),
 }
 
-export const pendingStorageRequiredMessage = '입력을 저장하지 못해 새 항목을 추가하지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const pendingStorageRequiredMessage = '입력을 저장하지 못해 새 항목을 추가하지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 // 탭 사이 잠금을 얻지 못한 이유별 안내
 const contentCreationLockMessages = {
   busy: '다른 탭에서 새 항목을 추가하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도하세요.',

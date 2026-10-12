@@ -417,7 +417,7 @@ test('공유 링크 변경 기록을 안전하게 저장할 수 없으면 새로
 
   const tryRotation = async () => {
     await reissueSharedLink(await openKeyManagement(page, testInfo.project.name))
-    await expect(page.getByRole('alert')).toContainText('일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.')
+    await expect(page.getByRole('alert')).toContainText('임시 기록을 저장하지 못해 공유 링크를 재발급하지 않았습니다.')
   }
 
   await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)

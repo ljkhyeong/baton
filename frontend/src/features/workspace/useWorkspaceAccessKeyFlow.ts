@@ -12,7 +12,6 @@ import {
   runWithAccessKeyRotationLock,
 } from './pendingAccessKeyChange'
 import { useRotateAccessKeyMutation } from './queries'
-import { pendingStorageRequiredMessage } from './useContentCreationCommand'
 
 type ToastTone = 'success' | 'error'
 
@@ -25,6 +24,7 @@ type WorkspaceAccessKeyFlowOptions = {
   notify: (message: string, tone?: ToastTone) => void
 }
 
+const rotationStorageRequiredMessage = '임시 기록을 저장하지 못해 공유 링크를 재발급하지 않았습니다. 일반 창을 사용하거나 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const rotationCleanupErrorMessage = '새 공유 링크를 발급했지만 임시 기록을 삭제하지 못했습니다. 새 링크를 보관하고 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const rotationJournalCleanupErrorMessage = '이전 공유 링크의 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const staleRotationReplayMessage = '임시 기록을 지웠습니다. 새 링크는 아직 발급하지 않았습니다. ‘공유 링크 재발급’을 다시 누르세요.'
@@ -236,7 +236,7 @@ export function useWorkspaceAccessKeyFlow({
         const idempotencyKey = idempotencyKeyForAccessKeyRotation(teamId)
         if (!idempotencyKey) {
           rotateAccessKeyMutation.reset()
-          setRotationStorageError(pendingStorageRequiredMessage)
+          setRotationStorageError(rotationStorageRequiredMessage)
           return false
         }
 
