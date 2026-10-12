@@ -3,6 +3,7 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
+import com.personal.baton.application.workspace.port.out.ResourceVerificationRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.Member;
@@ -13,6 +14,8 @@ import com.personal.baton.application.workspace.port.out.NotificationPreferences
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,11 +34,14 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
     private final NotificationReadReceiptPort receipts;
     private final Clock clock;
     private final NotificationPreferencesRepository preferences;
+    private final ResourceVerificationRepository verifications;
 
     public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, TeamAccountAccessPolicy accountAccess,
             WorkspaceOperationsRepository operations, WorkspacePeopleRepository people,
-            NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences) {
+            NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences,
+            ResourceVerificationRepository verifications) {
         this.preferences = preferences;
+        this.verifications = verifications;
         this.authorizer = authorizer;
         this.accountAccess = accountAccess;
         this.operations = operations;
@@ -68,6 +74,16 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
             for (var handoff : people.findTransferredHandoffs(teamId, seasonId, member.getId())) {
                 pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.HANDOFF_REQUEST,
                         handoff.getId(), handoff.getRoleId(), null, handoff.getRoleName(), handoff.getTransferredAt()));
+            }
+        }
+        if (settings.isResourceReviewEnabled()) {
+            ZoneId zone = scope.season().getZoneId();
+            for (var review : verifications.findDueReviews(teamId, seasonId, LocalDate.ofInstant(now, zone))) {
+                if (!member.getId().equals(review.getMemberId())) continue;
+                // 확인일은 시즌 시간대의 그날 시작 시각으로 정렬하고 확인일이 바뀌면 새 알림으로 식별한다.
+                pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.RESOURCE_REVIEW_DUE,
+                        review.getResourceId(), review.getRoleId(), null, review.getTitle(),
+                        review.getNextReviewOn().atStartOfDay(zone).toInstant()));
             }
         }
         Set<UUID> read = receipts.findRead(accountId, pending.stream().map(NotificationResult::id).toList());

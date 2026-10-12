@@ -67,3 +67,33 @@ test('@memory @responsive 자료 재확인 주기를 저장하고 사용 가능 
   await panel.getByRole('button', { name: '재확인 주기 저장', exact: true }).click()
   await expect(panel.getByText('정기 확인이 꺼져 있습니다.')).toBeVisible()
 })
+
+test('@memory @responsive 내 알림의 자료 재확인은 확인일을 날짜로 보여 주고 해당 자료의 확인 기록을 연다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내', url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
+  await installApi(page, projection)
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  await page.route('**/api/v1/teams/*/seasons/*/notifications', route => route.fulfill({ json: {
+    accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
+    notifications: [{ id: 'f1d4a7b2-3c5e-4d6f-8a9b-0c1d2e3f4a5b', kind: 'RESOURCE_REVIEW_DUE', sourceId: CREATED_ROLE_RESOURCE_ID,
+      roleId: ROLE_ID, roundId: null, title: '운영 안내', occurredAt: '2026-09-04T15:00:00Z', read: false }],
+  } }))
+  await page.route('**/role-resources/*/verifications/schedule', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, version: 0, intervalDays: 30,
+    nextReviewOn: '2026-09-05', today: '2026-09-05', reviewDue: true,
+  } }))
+  await page.route('**/role-resources/*/verifications', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, resourceVersion: 0, verifications: [],
+  } }))
+  await openSharedWorkspace(page)
+  await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
+  const inbox = page.locator('.notification-inbox')
+  await inbox.locator('summary').click()
+  const source = inbox.locator('.notification-source')
+  await expect(source).toContainText('자료 재확인 · 안 읽음')
+  await expect(source).toContainText('2026. 9. 5. 확인 기한')
+  await source.click()
+  const verification = page.locator('.resource-verification:visible').first()
+  await expect(verification).toHaveAttribute('open', '')
+  await expect(verification.locator('summary')).toBeFocused()
+})

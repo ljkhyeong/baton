@@ -83,7 +83,7 @@ class ResourceVerificationSecurityTest {
         mvc.perform(post(NotificationPreferencesController.PATH).with(authentication(auth)).with(csrf())
                         .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin").contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"expectedAccountId":"%s","expectedVersion":-1,"deadlineSoonEnabled":true,"overdueEnabled":true,"handoffEnabled":true,"deadlineLeadHours":24}
+                                {"expectedAccountId":"%s","expectedVersion":-1,"deadlineSoonEnabled":true,"overdueEnabled":true,"handoffEnabled":true,"resourceReviewEnabled":true,"deadlineLeadHours":24}
                                 """.formatted(UUID.randomUUID())))
                 .andExpect(status().isConflict());
         verifyNoInteractions(notifications, preferences);

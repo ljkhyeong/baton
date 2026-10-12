@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { configureNotificationPreferences, notificationPreferencesQueryOptions, type NotificationPreferences } from './api'
 
-type Draft = Pick<NotificationPreferences, 'deadlineSoonEnabled' | 'overdueEnabled' | 'handoffEnabled' | 'deadlineLeadHours'>
+type Draft = Pick<NotificationPreferences, 'deadlineSoonEnabled' | 'overdueEnabled' | 'handoffEnabled' | 'resourceReviewEnabled' | 'deadlineLeadHours'>
 export function NotificationPreferencesPanel({ accountId }: { accountId: string }) {
   const client = useQueryClient()
   const preferences = notificationPreferencesQueryOptions(accountId)
@@ -11,7 +11,7 @@ export function NotificationPreferencesPanel({ accountId }: { accountId: string 
   const values = draft ?? query.data
   const save = useMutation({ mutationFn: () => configureNotificationPreferences(accountId, {
     deadlineSoonEnabled: values!.deadlineSoonEnabled, overdueEnabled: values!.overdueEnabled,
-    handoffEnabled: values!.handoffEnabled, deadlineLeadHours: values!.deadlineLeadHours,
+    handoffEnabled: values!.handoffEnabled, resourceReviewEnabled: values!.resourceReviewEnabled, deadlineLeadHours: values!.deadlineLeadHours,
     expectedAccountId: accountId, expectedVersion: query.data!.version,
   }), onSuccess: async result => {
     client.setQueryData(preferences.queryKey, result); setDraft(null)
@@ -29,6 +29,7 @@ export function NotificationPreferencesPanel({ accountId }: { accountId: string 
           onChange={event => setDraft({ ...values, deadlineLeadHours: Number(event.target.value) })} /></label>
         <label><input type="checkbox" checked={values.overdueEnabled} onChange={event => setDraft({ ...values, overdueEnabled: event.target.checked })} />기한 지남</label>
         <label><input type="checkbox" checked={values.handoffEnabled} onChange={event => setDraft({ ...values, handoffEnabled: event.target.checked })} />인수인계 수락 요청</label>
+        <label><input type="checkbox" checked={values.resourceReviewEnabled} onChange={event => setDraft({ ...values, resourceReviewEnabled: event.target.checked })} />자료 재확인</label>
         <button className="primary-button" type="submit">{save.isPending ? '알림 설정 저장 중…' : '알림 설정 저장'}</button>
       </fieldset>
     </form>}

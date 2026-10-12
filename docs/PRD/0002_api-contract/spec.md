@@ -1340,9 +1340,9 @@ cd frontend && npm ci && cd ..
 
 ## 내 알림함
 
-`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 계정의 사전 알림 시간(기본 24시간) 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 인수인계는 `HANDOFF_REQUEST`다. 종료 시즌은 빈 목록이다.
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 계정의 사전 알림 시간(기본 24시간) 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 인수인계는 `HANDOFF_REQUEST`다. 현재 담당 역할의 보관하지 않은 자료 중 정기 재확인의 확인일이 시즌 현지 오늘 이하인 자료는 `RESOURCE_REVIEW_DUE`다. 종료 시즌은 빈 목록이다.
 
-항목의 `id`는 계정·팀·시즌·종류·원본·마감 또는 전달 시각에서 결정한다. `sourceId`는 실행 또는 역할 인수인계 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차다. `title`, `occurredAt`(마감 또는 전달 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
+항목의 `id`는 계정·팀·시즌·종류·원본과 마감·전달 시각 또는 확인일에서 결정하므로 확인일이 바뀌면 새 알림이다. `sourceId`는 실행, 역할 인수인계 또는 역할 자료 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차이며 인수인계·자료 재확인은 null이다. `title`(업무·역할·자료 이름), `occurredAt`(마감·전달 시각 또는 시즌 시간대 확인일의 시작 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
 
 `POST /api/v1/teams/{teamId}/seasons/{seasonId}/notifications/{notificationId}/read`는 동일 출처·CSRF와 본문 `expectedAccountId` 일치를 추가 확인한다. 현재 계정의 현재 알림만 읽음으로 기록하고 전체 알림함을 `200 OK`로 반환한다. 반복 요청은 최초 읽음 시각을 보존한다. 원본이 해소되었거나 다른 계정의 알림이면 `404 NOTIFICATION_NOT_FOUND`, 미연결·활동 종료는 `403 WORKSPACE_ACCESS_DENIED`다. 읽음 표시는 업무를 완료하거나 인수인계를 수락하지 않는다.
 
@@ -1474,9 +1474,9 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 
 ## 개인 알림 설정
 
-`GET /api/v1/notification-preferences`는 로그인 계정의 `accountId`, `version`, `deadlineSoonEnabled`, `overdueEnabled`, `handoffEnabled`, `deadlineLeadHours`를 반환한다. 저장 전 기본값은 세 종류 모두 표시, 24시간, 버전 `-1`이다.
+`GET /api/v1/notification-preferences`는 로그인 계정의 `accountId`, `version`, `deadlineSoonEnabled`, `overdueEnabled`, `handoffEnabled`, `resourceReviewEnabled`, `deadlineLeadHours`를 반환한다. 저장 전 기본값은 네 종류 모두 표시, 24시간, 버전 `-1`이다.
 
-같은 경로의 `POST`는 `expectedAccountId`, `expectedVersion`(-1 이상), 세 가지 필수 Boolean과 `deadlineLeadHours`(1~168 정수)를 받는다. 동일 출처·CSRF와 계정 일치를 검증하고 저장한 설정을 반환한다. 성공은 `200 OK`, `Cache-Control: no-store`이며 다른 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 오래된 버전은 `409 WORKSPACE_CONTENT_CONFLICT`, 잘못된 입력은 `400 INVALID_INPUT`이다.
+같은 경로의 `POST`는 `expectedAccountId`, `expectedVersion`(-1 이상), 네 가지 필수 Boolean과 `deadlineLeadHours`(1~168 정수)를 받는다. 동일 출처·CSRF와 계정 일치를 검증하고 저장한 설정을 반환한다. 성공은 `200 OK`, `Cache-Control: no-store`이며 다른 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 오래된 버전은 `409 WORKSPACE_CONTENT_CONFLICT`, 잘못된 입력은 `400 INVALID_INPUT`이다.
 
 설정은 계정 전체에 적용한다. 알림함에서 꺼진 종류를 제외하며 사전 알림 시간의 경계부터 마감 임박을 포함한다. 읽음 기록과 알림 식별자는 설정 변경으로 삭제하거나 재발급하지 않는다. 외부 전송 설정은 포함하지 않는다.
 

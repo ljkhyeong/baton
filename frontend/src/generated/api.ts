@@ -1273,7 +1273,7 @@ export interface paths {
         };
         /**
          * 내 알림함 조회
-         * @description 현재 내 역할의 마감 임박·지연 업무와 수락할 인수인계를 반환한다.
+         * @description 현재 내 역할의 마감 임박·지연 업무, 수락할 인수인계와 확인일이 된 담당 자료를 반환한다.
          */
         get: operations["getWorkspaceNotifications"];
         put?: never;
@@ -2002,23 +2002,6 @@ export interface components {
                 timeZone: string;
             };
         };
-        Schema_0b69cfbed0f085a4: {
-            /**
-             * Format: uuid
-             * @description 현재 계정
-             */
-            accountId: string;
-            /** @description 마감 몇 시간 전부터 표시할지 */
-            deadlineLeadHours: number;
-            /** @description 마감 임박 알림 사용 */
-            deadlineSoonEnabled: boolean;
-            /** @description 인수인계 수락 요청 알림 사용 */
-            handoffEnabled: boolean;
-            /** @description 기한 지남 알림 사용 */
-            overdueEnabled: boolean;
-            /** @description 설정 버전. 미설정은 -1 */
-            version: number;
-        };
         Schema_0b95087e3a2421e5: {
             /**
              * Format: date-time
@@ -2229,6 +2212,25 @@ export interface components {
                  */
                 verifiedAt: string;
             }[];
+        };
+        Schema_3e1ed3b9bec41e22: {
+            /**
+             * Format: uuid
+             * @description 현재 계정
+             */
+            accountId: string;
+            /** @description 마감 몇 시간 전부터 표시할지 */
+            deadlineLeadHours: number;
+            /** @description 마감 임박 알림 사용 */
+            deadlineSoonEnabled: boolean;
+            /** @description 인수인계 수락 요청 알림 사용 */
+            handoffEnabled: boolean;
+            /** @description 기한 지남 알림 사용 */
+            overdueEnabled: boolean;
+            /** @description 담당 자료 재확인 알림 사용 */
+            resourceReviewEnabled: boolean;
+            /** @description 설정 버전. 미설정은 -1 */
+            version: number;
         };
         Schema_4abb9640ae4170a2: {
             /**
@@ -2748,6 +2750,25 @@ export interface components {
             providers: ("google" | "naver")[];
             /** @description 자동 요청 방지 위젯의 공개 사이트 키. 기능이 꺼지면 null */
             turnstileSiteKey: string | null;
+        };
+        Schema_099fe41d3824480c: {
+            /** @description 마감 1~168시간 전 */
+            deadlineLeadHours: number;
+            /** @description 마감 임박 알림 */
+            deadlineSoonEnabled: boolean;
+            /**
+             * Format: uuid
+             * @description 현재 로그인 계정
+             */
+            expectedAccountId: string;
+            /** @description 조회한 설정 버전. 미설정은 -1 */
+            expectedVersion: number;
+            /** @description 인수인계 수락 요청 알림 */
+            handoffEnabled: boolean;
+            /** @description 기한 지남 알림 */
+            overdueEnabled: boolean;
+            /** @description 담당 자료 재확인 알림 */
+            resourceReviewEnabled: boolean;
         };
         Schema_132ab51f4bca16af: {
             /**
@@ -3725,60 +3746,6 @@ export interface components {
              * @description 구독 UUID. 발급 전에는 null
              */
             subscriptionId: string | null;
-        };
-        Schema_a55bef4846f0ff82: {
-            /**
-             * Format: uuid
-             * @description 현재 계정 식별자
-             */
-            accountId: string;
-            /** @description 현재 내 알림 */
-            notifications: {
-                /**
-                 * Format: uuid
-                 * @description 알림 식별자
-                 */
-                id: string;
-                /**
-                 * @description 알림 종류
-                 * @enum {string}
-                 */
-                kind: "DEADLINE_SOON" | "OVERDUE" | "HANDOFF_REQUEST";
-                /**
-                 * Format: date-time
-                 * @description 마감 또는 인수인계 전달 시각
-                 */
-                occurredAt: string;
-                /** @description 현재 계정의 읽음 여부 */
-                read: boolean;
-                /**
-                 * Format: uuid
-                 * @description 관련 역할 식별자
-                 */
-                roleId: string;
-                /**
-                 * Format: uuid
-                 * @description 관련 회차 식별자, 인수인계는 null
-                 */
-                roundId: string | null;
-                /**
-                 * Format: uuid
-                 * @description 반복 업무 실행 또는 역할 인수인계 식별자
-                 */
-                sourceId: string;
-                /** @description 업무 또는 역할 이름 */
-                title: string;
-            }[];
-            /**
-             * Format: uuid
-             * @description 시즌 식별자
-             */
-            seasonId: string;
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
         };
         Schema_a74a5eb6e1727c5b: {
             /**
@@ -4838,22 +4805,59 @@ export interface components {
             /** Format: uuid */
             teamId: string;
         };
-        Schema_e654ecd4cfb8accd: {
-            /** @description 마감 1~168시간 전 */
-            deadlineLeadHours: number;
-            /** @description 마감 임박 알림 */
-            deadlineSoonEnabled: boolean;
+        Schema_e766d67f220861a9: {
             /**
              * Format: uuid
-             * @description 현재 로그인 계정
+             * @description 현재 계정 식별자
              */
-            expectedAccountId: string;
-            /** @description 조회한 설정 버전. 미설정은 -1 */
-            expectedVersion: number;
-            /** @description 인수인계 수락 요청 알림 */
-            handoffEnabled: boolean;
-            /** @description 기한 지남 알림 */
-            overdueEnabled: boolean;
+            accountId: string;
+            /** @description 현재 내 알림 */
+            notifications: {
+                /**
+                 * Format: uuid
+                 * @description 알림 식별자
+                 */
+                id: string;
+                /**
+                 * @description 알림 종류
+                 * @enum {string}
+                 */
+                kind: "DEADLINE_SOON" | "OVERDUE" | "HANDOFF_REQUEST" | "RESOURCE_REVIEW_DUE";
+                /**
+                 * Format: date-time
+                 * @description 마감, 인수인계 전달 시각 또는 시즌 시간대 자료 확인일의 시작 시각
+                 */
+                occurredAt: string;
+                /** @description 현재 계정의 읽음 여부 */
+                read: boolean;
+                /**
+                 * Format: uuid
+                 * @description 관련 역할 식별자
+                 */
+                roleId: string;
+                /**
+                 * Format: uuid
+                 * @description 관련 회차 식별자, 인수인계·자료 재확인은 null
+                 */
+                roundId: string | null;
+                /**
+                 * Format: uuid
+                 * @description 반복 업무 실행, 역할 인수인계 또는 역할 자료 식별자
+                 */
+                sourceId: string;
+                /** @description 업무·역할 또는 자료 이름 */
+                title: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description 시즌 식별자
+             */
+            seasonId: string;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
         };
         Schema_e7445cc2a46db86c: {
             /** @description 최초 로그인에 사용할 비밀번호 */
@@ -5939,7 +5943,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_0b69cfbed0f085a4"];
+                    "application/json": components["schemas"]["Schema_3e1ed3b9bec41e22"];
                 };
             };
         };
@@ -5969,7 +5973,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_e654ecd4cfb8accd"];
+                "application/json": components["schemas"]["Schema_099fe41d3824480c"];
             };
         };
         responses: {
@@ -5983,7 +5987,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_0b69cfbed0f085a4"];
+                    "application/json": components["schemas"]["Schema_3e1ed3b9bec41e22"];
                 };
             };
         };
@@ -8286,7 +8290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_a55bef4846f0ff82"];
+                    "application/json": components["schemas"]["Schema_e766d67f220861a9"];
                 };
             };
         };
@@ -8327,7 +8331,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_a55bef4846f0ff82"];
+                    "application/json": components["schemas"]["Schema_e766d67f220861a9"];
                 };
             };
         };

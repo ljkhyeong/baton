@@ -41,7 +41,7 @@ test('@smoke @responsive 여러 팀의 업무와 최근 기록을 모아 원본�
   })
   await page.route('**/api/v1/notification-preferences', route => route.fulfill({ json: {
     accountId: ACCOUNT, version: 0, deadlineSoonEnabled: true, overdueEnabled: true,
-    handoffEnabled: true, deadlineLeadHours: 24,
+    handoffEnabled: true, resourceReviewEnabled: true, deadlineLeadHours: 24,
   } }))
   await page.goto('/my-teams')
   const work = page.getByRole('region', { name: '모든 팀의 내 할 일' })

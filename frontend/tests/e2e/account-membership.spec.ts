@@ -550,7 +550,7 @@ test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 �
   await installApi(page, projection)
   await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
   let preferences = { accountId: ACCOUNT_ID, version: -1, deadlineSoonEnabled: true,
-    overdueEnabled: true, handoffEnabled: true, deadlineLeadHours: 24 }
+    overdueEnabled: true, handoffEnabled: true, resourceReviewEnabled: true, deadlineLeadHours: 24 }
   await page.route('**/api/v1/notification-preferences', route => {
     if (route.request().method() === 'POST') {
       const request = route.request().postDataJSON()
@@ -559,7 +559,8 @@ test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 �
       expect(route.request().headers()['x-csrf-token']).toBe(CSRF_TOKEN)
       preferences = { accountId: ACCOUNT_ID, version: preferences.version + 1,
         deadlineSoonEnabled: request.deadlineSoonEnabled, overdueEnabled: request.overdueEnabled,
-        handoffEnabled: request.handoffEnabled, deadlineLeadHours: request.deadlineLeadHours }
+        handoffEnabled: request.handoffEnabled, resourceReviewEnabled: request.resourceReviewEnabled,
+        deadlineLeadHours: request.deadlineLeadHours }
     }
     return route.fulfill({ json: preferences })
   })
@@ -573,6 +574,7 @@ test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 �
   await inbox.locator('summary').click()
   await inbox.getByRole('button', { name: '알림 설정', exact: true }).click()
   await inbox.getByLabel('기한 지남', { exact: true }).uncheck()
+  await inbox.getByLabel('자료 재확인', { exact: true }).uncheck()
   await inbox.getByLabel('마감 몇 시간 전부터 표시할까요?').fill('48')
   await inbox.getByRole('button', { name: '알림 설정 저장', exact: true }).click()
   await expect(inbox.getByText('알림 설정을 저장했습니다.')).toBeVisible()
@@ -582,6 +584,7 @@ test('@smoke @responsive 개인 알림 설정은 새로고침 후 유지되고 �
   await inbox.locator('summary').click()
   await inbox.getByRole('button', { name: '알림 설정', exact: true }).click()
   await expect(inbox.getByLabel('기한 지남', { exact: true })).not.toBeChecked()
+  await expect(inbox.getByLabel('자료 재확인', { exact: true })).not.toBeChecked()
   await expect(inbox.getByLabel('마감 몇 시간 전부터 표시할까요?')).toHaveValue('48')
   await inbox.getByLabel('기한 지남', { exact: true }).check()
   await inbox.getByRole('button', { name: '알림 설정 저장', exact: true }).click()

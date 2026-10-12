@@ -1484,9 +1484,9 @@ paths:
               examples:
                 getNotificationPreferences:
                   value: >-
-                    {"accountId":"00000000-0000-4000-8000-000000000004","version":-1,"deadlineSoonEnabled":true,"overdueEnabled":true,"handoffEnabled":true,"deadlineLeadHours":24}
+                    {"accountId":"00000000-0000-4000-8000-000000000004","version":-1,"deadlineSoonEnabled":true,"overdueEnabled":true,"handoffEnabled":true,"resourceReviewEnabled":true,"deadlineLeadHours":24}
               schema:
-                $ref: '#/components/schemas/Schema_0b69cfbed0f085a4'
+                $ref: '#/components/schemas/Schema_3e1ed3b9bec41e22'
           headers:
             Cache-Control:
               description: 개인 설정 캐시 금지
@@ -1530,9 +1530,9 @@ paths:
             examples:
               configureNotificationPreferences:
                 value: >
-                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","expectedVersion":-1,"deadlineSoonEnabled":true,"overdueEnabled":false,"handoffEnabled":true,"deadlineLeadHours":48}
+                  {"expectedAccountId":"00000000-0000-4000-8000-000000000004","expectedVersion":-1,"deadlineSoonEnabled":true,"overdueEnabled":false,"handoffEnabled":true,"resourceReviewEnabled":false,"deadlineLeadHours":48}
             schema:
-              $ref: '#/components/schemas/Schema_e654ecd4cfb8accd'
+              $ref: '#/components/schemas/Schema_099fe41d3824480c'
         required: true
       responses:
         '200':
@@ -1542,9 +1542,9 @@ paths:
               examples:
                 configureNotificationPreferences:
                   value: >-
-                    {"accountId":"00000000-0000-4000-8000-000000000004","version":0,"deadlineSoonEnabled":true,"overdueEnabled":false,"handoffEnabled":true,"deadlineLeadHours":48}
+                    {"accountId":"00000000-0000-4000-8000-000000000004","version":0,"deadlineSoonEnabled":true,"overdueEnabled":false,"handoffEnabled":true,"resourceReviewEnabled":false,"deadlineLeadHours":48}
               schema:
-                $ref: '#/components/schemas/Schema_0b69cfbed0f085a4'
+                $ref: '#/components/schemas/Schema_3e1ed3b9bec41e22'
           headers:
             Cache-Control:
               description: 개인 설정 캐시 금지
@@ -5719,7 +5719,7 @@ paths:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/notifications:
     get:
-      description: 현재 내 역할의 마감 임박·지연 업무와 수락할 인수인계를 반환한다.
+      description: 현재 내 역할의 마감 임박·지연 업무, 수락할 인수인계와 확인일이 된 담당 자료를 반환한다.
       operationId: getWorkspaceNotifications
       parameters:
         - description: 팀 식별자
@@ -5752,9 +5752,11 @@ paths:
                 getWorkspaceNotifications:
                   value: >-
                     {"accountId":"00000000-0000-4000-8000-000000000004","teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","notifications":[{"id":"00000000-0000-4000-8000-000000000003","kind":"OVERDUE","sourceId":"00000000-0000-4000-8000-000000000003","roleId":"00000000-0000-4000-8000-000000000003","roundId":"00000000-0000-4000-8000-000000000002","title":"운영
-                    자료 준비","occurredAt":"2026-09-05T03:00:00Z","read":false}]}
+                    자료
+                    준비","occurredAt":"2026-09-05T03:00:00Z","read":false},{"id":"00000000-0000-4000-8000-000000000005","kind":"RESOURCE_REVIEW_DUE","sourceId":"00000000-0000-4000-8000-000000000006","roleId":"00000000-0000-4000-8000-000000000003","roundId":null,"title":"운영
+                    안내","occurredAt":"2026-09-05T15:00:00Z","read":false}]}
               schema:
-                $ref: '#/components/schemas/Schema_a55bef4846f0ff82'
+                $ref: '#/components/schemas/Schema_e766d67f220861a9'
           headers:
             Cache-Control:
               description: 개인 데이터 캐시 금지
@@ -5818,9 +5820,11 @@ paths:
                 readWorkspaceNotification:
                   value: >-
                     {"accountId":"00000000-0000-4000-8000-000000000004","teamId":"00000000-0000-4000-8000-000000000001","seasonId":"00000000-0000-4000-8000-000000000002","notifications":[{"id":"00000000-0000-4000-8000-000000000003","kind":"OVERDUE","sourceId":"00000000-0000-4000-8000-000000000003","roleId":"00000000-0000-4000-8000-000000000003","roundId":"00000000-0000-4000-8000-000000000002","title":"운영
-                    자료 준비","occurredAt":"2026-09-05T03:00:00Z","read":true}]}
+                    자료
+                    준비","occurredAt":"2026-09-05T03:00:00Z","read":true},{"id":"00000000-0000-4000-8000-000000000005","kind":"RESOURCE_REVIEW_DUE","sourceId":"00000000-0000-4000-8000-000000000006","roleId":"00000000-0000-4000-8000-000000000003","roundId":null,"title":"운영
+                    안내","occurredAt":"2026-09-05T15:00:00Z","read":false}]}
               schema:
-                $ref: '#/components/schemas/Schema_a55bef4846f0ff82'
+                $ref: '#/components/schemas/Schema_e766d67f220861a9'
           headers:
             Cache-Control:
               description: 개인 데이터 캐시 금지
@@ -10089,6 +10093,42 @@ components:
         - meetingDate
         - name
       type: object
+    Schema_099fe41d3824480c:
+      properties:
+        deadlineLeadHours:
+          description: 마감 1~168시간 전
+          maximum: 168
+          minimum: 1
+          type: integer
+        deadlineSoonEnabled:
+          description: 마감 임박 알림
+          type: boolean
+        expectedAccountId:
+          description: 현재 로그인 계정
+          format: uuid
+          type: string
+        expectedVersion:
+          description: 조회한 설정 버전. 미설정은 -1
+          minimum: -1
+          type: integer
+        handoffEnabled:
+          description: 인수인계 수락 요청 알림
+          type: boolean
+        overdueEnabled:
+          description: 기한 지남 알림
+          type: boolean
+        resourceReviewEnabled:
+          description: 담당 자료 재확인 알림
+          type: boolean
+      required:
+        - deadlineLeadHours
+        - deadlineSoonEnabled
+        - expectedAccountId
+        - expectedVersion
+        - handoffEnabled
+        - overdueEnabled
+        - resourceReviewEnabled
+      type: object
     Schema_0a33700254652cb2:
       properties:
         copiedRoles:
@@ -10280,35 +10320,6 @@ components:
         - copiedRoutines
         - season
         - sourceSeason
-      type: object
-    Schema_0b69cfbed0f085a4:
-      properties:
-        version:
-          description: 설정 버전. 미설정은 -1
-          type: number
-        accountId:
-          description: 현재 계정
-          format: uuid
-          type: string
-        deadlineLeadHours:
-          description: 마감 몇 시간 전부터 표시할지
-          type: number
-        deadlineSoonEnabled:
-          description: 마감 임박 알림 사용
-          type: boolean
-        handoffEnabled:
-          description: 인수인계 수락 요청 알림 사용
-          type: boolean
-        overdueEnabled:
-          description: 기한 지남 알림 사용
-          type: boolean
-      required:
-        - accountId
-        - deadlineLeadHours
-        - deadlineSoonEnabled
-        - handoffEnabled
-        - overdueEnabled
-        - version
       type: object
     Schema_0b95087e3a2421e5:
       properties:
@@ -11462,6 +11473,39 @@ components:
         - seasonId
         - teamId
         - verifications
+      type: object
+    Schema_3e1ed3b9bec41e22:
+      properties:
+        version:
+          description: 설정 버전. 미설정은 -1
+          type: number
+        accountId:
+          description: 현재 계정
+          format: uuid
+          type: string
+        deadlineLeadHours:
+          description: 마감 몇 시간 전부터 표시할지
+          type: number
+        deadlineSoonEnabled:
+          description: 마감 임박 알림 사용
+          type: boolean
+        handoffEnabled:
+          description: 인수인계 수락 요청 알림 사용
+          type: boolean
+        overdueEnabled:
+          description: 기한 지남 알림 사용
+          type: boolean
+        resourceReviewEnabled:
+          description: 담당 자료 재확인 알림 사용
+          type: boolean
+      required:
+        - accountId
+        - deadlineLeadHours
+        - deadlineSoonEnabled
+        - handoffEnabled
+        - overdueEnabled
+        - resourceReviewEnabled
+        - version
       type: object
     Schema_42b1cc7be118ed2a:
       properties:
@@ -12968,75 +13012,6 @@ components:
         - memberId
         - permission
       type: object
-    Schema_a55bef4846f0ff82:
-      properties:
-        accountId:
-          description: 현재 계정 식별자
-          format: uuid
-          type: string
-        notifications:
-          description: 현재 내 알림
-          items:
-            properties:
-              title:
-                description: 업무 또는 역할 이름
-                type: string
-              id:
-                description: 알림 식별자
-                format: uuid
-                type: string
-              kind:
-                description: 알림 종류
-                enum:
-                  - DEADLINE_SOON
-                  - OVERDUE
-                  - HANDOFF_REQUEST
-                type: string
-              occurredAt:
-                description: 마감 또는 인수인계 전달 시각
-                format: date-time
-                type: string
-              read:
-                description: 현재 계정의 읽음 여부
-                type: boolean
-              roleId:
-                description: 관련 역할 식별자
-                format: uuid
-                type: string
-              roundId:
-                description: 관련 회차 식별자, 인수인계는 null
-                format: uuid
-                nullable: true
-                type: string
-              sourceId:
-                description: 반복 업무 실행 또는 역할 인수인계 식별자
-                format: uuid
-                type: string
-            required:
-              - id
-              - kind
-              - occurredAt
-              - read
-              - roleId
-              - roundId
-              - sourceId
-              - title
-            type: object
-          type: array
-        seasonId:
-          description: 시즌 식별자
-          format: uuid
-          type: string
-        teamId:
-          description: 팀 식별자
-          format: uuid
-          type: string
-      required:
-        - accountId
-        - notifications
-        - seasonId
-        - teamId
-      type: object
     Schema_a74a5eb6e1727c5b:
       properties:
         title:
@@ -14539,38 +14514,6 @@ components:
         - windowStart
         - zoneId
       type: object
-    Schema_e654ecd4cfb8accd:
-      properties:
-        deadlineLeadHours:
-          description: 마감 1~168시간 전
-          maximum: 168
-          minimum: 1
-          type: integer
-        deadlineSoonEnabled:
-          description: 마감 임박 알림
-          type: boolean
-        expectedAccountId:
-          description: 현재 로그인 계정
-          format: uuid
-          type: string
-        expectedVersion:
-          description: 조회한 설정 버전. 미설정은 -1
-          minimum: -1
-          type: integer
-        handoffEnabled:
-          description: 인수인계 수락 요청 알림
-          type: boolean
-        overdueEnabled:
-          description: 기한 지남 알림
-          type: boolean
-      required:
-        - deadlineLeadHours
-        - deadlineSoonEnabled
-        - expectedAccountId
-        - expectedVersion
-        - handoffEnabled
-        - overdueEnabled
-      type: object
     Schema_e7445cc2a46db86c:
       properties:
         password:
@@ -14586,6 +14529,76 @@ components:
       required:
         - password
         - token
+      type: object
+    Schema_e766d67f220861a9:
+      properties:
+        accountId:
+          description: 현재 계정 식별자
+          format: uuid
+          type: string
+        notifications:
+          description: 현재 내 알림
+          items:
+            properties:
+              title:
+                description: 업무·역할 또는 자료 이름
+                type: string
+              id:
+                description: 알림 식별자
+                format: uuid
+                type: string
+              kind:
+                description: 알림 종류
+                enum:
+                  - DEADLINE_SOON
+                  - OVERDUE
+                  - HANDOFF_REQUEST
+                  - RESOURCE_REVIEW_DUE
+                type: string
+              occurredAt:
+                description: 마감, 인수인계 전달 시각 또는 시즌 시간대 자료 확인일의 시작 시각
+                format: date-time
+                type: string
+              read:
+                description: 현재 계정의 읽음 여부
+                type: boolean
+              roleId:
+                description: 관련 역할 식별자
+                format: uuid
+                type: string
+              roundId:
+                description: 관련 회차 식별자, 인수인계·자료 재확인은 null
+                format: uuid
+                nullable: true
+                type: string
+              sourceId:
+                description: 반복 업무 실행, 역할 인수인계 또는 역할 자료 식별자
+                format: uuid
+                type: string
+            required:
+              - id
+              - kind
+              - occurredAt
+              - read
+              - roleId
+              - roundId
+              - sourceId
+              - title
+            type: object
+          type: array
+        seasonId:
+          description: 시즌 식별자
+          format: uuid
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+      required:
+        - accountId
+        - notifications
+        - seasonId
+        - teamId
       type: object
     Schema_e7744faecbdb49bc:
       properties:

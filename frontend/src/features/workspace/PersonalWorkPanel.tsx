@@ -8,12 +8,13 @@ import { activeMember } from './useCurrentMember'
 import type { WorkspaceProjection } from './types'
 import WorkspaceLoginLink from './WorkspaceLoginLink'
 
-export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, onOpenRound, onOpenHandoff }: {
+export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, onOpenRound, onOpenHandoff, onOpenResource }: {
   workspace: WorkspaceProjection
   accessKey: string
   onManageMembership: () => void
   onOpenRound: (roundId: string, executionId: string) => void
   onOpenHandoff: (roleId: string) => void
+  onOpenResource: (roleId: string, resourceId: string) => void
 }) {
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''
@@ -50,7 +51,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
         <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
           scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
-          workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} />
+          workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} onOpenResource={onOpenResource} />
         <div className="personal-work-columns">
           <div>
             <h3>남은 업무</h3>

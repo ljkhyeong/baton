@@ -16,7 +16,7 @@ function decode(value: unknown, scope: NotificationScope): NotificationInbox {
     || !value.notifications.every((item: unknown) => isJsonObject(item) && isUuid(item.id)
       && isUuid(item.sourceId) && isUuid(item.roleId) && typeof item.title === 'string'
       && typeof item.read === 'boolean' && isInstant(item.occurredAt)
-      && ((item.kind === 'HANDOFF_REQUEST' && item.roundId === null)
+      && (((item.kind === 'HANDOFF_REQUEST' || item.kind === 'RESOURCE_REVIEW_DUE') && item.roundId === null)
         || ((item.kind === 'OVERDUE' || item.kind === 'DEADLINE_SOON') && isUuid(item.roundId))))) {
     throw new Error('내 알림 응답을 읽지 못했습니다. 다시 불러와 주세요.')
   }
@@ -37,6 +37,7 @@ type ConfigurePreferences = NonNullable<operations['configureNotificationPrefere
 function decodePreferences(value: unknown, accountId: string): NotificationPreferences {
   if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Number.isSafeInteger(value.version) || Number(value.version) < -1
     || typeof value.deadlineSoonEnabled !== 'boolean' || typeof value.overdueEnabled !== 'boolean' || typeof value.handoffEnabled !== 'boolean'
+    || typeof value.resourceReviewEnabled !== 'boolean'
     || !Number.isSafeInteger(value.deadlineLeadHours) || Number(value.deadlineLeadHours) < 1 || Number(value.deadlineLeadHours) > 168) {
     throw new Error('알림 설정을 읽지 못했습니다.')
   }

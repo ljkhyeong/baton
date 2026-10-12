@@ -847,6 +847,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
                 onManageMembership={openMemberManagementModal}
                 onOpenRound={openPersonalRound}
                 onOpenHandoff={openPersonalHandoff}
+                onOpenResource={openResourceReview}
               /></>}
               weeklyBrief={<><BriefAttentionPanel navigation={briefNavigation} workspace={workspace} accessKey={currentAccessKey} changesDisabled={contentChangesDisabled}
                 onManageMembership={openMemberManagementModal} onOpenSource={openBriefSource} /><CalendarSubscriptionPanel

@@ -1,17 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { isAccessDenied } from '@/shared/api/ApiError'
-import { formatInstant } from '@/shared/lib/dateTimeFormat'
+import { formatInstant, formatInstantDate } from '@/shared/lib/dateTimeFormat'
 import { NotificationPreferencesPanel } from './NotificationPreferencesPanel'
 import type { WorkspaceProjection } from '@/features/workspace/types'
-import { getNotifications, readNotification, type NotificationScope } from './api'
+import { getNotifications, readNotification, type NotificationInbox as Inbox, type NotificationScope } from './api'
 import './notifications.scss'
 
+type InboxNotification = Inbox['notifications'][number]
 
-export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff }: {
+const kindCopy = {
+  DEADLINE_SOON: '마감 임박',
+  OVERDUE: '기한 지남',
+  HANDOFF_REQUEST: '인수인계 수락 요청',
+  RESOURCE_REVIEW_DUE: '자료 재확인',
+} satisfies Record<InboxNotification['kind'], string>
+
+function occurrenceCopy(item: InboxNotification, timeZone: string) {
+  // 자료 재확인은 시즌 날짜가 기준이므로 시각 없이 확인일만 보여 준다.
+  if (item.kind === 'RESOURCE_REVIEW_DUE') return `${formatInstantDate(item.occurredAt, timeZone)} 확인 기한`
+  return `${formatInstant(item.occurredAt, timeZone)} ${item.kind === 'HANDOFF_REQUEST' ? '전달' : '마감'}`
+}
+
+export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff, onOpenResource }: {
   scope: NotificationScope; workspace: WorkspaceProjection
   onOpenRound: (roundId: string, executionId: string) => void
   onOpenHandoff: (roleId: string) => void
+  onOpenResource: (roleId: string, resourceId: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -38,7 +53,7 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
   }}>
     <summary>내 알림 {inbox.data && !inbox.isError ? `· 안 읽음 ${unread}건` : ''}</summary>
     {open && <>
-      <p>마감이 다가오거나 지난 업무, 내가 수락할 인수인계를 알려드립니다. 완료한 업무는 표시하지 않습니다.</p>
+      <p>마감이 다가오거나 지난 업무, 내가 수락할 인수인계와 확인일이 된 담당 자료를 알려드립니다. 완료한 업무는 표시하지 않습니다.</p>
       <div className="notification-controls">
         <label><input type="checkbox" checked={unreadOnly} onChange={event => setUnreadOnly(event.target.checked)} />안 읽은 알림만</label>
         <button type="button" className="text-button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)}>알림 설정</button>
@@ -50,11 +65,12 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
             : <ul>{visible.map(item => <li key={item.id} data-read={item.read}>
               <button type="button" className="notification-source" onClick={() => {
                 if (item.kind === 'HANDOFF_REQUEST') onOpenHandoff(item.roleId)
+                else if (item.kind === 'RESOURCE_REVIEW_DUE') onOpenResource(item.roleId, item.sourceId)
                 else if (item.roundId) onOpenRound(item.roundId, item.sourceId)
               }}>
-                <span>{item.kind === 'HANDOFF_REQUEST' ? '인수인계 수락 요청' : item.kind === 'OVERDUE' ? '기한 지남' : '마감 임박'} · {item.read ? '읽음' : '안 읽음'}</span>
+                <span>{kindCopy[item.kind]} · {item.read ? '읽음' : '안 읽음'}</span>
                 <strong>{item.title}</strong>
-                <small>{formatInstant(item.occurredAt, workspace.season.timeZone)}{item.kind === 'HANDOFF_REQUEST' ? ' 전달' : ' 마감'} · 관련 항목 보기</small>
+                <small>{occurrenceCopy(item, workspace.season.timeZone)} · 관련 항목 보기</small>
               </button>
               {!item.read && <button type="button" className="text-button" disabled={read.isPending || inbox.isError}
                 aria-label={`${item.title} 알림 읽음 처리`} onClick={() => read.mutate(item.id)}>읽음 처리</button>}
