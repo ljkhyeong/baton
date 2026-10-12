@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionController;
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase;
@@ -70,6 +71,9 @@ class CalendarSubscriptionRestDocsTest {
             "00000000-0000-0000-0000-000000002645"
     );
     private static final String ACCESS_KEY = "workspace-access-key";
+    private static final UUID REQUEST_ID = UUID.fromString(
+            "00000000-0000-0000-0000-000000002646"
+    );
 
     private CalendarSubscriptionUseCase subscriptions;
     private MockMvc mockMvc;
@@ -81,6 +85,7 @@ class CalendarSubscriptionRestDocsTest {
                         new CalendarSubscriptionController(subscriptions)
                 )
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(
                         AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(
@@ -91,6 +96,7 @@ class CalendarSubscriptionRestDocsTest {
                         .operationPreprocessors()
                         .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
                 .build();
     }
 
@@ -222,7 +228,10 @@ class CalendarSubscriptionRestDocsTest {
     }
 
     private org.springframework.restdocs.snippet.Snippet noStoreHeader() {
-        return responseHeaders(headerWithName("Cache-Control").description("no-store"));
+        return responseHeaders(
+                headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"),
+                headerWithName("Cache-Control").description("no-store")
+        );
     }
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {

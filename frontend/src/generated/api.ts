@@ -5182,6 +5182,8 @@ export interface operations {
                     "Cache-Control"?: string;
                     /** @description 현재 JSESSIONID 제거 */
                     "Set-Cookie"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5189,6 +5191,8 @@ export interface operations {
             /** @description 409 */
             409: {
                 headers: {
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5773,6 +5777,8 @@ export interface operations {
             /** @description 204 */
             204: {
                 headers: {
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -5780,6 +5786,8 @@ export interface operations {
             /** @description 400 */
             400: {
                 headers: {
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5791,6 +5799,8 @@ export interface operations {
                 headers: {
                     /** @description Bearer 인증 필요 */
                     "WWW-Authenticate"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5900,6 +5910,8 @@ export interface operations {
                 headers: {
                     /** @description no-store */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5922,6 +5934,8 @@ export interface operations {
                 headers: {
                     /** @description 개인 설정 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -5964,6 +5978,8 @@ export interface operations {
                 headers: {
                     /** @description 개인 설정 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6149,6 +6165,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6194,6 +6212,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6234,6 +6254,8 @@ export interface operations {
                 headers: {
                     /** @description 초대 토큰 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6276,6 +6298,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6318,6 +6342,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6327,6 +6353,8 @@ export interface operations {
             /** @description 403 */
             403: {
                 headers: {
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6349,6 +6377,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6386,6 +6416,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -6423,6 +6455,8 @@ export interface operations {
                 headers: {
                     /** @description 비공개 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7187,6 +7221,8 @@ export interface operations {
                 headers: {
                     /** @description no-store */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7240,6 +7276,8 @@ export interface operations {
                 headers: {
                     /** @description no-store */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7293,6 +7331,8 @@ export interface operations {
                 headers: {
                     /** @description no-store */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
@@ -7344,6 +7384,8 @@ export interface operations {
                 headers: {
                     /** @description no-store */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -7561,6 +7603,8 @@ export interface operations {
                 headers: {
                     /** @description 기록 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8237,6 +8281,8 @@ export interface operations {
                 headers: {
                     /** @description 개인 데이터 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8276,6 +8322,8 @@ export interface operations {
                 headers: {
                     /** @description 개인 데이터 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8309,6 +8357,8 @@ export interface operations {
                 headers: {
                     /** @description 응답 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8403,6 +8453,8 @@ export interface operations {
                 headers: {
                     /** @description 기록 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8691,6 +8743,8 @@ export interface operations {
                 headers: {
                     /** @description 개인 데이터 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8730,6 +8784,8 @@ export interface operations {
                 headers: {
                     /** @description 개인 데이터 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8765,6 +8821,8 @@ export interface operations {
                 headers: {
                     /** @description 일정 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -8798,6 +8856,8 @@ export interface operations {
                 headers: {
                     /** @description 일정 캐시 금지 */
                     "Cache-Control"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
                     [name: string]: unknown;
                 };
                 content: {

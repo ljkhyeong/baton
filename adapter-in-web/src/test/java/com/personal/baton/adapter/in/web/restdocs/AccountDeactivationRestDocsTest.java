@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.restdocs;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.auth.AccountDeactivationController;
 import com.personal.baton.adapter.in.web.auth.AccountDeactivationController.AccountDeactivationRequest;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.DefaultSecurityFilterChain;
@@ -40,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(RestDocumentationExtension.class)
 class AccountDeactivationRestDocsTest {
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private static final String DEACTIVATE_ACCOUNT_DESCRIPTION = "현재 계정을 비활성화하고 모든 세션과 계정 권한 접근을 중지한다. 조직 기록은 보존하며 마지막 관리자는 먼저 후임 관리자를 지정해야 한다.";
     private static final String DEACTIVATE_ACCOUNT_SUMMARY = "계정 비활성화";
     private MockMvc mvc;
@@ -48,9 +51,11 @@ class AccountDeactivationRestDocsTest {
         useCase = mock(DeactivateAccountUseCase.class);
         mvc = MockMvcBuilders.standaloneSetup(new AccountDeactivationController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler()).setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
     @Test @DisplayName("계정 비활성화는 확인한 계정을 대조하고 현재 세션 쿠키도 제거한다")
     void documentsDeactivation() throws Exception {
@@ -62,7 +67,7 @@ class AccountDeactivationRestDocsTest {
                 .andDo(MockMvcRestDocumentationWrapper.document("deactivateAccount", DEACTIVATE_ACCOUNT_DESCRIPTION, DEACTIVATE_ACCOUNT_SUMMARY,
                         requestHeaders(headerWithName("Origin").description("BATON 동일 출처"), headerWithName("Sec-Fetch-Site").description("same-origin"), headerWithName("X-CSRF-TOKEN").description("세션 CSRF 토큰")),
                         requestFields(new ConstrainedFields(AccountDeactivationRequest.class).withPath("expectedAccountId").description("화면에서 확인한 로그인 계정")),
-                        responseHeaders(headerWithName("Cache-Control").description("캐시 금지"), headerWithName("Set-Cookie").description("현재 JSESSIONID 제거"))));
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("캐시 금지"), headerWithName("Set-Cookie").description("현재 JSESSIONID 제거"))));
         verify(useCase).deactivateAccount(ACCOUNT);
     }
     @Test @DisplayName("마지막 관리자의 비활성화는 팀 이름과 함께 충돌을 반환한다")
@@ -72,7 +77,9 @@ class AccountDeactivationRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\"}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ACCOUNT_DEACTIVATION_BLOCKED"))
                 .andDo(MockMvcRestDocumentationWrapper.document("deactivateAccountLastAdministrator", DEACTIVATE_ACCOUNT_DESCRIPTION, DEACTIVATE_ACCOUNT_SUMMARY,
+                        responseHeaders(requestIdHeader()),
                         responseFields(fieldWithPath("code").description("ACCOUNT_DEACTIVATION_BLOCKED"), fieldWithPath("message").description("후임 관리자를 지정할 팀 안내"))));
     }
+    private HeaderDescriptor requestIdHeader() { return headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"); }
     private UsernamePasswordAuthenticationToken auth() { return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of()); }
 }

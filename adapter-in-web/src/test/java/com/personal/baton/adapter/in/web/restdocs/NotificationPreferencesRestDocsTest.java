@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.restdocs;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.NotificationPreferencesController;
 import com.personal.baton.adapter.in.web.workspace.NotificationPreferencesRequest;
@@ -43,15 +44,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(RestDocumentationExtension.class)
 class NotificationPreferencesRestDocsTest {
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private MockMvc mvc;
     private NotificationPreferencesUseCase useCase;
     @BeforeEach void setUp(RestDocumentationContextProvider documentation) {
         useCase = mock(NotificationPreferencesUseCase.class);
         mvc = MockMvcBuilders.standaloneSetup(new NotificationPreferencesController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler()).setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
     @Test @DisplayName("개인 알림 설정은 현재 계정과 알림 종류별 사용 여부 및 사전 알림 시간을 반환한다")
     void documentsPreferences() throws Exception {
@@ -80,7 +84,10 @@ class NotificationPreferencesRestDocsTest {
                                 constrained.withPath("handoffEnabled").description("인수인계 수락 요청 알림"), constrained.withPath("deadlineLeadHours").description("마감 1~168시간 전")),
                         noStoreHeader(), fields()));
     }
-    private ResponseHeadersSnippet noStoreHeader() { return responseHeaders(headerWithName("Cache-Control").description("개인 설정 캐시 금지")); }
+    private ResponseHeadersSnippet noStoreHeader() {
+        return responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"),
+                headerWithName("Cache-Control").description("개인 설정 캐시 금지"));
+    }
     private ResponseFieldsSnippet fields() { return responseFields(fieldWithPath("accountId").description("현재 계정"), fieldWithPath("version").description("설정 버전. 미설정은 -1"),
             fieldWithPath("deadlineSoonEnabled").description("마감 임박 알림 사용"), fieldWithPath("overdueEnabled").description("기한 지남 알림 사용"),
             fieldWithPath("handoffEnabled").description("인수인계 수락 요청 알림 사용"), fieldWithPath("deadlineLeadHours").description("마감 몇 시간 전부터 표시할지")); }

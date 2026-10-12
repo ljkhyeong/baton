@@ -4,6 +4,7 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.TeamAccessController;
 import com.personal.baton.adapter.in.web.workspace.TeamAccessRequests.ActivateTeamAccessRequest;
@@ -63,6 +64,7 @@ class TeamAccessRestDocsTest {
     private static final UUID SEASON = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private static final UUID RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000003");
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private static final String CHANGE_PERMISSION_DESCRIPTION = "구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.";
     private static final String CHANGE_PERMISSION_SUMMARY = "팀 구성원 권한 변경";
     private MockMvc mvc;
@@ -74,9 +76,11 @@ class TeamAccessRestDocsTest {
         mvc = MockMvcBuilders.standaloneSetup(new TeamAccessController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test @DisplayName("내 팀 목록은 로그인 계정과 현재 권한·열 시즌을 반환한다")
@@ -133,7 +137,7 @@ class TeamAccessRestDocsTest {
                         teamPath(), accountMutationHeaders(), requestFields(new ConstrainedFields(CreateTeamInvitationRequest.class).withPath("expectedAccountId").description("현재 로그인 계정"),
                                 new ConstrainedFields(CreateTeamInvitationRequest.class).withPath("memberId").description("초대할 기존 구성원"),
                                 new EnumFields(TeamPermission.class).withPath("permission").description("초대 권한")),
-                        responseHeaders(headerWithName("Cache-Control").description("초대 토큰 캐시 금지")),
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("초대 토큰 캐시 금지")),
                         responseFields(fieldWithPath("token").description("43자 일회용 초대 토큰"),
                                 fieldWithPath("invitation.id").description("초대 식별자"), fieldWithPath("invitation.memberId").description("초대할 구성원"),
                                 new EnumFields(TeamPermission.class).withPath("invitation.permission").description("초대 권한"),
@@ -171,7 +175,7 @@ class TeamAccessRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\",\"permission\":\"VIEWER\"}"))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_DEACTIVATED"))
                 .andDo(MockMvcRestDocumentationWrapper.document("changeTeamPermissionDeactivatedAccount", CHANGE_PERMISSION_DESCRIPTION, CHANGE_PERMISSION_SUMMARY,
-                        memberPath(),
+                        memberPath(), responseHeaders(requestIdHeader()),
                         responseFields(fieldWithPath("code").description("ACCOUNT_DEACTIVATED"), fieldWithPath("message").description("비활성 계정 안내"))));
     }
     @Test @DisplayName("초대 수락 전 팀과 구성원 및 권한을 확인한다")
@@ -216,7 +220,10 @@ class TeamAccessRestDocsTest {
     private PathParametersSnippet memberPath() {
         return pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("memberId").description("구성원 식별자"));
     }
-    private ResponseHeadersSnippet privateCacheHeader() { return responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")); }
+    private ResponseHeadersSnippet privateCacheHeader() {
+        return responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("비공개 응답 캐시 금지"));
+    }
+    private HeaderDescriptor requestIdHeader() { return headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"); }
     private InvitationResult invitation() { return new InvitationResult(RESOURCE, RESOURCE, TeamPermission.VIEWER, NOW, NOW.plusSeconds(604800), null, null); }
     private TeamAccessResult settings() {
         return new TeamAccessResult(TEAM, ACCOUNT, true, RESOURCE, TeamPermission.ADMIN,

@@ -4,6 +4,7 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController.ReadNotificationRequest;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.headers.ResponseHeadersSnippet;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.payload.ResponseFieldsSnippet;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -51,6 +53,7 @@ class WorkspaceNotificationRestDocsTest {
     private static final UUID SEASON = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private static final UUID RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000003");
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private MockMvc mvc;
     private WorkspaceNotificationUseCase useCase;
 
@@ -60,9 +63,11 @@ class WorkspaceNotificationRestDocsTest {
         mvc = MockMvcBuilders.standaloneSetup(new WorkspaceNotificationController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test
@@ -78,7 +83,7 @@ class WorkspaceNotificationRestDocsTest {
                         pathParameters(parameterWithName("teamId").description("팀 식별자"),
                                 parameterWithName("seasonId").description("시즌 식별자")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+                        noStoreHeader(), fields()));
     }
 
     @Test
@@ -99,9 +104,13 @@ class WorkspaceNotificationRestDocsTest {
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
                         requestFields(new ConstrainedFields(ReadNotificationRequest.class).withPath("expectedAccountId")
                                 .description("화면에서 확인한 로그인 계정")),
-                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+                        noStoreHeader(), fields()));
     }
 
+    private ResponseHeadersSnippet noStoreHeader() {
+        return responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"),
+                headerWithName("Cache-Control").description("개인 데이터 캐시 금지"));
+    }
     private UsernamePasswordAuthenticationToken auth() {
         return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of());
     }

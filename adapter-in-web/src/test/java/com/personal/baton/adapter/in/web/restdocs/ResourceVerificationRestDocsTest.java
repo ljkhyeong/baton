@@ -4,6 +4,7 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController;
 import com.personal.baton.adapter.in.web.workspace.ResourceVerificationController.VerifyResourceRequest;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.payload.ResponseFieldsSnippet;
 import org.springframework.restdocs.request.PathParametersSnippet;
@@ -57,6 +59,7 @@ class ResourceVerificationRestDocsTest {
     private static final UUID SEASON = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private static final UUID RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000003");
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private MockMvc mvc;
     private ResourceVerificationUseCase useCase;
 
@@ -66,9 +69,11 @@ class ResourceVerificationRestDocsTest {
         mvc = MockMvcBuilders.standaloneSetup(new ResourceVerificationController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test
@@ -86,7 +91,7 @@ class ResourceVerificationRestDocsTest {
                         "시즌 날짜 기준 재확인 기한이 된 활성 자료를 확인일·식별자 순으로 반환한다. 종료 시즌은 빈 목록이다.", "재확인할 자료 목록",
                         pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀의 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("응답 캐시 금지")),
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("응답 캐시 금지")),
                         responseFields(fieldWithPath("teamId").description("팀 식별자"), fieldWithPath("seasonId").description("시즌 식별자"),
                                 fieldWithPath("today").description("시즌 현지 오늘 날짜"), fieldWithPath("timeZone").description("시즌 IANA 시간대"),
                                 fieldWithPath("resources").type(JsonFieldType.ARRAY).attributes(key("itemsType").value(JsonFieldType.OBJECT)).description("재확인할 활성 자료"),
@@ -108,7 +113,7 @@ class ResourceVerificationRestDocsTest {
                         "자료 버전과 최근 20건의 수동 확인 이력을 반환한다.", "자료 확인 이력 조회",
                         resourcePath(),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
     }
 
     @Test
@@ -131,7 +136,7 @@ class ResourceVerificationRestDocsTest {
                                 new ConstrainedFields(VerifyResourceRequest.class).withPath("resourceVersion").description("확인한 자료 버전"),
                                 new EnumFields(ResourceVerificationStatus.class).withPath("status").description("확인 결과"),
                                 new ConstrainedFields(VerifyResourceRequest.class).withPath("note").description("확인 메모").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
         verify(useCase).verify(eq(TEAM), eq(SEASON), eq(RESOURCE), eq("key"), eq(ACCOUNT),
                 argThat(command -> command.resourceVersion() == 2 && command.status() == ResourceVerificationStatus.CONFIRMED));
     }
@@ -145,7 +150,7 @@ class ResourceVerificationRestDocsTest {
                 .andDo(MockMvcRestDocumentationWrapper.document("getResourceReviewSchedule", "자료별 재확인 주기와 시즌 시간대의 확인 기한을 조회한다.", "자료 재확인 일정 조회",
                         resourcePath(),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀의 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
     }
     @Test @DisplayName("연결된 구성원은 확인 일정의 버전을 확인하고 재확인 주기를 설정한다")
     void documentsConfigureSchedule() throws Exception {
@@ -162,7 +167,7 @@ class ResourceVerificationRestDocsTest {
                         requestFields(fields.withPath("expectedAccountId").description("현재 로그인 계정"), fields.withPath("expectedVersion").description("조회한 일정 버전. 미설정은 -1"),
                                 fields.withPath("intervalDays").type(JsonFieldType.NUMBER).optional().description("확인 간격 1~365일. 해제는 null"),
                                 fields.withPath("nextReviewOn").type(JsonFieldType.STRING).optional().description("시즌 달력 기준 다음 확인일. 해제는 null")),
-                        responseHeaders(headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("일정 캐시 금지")), scheduleFields()));
     }
     private ReviewScheduleResult schedule() { return new ReviewScheduleResult(TEAM, SEASON, RESOURCE, 0, 30,
             LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 5), true); }
@@ -202,5 +207,9 @@ class ResourceVerificationRestDocsTest {
                 fieldWithPath("verifications[].note").description("확인 메모").optional(),
                 fieldWithPath("verifications[].verifiedAt").description("서버 확인 시각"),
                 fieldWithPath("verifications[].current").description("현재 자료 버전에 대한 확인 여부"));
+    }
+
+    private HeaderDescriptor requestIdHeader() {
+        return headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID");
     }
 }

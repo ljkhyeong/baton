@@ -3,6 +3,7 @@ package com.personal.baton.adapter.in.web.restdocs;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.workspace.ContentChangeController;
 import com.personal.baton.application.workspace.port.in.ContentChangeUseCase;
 import com.personal.baton.application.workspace.port.in.ContentChangeUseCase.ContentHistoryResult;
@@ -37,12 +38,14 @@ class ContentChangeRestDocsTest {
     private final UUID team = UUID.fromString("00000000-0000-4000-8000-000000000001");
     private final UUID season = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private final UUID record = UUID.fromString("00000000-0000-4000-8000-000000000003");
+    private final UUID requestId = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private MockMvc mvc;
     private ContentChangeUseCase useCase;
     @BeforeEach void setUp(RestDocumentationContextProvider documentation) {
         useCase = mock(ContentChangeUseCase.class);
         mvc = MockMvcBuilders.standaloneSetup(new ContentChangeController(useCase)).setControllerAdvice(new GlobalExceptionHandler())
-                .apply(documentationConfiguration(documentation)).build();
+                .addFilters(new RequestIdFilter(() -> requestId)).apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, requestId.toString())).build();
     }
     @Test @DisplayName("결정 수정 이력은 변경자와 필드별 변경 전후를 반환한다")
     void documentsDecisionChanges() throws Exception { document(ContentRecordKind.DECISION, ContentChangeController.DECISION_PATH, "getDecisionChanges"); }
@@ -62,7 +65,8 @@ class ContentChangeRestDocsTest {
                         pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("seasonId").description("시즌 식별자"),
                                 parameterWithName("recordId").description("원본 기록 식별자")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀의 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("기록 캐시 금지")),
+                        responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"),
+                                headerWithName("Cache-Control").description("기록 캐시 금지")),
                         responseFields(fieldWithPath("teamId").description("팀 식별자"), fieldWithPath("seasonId").description("시즌 식별자"),
                                 fieldWithPath("recordId").description("원본 기록 식별자"), new EnumFields(ContentRecordKind.class).withPath("recordKind").description("기록 종류"),
                                 fieldWithPath("changes").type(JsonFieldType.ARRAY).attributes(key("itemsType").value(JsonFieldType.OBJECT)).description("최신순 이력"),
