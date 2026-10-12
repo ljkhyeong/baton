@@ -2297,6 +2297,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 .personal-work h3 { font-size: 13px; }
 .personal-work p, .personal-work > small { color: var(--muted); font-size: 13px; line-height: 1.65; }
 .personal-work button, .personal-work a { color: var(--ink); font-size: inherit; }
+.personal-work .primary-button { color: var(--on-ink); }
 .personal-work p button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
 .personal-work-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; }
 .personal-work-columns ul { list-style: none; margin: 0 0 12px; padding: 0; }
