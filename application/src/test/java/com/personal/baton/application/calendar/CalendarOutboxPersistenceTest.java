@@ -98,6 +98,9 @@ class CalendarOutboxPersistenceTest {
     private CalendarBackfillPort backfillPort;
 
     @Autowired
+    private CalendarSnapshotBackfillWorker backfillWorker;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -363,6 +366,27 @@ class CalendarOutboxPersistenceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(EXECUTION_ID.toString())
                 .hasMessageNotContaining(incompatibleText);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM calendar_snapshot_outbox",
+                Long.class
+        )).isZero();
+    }
+
+    @DisplayName("사전 점검 뒤 회차 이름이 CAL 계약과 맞지 않게 바뀌면 잠금 뒤 다시 검사해 보정 아웃박스를 추가하지 않는다")
+    @Test
+    void rechecksTextAfterLockingBackfillRound() {
+        insertRound();
+        var candidate = new CalendarBackfillCandidate(ROUND_ID, SEASON_ID);
+        backfillWorker.verifyTextCompatibility(candidate);
+        jdbcTemplate.update(
+                "UPDATE season_rounds SET name = ? WHERE id = UUID_TO_BIN(?)",
+                "Cafe\u0301",
+                ROUND_ID.toString()
+        );
+
+        assertThatThrownBy(() -> backfillWorker.backfill(candidate))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(ROUND_ID.toString());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM calendar_snapshot_outbox",
                 Long.class

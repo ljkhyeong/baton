@@ -41,20 +41,10 @@ public class CalendarSnapshotBackfillWorker {
         if (round == null) {
             return;
         }
-        CalendarTextCompatibility.require(round.getId(), "summary", round.getName());
-        List<RoutineExecution> executions = operationsRepository
-                .findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()));
-        for (RoutineExecution execution : executions) {
-            if (execution.getDeadlineAt() == null) {
-                continue;
-            }
-            CalendarTextCompatibility.require(execution.getId(), "summary", execution.getTitle());
-            CalendarTextCompatibility.require(
-                    execution.getId(),
-                    "description",
-                    execution.getDetail()
-            );
-        }
+        requireTextCompatibility(
+                round,
+                operationsRepository.findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()))
+        );
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -74,6 +64,8 @@ public class CalendarSnapshotBackfillWorker {
                 ));
         List<RoutineExecution> executions = operationsRepository
                 .findRoutineExecutionsBySeasonRoundIdWithSharedLock(round.getId());
+        // 사전 점검 이후 변경될 수 있으므로 잠금으로 확정한 현재 문자열을 검사한다.
+        requireTextCompatibility(round, executions);
         int appendedCount = 0;
         for (CalendarSnapshotDraft snapshot : snapshotFactory.roundSnapshots(
                 clock.instant(),
@@ -88,4 +80,21 @@ public class CalendarSnapshotBackfillWorker {
         return appendedCount;
     }
 
+    private static void requireTextCompatibility(
+            SeasonRound round,
+            List<RoutineExecution> executions
+    ) {
+        CalendarTextCompatibility.require(round.getId(), "summary", round.getName());
+        for (RoutineExecution execution : executions) {
+            if (execution.getDeadlineAt() == null) {
+                continue;
+            }
+            CalendarTextCompatibility.require(execution.getId(), "summary", execution.getTitle());
+            CalendarTextCompatibility.require(
+                    execution.getId(),
+                    "description",
+                    execution.getDetail()
+            );
+        }
+    }
 }
