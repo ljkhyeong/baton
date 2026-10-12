@@ -1769,7 +1769,7 @@ dialog.inspector::backdrop {
 .round-room-text-action { min-height: 32px; padding: 6px 0; font-weight: 700; }
 a.round-room-text-action { display: inline-flex; align-items: center; text-align: right; }
 .round-room-status { color: var(--muted); font-size: 12px; }
-.round-room-error { flex-basis: 100%; color: var(--warning); font-size: 12px; line-height: 1.45; text-align: right; }
+.round-room-resource-actions .round-room-error { flex-basis: 100%; color: var(--warning); font-size: 12px; line-height: 1.45; text-align: right; }
 .round-room-primary-action:disabled,
 .round-room-text-action:disabled { cursor: not-allowed; opacity: .48; }
 .next-event strong { display: block; margin-top: 12px; font-size: 13px; }
