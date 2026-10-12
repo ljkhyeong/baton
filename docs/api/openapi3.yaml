@@ -576,14 +576,12 @@ paths:
                 value: |-
                   {
                     "email" : "member@example.com",
-                    "displayName" : "사용자",
                     "turnstileToken" : "test-token"
                   }
               requestPasswordResetHumanVerification503:
                 value: |-
                   {
                     "email" : "member@example.com",
-                    "displayName" : "사용자",
                     "turnstileToken" : "test-token"
                   }
             schema:
@@ -4039,7 +4037,7 @@ paths:
                       "authorName" : "박민서",
                       "roleIds" : [ "44444444-4444-4444-4444-444444444444" ],
                       "archivedAt" : null,
-                      "textFormat" : "PLAIN_TEXT"
+                      "textFormat" : "MARKDOWN"
                     }
               schema:
                 $ref: '#/components/schemas/Schema_e2d0bb9a881c7ddd'

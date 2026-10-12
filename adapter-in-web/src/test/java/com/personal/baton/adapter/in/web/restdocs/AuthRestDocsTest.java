@@ -451,9 +451,12 @@ class AuthRestDocsTest {
                 ? new com.personal.baton.application.identity.error.HumanVerificationUnavailableException()
                 : new HumanVerificationRejectedException();
         doThrow(failure).when(humanVerificationUseCase).verify(any());
+        String body = operation.equals("registerLocalAccount")
+                ? "{\"email\":\"member@example.com\",\"displayName\":\"사용자\",\"turnstileToken\":\"test-token\"}"
+                : "{\"email\":\"member@example.com\",\"turnstileToken\":\"test-token\"}";
         mockMvc.perform(sameOriginMutation(post("/api/v1/auth/" + path))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"member@example.com\",\"displayName\":\"사용자\",\"turnstileToken\":\"test-token\"}"))
+                        .content(body))
                 .andExpect(status().is(statusCode))
                 .andExpect(jsonPath("$.code").value(unavailable
                         ? "HUMAN_VERIFICATION_UNAVAILABLE" : "HUMAN_VERIFICATION_FAILED"))

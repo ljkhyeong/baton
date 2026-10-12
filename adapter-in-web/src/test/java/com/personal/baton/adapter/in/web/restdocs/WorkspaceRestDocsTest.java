@@ -2557,7 +2557,7 @@ class WorkspaceRestDocsTest {
                 eq(ACCESS_KEY),
                 any(CreateDecisionCommand.class)
         ))
-                .thenReturn(decisionResult());
+                .thenReturn(decisionResult(null, DecisionTextFormat.MARKDOWN));
 
         mockMvc.perform(post("/api/v1/teams/{teamId}/seasons/{seasonId}/decisions", TEAM_ID, SEASON_ID)
                         .header("Idempotency-Key", CONTENT_IDEMPOTENCY_KEY)
@@ -2576,7 +2576,7 @@ class WorkspaceRestDocsTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdAt").value("2026-07-20T03:04:05Z"))
                 .andExpect(jsonPath("$.authorName").value("박민서"))
-                .andExpect(jsonPath("$.textFormat").value("PLAIN_TEXT"))
+                .andExpect(jsonPath("$.textFormat").value("MARKDOWN"))
                 .andDo(document(
                         "createDecision",
                         CREATE_DECISION,
@@ -4368,6 +4368,10 @@ class WorkspaceRestDocsTest {
     }
 
     private DecisionResult decisionResult(Instant archivedAt) {
+        return decisionResult(archivedAt, DecisionTextFormat.PLAIN_TEXT);
+    }
+
+    private DecisionResult decisionResult(Instant archivedAt, DecisionTextFormat textFormat) {
         return new DecisionResult(
                 DECISION_ID,
                 "질문은 모임 전날 마감한다",
@@ -4378,7 +4382,7 @@ class WorkspaceRestDocsTest {
                 "박민서",
                 List.of(ROLE_ID),
                 archivedAt,
-                DecisionTextFormat.PLAIN_TEXT
+                textFormat
         );
     }
 
