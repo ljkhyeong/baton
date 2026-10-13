@@ -40,9 +40,10 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
       weekStart: '2026-08-24', zoneId: 'America/New_York', windowStart: '2026-08-24T04:00:00Z', windowEnd: '2026-08-31T04:00:00Z',
       generatedAt: '2026-08-31T00:00:00Z', sourceCursor: 4, ruleVersion: 2,
       items: [{ reasonCode: 'ROLE_UNASSIGNED', severity: 'HIGH', status: 'ACTIVE', sourceReference: 'role:current',
-        observedAt: '2026-08-30T00:00:00Z', ruleVersion: 1, aggregateRevision: 2, revisionGap: false, section: 'CURRENT_WEEK' },
+        observedAt: '2026-08-30T00:00:00Z', activeSince: '2026-08-26T12:00:00Z', ruleVersion: 1, aggregateRevision: 2, revisionGap: false, section: 'CURRENT_WEEK' },
+      // 생성 시각(뉴욕 8월 30일) 기준으로 뉴욕 날짜(8월 11일)부터 센다. UTC 날짜(8월 12일)로 세지 않는다.
       { reasonCode: 'HANDOFF_INCOMPLETE', severity: 'HIGH', status: 'ACTIVE', sourceReference: 'handoff:carry',
-        observedAt: '2026-08-20T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }],
+        observedAt: '2026-08-20T00:00:00Z', activeSince: '2026-08-12T02:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }],
     } })
   })
   await openSharedWorkspace(page)
@@ -65,8 +66,10 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
   await expect(edition.getByRole('region', { name: '저장 이후 변경 확인' })).toContainText('새 변경이 전달됐습니다.')
   await expect(edition).toContainText('America/New_York')
   await expect(edition.getByRole('region', { name: '이번 주 변경' })).toContainText('역할 담당자 없음')
+  await expect(edition.getByRole('region', { name: '이번 주 변경' })).toContainText('미해결 시작 2026. 8. 26. · 생성 시점 기준 4일 지남')
   await expect(edition.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('role:current')
   await expect(edition.getByRole('region', { name: '이전 주부터 미해결' })).toContainText('인수인계 미완료')
+  await expect(edition.getByRole('region', { name: '이전 주부터 미해결' })).toContainText('미해결 시작 2026. 8. 11. · 생성 시점 기준 19일 지남')
   await expect(edition.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('handoff:carry')
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await edition.getByRole('region', { name: '이전 주부터 미해결' }).scrollIntoViewIfNeeded()
@@ -108,7 +111,7 @@ for (const access of ['ended', 'viewer'] as const) {
         weekStart: '2026-08-24', zoneId: 'Asia/Seoul', windowStart: '2026-08-23T15:00:00Z', windowEnd: '2026-08-30T15:00:00Z',
         generatedAt: '2026-08-29T00:00:00Z', sourceCursor: 1, ruleVersion: 1,
         items: [{ reasonCode: 'ROUTINE_MISSED', severity: 'MEDIUM', status: 'ACTIVE', sourceReference: 'legacy:+& 한글',
-          observedAt: '2026-08-28T00:00:00Z', ruleVersion: 1, aggregateRevision: null, revisionGap: null, section: null }],
+          observedAt: '2026-08-28T00:00:00Z', activeSince: null, ruleVersion: 1, aggregateRevision: null, revisionGap: null, section: null }],
       } })
     })
     if (access === 'viewer') await page.goto(WORKSPACE_PATH)
@@ -117,6 +120,8 @@ for (const access of ['ended', 'viewer'] as const) {
     await panel.locator('summary').click()
     await panel.getByText('저장된 주간 요약', { exact: true }).click()
     await expect(panel.getByRole('region', { name: '이전 주간 요약 · 분류 미기록' })).toContainText('반복 업무 누락')
+    // 미해결 시작 시각을 주지 않은 이전 BRIEF 주간 요약은 기간을 추정해 표시하지 않는다.
+    await expect(panel.getByRole('region', { name: '이전 주간 요약 · 분류 미기록' })).not.toContainText('미해결 시작')
     await expect(panel.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('legacy:+& 한글')
     await expect(panel.getByText('이전 주간 요약: 변경 번호·누락 여부 미기록')).not.toBeVisible()
     await panel.getByText('연동 상세', { exact: true }).click()

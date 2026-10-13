@@ -1,5 +1,5 @@
 import { apiRequest } from '@/shared/api/client'
-import { isInstant, isJsonObject, isSameUuid, isSupportedTimeZone, isUuid } from '@/shared/api/responseValidation'
+import { isInstant, isJsonObject, isNullableInstant, isSameUuid, isSupportedTimeZone, isUuid } from '@/shared/api/responseValidation'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { csrfHeaders } from '@/features/auth/api'
 import { attentionReasons } from './types'
@@ -27,13 +27,13 @@ function decodeItem(value: unknown): AttentionItem {
     || (value.severity !== 'HIGH' && value.severity !== 'MEDIUM')
     || (value.status !== 'ACTIVE' && value.status !== 'RESOLVED')
     || typeof value.sourceReference !== 'string' || !value.sourceReference.length
-    || !isInstant(value.observedAt)
+    || !isInstant(value.observedAt) || !isNullableInstant(value.activeSince)
     || !isPositiveInteger(value.aggregateRevision) || !isPositiveInteger(value.ruleVersion)
     || typeof value.revisionGap !== 'boolean') {
     throw new Error('점검 항목 응답을 확인할 수 없습니다.')
   }
   return { reasonCode: value.reasonCode, severity: value.severity, status: value.status,
-    sourceReference: value.sourceReference, observedAt: value.observedAt,
+    sourceReference: value.sourceReference, observedAt: value.observedAt, activeSince: value.activeSince,
     aggregateRevision: value.aggregateRevision, ruleVersion: value.ruleVersion, revisionGap: value.revisionGap }
 }
 
@@ -137,14 +137,14 @@ function decodeEditionItem(item: unknown): BriefEdition['items'][number] {
       || (item.severity !== 'HIGH' && item.severity !== 'MEDIUM')
       || (item.status !== 'ACTIVE' && item.status !== 'RESOLVED')
       || typeof item.sourceReference !== 'string' || !item.sourceReference.length
-      || !isInstant(item.observedAt) || !isPositiveInteger(item.ruleVersion)
+      || !isInstant(item.observedAt) || !isNullableInstant(item.activeSince) || !isPositiveInteger(item.ruleVersion)
       || (item.section !== null && item.section !== 'CURRENT_WEEK' && item.section !== 'CARRY_OVER')
       || !((item.aggregateRevision === null && item.revisionGap === null)
         || (isPositiveInteger(item.aggregateRevision) && typeof item.revisionGap === 'boolean'))) {
       throw new Error('저장된 주간 요약 항목을 확인할 수 없습니다.')
     }
     return { reasonCode: item.reasonCode, severity: item.severity, status: item.status, sourceReference: item.sourceReference,
-      observedAt: item.observedAt, ruleVersion: item.ruleVersion, aggregateRevision: item.aggregateRevision,
+      observedAt: item.observedAt, activeSince: item.activeSince, ruleVersion: item.ruleVersion, aggregateRevision: item.aggregateRevision,
       revisionGap: item.revisionGap, section: item.section }
 }
 

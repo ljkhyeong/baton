@@ -8,7 +8,7 @@ const MIDDLE = '8e448211-66ae-44ab-9888-c4960648c222'
 const LATEST = '8e448211-66ae-44ab-9888-c4960648c223'
 const SOURCE = 'baton-continuity:8e448211-66ae-44ab-9888-c4960648c224'
 const currentItem = { reasonCode: 'ROLE_UNASSIGNED', sourceReference: SOURCE, severity: 'HIGH', status: 'ACTIVE',
-  observedAt: '2026-08-25T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }
+  observedAt: '2026-08-25T00:00:00Z', activeSince: '2026-08-18T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }
 const oldItem = { ...currentItem, section: 'CURRENT_WEEK' }
 const summaries = [LATEST, MIDDLE, OLD].map((editionId, index) => ({ editionId, generation: 3 - index,
   weekStart: index === 0 ? '2026-08-31' : '2026-08-24', zoneId: 'Asia/Seoul', generatedAt: '2026-09-05T00:00:00Z', sourceCursor: 3 - index, ruleVersion: 2, itemCount: 1 }))
@@ -361,6 +361,7 @@ async function installSharedEdition(page: Page, options: { printItems?: boolean 
     const selected = edition(OLD)
     return route.fulfill({ json: options.printItems ? { ...selected, itemCount: 24, items: Array.from({ length: 24 }, (_, index) => ({ ...oldItem,
       sourceReference: index === 0 ? SOURCE : `role:print-${index}`, section: index % 3 === 0 ? 'CURRENT_WEEK' : index % 3 === 1 ? 'CARRY_OVER' : null,
+      activeSince: index % 3 === 2 ? null : oldItem.activeSince,
       aggregateRevision: index % 3 === 2 ? null : 1, revisionGap: index % 3 === 2 ? null : false })) } : selected })
   })
 }
@@ -487,6 +488,8 @@ test('인쇄에는 선택한 불변 주간 요약과 현재 업무명 구분만 
   await expect(printSheet).toContainText('이전 주부터 미해결 · 8건')
   await expect(printSheet).toContainText('이전 주간 요약 · 분류 미기록 · 8건')
   await expect(printSheet).toContainText('이전 주간 요약: 변경 번호·누락 여부 미기록')
+  // 미해결 기간은 생성 시각까지 세며 값을 주지 않은 이전 항목 8건에는 붙이지 않는다.
+  await expect(printSheet.getByText('미해결 시작 2026. 8. 18. · 생성 시점 기준 18일 지남', { exact: true })).toHaveCount(16)
   await expect(printSheet).toContainText(OLD)
   await expect(printSheet).not.toContainText(LATEST)
   await expect(printSheet).not.toContainText(ACCESS_KEY)

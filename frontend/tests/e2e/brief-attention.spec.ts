@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test'
 import { installAccountSession, installApi, openSharedWorkspace, MEMBER_ONE_ID, ACCESS_KEY, ACCOUNT_ID } from './support/workspaceApiHarness'
 
 test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초기화를 확인한다 @smoke', async ({ page }) => {
+  // 미해결 기간은 시즌 시간대(Asia/Seoul)의 오늘 날짜까지 센다.
+  await page.clock.setFixedTime(new Date('2026-09-02T09:00:00+09:00'))
   await installApi(page)
   await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   const calls: URLSearchParams[] = []
@@ -33,13 +35,15 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
     const after = url.searchParams.get('afterSourceReference')
     const sourceReference = gap ? 'role:gap' : after ? 'role:second' : 'role:+& 한글'
     return route.fulfill({ json: { items: [{ reasonCode: 'ROLE_UNASSIGNED', severity: gap ? 'MEDIUM' : 'HIGH',
-      sourceReference, status: 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', aggregateRevision: 3, ruleVersion: 1, revisionGap: gap }],
+      sourceReference, status: 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', activeSince: gap ? '2026-08-31T00:00:00Z' : '2026-08-25T00:00:00Z',
+      aggregateRevision: 3, ruleVersion: 1, revisionGap: gap }],
     nextCursor: !gap && !after ? { eventType: 'ROLE_UNASSIGNED', sourceReference } : null } })
   })
   await openSharedWorkspace(page)
   const panel = page.locator('.brief-attention')
   await panel.locator('summary').click()
   await expect(panel.getByRole('button', { name: '높은 심각도 2건' })).toBeVisible()
+  await expect(panel.getByText('미해결 시작 2026. 8. 25. · 8일 지남', { exact: true })).toBeVisible()
   expect(historyCalls).toHaveLength(0)
   await panel.getByRole('button', { name: '변경 이력 보기' }).click()
   const history = panel.getByRole('region', { name: '점검 항목 변경 이력' })
@@ -68,6 +72,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   expect(calls.at(-1)?.get('revisionGap')).toBe('false')
   await panel.getByRole('button', { name: '변경 기록 누락 1건' }).click()
   await expect(panel.getByText('role:gap', { exact: true })).toBeAttached()
+  await expect(panel.getByText('미해결 시작 2026. 8. 31. · 2일 지남 · 누락 이전 기간 제외', { exact: true })).toBeVisible()
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect(calls.at(-1)?.get('afterEventType')).toBeNull()
   expect(calls.at(-1)?.get('severity')).toBeNull()

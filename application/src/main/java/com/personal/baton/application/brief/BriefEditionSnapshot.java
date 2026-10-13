@@ -29,6 +29,7 @@ public record BriefEditionSnapshot(
             String severity,
             String status,
             Instant observedAt,
+            Instant activeSince,
             int ruleVersion,
             Long aggregateRevision,
             Boolean revisionGap,

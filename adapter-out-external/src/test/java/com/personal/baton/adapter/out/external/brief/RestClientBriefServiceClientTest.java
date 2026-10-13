@@ -11,12 +11,14 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.personal.baton.application.brief.port.out.BriefServiceClient.Outcome;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
+import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -155,6 +157,37 @@ class RestClientBriefServiceClientTest {
         assertThat(result.outcome()).isEqualTo(Outcome.COMPLETED);
         assertThat(result.edition().workspaceId()).isEqualTo(TEAM_ID);
         assertThat(result.etag()).isEqualTo("\"brief-edition-v1-test\"");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("미해결 시작 시각을 읽고 이 필드가 없는 이전 BRIEF 응답은 null로 받는다")
+    void readsActiveSinceAndAcceptsPreviousBrief() {
+        String item = """
+                {"reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","sourceReference":"role:%s","status":"ACTIVE",
+                 "observedAt":"2026-08-31T00:00:00Z",%s"aggregateRevision":3,"ruleVersion":1,"revisionGap":false}
+                """;
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"items\":[" + item.formatted("current", "\"activeSince\":\"2026-08-24T00:00:00Z\",")
+                        + "," + item.formatted("previous", "") + "],\"nextCursor\":null}"));
+        String editionItem = """
+                {"sourceReference":"role:%s","reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","status":"ACTIVE",
+                 "observedAt":"2026-08-28T00:00:00Z",%s"ruleVersion":1,"aggregateRevision":2,"revisionGap":false,"section":"CARRY_OVER"}
+                """;
+        server.expect(requestTo(BASE_URL + latestPath())).andRespond(withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON).header(HttpHeaders.ETAG, "\"brief-edition-v3-test\"")
+                .body(editionJson().replace("\"items\": []", "\"items\": [" + editionItem.formatted("current",
+                        "\"activeSince\":\"2026-08-14T00:00:00Z\",") + "," + editionItem.formatted("previous", "") + "]")));
+
+        var page = client.findAttentionItems(TEAM_ID, SEASON_ID,
+                new BriefAttentionPage.Filter(BriefAttentionPage.Status.ACTIVE, null, null, null, 20));
+        var edition = client.findLatestEdition(TEAM_ID, SEASON_ID);
+
+        assertThat(page.items()).extracting(BriefAttentionPage.Item::activeSince)
+                .containsExactly(Instant.parse("2026-08-24T00:00:00Z"), null);
+        assertThat(edition.outcome()).isEqualTo(Outcome.COMPLETED);
+        assertThat(edition.edition().items()).extracting(BriefEditionSnapshot.Item::activeSince)
+                .containsExactly(Instant.parse("2026-08-14T00:00:00Z"), null);
         server.verify();
     }
 

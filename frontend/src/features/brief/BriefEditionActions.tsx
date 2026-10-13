@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useWorkspacePrint } from '@/features/workspace/useWorkspacePrint'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { BriefSourceContext } from './BriefSources'
-import { attentionReasons, editionItemEvidence, editionSections, severityLabel, statusLabel } from './types'
+import { activeSinceText, attentionReasons, editionItemEvidence, editionSections, severityLabel, statusLabel } from './types'
 import type { AttentionItem, BriefEdition, BriefScope } from './types'
 
 export function BriefEditionActions({ edition, workspaceName, scope, loading }: {
@@ -73,6 +73,7 @@ export function BriefEditionActions({ edition, workspaceName, scope, loading }: 
               <h3>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</h3>
               <p>현재 업무명: {source?.target?.title ?? '확인할 수 없음'}</p>
               <p>{severityLabel(item.severity)} · {statusLabel(item.status)} · 상태 기록 {formatInstant(item.observedAt, edition.zoneId)}</p>
+              {item.activeSince !== null && <p>{activeSinceText(item, edition.zoneId, new Date(edition.generatedAt), '생성 시점 기준 ')}</p>}
               <p className="brief-print-evidence">원본 항목 ID: {item.sourceReference}<br />
                 {editionItemEvidence(item)}</p>
             </li>

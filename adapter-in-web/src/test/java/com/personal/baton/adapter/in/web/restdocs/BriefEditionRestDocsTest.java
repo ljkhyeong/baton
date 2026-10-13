@@ -155,6 +155,7 @@ class BriefEditionRestDocsTest {
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
                 .andExpect(jsonPath("$.items[0].section").value("CURRENT_WEEK"))
                 .andExpect(jsonPath("$.items[1].section").value("CARRY_OVER"))
+                .andExpect(jsonPath("$.items[1].activeSince").value("2026-08-14T03:00:00Z"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getLatestBriefEdition",
                         "인증된 BATON 계정의 활성 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF의 최신 주간 요약을 전달한다.",
@@ -321,7 +322,8 @@ class BriefEditionRestDocsTest {
     void documentsComparison() throws Exception {
         var before = edition().items().getFirst();
         var after = new BriefEditionSnapshot.Item(before.sourceReference(), before.reasonCode(), before.severity(), before.status(),
-                before.observedAt(), before.ruleVersion(), before.aggregateRevision(), before.revisionGap(), BriefEditionSnapshot.Section.CARRY_OVER);
+                before.observedAt(), before.activeSince(), before.ruleVersion(), before.aggregateRevision(), before.revisionGap(),
+                BriefEditionSnapshot.Section.CARRY_OVER);
         when(briefEditionUseCase.compareEditions(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), ACCOUNT_ID, EDITION_ID))
                 .thenReturn(new BriefEditionComparison(new BriefEditionHistory.Summary(ACCOUNT_ID, 2, summary().weekStart(), summary().zoneId(),
                         summary().generatedAt(), 16, 2, 2), summary(), List.of(before), List.of(before), List.of(new BriefEditionComparison.Change(before, after))));
@@ -433,6 +435,8 @@ class BriefEditionRestDocsTest {
                 fieldWithPath(prefix + "severity").description("BRIEF 표시 심각도"),
                 fieldWithPath(prefix + "status").description("생성 시점 신호 상태"),
                 fieldWithPath(prefix + "observedAt").description("원본 상태 관찰 시각"),
+                fieldWithPath(prefix + "activeSince").optional()
+                        .description("생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null"),
                 fieldWithPath(prefix + "ruleVersion").description("항목 투영 규칙 버전"),
                 fieldWithPath(prefix + "aggregateRevision").optional().description("원본 변경 번호. 이전 주간 요약의 미기록 값은 null"),
                 fieldWithPath(prefix + "revisionGap").optional().description("생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null"),
@@ -468,12 +472,14 @@ class BriefEditionRestDocsTest {
                         "MEDIUM",
                         "ACTIVE",
                         Instant.parse("2026-08-28T03:00:00Z"),
+                        Instant.parse("2026-08-20T03:00:00Z"),
                         1,
                         2L,
                         false,
                         BriefEditionSnapshot.Section.CURRENT_WEEK
                 ), new BriefEditionSnapshot.Item("routine:carry-over", "ROUTINE_MISSED", "MEDIUM", "ACTIVE",
-                        Instant.parse("2026-08-21T03:00:00Z"), 1, 1L, false, BriefEditionSnapshot.Section.CARRY_OVER))
+                        Instant.parse("2026-08-21T03:00:00Z"), Instant.parse("2026-08-14T03:00:00Z"), 1, 1L, false,
+                        BriefEditionSnapshot.Section.CARRY_OVER))
         );
     }
 }

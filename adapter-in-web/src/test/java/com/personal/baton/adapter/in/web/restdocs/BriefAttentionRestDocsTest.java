@@ -143,17 +143,18 @@ class BriefAttentionRestDocsTest {
     @Test
     @DisplayName("점검 항목 필터와 페이지 커서를 전달하고 불완전한 커서는 거부한다")
     void documentsFilteredPage() throws Exception {
-        var filter = new Filter(Status.RESOLVED, Severity.HIGH, true,
+        var filter = new Filter(Status.ACTIVE, Severity.HIGH, true,
                 new Cursor(EventType.ROLE_UNASSIGNED, "role:1"), 1);
-        var item = new Item(EventType.ROLE_UNASSIGNED, Severity.HIGH, "role:2", Status.RESOLVED,
-                Instant.parse("2026-08-31T00:00:00Z"), 4L, 1, true);
+        var item = new Item(EventType.ROLE_UNASSIGNED, Severity.HIGH, "role:2", Status.ACTIVE,
+                Instant.parse("2026-08-31T00:00:00Z"), Instant.parse("2026-08-29T00:00:00Z"), 4L, 1, true);
         when(useCase.findAttentionItems(SCOPE, filter)).thenReturn(new BriefAttentionPage(
                 List.of(item), new Cursor(item.reasonCode(), item.sourceReference())));
         mvc.perform(get(BriefAttentionController.LIST_PATH, TEAM, SEASON)
                         .header("X-Baton-Access-Key", "access-key").with(authentication(account()))
-                        .param("status", "RESOLVED").param("severity", "HIGH").param("revisionGap", "true")
+                        .param("status", "ACTIVE").param("severity", "HIGH").param("revisionGap", "true")
                         .param("afterEventType", "ROLE_UNASSIGNED").param("afterSourceReference", "role:1").param("limit", "1"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].aggregateRevision").value(4))
+                .andExpect(jsonPath("$.items[0].activeSince").value("2026-08-29T00:00:00Z"))
                 .andExpect(jsonPath("$.nextCursor.sourceReference").value("role:2"))
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefAttentionItems",
@@ -175,6 +176,8 @@ class BriefAttentionRestDocsTest {
                                 fieldWithPath("items[].sourceReference").description("원본 참조 문자열"),
                                 new EnumFields(Status.class).withPath("items[].status").description("현재 상태"),
                                 fieldWithPath("items[].observedAt").description("원본 관측 UTC 시각"),
+                                fieldWithPath("items[].activeSince").optional()
+                                        .description("변경 기록 누락 없이 이어진 현재 미해결 구간의 시작 UTC 시각. 해결 항목이거나 BRIEF가 제공하지 않으면 null"),
                                 fieldWithPath("items[].aggregateRevision").description("적용한 원본 리비전"),
                                 fieldWithPath("items[].ruleVersion").description("투영 규칙 버전"),
                                 fieldWithPath("items[].revisionGap").description("누적 리비전 공백 기록 여부"),

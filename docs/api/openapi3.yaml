@@ -2682,9 +2682,9 @@ paths:
               examples:
                 getBriefAttentionItems:
                   value: >-
-                    {"items":[{"reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","sourceReference":"role:2","status":"RESOLVED","observedAt":"2026-08-31T00:00:00Z","aggregateRevision":4,"ruleVersion":1,"revisionGap":true}],"nextCursor":{"eventType":"ROLE_UNASSIGNED","sourceReference":"role:2"}}
+                    {"items":[{"reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","sourceReference":"role:2","status":"ACTIVE","observedAt":"2026-08-31T00:00:00Z","activeSince":"2026-08-29T00:00:00Z","aggregateRevision":4,"ruleVersion":1,"revisionGap":true}],"nextCursor":{"eventType":"ROLE_UNASSIGNED","sourceReference":"role:2"}}
               schema:
-                $ref: '#/components/schemas/Schema_1d3be7104c4d77c4'
+                $ref: '#/components/schemas/Schema_279a941db5446655'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -3141,6 +3141,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-28T03:00:00Z",
+                        "activeSince" : "2026-08-20T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 2,
                         "revisionGap" : false,
@@ -3151,6 +3152,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-21T03:00:00Z",
+                        "activeSince" : "2026-08-14T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 1,
                         "revisionGap" : false,
@@ -3158,7 +3160,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_2688cd5555c641f8'
+                $ref: '#/components/schemas/Schema_9717e6284680a747'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -3250,6 +3252,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-28T03:00:00Z",
+                        "activeSince" : "2026-08-20T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 2,
                         "revisionGap" : false,
@@ -3261,6 +3264,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-28T03:00:00Z",
+                        "activeSince" : "2026-08-20T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 2,
                         "revisionGap" : false,
@@ -3273,6 +3277,7 @@ paths:
                           "severity" : "MEDIUM",
                           "status" : "ACTIVE",
                           "observedAt" : "2026-08-28T03:00:00Z",
+                          "activeSince" : "2026-08-20T03:00:00Z",
                           "ruleVersion" : 1,
                           "aggregateRevision" : 2,
                           "revisionGap" : false,
@@ -3284,6 +3289,7 @@ paths:
                           "severity" : "MEDIUM",
                           "status" : "ACTIVE",
                           "observedAt" : "2026-08-28T03:00:00Z",
+                          "activeSince" : "2026-08-20T03:00:00Z",
                           "ruleVersion" : 1,
                           "aggregateRevision" : 2,
                           "revisionGap" : false,
@@ -3292,7 +3298,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_22887dd3879d2843'
+                $ref: '#/components/schemas/Schema_86c45ae8243c5228'
       summary: BRIEF 비교
       tags:
         - api
@@ -3406,6 +3412,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-28T03:00:00Z",
+                        "activeSince" : "2026-08-20T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 2,
                         "revisionGap" : false,
@@ -3416,6 +3423,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-21T03:00:00Z",
+                        "activeSince" : "2026-08-14T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 1,
                         "revisionGap" : false,
@@ -3423,7 +3431,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_2688cd5555c641f8'
+                $ref: '#/components/schemas/Schema_9717e6284680a747'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -3492,6 +3500,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-28T03:00:00Z",
+                        "activeSince" : "2026-08-20T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 2,
                         "revisionGap" : false,
@@ -3502,6 +3511,7 @@ paths:
                         "severity" : "MEDIUM",
                         "status" : "ACTIVE",
                         "observedAt" : "2026-08-21T03:00:00Z",
+                        "activeSince" : "2026-08-14T03:00:00Z",
                         "ruleVersion" : 1,
                         "aggregateRevision" : 1,
                         "revisionGap" : false,
@@ -3509,7 +3519,7 @@ paths:
                       } ]
                     }
               schema:
-                $ref: '#/components/schemas/Schema_2688cd5555c641f8'
+                $ref: '#/components/schemas/Schema_9717e6284680a747'
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
@@ -10606,94 +10616,6 @@ components:
         - seasonId
         - teamId
       type: object
-    Schema_1d3be7104c4d77c4:
-      properties:
-        items:
-          description: 현재 점검 항목
-          items:
-            properties:
-              aggregateRevision:
-                description: 적용한 원본 리비전
-                format: int64
-                minimum: 1
-                type: integer
-              observedAt:
-                description: 원본 관측 UTC 시각
-                format: date-time
-                type: string
-              reasonCode:
-                description: 원본 신호 종류
-                enum:
-                  - HANDOFF_BLOCKED
-                  - ROUTINE_MISSED
-                  - DECISION_FOLLOW_UP_OVERDUE
-                  - ROLE_UNASSIGNED
-                  - ROLE_SUCCESSOR_MISSING
-                  - ROLE_PREPARATION_INCOMPLETE
-                  - ROUTINE_REPEATEDLY_OVERDUE
-                  - HANDOFF_INCOMPLETE
-                type: string
-              revisionGap:
-                description: 누적 리비전 공백 기록 여부
-                type: boolean
-              ruleVersion:
-                description: 투영 규칙 버전
-                format: int32
-                minimum: 1
-                type: integer
-              severity:
-                description: 표시 심각도
-                enum:
-                  - HIGH
-                  - MEDIUM
-                type: string
-              sourceReference:
-                description: 원본 참조 문자열
-                type: string
-              status:
-                description: 현재 상태
-                enum:
-                  - ACTIVE
-                  - RESOLVED
-                type: string
-            required:
-              - aggregateRevision
-              - observedAt
-              - reasonCode
-              - revisionGap
-              - ruleVersion
-              - severity
-              - sourceReference
-              - status
-            type: object
-          type: array
-        nextCursor:
-          description: 다음 커서, 마지막 페이지는 null
-          nullable: true
-          properties:
-            eventType:
-              description: 커서 신호 종류
-              enum:
-                - HANDOFF_BLOCKED
-                - ROUTINE_MISSED
-                - DECISION_FOLLOW_UP_OVERDUE
-                - ROLE_UNASSIGNED
-                - ROLE_SUCCESSOR_MISSING
-                - ROLE_PREPARATION_INCOMPLETE
-                - ROUTINE_REPEATEDLY_OVERDUE
-                - HANDOFF_INCOMPLETE
-              type: string
-            sourceReference:
-              description: 커서 원본 참조
-              type: string
-          required:
-            - eventType
-            - sourceReference
-          type: object
-      required:
-        - items
-        - nextCursor
-      type: object
     Schema_1e12d96dd5d2673b:
       properties:
         archivedAt:
@@ -10743,300 +10665,6 @@ components:
           type: string
       required:
         - accessKey
-      type: object
-    Schema_22887dd3879d2843:
-      properties:
-        added:
-          description: 대상에만 포함된 항목
-          items:
-            properties:
-              aggregateRevision:
-                description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
-                nullable: true
-                type: number
-              observedAt:
-                description: 원본 상태 관찰 시각
-                format: date-time
-                type: string
-              reasonCode:
-                description: BATON 연속성 신호 유형
-                type: string
-              revisionGap:
-                description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
-                nullable: true
-                type: boolean
-              ruleVersion:
-                description: 항목 투영 규칙 버전
-                type: number
-              section:
-                description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                enum:
-                  - CURRENT_WEEK
-                  - CARRY_OVER
-                nullable: true
-                type: string
-              severity:
-                description: BRIEF 표시 심각도
-                type: string
-              sourceReference:
-                description: BATON 신호의 안정적인 원본 참조
-                type: string
-              status:
-                description: 생성 시점 신호 상태
-                type: string
-            required:
-              - aggregateRevision
-              - observedAt
-              - reasonCode
-              - revisionGap
-              - ruleVersion
-              - section
-              - severity
-              - sourceReference
-              - status
-            type: object
-          type: array
-        changed:
-          description: 고정 필드가 달라진 항목
-          items:
-            properties:
-              after:
-                description: 대상에 저장된 항목
-                properties:
-                  aggregateRevision:
-                    description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
-                    nullable: true
-                    type: number
-                  observedAt:
-                    description: 원본 상태 관찰 시각
-                    format: date-time
-                    type: string
-                  reasonCode:
-                    description: BATON 연속성 신호 유형
-                    type: string
-                  revisionGap:
-                    description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
-                    nullable: true
-                    type: boolean
-                  ruleVersion:
-                    description: 항목 투영 규칙 버전
-                    type: number
-                  section:
-                    description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                    enum:
-                      - CURRENT_WEEK
-                      - CARRY_OVER
-                    nullable: true
-                    type: string
-                  severity:
-                    description: BRIEF 표시 심각도
-                    type: string
-                  sourceReference:
-                    description: BATON 신호의 안정적인 원본 참조
-                    type: string
-                  status:
-                    description: 생성 시점 신호 상태
-                    type: string
-                required:
-                  - aggregateRevision
-                  - observedAt
-                  - reasonCode
-                  - revisionGap
-                  - ruleVersion
-                  - section
-                  - severity
-                  - sourceReference
-                  - status
-                type: object
-              before:
-                description: 기준에 저장된 항목
-                properties:
-                  aggregateRevision:
-                    description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
-                    nullable: true
-                    type: number
-                  observedAt:
-                    description: 원본 상태 관찰 시각
-                    format: date-time
-                    type: string
-                  reasonCode:
-                    description: BATON 연속성 신호 유형
-                    type: string
-                  revisionGap:
-                    description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
-                    nullable: true
-                    type: boolean
-                  ruleVersion:
-                    description: 항목 투영 규칙 버전
-                    type: number
-                  section:
-                    description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                    enum:
-                      - CURRENT_WEEK
-                      - CARRY_OVER
-                    nullable: true
-                    type: string
-                  severity:
-                    description: BRIEF 표시 심각도
-                    type: string
-                  sourceReference:
-                    description: BATON 신호의 안정적인 원본 참조
-                    type: string
-                  status:
-                    description: 생성 시점 신호 상태
-                    type: string
-                required:
-                  - aggregateRevision
-                  - observedAt
-                  - reasonCode
-                  - revisionGap
-                  - ruleVersion
-                  - section
-                  - severity
-                  - sourceReference
-                  - status
-                type: object
-            required:
-              - after
-              - before
-            type: object
-          type: array
-        from:
-          description: 비교 기준 주간 요약
-          properties:
-            editionId:
-              description: 주간 요약 UUID
-              format: uuid
-              type: string
-            generatedAt:
-              description: 생성 UTC 시각
-              format: date-time
-              type: string
-            generation:
-              description: 시즌 안에서 증가하는 생성 순번
-              type: number
-            itemCount:
-              description: 고정된 항목 수
-              type: number
-            ruleVersion:
-              description: 선정 규칙 버전
-              type: number
-            sourceCursor:
-              description: BRIEF 로컬 수신 경계
-              type: number
-            weekStart:
-              description: 주간 시작 월요일
-              type: string
-            zoneId:
-              description: 저장된 IANA 시간대
-              format: uuid
-              type: string
-          required:
-            - editionId
-            - generatedAt
-            - generation
-            - itemCount
-            - ruleVersion
-            - sourceCursor
-            - weekStart
-            - zoneId
-          type: object
-        removed:
-          description: 대상에서 제외된 항목. 해소 판정이 아님
-          items:
-            properties:
-              aggregateRevision:
-                description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
-                nullable: true
-                type: number
-              observedAt:
-                description: 원본 상태 관찰 시각
-                format: date-time
-                type: string
-              reasonCode:
-                description: BATON 연속성 신호 유형
-                type: string
-              revisionGap:
-                description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
-                nullable: true
-                type: boolean
-              ruleVersion:
-                description: 항목 투영 규칙 버전
-                type: number
-              section:
-                description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                enum:
-                  - CURRENT_WEEK
-                  - CARRY_OVER
-                nullable: true
-                type: string
-              severity:
-                description: BRIEF 표시 심각도
-                type: string
-              sourceReference:
-                description: BATON 신호의 안정적인 원본 참조
-                type: string
-              status:
-                description: 생성 시점 신호 상태
-                type: string
-            required:
-              - aggregateRevision
-              - observedAt
-              - reasonCode
-              - revisionGap
-              - ruleVersion
-              - section
-              - severity
-              - sourceReference
-              - status
-            type: object
-          type: array
-        to:
-          description: 비교 대상 주간 요약
-          properties:
-            editionId:
-              description: 주간 요약 UUID
-              format: uuid
-              type: string
-            generatedAt:
-              description: 생성 UTC 시각
-              format: date-time
-              type: string
-            generation:
-              description: 시즌 안에서 증가하는 생성 순번
-              type: number
-            itemCount:
-              description: 고정된 항목 수
-              type: number
-            ruleVersion:
-              description: 선정 규칙 버전
-              type: number
-            sourceCursor:
-              description: BRIEF 로컬 수신 경계
-              type: number
-            weekStart:
-              description: 주간 시작 월요일
-              type: string
-            zoneId:
-              description: 저장된 IANA 시간대
-              format: uuid
-              type: string
-          required:
-            - editionId
-            - generatedAt
-            - generation
-            - itemCount
-            - ruleVersion
-            - sourceCursor
-            - weekStart
-            - zoneId
-          type: object
-      required:
-        - added
-        - changed
-        - from
-        - removed
-        - to
       type: object
     Schema_254976d61d5d5175:
       properties:
@@ -11093,113 +10721,6 @@ components:
         - nextAfterSeasonId
         - subscriptions
       type: object
-    Schema_2688cd5555c641f8:
-      properties:
-        editionId:
-          description: 주간 요약 UUID
-          format: uuid
-          type: string
-        generatedAt:
-          description: 주간 요약 생성 UTC 시각
-          format: date-time
-          type: string
-        generation:
-          description: 작업 공간·시즌 단위 요약 버전
-          type: number
-        items:
-          description: 저장된 주간 요약 항목 목록
-          items:
-            properties:
-              aggregateRevision:
-                description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
-                nullable: true
-                type: number
-              observedAt:
-                description: 원본 상태 관찰 시각
-                format: date-time
-                type: string
-              reasonCode:
-                description: BATON 연속성 신호 유형
-                type: string
-              revisionGap:
-                description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
-                nullable: true
-                type: boolean
-              ruleVersion:
-                description: 항목 투영 규칙 버전
-                type: number
-              section:
-                description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                enum:
-                  - CURRENT_WEEK
-                  - CARRY_OVER
-                nullable: true
-                type: string
-              severity:
-                description: BRIEF 표시 심각도
-                type: string
-              sourceReference:
-                description: BATON 신호의 안정적인 원본 참조
-                type: string
-              status:
-                description: 생성 시점 신호 상태
-                type: string
-            required:
-              - aggregateRevision
-              - observedAt
-              - reasonCode
-              - revisionGap
-              - ruleVersion
-              - section
-              - severity
-              - sourceReference
-              - status
-            type: object
-          type: array
-        ruleVersion:
-          description: BRIEF 선정 규칙 버전
-          type: number
-        seasonId:
-          description: BATON 시즌 UUID
-          format: uuid
-          type: string
-        sourceCursor:
-          description: BRIEF 로컬 수신 순서 커서
-          type: number
-        weekStart:
-          description: 시즌 시간대 기준 월요일
-          format: date
-          type: string
-        windowEnd:
-          description: 주간 구간 종료 UTC 시각
-          format: date-time
-          type: string
-        windowStart:
-          description: 주간 구간 시작 UTC 시각
-          format: date-time
-          type: string
-        workspaceId:
-          description: BATON 팀 UUID와 같은 BRIEF 작업 공간 UUID
-          format: uuid
-          type: string
-        zoneId:
-          description: 생성 당시 IANA 시간대
-          format: uuid
-          type: string
-      required:
-        - editionId
-        - generatedAt
-        - generation
-        - items
-        - ruleVersion
-        - seasonId
-        - sourceCursor
-        - weekStart
-        - windowEnd
-        - windowStart
-        - workspaceId
-        - zoneId
-      type: object
     Schema_2749ed0aebe2038f:
       properties:
         title:
@@ -11244,6 +10765,100 @@ components:
         - ownerRoleId
         - phase
         - title
+      type: object
+    Schema_279a941db5446655:
+      properties:
+        items:
+          description: 현재 점검 항목
+          items:
+            properties:
+              activeSince:
+                description: 변경 기록 누락 없이 이어진 현재 미해결 구간의 시작 UTC 시각. 해결 항목이거나 BRIEF가 제공하지 않으면 null
+                format: date-time
+                nullable: true
+                type: string
+              aggregateRevision:
+                description: 적용한 원본 리비전
+                format: int64
+                minimum: 1
+                type: integer
+              observedAt:
+                description: 원본 관측 UTC 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: 원본 신호 종류
+                enum:
+                  - HANDOFF_BLOCKED
+                  - ROUTINE_MISSED
+                  - DECISION_FOLLOW_UP_OVERDUE
+                  - ROLE_UNASSIGNED
+                  - ROLE_SUCCESSOR_MISSING
+                  - ROLE_PREPARATION_INCOMPLETE
+                  - ROUTINE_REPEATEDLY_OVERDUE
+                  - HANDOFF_INCOMPLETE
+                type: string
+              revisionGap:
+                description: 누적 리비전 공백 기록 여부
+                type: boolean
+              ruleVersion:
+                description: 투영 규칙 버전
+                format: int32
+                minimum: 1
+                type: integer
+              severity:
+                description: 표시 심각도
+                enum:
+                  - HIGH
+                  - MEDIUM
+                type: string
+              sourceReference:
+                description: 원본 참조 문자열
+                type: string
+              status:
+                description: 현재 상태
+                enum:
+                  - ACTIVE
+                  - RESOLVED
+                type: string
+            required:
+              - activeSince
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        nextCursor:
+          description: 다음 커서, 마지막 페이지는 null
+          nullable: true
+          properties:
+            eventType:
+              description: 커서 신호 종류
+              enum:
+                - HANDOFF_BLOCKED
+                - ROUTINE_MISSED
+                - DECISION_FOLLOW_UP_OVERDUE
+                - ROLE_UNASSIGNED
+                - ROLE_SUCCESSOR_MISSING
+                - ROLE_PREPARATION_INCOMPLETE
+                - ROUTINE_REPEATEDLY_OVERDUE
+                - HANDOFF_INCOMPLETE
+              type: string
+            sourceReference:
+              description: 커서 원본 참조
+              type: string
+          required:
+            - eventType
+            - sourceReference
+          type: object
+      required:
+        - items
+        - nextCursor
       type: object
     Schema_27a7f932602250ee:
       properties:
@@ -12598,6 +12213,324 @@ components:
         - phase
         - title
       type: object
+    Schema_86c45ae8243c5228:
+      properties:
+        added:
+          description: 대상에만 포함된 항목
+          items:
+            properties:
+              activeSince:
+                description: 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                format: date-time
+                nullable: true
+                type: string
+              aggregateRevision:
+                description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
+                nullable: true
+                type: number
+              observedAt:
+                description: 원본 상태 관찰 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: BATON 연속성 신호 유형
+                type: string
+              revisionGap:
+                description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
+                nullable: true
+                type: boolean
+              ruleVersion:
+                description: 항목 투영 규칙 버전
+                type: number
+              section:
+                description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                enum:
+                  - CURRENT_WEEK
+                  - CARRY_OVER
+                nullable: true
+                type: string
+              severity:
+                description: BRIEF 표시 심각도
+                type: string
+              sourceReference:
+                description: BATON 신호의 안정적인 원본 참조
+                type: string
+              status:
+                description: 생성 시점 신호 상태
+                type: string
+            required:
+              - activeSince
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - section
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        changed:
+          description: 고정 필드가 달라진 항목
+          items:
+            properties:
+              after:
+                description: 대상에 저장된 항목
+                properties:
+                  activeSince:
+                    description: 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                    format: date-time
+                    nullable: true
+                    type: string
+                  aggregateRevision:
+                    description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
+                    nullable: true
+                    type: number
+                  observedAt:
+                    description: 원본 상태 관찰 시각
+                    format: date-time
+                    type: string
+                  reasonCode:
+                    description: BATON 연속성 신호 유형
+                    type: string
+                  revisionGap:
+                    description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
+                    nullable: true
+                    type: boolean
+                  ruleVersion:
+                    description: 항목 투영 규칙 버전
+                    type: number
+                  section:
+                    description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                    enum:
+                      - CURRENT_WEEK
+                      - CARRY_OVER
+                    nullable: true
+                    type: string
+                  severity:
+                    description: BRIEF 표시 심각도
+                    type: string
+                  sourceReference:
+                    description: BATON 신호의 안정적인 원본 참조
+                    type: string
+                  status:
+                    description: 생성 시점 신호 상태
+                    type: string
+                required:
+                  - activeSince
+                  - aggregateRevision
+                  - observedAt
+                  - reasonCode
+                  - revisionGap
+                  - ruleVersion
+                  - section
+                  - severity
+                  - sourceReference
+                  - status
+                type: object
+              before:
+                description: 기준에 저장된 항목
+                properties:
+                  activeSince:
+                    description: 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                    format: date-time
+                    nullable: true
+                    type: string
+                  aggregateRevision:
+                    description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
+                    nullable: true
+                    type: number
+                  observedAt:
+                    description: 원본 상태 관찰 시각
+                    format: date-time
+                    type: string
+                  reasonCode:
+                    description: BATON 연속성 신호 유형
+                    type: string
+                  revisionGap:
+                    description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
+                    nullable: true
+                    type: boolean
+                  ruleVersion:
+                    description: 항목 투영 규칙 버전
+                    type: number
+                  section:
+                    description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                    enum:
+                      - CURRENT_WEEK
+                      - CARRY_OVER
+                    nullable: true
+                    type: string
+                  severity:
+                    description: BRIEF 표시 심각도
+                    type: string
+                  sourceReference:
+                    description: BATON 신호의 안정적인 원본 참조
+                    type: string
+                  status:
+                    description: 생성 시점 신호 상태
+                    type: string
+                required:
+                  - activeSince
+                  - aggregateRevision
+                  - observedAt
+                  - reasonCode
+                  - revisionGap
+                  - ruleVersion
+                  - section
+                  - severity
+                  - sourceReference
+                  - status
+                type: object
+            required:
+              - after
+              - before
+            type: object
+          type: array
+        from:
+          description: 비교 기준 주간 요약
+          properties:
+            editionId:
+              description: 주간 요약 UUID
+              format: uuid
+              type: string
+            generatedAt:
+              description: 생성 UTC 시각
+              format: date-time
+              type: string
+            generation:
+              description: 시즌 안에서 증가하는 생성 순번
+              type: number
+            itemCount:
+              description: 고정된 항목 수
+              type: number
+            ruleVersion:
+              description: 선정 규칙 버전
+              type: number
+            sourceCursor:
+              description: BRIEF 로컬 수신 경계
+              type: number
+            weekStart:
+              description: 주간 시작 월요일
+              type: string
+            zoneId:
+              description: 저장된 IANA 시간대
+              format: uuid
+              type: string
+          required:
+            - editionId
+            - generatedAt
+            - generation
+            - itemCount
+            - ruleVersion
+            - sourceCursor
+            - weekStart
+            - zoneId
+          type: object
+        removed:
+          description: 대상에서 제외된 항목. 해소 판정이 아님
+          items:
+            properties:
+              activeSince:
+                description: 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                format: date-time
+                nullable: true
+                type: string
+              aggregateRevision:
+                description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
+                nullable: true
+                type: number
+              observedAt:
+                description: 원본 상태 관찰 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: BATON 연속성 신호 유형
+                type: string
+              revisionGap:
+                description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
+                nullable: true
+                type: boolean
+              ruleVersion:
+                description: 항목 투영 규칙 버전
+                type: number
+              section:
+                description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                enum:
+                  - CURRENT_WEEK
+                  - CARRY_OVER
+                nullable: true
+                type: string
+              severity:
+                description: BRIEF 표시 심각도
+                type: string
+              sourceReference:
+                description: BATON 신호의 안정적인 원본 참조
+                type: string
+              status:
+                description: 생성 시점 신호 상태
+                type: string
+            required:
+              - activeSince
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - section
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        to:
+          description: 비교 대상 주간 요약
+          properties:
+            editionId:
+              description: 주간 요약 UUID
+              format: uuid
+              type: string
+            generatedAt:
+              description: 생성 UTC 시각
+              format: date-time
+              type: string
+            generation:
+              description: 시즌 안에서 증가하는 생성 순번
+              type: number
+            itemCount:
+              description: 고정된 항목 수
+              type: number
+            ruleVersion:
+              description: 선정 규칙 버전
+              type: number
+            sourceCursor:
+              description: BRIEF 로컬 수신 경계
+              type: number
+            weekStart:
+              description: 주간 시작 월요일
+              type: string
+            zoneId:
+              description: 저장된 IANA 시간대
+              format: uuid
+              type: string
+          required:
+            - editionId
+            - generatedAt
+            - generation
+            - itemCount
+            - ruleVersion
+            - sourceCursor
+            - weekStart
+            - zoneId
+          type: object
+      required:
+        - added
+        - changed
+        - from
+        - removed
+        - to
+      type: object
     Schema_8722349937f63e53:
       properties:
         password:
@@ -12887,6 +12820,119 @@ components:
       required:
         - expectedAccountId
         - expectedVersion
+      type: object
+    Schema_9717e6284680a747:
+      properties:
+        editionId:
+          description: 주간 요약 UUID
+          format: uuid
+          type: string
+        generatedAt:
+          description: 주간 요약 생성 UTC 시각
+          format: date-time
+          type: string
+        generation:
+          description: 작업 공간·시즌 단위 요약 버전
+          type: number
+        items:
+          description: 저장된 주간 요약 항목 목록
+          items:
+            properties:
+              activeSince:
+                description: 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                format: date-time
+                nullable: true
+                type: string
+              aggregateRevision:
+                description: 원본 변경 번호. 이전 주간 요약의 미기록 값은 null
+                nullable: true
+                type: number
+              observedAt:
+                description: 원본 상태 관찰 시각
+                format: date-time
+                type: string
+              reasonCode:
+                description: BATON 연속성 신호 유형
+                type: string
+              revisionGap:
+                description: 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null
+                nullable: true
+                type: boolean
+              ruleVersion:
+                description: 항목 투영 규칙 버전
+                type: number
+              section:
+                description: 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                enum:
+                  - CURRENT_WEEK
+                  - CARRY_OVER
+                nullable: true
+                type: string
+              severity:
+                description: BRIEF 표시 심각도
+                type: string
+              sourceReference:
+                description: BATON 신호의 안정적인 원본 참조
+                type: string
+              status:
+                description: 생성 시점 신호 상태
+                type: string
+            required:
+              - activeSince
+              - aggregateRevision
+              - observedAt
+              - reasonCode
+              - revisionGap
+              - ruleVersion
+              - section
+              - severity
+              - sourceReference
+              - status
+            type: object
+          type: array
+        ruleVersion:
+          description: BRIEF 선정 규칙 버전
+          type: number
+        seasonId:
+          description: BATON 시즌 UUID
+          format: uuid
+          type: string
+        sourceCursor:
+          description: BRIEF 로컬 수신 순서 커서
+          type: number
+        weekStart:
+          description: 시즌 시간대 기준 월요일
+          format: date
+          type: string
+        windowEnd:
+          description: 주간 구간 종료 UTC 시각
+          format: date-time
+          type: string
+        windowStart:
+          description: 주간 구간 시작 UTC 시각
+          format: date-time
+          type: string
+        workspaceId:
+          description: BATON 팀 UUID와 같은 BRIEF 작업 공간 UUID
+          format: uuid
+          type: string
+        zoneId:
+          description: 생성 당시 IANA 시간대
+          format: uuid
+          type: string
+      required:
+        - editionId
+        - generatedAt
+        - generation
+        - items
+        - ruleVersion
+        - seasonId
+        - sourceCursor
+        - weekStart
+        - windowEnd
+        - windowStart
+        - workspaceId
+        - zoneId
       type: object
     Schema_974296610da1dd74:
       properties:

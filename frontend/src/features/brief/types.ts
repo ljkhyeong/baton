@@ -1,4 +1,7 @@
 import type { operations } from '@/generated/api'
+import { pilotCalendarDate } from '@/features/workspace/seasonCalendar'
+import { calendarDayNumber } from '@/shared/lib/calendarDate'
+import { formatInstantDate } from '@/shared/lib/dateTimeFormat'
 
 export type WeeklyResolutions = operations['getBriefWeeklyResolutions']['responses'][200]['content']['application/json']
 export type AttentionSummary = operations['getBriefAttentionSummary']['responses'][200]['content']['application/json']
@@ -35,6 +38,16 @@ export const statusLabel = (status: string) => status === 'ACTIVE' ? '미해결'
 export function editionItemEvidence({ aggregateRevision, revisionGap }: Pick<BriefEdition['items'][number], 'aggregateRevision' | 'revisionGap'>) {
   return aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
     : `원본 변경 번호 ${aggregateRevision} · ${revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`
+}
+
+// 미해결 시작일과 기준 시각까지 지난 날 수를 같은 시간대의 달력 날짜로 센다. 시작일이 기준일과 같거나 늦으면 날 수를 붙이지 않는다.
+// 누락이 있으면 BRIEF가 누락 이후부터 센 값이므로 이전 기간이 빠졌다고 밝힌다. 이전 BRIEF가 값을 주지 않으면 표시하지 않는다.
+export function activeSinceText({ activeSince, revisionGap }: { activeSince: string | null; revisionGap: boolean | null },
+  timeZone: string, reference: Date, referenceLabel = '') {
+  if (activeSince === null) return null
+  const days = calendarDayNumber(pilotCalendarDate(reference, timeZone)) - calendarDayNumber(pilotCalendarDate(new Date(activeSince), timeZone))
+  return [`미해결 시작 ${formatInstantDate(activeSince, timeZone)}`, days > 0 && `${referenceLabel}${days}일 지남`,
+    revisionGap && '누락 이전 기간 제외'].filter(Boolean).join(' · ')
 }
 
 export const attentionReasons = {

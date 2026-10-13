@@ -2046,55 +2046,6 @@ export interface components {
              */
             teamId: string;
         };
-        Schema_1d3be7104c4d77c4: {
-            /** @description 현재 점검 항목 */
-            items: {
-                /**
-                 * Format: int64
-                 * @description 적용한 원본 리비전
-                 */
-                aggregateRevision: number;
-                /**
-                 * Format: date-time
-                 * @description 원본 관측 UTC 시각
-                 */
-                observedAt: string;
-                /**
-                 * @description 원본 신호 종류
-                 * @enum {string}
-                 */
-                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 누적 리비전 공백 기록 여부 */
-                revisionGap: boolean;
-                /**
-                 * Format: int32
-                 * @description 투영 규칙 버전
-                 */
-                ruleVersion: number;
-                /**
-                 * @description 표시 심각도
-                 * @enum {string}
-                 */
-                severity: "HIGH" | "MEDIUM";
-                /** @description 원본 참조 문자열 */
-                sourceReference: string;
-                /**
-                 * @description 현재 상태
-                 * @enum {string}
-                 */
-                status: "ACTIVE" | "RESOLVED";
-            }[];
-            /** @description 다음 커서, 마지막 페이지는 null */
-            nextCursor: {
-                /**
-                 * @description 커서 신호 종류
-                 * @enum {string}
-                 */
-                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
-                /** @description 커서 원본 참조 */
-                sourceReference: string;
-            } | null;
-        };
         Schema_1e12d96dd5d2673b: {
             /**
              * Format: date-time
@@ -2657,6 +2608,195 @@ export interface components {
             /** @description 시즌 안에서 유일한 회차 이름 */
             name: string;
         };
+        Schema_86c45ae8243c5228: {
+            /** @description 대상에만 포함된 항목 */
+            added: {
+                /**
+                 * Format: date-time
+                 * @description 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                 */
+                activeSince: string | null;
+                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description 고정 필드가 달라진 항목 */
+            changed: {
+                /** @description 대상에 저장된 항목 */
+                after: {
+                    /**
+                     * Format: date-time
+                     * @description 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                     */
+                    activeSince: string | null;
+                    /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                    aggregateRevision: number | null;
+                    /**
+                     * Format: date-time
+                     * @description 원본 상태 관찰 시각
+                     */
+                    observedAt: string;
+                    /** @description BATON 연속성 신호 유형 */
+                    reasonCode: string;
+                    /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                    revisionGap: boolean | null;
+                    /** @description 항목 투영 규칙 버전 */
+                    ruleVersion: number;
+                    /**
+                     * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                     * @enum {string|null}
+                     */
+                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                    /** @description BRIEF 표시 심각도 */
+                    severity: string;
+                    /** @description BATON 신호의 안정적인 원본 참조 */
+                    sourceReference: string;
+                    /** @description 생성 시점 신호 상태 */
+                    status: string;
+                };
+                /** @description 기준에 저장된 항목 */
+                before: {
+                    /**
+                     * Format: date-time
+                     * @description 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                     */
+                    activeSince: string | null;
+                    /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                    aggregateRevision: number | null;
+                    /**
+                     * Format: date-time
+                     * @description 원본 상태 관찰 시각
+                     */
+                    observedAt: string;
+                    /** @description BATON 연속성 신호 유형 */
+                    reasonCode: string;
+                    /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                    revisionGap: boolean | null;
+                    /** @description 항목 투영 규칙 버전 */
+                    ruleVersion: number;
+                    /**
+                     * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                     * @enum {string|null}
+                     */
+                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                    /** @description BRIEF 표시 심각도 */
+                    severity: string;
+                    /** @description BATON 신호의 안정적인 원본 참조 */
+                    sourceReference: string;
+                    /** @description 생성 시점 신호 상태 */
+                    status: string;
+                };
+            }[];
+            /** @description 비교 기준 주간 요약 */
+            from: {
+                /**
+                 * Format: uuid
+                 * @description 주간 요약 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            };
+            /** @description 대상에서 제외된 항목. 해소 판정이 아님 */
+            removed: {
+                /**
+                 * Format: date-time
+                 * @description 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                 */
+                activeSince: string | null;
+                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
+                aggregateRevision: number | null;
+                /**
+                 * Format: date-time
+                 * @description 원본 상태 관찰 시각
+                 */
+                observedAt: string;
+                /** @description BATON 연속성 신호 유형 */
+                reasonCode: string;
+                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
+                revisionGap: boolean | null;
+                /** @description 항목 투영 규칙 버전 */
+                ruleVersion: number;
+                /**
+                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
+                 * @enum {string|null}
+                 */
+                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
+                /** @description BRIEF 표시 심각도 */
+                severity: string;
+                /** @description BATON 신호의 안정적인 원본 참조 */
+                sourceReference: string;
+                /** @description 생성 시점 신호 상태 */
+                status: string;
+            }[];
+            /** @description 비교 대상 주간 요약 */
+            to: {
+                /**
+                 * Format: uuid
+                 * @description 주간 요약 UUID
+                 */
+                editionId: string;
+                /**
+                 * Format: date-time
+                 * @description 생성 UTC 시각
+                 */
+                generatedAt: string;
+                /** @description 시즌 안에서 증가하는 생성 순번 */
+                generation: number;
+                /** @description 고정된 항목 수 */
+                itemCount: number;
+                /** @description 선정 규칙 버전 */
+                ruleVersion: number;
+                /** @description BRIEF 로컬 수신 경계 */
+                sourceCursor: number;
+                /** @description 주간 시작 월요일 */
+                weekStart: string;
+                /**
+                 * Format: uuid
+                 * @description 저장된 IANA 시간대
+                 */
+                zoneId: string;
+            };
+        };
         Schema_89a67e6a4a2dd84e: {
             /** @description 변경 요청에 사용할 CSRF 헤더 이름 */
             csrfHeaderName: string;
@@ -2878,6 +3018,60 @@ export interface components {
                  */
                 state: "ACTIVE" | "RESOLVED";
             }[];
+        };
+        Schema_279a941db5446655: {
+            /** @description 현재 점검 항목 */
+            items: {
+                /**
+                 * Format: date-time
+                 * @description 변경 기록 누락 없이 이어진 현재 미해결 구간의 시작 UTC 시각. 해결 항목이거나 BRIEF가 제공하지 않으면 null
+                 */
+                activeSince: string | null;
+                /**
+                 * Format: int64
+                 * @description 적용한 원본 리비전
+                 */
+                aggregateRevision: number;
+                /**
+                 * Format: date-time
+                 * @description 원본 관측 UTC 시각
+                 */
+                observedAt: string;
+                /**
+                 * @description 원본 신호 종류
+                 * @enum {string}
+                 */
+                reasonCode: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 누적 리비전 공백 기록 여부 */
+                revisionGap: boolean;
+                /**
+                 * Format: int32
+                 * @description 투영 규칙 버전
+                 */
+                ruleVersion: number;
+                /**
+                 * @description 표시 심각도
+                 * @enum {string}
+                 */
+                severity: "HIGH" | "MEDIUM";
+                /** @description 원본 참조 문자열 */
+                sourceReference: string;
+                /**
+                 * @description 현재 상태
+                 * @enum {string}
+                 */
+                status: "ACTIVE" | "RESOLVED";
+            }[];
+            /** @description 다음 커서, 마지막 페이지는 null */
+            nextCursor: {
+                /**
+                 * @description 커서 신호 종류
+                 * @enum {string}
+                 */
+                eventType: "HANDOFF_BLOCKED" | "ROUTINE_MISSED" | "DECISION_FOLLOW_UP_OVERDUE" | "ROLE_UNASSIGNED" | "ROLE_SUCCESSOR_MISSING" | "ROLE_PREPARATION_INCOMPLETE" | "ROUTINE_REPEATEDLY_OVERDUE" | "HANDOFF_INCOMPLETE";
+                /** @description 커서 원본 참조 */
+                sourceReference: string;
+            } | null;
         };
         Schema_316d1fabcd9119c2: {
             /** @description true이면 종료하고 false이면 가능한 경우 다시 연다 */
@@ -3109,7 +3303,62 @@ export interface components {
             /** @description 시즌 달력 기준 다음 확인일. 해제는 null */
             nextReviewOn?: string | null;
         };
-        Schema_2688cd5555c641f8: {
+        Schema_2749ed0aebe2038f: {
+            /** @description 모임 날짜 기준 마감일 오프셋 */
+            deadlineDayOffset?: number | null;
+            /** @description 시즌 시간대 기준 마감 시각 */
+            deadlineTime?: string | null;
+            /** @description 실행 방법 */
+            detail: string;
+            /** @description 사용자에게 보일 기한 문구 */
+            dueLabel: string;
+            /**
+             * Format: uuid
+             * @description 담당 역할 UUID
+             */
+            ownerRoleId: string;
+            /**
+             * @description 실행 단계: BEFORE, DURING, AFTER
+             * @enum {string}
+             */
+            phase: "BEFORE" | "DURING" | "AFTER";
+            /** @description 반복 업무 제목 */
+            title: string;
+        };
+        Schema_4343cd869e5bb959: {
+            /** @description 가입한 이메일 */
+            email: string;
+            /** @description 위젯이 발급한 일회용 자동 요청 방지 token */
+            turnstileToken?: string | null;
+        };
+        Schema_4638c5064b4052d0: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+            /**
+             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
+             * @enum {string|null}
+             */
+            template?: "STUDY_V1" | "TEAM_V1" | "TASK_FORCE_V1" | null;
+        };
+        Schema_5411bd92352a352b: {
+            /** @description 완료 여부 */
+            completed: boolean;
+        };
+        Schema_9717e6284680a747: {
             /**
              * Format: uuid
              * @description 주간 요약 UUID
@@ -3124,6 +3373,11 @@ export interface components {
             generation: number;
             /** @description 저장된 주간 요약 항목 목록 */
             items: {
+                /**
+                 * Format: date-time
+                 * @description 생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null
+                 */
+                activeSince: string | null;
                 /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
                 aggregateRevision: number | null;
                 /**
@@ -3183,230 +3437,6 @@ export interface components {
              * @description 생성 당시 IANA 시간대
              */
             zoneId: string;
-        };
-        Schema_2749ed0aebe2038f: {
-            /** @description 모임 날짜 기준 마감일 오프셋 */
-            deadlineDayOffset?: number | null;
-            /** @description 시즌 시간대 기준 마감 시각 */
-            deadlineTime?: string | null;
-            /** @description 실행 방법 */
-            detail: string;
-            /** @description 사용자에게 보일 기한 문구 */
-            dueLabel: string;
-            /**
-             * Format: uuid
-             * @description 담당 역할 UUID
-             */
-            ownerRoleId: string;
-            /**
-             * @description 실행 단계: BEFORE, DURING, AFTER
-             * @enum {string}
-             */
-            phase: "BEFORE" | "DURING" | "AFTER";
-            /** @description 반복 업무 제목 */
-            title: string;
-        };
-        Schema_4343cd869e5bb959: {
-            /** @description 가입한 이메일 */
-            email: string;
-            /** @description 위젯이 발급한 일회용 자동 요청 방지 token */
-            turnstileToken?: string | null;
-        };
-        Schema_4638c5064b4052d0: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 한 명 이상의 구성원 이름 */
-            memberNames: string[];
-            /** @description 첫 시즌 이름 */
-            seasonName: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-            /** @description 팀 이름 */
-            teamName: string;
-            /**
-             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
-             * @enum {string|null}
-             */
-            template?: "STUDY_V1" | "TEAM_V1" | "TASK_FORCE_V1" | null;
-        };
-        Schema_5411bd92352a352b: {
-            /** @description 완료 여부 */
-            completed: boolean;
-        };
-        Schema_22887dd3879d2843: {
-            /** @description 대상에만 포함된 항목 */
-            added: {
-                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
-                aggregateRevision: number | null;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
-                revisionGap: boolean | null;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /**
-                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                 * @enum {string|null}
-                 */
-                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description 고정 필드가 달라진 항목 */
-            changed: {
-                /** @description 대상에 저장된 항목 */
-                after: {
-                    /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
-                    aggregateRevision: number | null;
-                    /**
-                     * Format: date-time
-                     * @description 원본 상태 관찰 시각
-                     */
-                    observedAt: string;
-                    /** @description BATON 연속성 신호 유형 */
-                    reasonCode: string;
-                    /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
-                    revisionGap: boolean | null;
-                    /** @description 항목 투영 규칙 버전 */
-                    ruleVersion: number;
-                    /**
-                     * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                     * @enum {string|null}
-                     */
-                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                    /** @description BRIEF 표시 심각도 */
-                    severity: string;
-                    /** @description BATON 신호의 안정적인 원본 참조 */
-                    sourceReference: string;
-                    /** @description 생성 시점 신호 상태 */
-                    status: string;
-                };
-                /** @description 기준에 저장된 항목 */
-                before: {
-                    /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
-                    aggregateRevision: number | null;
-                    /**
-                     * Format: date-time
-                     * @description 원본 상태 관찰 시각
-                     */
-                    observedAt: string;
-                    /** @description BATON 연속성 신호 유형 */
-                    reasonCode: string;
-                    /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
-                    revisionGap: boolean | null;
-                    /** @description 항목 투영 규칙 버전 */
-                    ruleVersion: number;
-                    /**
-                     * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                     * @enum {string|null}
-                     */
-                    section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                    /** @description BRIEF 표시 심각도 */
-                    severity: string;
-                    /** @description BATON 신호의 안정적인 원본 참조 */
-                    sourceReference: string;
-                    /** @description 생성 시점 신호 상태 */
-                    status: string;
-                };
-            }[];
-            /** @description 비교 기준 주간 요약 */
-            from: {
-                /**
-                 * Format: uuid
-                 * @description 주간 요약 UUID
-                 */
-                editionId: string;
-                /**
-                 * Format: date-time
-                 * @description 생성 UTC 시각
-                 */
-                generatedAt: string;
-                /** @description 시즌 안에서 증가하는 생성 순번 */
-                generation: number;
-                /** @description 고정된 항목 수 */
-                itemCount: number;
-                /** @description 선정 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 로컬 수신 경계 */
-                sourceCursor: number;
-                /** @description 주간 시작 월요일 */
-                weekStart: string;
-                /**
-                 * Format: uuid
-                 * @description 저장된 IANA 시간대
-                 */
-                zoneId: string;
-            };
-            /** @description 대상에서 제외된 항목. 해소 판정이 아님 */
-            removed: {
-                /** @description 원본 변경 번호. 이전 주간 요약의 미기록 값은 null */
-                aggregateRevision: number | null;
-                /**
-                 * Format: date-time
-                 * @description 원본 상태 관찰 시각
-                 */
-                observedAt: string;
-                /** @description BATON 연속성 신호 유형 */
-                reasonCode: string;
-                /** @description 생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null */
-                revisionGap: boolean | null;
-                /** @description 항목 투영 규칙 버전 */
-                ruleVersion: number;
-                /**
-                 * @description 생성 당시 이번 주 변경 또는 이전 주부터 미해결 분류. 이전 주간 요약은 null
-                 * @enum {string|null}
-                 */
-                section: "CURRENT_WEEK" | "CARRY_OVER" | null;
-                /** @description BRIEF 표시 심각도 */
-                severity: string;
-                /** @description BATON 신호의 안정적인 원본 참조 */
-                sourceReference: string;
-                /** @description 생성 시점 신호 상태 */
-                status: string;
-            }[];
-            /** @description 비교 대상 주간 요약 */
-            to: {
-                /**
-                 * Format: uuid
-                 * @description 주간 요약 UUID
-                 */
-                editionId: string;
-                /**
-                 * Format: date-time
-                 * @description 생성 UTC 시각
-                 */
-                generatedAt: string;
-                /** @description 시즌 안에서 증가하는 생성 순번 */
-                generation: number;
-                /** @description 고정된 항목 수 */
-                itemCount: number;
-                /** @description 선정 규칙 버전 */
-                ruleVersion: number;
-                /** @description BRIEF 로컬 수신 경계 */
-                sourceCursor: number;
-                /** @description 주간 시작 월요일 */
-                weekStart: string;
-                /**
-                 * Format: uuid
-                 * @description 저장된 IANA 시간대
-                 */
-                zoneId: string;
-            };
         };
         Schema_36573e9631395414: {
             /** @description 자료 설명 */
@@ -6701,7 +6731,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_1d3be7104c4d77c4"];
+                    "application/json": components["schemas"]["Schema_279a941db5446655"];
                 };
             };
         };
@@ -6964,7 +6994,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_2688cd5555c641f8"];
+                    "application/json": components["schemas"]["Schema_9717e6284680a747"];
                 };
             };
         };
@@ -7000,7 +7030,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_22887dd3879d2843"];
+                    "application/json": components["schemas"]["Schema_86c45ae8243c5228"];
                 };
             };
         };
@@ -7072,7 +7102,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_2688cd5555c641f8"];
+                    "application/json": components["schemas"]["Schema_9717e6284680a747"];
                 };
             };
         };
@@ -7109,7 +7139,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_2688cd5555c641f8"];
+                    "application/json": components["schemas"]["Schema_9717e6284680a747"];
                 };
             };
         };

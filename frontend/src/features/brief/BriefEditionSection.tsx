@@ -2,7 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { ApiError, isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { briefScopeKey, compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
-import { attentionReasons, editionItemEvidence, editionSections, sectionNames, severityLabel, statusLabel } from './types'
+import { activeSinceText, attentionReasons, editionItemEvidence, editionSections, sectionNames, severityLabel, statusLabel } from './types'
 import { BriefEditionActions } from './BriefEditionActions'
 import type { BriefNavigation } from './useBriefNavigation'
 import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
@@ -148,13 +148,13 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
           {comparisonData.from.ruleVersion !== comparisonData.to.ruleVersion && <p className="brief-note">선정 기준이 달라 항목에 차이가 있을 수 있습니다.</p>}
           <p>추가 {comparisonData.added.length}건 · 제외 {comparisonData.removed.length}건 · 변경 {comparisonData.changed.length}건</p>
           {comparisonData.added.length + comparisonData.removed.length + comparisonData.changed.length === 0 && <p>저장된 항목의 차이가 없습니다.</p>}
-          {comparisonData.added.length > 0 && <section aria-label="주간 요약에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></section>}
-          {comparisonData.removed.length > 0 && <section aria-label="주간 요약에서 제외됨"><h5>제외</h5><EditionItems items={comparisonData.removed} zoneId={comparisonData.from.zoneId} readOnly={readOnly} /></section>}
+          {comparisonData.added.length > 0 && <section aria-label="주간 요약에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} edition={comparisonData.to} readOnly={readOnly} /></section>}
+          {comparisonData.removed.length > 0 && <section aria-label="주간 요약에서 제외됨"><h5>제외</h5><EditionItems items={comparisonData.removed} edition={comparisonData.from} readOnly={readOnly} /></section>}
           {comparisonData.changed.map((change) => <section className="brief-change" key={`${change.after.reasonCode}:${change.after.sourceReference}`} aria-label="주간 요약 항목 변경">
             <h5>변경된 항목</h5>
             {change.before.section !== change.after.section && <p>분류 변경: {change.before.section ? sectionNames[change.before.section] : '분류 미기록'} → {change.after.section ? sectionNames[change.after.section] : '분류 미기록'}</p>}
-            <div className="brief-change-columns"><div><h6>변경 전</h6><EditionItems items={[change.before]} zoneId={comparisonData.from.zoneId} readOnly={readOnly} /></div>
-              <div><h6>변경 후</h6><EditionItems items={[change.after]} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></div></div>
+            <div className="brief-change-columns"><div><h6>변경 전</h6><EditionItems items={[change.before]} edition={comparisonData.from} readOnly={readOnly} /></div>
+              <div><h6>변경 후</h6><EditionItems items={[change.after]} edition={comparisonData.to} readOnly={readOnly} /></div></div>
           </section>)}
           <details className="brief-evidence" aria-label="비교 결과 연동 상세"><summary>연동 상세</summary>
             <h5>추가</h5><EditionEvidence items={comparisonData.added} />
@@ -172,7 +172,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
             .map((section) => {
               const items = edition.items.filter((item) => item.section === section.value)
               return items.length > 0 && <section key={section.value ?? 'legacy'} aria-label={section.label}>
-                <h4>{section.label} · {items.length}건</h4><EditionItems items={items} zoneId={edition.zoneId} readOnly={readOnly} />
+                <h4>{section.label} · {items.length}건</h4><EditionItems items={items} edition={edition} readOnly={readOnly} />
               </section>
             })}
         <details key={`evidence:${edition.editionId}`} className="brief-evidence" aria-label="저장된 요약 연동 상세"><summary>연동 상세</summary>
@@ -185,12 +185,15 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
   </section>
 }
 
-function EditionItems({ items, zoneId, readOnly }: { items: BriefEdition['items']; zoneId: string; readOnly: boolean }) {
+// 항목 시각은 해당 주간 요약의 저장 시간대로, 미해결 기간은 그 요약의 생성 시각까지로 표시한다.
+function EditionItems({ items, edition, readOnly }: { items: BriefEdition['items']; edition: Pick<BriefEdition, 'zoneId' | 'generatedAt'>; readOnly: boolean }) {
+  const { zoneId, generatedAt } = edition
   return <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
       <span>{severityLabel(item.severity)} · {statusLabel(item.status)}</span></div>
     <BriefSourceLink item={item} readOnly={readOnly} />
     <small>상태 기록 {formatInstant(item.observedAt, zoneId)} ({zoneId})</small>
+    {item.activeSince !== null && <small>{activeSinceText(item, zoneId, new Date(generatedAt), '생성 시점 기준 ')}</small>}
   </li>)}</ul>
 }
 

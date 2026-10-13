@@ -10,7 +10,7 @@ import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { isSameUuid } from '@/shared/api/responseValidation'
 import { briefScopeKey, getAttentionPage, getAttentionSummary, getAttentionTransitions, getWeeklyResolutions } from './api'
 import { BriefEditionSection } from './BriefEditionSection'
-import { attentionReasons, severityLabel, statusLabel } from './types'
+import { activeSinceText, attentionReasons, severityLabel, statusLabel } from './types'
 import type { AttentionCursor, AttentionFilter, BriefScope } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 import type { BriefSource } from './types'
@@ -74,6 +74,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
   const resolutionWeekChanged = Boolean(resolutionPage && resolutionData
     && (resolutionPage.weekStart !== resolutionData.weekStart || resolutionPage.zoneId !== resolutionData.zoneId))
   const pageData = page.isError ? undefined : page.data
+  const now = new Date()
   const accessError = [summary.error, page.error, history.error, resolutions.error].find(isAccessDenied)
   if (accessError) return <p role="alert">{accessError.message}{' '}
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
@@ -141,6 +142,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
           <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{severityLabel(item.severity)} · {statusLabel(item.status)}{item.revisionGap && ' · 누락 있음'}</span></div>
           <BriefSourceLink item={item} readOnly={readOnly} />
           <small>상태 기록 {formatInstant(item.observedAt, timeZone)} ({timeZone})</small>
+          {item.status === 'ACTIVE' && item.activeSince !== null && <small>{activeSinceText(item, timeZone, now)}</small>}
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
             onClick={() => { setSelected({ eventType: item.reasonCode, sourceReference: item.sourceReference }); setBefore(null) }}>

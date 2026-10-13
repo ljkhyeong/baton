@@ -1230,6 +1230,8 @@ CSRF 없이 조회한다.
 `revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
 첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
 현재 조회에는 `ETag`가 없고, BRIEF 장애를 빈 결과로 바꾸지 않는다.
+현재 점검 항목과 저장된 주간 요약·비교 항목은 nullable `activeSince`(미해결 구간 시작 UTC 시각)를
+포함한다. 해결 항목과 이 값을 주지 않는 이전 BRIEF는 `null`이며 의미와 표시는 PRD-0008·PRD-0009를 따른다.
 이번 주 해소는 BATON이 시즌 시간대와 현재 주차를 정한다. 항목은 `reasonCode`,
 `sourceReference`, `resolvedAt`, `resolvedRevision`이며 개수와 동일한 조건의 현재 해소만
 반환한다. 전체 개수는 커서와 무관하며 마지막 커서는 null이다. 페이지 사이 주차·시간대가
