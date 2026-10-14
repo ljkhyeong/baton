@@ -7,10 +7,10 @@ test('시작 템플릿 선택과 응답 유실 복구가 같은 생성 요청을
   api.commitNextWorkspaceCreationThenTimeout()
   await page.goto('/')
   await expect(page.getByRole('combobox', { name: '템플릿 선택', exact: true })).toHaveValue('')
-  await page.getByRole('combobox', { name: '템플릿 선택', exact: true }).selectOption('TASK_FORCE_V1')
-  await expect(page.getByRole('region', { name: '템플릿 미리보기' })).toContainText('진행 상황과 장애물 확인')
+  await page.getByRole('combobox', { name: '템플릿 선택', exact: true }).selectOption('COMMITTEE_V1')
+  await expect(page.getByRole('region', { name: '템플릿 미리보기' })).toContainText('사업 진행 보고')
   await fillOnboardingForm(page, {
-    teamName: '출시 준비 TF',
+    teamName: '총학생회 집행부',
     seasonName: '2026 가을',
     startDate: '2026-09-01',
     endDate: '2026-11-30',
@@ -20,20 +20,20 @@ test('시작 템플릿 선택과 응답 유실 복구가 같은 생성 요청을
   await expect(page.getByRole('alert')).toContainText('작업 공간 생성 응답을 확인하지 못했습니다.')
   const pending = await pendingCreationEntries(page)
   expect(pending).toHaveLength(1)
-  expect(JSON.parse(pending[0]!.normalizedPayload).template).toBe('TASK_FORCE_V1')
+  expect(JSON.parse(pending[0]!.normalizedPayload).template).toBe('COMMITTEE_V1')
 
   await page.reload()
   await page.locator('.pending-workspaces summary').click()
   const recovery = page.getByRole('region', { name: '생성 결과 확인 필요' })
-  await expect(recovery).toContainText('TF 기본 구성')
-  await recovery.getByRole('button', { name: '출시 준비 TF 2026 가을 저장된 입력 불러오기' }).click()
-  await expect(page.getByRole('combobox', { name: '템플릿 선택', exact: true })).toHaveValue('TASK_FORCE_V1')
+  await expect(recovery).toContainText('학생회·위원회 기본 구성')
+  await recovery.getByRole('button', { name: '총학생회 집행부 2026 가을 저장된 입력 불러오기' }).click()
+  await expect(page.getByRole('combobox', { name: '템플릿 선택', exact: true })).toHaveValue('COMMITTEE_V1')
   await page.getByRole('button', { name: '생성 결과 다시 확인' }).click()
   await expect(page).toHaveURL(/\/teams\/[^/]+\/seasons\/[^/]+$/)
 
   const attempts = recordedCalls(api, 'POST', '/api/v1/workspaces')
   expect(attempts).toHaveLength(2)
   expect(attempts[1]!.headers['idempotency-key']).toBe(attempts[0]!.headers['idempotency-key'])
-  expect((attempts[1]!.body as CreateWorkspaceRequest).template).toBe('TASK_FORCE_V1')
+  expect((attempts[1]!.body as CreateWorkspaceRequest).template).toBe('COMMITTEE_V1')
   await expect.poll(async () => (await pendingCreationEntries(page)).length).toBe(0)
 })
