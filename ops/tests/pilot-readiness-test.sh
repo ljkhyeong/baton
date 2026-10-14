@@ -335,6 +335,11 @@ if [[ "${COMPOSE_MENU:-}" != "false" ]]; then
   exit 88
 fi
 
+if [[ "${BUILDX_BAKE_ENTITLEMENTS_FS:-}" != "0" ]]; then
+  printf 'Production wrapper did not let bake read its pinned build secret files.\n' >&2
+  exit 91
+fi
+
 for required_secret_name in \
   BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN \
   BATON_SECRET_TURNSTILE_SECRET_KEY \

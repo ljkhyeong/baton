@@ -3335,29 +3335,6 @@ export interface components {
             /** @description 위젯이 발급한 일회용 자동 요청 방지 token */
             turnstileToken?: string | null;
         };
-        Schema_4638c5064b4052d0: {
-            /**
-             * Format: date
-             * @description 시즌 종료일(ISO-8601 날짜)
-             */
-            endDate: string;
-            /** @description 한 명 이상의 구성원 이름 */
-            memberNames: string[];
-            /** @description 첫 시즌 이름 */
-            seasonName: string;
-            /**
-             * Format: date
-             * @description 시즌 시작일(ISO-8601 날짜)
-             */
-            startDate: string;
-            /** @description 팀 이름 */
-            teamName: string;
-            /**
-             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
-             * @enum {string|null}
-             */
-            template?: "STUDY_V1" | "TEAM_V1" | "TASK_FORCE_V1" | null;
-        };
         Schema_5411bd92352a352b: {
             /** @description 완료 여부 */
             completed: boolean;
@@ -3902,6 +3879,29 @@ export interface components {
              * @description 구독 UUID
              */
             subscriptionId: string;
+        };
+        Schema_af4d7b977701df2f: {
+            /**
+             * Format: date
+             * @description 시즌 종료일(ISO-8601 날짜)
+             */
+            endDate: string;
+            /** @description 한 명 이상의 구성원 이름 */
+            memberNames: string[];
+            /** @description 첫 시즌 이름 */
+            seasonName: string;
+            /**
+             * Format: date
+             * @description 시즌 시작일(ISO-8601 날짜)
+             */
+            startDate: string;
+            /** @description 팀 이름 */
+            teamName: string;
+            /**
+             * @description 시작 템플릿. 생략 또는 null이면 빈 역할·반복 업무 구성
+             * @enum {string|null}
+             */
+            template?: "STUDY_V1" | "TEAM_V1" | "TASK_FORCE_V1" | "CLUB_V1" | "COMMITTEE_V1" | null;
         };
         Schema_af036bda61e00299: {
             /**
@@ -10096,7 +10096,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Schema_4638c5064b4052d0"];
+                "application/json": components["schemas"]["Schema_af4d7b977701df2f"];
             };
         };
         responses: {

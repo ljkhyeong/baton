@@ -106,6 +106,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -160,6 +162,24 @@ class WorkspaceUseCaseTest {
                         command.memberNames(), WorkspaceTemplate.TEAM_V1))).isInstanceOf(IdempotencyKeyReusedException.class);
     }
 
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "CLUB_V1|운영 총괄,행사 담당,총무 담당",
+            "COMMITTEE_V1|위원장,사업 담당,간사"
+    })
+    @DisplayName("동아리·위원회 템플릿은 담당자 없는 역할 3개와 그 역할이 맡는 반복 업무 3개를 만든다")
+    void createsClubAndCommitteeTemplates(WorkspaceTemplate template, String roleNames) {
+        var created = lifecycleUseCase.createWorkspace(UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("가을 운영 모임", "첫 시즌", LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 12, 31), List.of("박민서"), template));
+        var workspace = lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey());
+        assertThat(workspace.roles()).extracting(RoleResult::name).containsExactlyInAnyOrder(roleNames.split(","));
+        assertThat(workspace.roles()).allSatisfy(role -> assertThat(role.currentMemberId()).isNull());
+        assertThat(workspace.routines()).hasSize(3).extracting(RoutineResult::ownerRoleId)
+                .containsExactlyInAnyOrderElementsOf(workspace.roles().stream().map(RoleResult::id).toList());
+        assertThat(workspace.rounds()).isEmpty();
+    }
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-07-20T03:04:05Z");
     private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";

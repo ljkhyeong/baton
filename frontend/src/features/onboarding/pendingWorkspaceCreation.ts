@@ -9,6 +9,7 @@ import {
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { workspaceTemplates } from './workspaceTemplates'
 import {
   MAX_INITIAL_MEMBER_COUNT,
   MAX_MEMBER_NAME_LENGTH,
@@ -87,8 +88,8 @@ function isNormalizedPayload(value: unknown): value is string {
       || !isCalendarDate(parsed.startDate)
       || !isCalendarDate(parsed.endDate)
       || parsed.startDate > parsed.endDate
-      || !(parsed.template === undefined || parsed.template === 'STUDY_V1' || parsed.template === 'TEAM_V1'
-        || parsed.template === 'TASK_FORCE_V1')
+      || !(parsed.template === undefined
+        || (typeof parsed.template === 'string' && Object.hasOwn(workspaceTemplates, parsed.template)))
       || !Array.isArray(parsed.memberNames)
       || !parsed.memberNames.length
       || parsed.memberNames.length > MAX_INITIAL_MEMBER_COUNT
