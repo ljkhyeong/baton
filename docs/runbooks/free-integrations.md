@@ -399,6 +399,8 @@ Google 계정의 무료 저장 공간은 Gmail·Drive·Photos가 공유하는 [1
 - [전체 스택 테스트 DB](../../compose.fullstack-e2e.yml)
 - [ROUND 테스트 DB·Caddy](../../compose.round-fullstack-e2e.yml)
 
+Java·npm 업데이트는 minor·patch만 그룹으로 묶고, 메이저 업데이트는 그룹 전체를 막지 않도록 개별 PR로 연다. Dockerfile의 `eclipse-temurin`(Java 21 LTS)·`node`(Node 22 LTS) 메이저 전환은 제안받지 않고 별도 작업으로 검토한다.
+
 Compose 업데이트는 한 그룹으로 묶고 동시에 열린 PR을 1개로 제한한다. MySQL `8.5` 이상과 Caddy 메이저 버전 변경은 제외한다. MySQL 8.4 LTS·Caddy 2 범위 안의 제안을 기존 CI와 함께 검토하며, DB 상위 계열 전환은 별도 마이그레이션 작업으로 다룬다. 이미지 버전·해시는 이번에 변경하지 않았다.
 
 [일반 GitHub 실행기의 Dependabot 업데이트 작업](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-on-actions)은 포함된 Actions 실행 시간을 사용하지 않는다. 업데이트 PR의 별도 CI에는 [기존 Actions 요금 기준](https://docs.github.com/en/billing/concepts/product-billing/github-actions)이 적용되므로 비공개 저장소에서는 무료 한도와 초과 사용 차단을 유지한다. 유료 대형 실행기를 연결하지 않는다.

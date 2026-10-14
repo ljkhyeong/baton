@@ -82,7 +82,7 @@ npm run e2e:fullstack
 
 ### CI 품질 관문
 
-`.github/workflows/quality-gate.yml`은 모든 풀 리퀘스트, `main` 푸시와 수동 실행에서 배포 가능한 커밋인지 판정한다. 오래된 같은 참조의 실행은 취소하고 각 검증에 시간 제한을 둔다. 경로 필터는 사용하지 않아 문서만 바뀐 풀 리퀘스트도 필수 상태가 누락되지 않게 한다.
+`.github/workflows/quality-gate.yml`은 모든 풀 리퀘스트, `main` 푸시와 수동 실행에서 배포 가능한 커밋인지 판정한다. 오래된 같은 참조의 실행은 취소하고 각 검증에 시간 제한을 둔다. 경로 필터는 사용하지 않아 문서만 바뀐 풀 리퀘스트도 필수 상태가 누락되지 않게 한다. 실행기는 `ubuntu-24.04`로 고정한다. `ubuntu-latest`의 OS 전환은 Docker·Compose·buildx와 Playwright 브라우저 의존성을 함께 바꾸므로 별도로 검증한 뒤 올린다.
 
 - 백엔드와 API 계약은 Docker가 실제로 사용 가능한지 먼저 확인한 뒤 `build checkApiContract`를 한 Gradle 호출로 실행한다. 이 조합은 Testcontainers·Flyway 통합 테스트와 REST Docs를 포함하고 같은 태스크 그래프 안에서 REST Docs 중복 실행을 피한다.
 - 프런트엔드는 `npm run typecheck`로 프로덕션 소스와 Playwright 코드를 엄격하게 검사하고 `npm run build`로 프로덕션 번들을 확인한 뒤 Chromium·WebKit에서 Playwright E2E를 실행한다. Chromium은 전체 흐름과 390px 모바일 흐름, WebKit은 핵심 스모크·반응형 흐름과 브라우저 API 대표 사례를 소유한다. CI에서는 `test.only`를 거부하고 재시도에서만 성공한 불안정 테스트도 실패로 판정한다. 같은 실행기에서 워커 2개를 사용하고, 테스트별 진행 결과를 로그에 남긴다. 전체 작업 제한은 브라우저 설치와 전체 E2E 실행 시간을 포함해 40분이며, 개별 테스트 제한은 30초를 유지한다. 실패한 실행의 보고서·추적·화면 캡처는 7일 동안 산출물로 남긴다.
