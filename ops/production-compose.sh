@@ -325,6 +325,8 @@ elif [[ "$compose_command" == "down" ]]; then
 fi
 
 # 비밀값은 env 인자로 넘기면 잠시 프로세스 목록에 보이므로 명령 환경으로만 전달한다.
+# Compose v5의 bake는 작업 디렉터리 밖 빌드 비밀 파일(미설정 시 /dev/null)을 별도 권한 없이 읽지 못하고
+# docker compose에는 권한 옵션이 없다. 래퍼가 고정한 Compose 파일만 쓰므로 이 호출의 파일 권한 검사를 끈다.
 BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
 BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
 BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
@@ -432,6 +434,7 @@ env \
   -u COMPOSE_REMOVE_ORPHANS \
   -u COMPOSE_CONVERT_WINDOWS_PATHS \
   COMPOSE_MENU=false \
+  BUILDX_BAKE_ENTITLEMENTS_FS=0 \
   BATON_EFFECTIVE_ROUND_UID="$round_runtime_uid" \
   BATON_EFFECTIVE_ROUND_GID="$round_runtime_gid" \
   BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE="$spring_profiles_active" \

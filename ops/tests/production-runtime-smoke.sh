@@ -88,8 +88,9 @@ RECOVERED_ACCESS_KEY_A=""
 RECOVERED_ACCESS_KEY_B=""
 COMPOSE_SCOPE_INITIALIZED=false
 
+# 운영 래퍼와 같이 Compose v5 bake가 작업 디렉터리 밖 빌드 비밀(/dev/null)을 읽도록 파일 권한 검사를 끈다.
 COMPOSE=(
-  "$REAL_DOCKER" compose
+  env BUILDX_BAKE_ENTITLEMENTS_FS=0 "$REAL_DOCKER" compose
   --project-name "$COMPOSE_PROJECT"
   --file "$COMPOSE_FILE"
   --file "$ROUND_COMPOSE_FILE"
