@@ -14,6 +14,11 @@ const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
   NO_ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 추가 전달 기록이 없습니다.',
   UNKNOWN: '이 주간 요약의 생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.',
 }
+// 내용 판정은 BRIEF가 받은 변경으로 같은 주간을 다시 선정한 결과다. 추가 전달 여부와 따로 보여 준다.
+const freshnessText = ({ upToDate, ruleVersionChanged }: Pick<BriefDeliveryStatus, 'upToDate' | 'ruleVersionChanged'>) =>
+  upToDate ? '지금 점검 상태로 다시 만들어도 이 요약과 내용이 같습니다.'
+    : ruleVersionChanged ? '선정 기준이 바뀌어 지금 다시 만들면 이 요약과 내용이 달라집니다.'
+      : '지금 점검 상태로 다시 만들면 이 요약과 내용이 달라집니다.'
 const readinessText: Record<BriefReadiness['status'], string> = {
   READY: '주간 요약 생성 가능', DELIVERY_PENDING: 'BRIEF로 변경사항 전송 중', DELIVERY_FAILED: '변경사항 전송 실패 · 관리자 확인 필요',
   GENERATING: '주간 요약 생성 진행 중', GENERATION_FAILED: '주간 요약 생성 오류 · 관리자 확인 필요', SEASON_ENDED: '종료된 시즌 · 조회만 가능', DISABLED: 'BRIEF 연동이 꺼져 있습니다',
@@ -126,16 +131,17 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
       <h3>{edition.weekStart} 시작 주 · 요약 버전 {edition.generation}</h3>
       <p>생성 {formatInstant(edition.generatedAt, edition.zoneId)} ({edition.zoneId})</p>
       <section className="brief-delivery-status" aria-label="저장 이후 변경 확인">
-        <strong>{deliveryData ? deliveryStatusText[deliveryData.status] : delivery.isError
-          ? '추가 전달 기록을 불러오지 못했습니다.' : '추가 전달 기록 확인 중…'}</strong>
+        <strong>{deliveryData ? freshnessText(deliveryData) : delivery.isError
+          ? '저장 이후 변경을 확인하지 못했습니다.' : '저장 이후 변경 확인 중…'}</strong>
+        {deliveryData && <p>{deliveryStatusText[deliveryData.status]}</p>}
         {deliveryData && <small>확인 {formatInstant(deliveryData.checkedAt, timeZone)} ({timeZone})</small>}
-        {deliveryData?.status === 'ADDITIONAL_DELIVERIES' && <p>{readOnly
+        {deliveryData && !deliveryData.upToDate && <p>{readOnly
           ? '종료된 시즌은 현재 점검 항목에서 이후 상태를 확인해 주세요.'
           : '현재 점검 항목을 확인하고, 생성 준비가 끝나면 이번 주 요약을 요청할 수 있습니다.'}</p>}
         <button type="button" disabled={delivery.isFetching} onClick={() => void delivery.refetch()}>저장 이후 변경 새로고침</button>
         <details className="brief-evidence"><summary>확인 기준 보기</summary>
-          <p className="brief-note">이 주간 요약을 생성하거나 재사용한 마지막 성공 요청을 기준으로 확인합니다.
-            추가 전달이 있어도 주간 요약 항목은 같을 수 있으며, 추가 전달이 없어도 원본 전체의 반영을 보장하지 않습니다.</p>
+          <p className="brief-note">내용 비교는 BRIEF가 받은 변경으로 같은 주간을 다시 선정한 결과이며, BRIEF로 아직 전달되지 않은 변경은 반영하지 않습니다.
+            추가 전달 여부는 이 주간 요약을 생성하거나 재사용한 마지막 성공 요청을 기준으로 확인하며, 추가 전달이 없어도 원본 전체의 반영을 보장하지 않습니다.</p>
         </details>
       </section>
       {effectiveBaseId && <section className="brief-comparison" aria-label="주간 요약 비교 결과">

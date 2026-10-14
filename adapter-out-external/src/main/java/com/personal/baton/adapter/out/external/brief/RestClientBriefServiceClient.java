@@ -6,12 +6,14 @@ import com.personal.baton.application.brief.BriefWeeklyResolutions;
 import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
+import com.personal.baton.application.brief.error.BriefEditionNotFoundException;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import com.personal.baton.application.brief.port.out.BriefServiceClient;
 import java.io.IOException;
 import com.personal.baton.application.brief.BriefEditionHistory;
 import com.personal.baton.application.brief.BriefEditionComparison;
+import com.personal.baton.application.brief.BriefEditionFreshness;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -29,6 +31,15 @@ import org.springframework.web.client.RestClientResponseException;
 
 public final class RestClientBriefServiceClient
         implements BriefServiceClient {
+
+    /** 업무 의미가 있는 BRIEF 4xx. 나머지 4xx는 연동 계약·설정 오류다. */
+    private enum ExpectedRejection {
+        NONE,
+        /** 조회 조건 400은 사용자 입력 오류로 중계한다. */
+        QUERY,
+        /** 범위 지정 주간 요약의 404는 없거나 팀·시즌 밖인 요약이다. */
+        EDITION_SCOPE
+    }
 
     private final RestClient restClient;
 
@@ -48,7 +59,7 @@ public final class RestClientBriefServiceClient
                                 .build(workspaceId, seasonId, after.sourceReference());
                     }
                     return builder.build(workspaceId, seasonId);
-                }).accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefWeeklyResolutions.class), true);
+                }).accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefWeeklyResolutions.class), ExpectedRejection.QUERY);
         if (!weekStart.equals(summary.weekStart()) || !zoneId.equals(summary.zoneId())
                 || !weekStart.atStartOfDay(zoneId).toInstant().equals(summary.windowStart())
                 || !weekStart.plusWeeks(1).atStartOfDay(zoneId).toInstant().equals(summary.windowEnd())
@@ -86,7 +97,7 @@ public final class RestClientBriefServiceClient
         BriefAttentionSummary summary = readQuery(() -> restClient.get()
                 .uri("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/summary",
                         workspaceId, seasonId)
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionSummary.class), false);
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionSummary.class), ExpectedRejection.NONE);
         if (summary.highCount() == null || summary.highCount() < 0
                 || summary.mediumCount() == null || summary.mediumCount() < 0
                 || summary.revisionGapCount() == null || summary.revisionGapCount() < 0) {
@@ -113,7 +124,7 @@ public final class RestClientBriefServiceClient
                     }
                     return builder.build(workspaceId, seasonId);
                 })
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionPage.class), true);
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionPage.class), ExpectedRejection.QUERY);
         if (page.items() == null || page.items().stream().anyMatch(item -> item == null
                 || item.reasonCode() == null || item.severity() == null
                 || item.sourceReference() == null || item.sourceReference().isBlank()
@@ -141,7 +152,7 @@ public final class RestClientBriefServiceClient
                         .queryParam("limit", query.limit())
                         .queryParamIfPresent("beforeAggregateRevision", Optional.ofNullable(query.beforeAggregateRevision()))
                         .build(workspaceId, seasonId, query.sourceReference()))
-                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionTransitions.class), true);
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefAttentionTransitions.class), ExpectedRejection.QUERY);
         if (history.transitions() == null || history.transitions().stream().anyMatch(transition -> transition == null
                 || transition.eventId() == null || transition.aggregateRevision() == null || transition.aggregateRevision() < 1
                 || transition.state() == null || transition.observedAt() == null || transition.detectedRevisionGap() == null)
@@ -151,7 +162,7 @@ public final class RestClientBriefServiceClient
         return history;
     }
 
-    private <T> T readQuery(Supplier<ResponseEntity<T>> request, boolean hasFilter) {
+    private <T> T readQuery(Supplier<ResponseEntity<T>> request, ExpectedRejection expected) {
         try {
             ResponseEntity<T> response = request.get();
             if (response.getStatusCode().value() != 200 || response.getBody() == null) {
@@ -160,8 +171,11 @@ public final class RestClientBriefServiceClient
             return response.getBody();
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
-            if (hasFilter && status == 400) {
+            if (expected == ExpectedRejection.QUERY && status == 400) {
                 throw new BriefAttentionQueryRejectedException();
+            }
+            if (expected == ExpectedRejection.EDITION_SCOPE && status == 404) {
+                throw new BriefEditionNotFoundException();
             }
             if (status == 429 || exception.getStatusCode().is5xxServerError()) {
                 throw new BriefIntegrationUnavailableException();
@@ -197,7 +211,7 @@ public final class RestClientBriefServiceClient
                 .queryParam("limit", query.limit())
                 .queryParamIfPresent("beforeGeneration", Optional.ofNullable(query.beforeGeneration()))
                 .build(workspaceId, seasonId)).accept(MediaType.APPLICATION_JSON)
-                .retrieve().toEntity(BriefEditionHistory.class), false);
+                .retrieve().toEntity(BriefEditionHistory.class), ExpectedRejection.NONE);
         if (history.editions() == null || history.editions().stream().anyMatch(summary -> !isValid(summary))
                 || (history.nextBeforeGeneration() != null && history.nextBeforeGeneration() < 1)) {
             throw new BriefIntegrationConfigurationException();
@@ -206,11 +220,12 @@ public final class RestClientBriefServiceClient
     }
 
     @Override
-    public BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId) {
+    public BriefEditionComparison compareEditions(UUID workspaceId, UUID seasonId, UUID fromEditionId, UUID toEditionId) {
         var comparison = readQuery(() -> restClient.get().uri(builder -> builder
-                .path("/api/v1/editions/{editionId}/changes").queryParam("fromEditionId", fromEditionId)
-                .build(toEditionId)).accept(MediaType.APPLICATION_JSON)
-                .retrieve().toEntity(BriefEditionComparison.class), false);
+                .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/{editionId}/changes")
+                .queryParam("fromEditionId", fromEditionId)
+                .build(workspaceId, seasonId, toEditionId)).accept(MediaType.APPLICATION_JSON)
+                .retrieve().toEntity(BriefEditionComparison.class), ExpectedRejection.EDITION_SCOPE);
         if (!isValid(comparison.from()) || !isValid(comparison.to())
                 || !fromEditionId.equals(comparison.from().editionId()) || !toEditionId.equals(comparison.to().editionId())
                 || comparison.added() == null || comparison.added().stream().anyMatch(item -> !isValid(item))
@@ -222,6 +237,22 @@ public final class RestClientBriefServiceClient
             throw new BriefIntegrationConfigurationException();
         }
         return comparison;
+    }
+
+    @Override
+    public BriefEditionFreshness checkEditionFreshness(UUID workspaceId, UUID seasonId, UUID editionId) {
+        var freshness = readQuery(() -> restClient.get()
+                .uri("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/{editionId}/freshness",
+                        workspaceId, seasonId, editionId)
+                .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionFreshness.class),
+                ExpectedRejection.EDITION_SCOPE);
+        // 규칙 버전이 바뀐 요약은 BRIEF 계약상 항상 최신이 아니다.
+        if (!editionId.equals(freshness.editionId()) || freshness.upToDate() == null
+                || freshness.ruleVersionChanged() == null || freshness.evaluatedAt() == null
+                || (freshness.ruleVersionChanged() && freshness.upToDate())) {
+            throw new BriefIntegrationConfigurationException();
+        }
+        return freshness;
     }
 
     private boolean isValid(BriefEditionHistory.Summary summary) {

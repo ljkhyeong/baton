@@ -7,6 +7,7 @@ import com.personal.baton.application.brief.BriefAttentionSummary;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.BriefEditionHistory;
 import com.personal.baton.application.brief.BriefEditionComparison;
+import com.personal.baton.application.brief.BriefEditionFreshness;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -58,7 +59,11 @@ public interface BriefServiceClient {
 
     BriefEditionHistory findEditionHistory(UUID workspaceId, UUID seasonId, BriefEditionHistory.Query query);
 
-    BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId);
+    /** 두 주간 요약이 없거나 팀·시즌 밖이면 존재를 드러내지 않고 {@code BriefEditionNotFoundException}으로 끝난다. */
+    BriefEditionComparison compareEditions(UUID workspaceId, UUID seasonId, UUID fromEditionId, UUID toEditionId);
+
+    /** 주간 요약이 없거나 팀·시즌 밖이면 {@code BriefEditionNotFoundException}으로 끝난다. */
+    BriefEditionFreshness checkEditionFreshness(UUID workspaceId, UUID seasonId, UUID editionId);
 
     Result findLatestEditionForWeek(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId);
 

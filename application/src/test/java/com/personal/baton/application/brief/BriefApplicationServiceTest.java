@@ -145,37 +145,39 @@ class BriefApplicationServiceTest {
     }
 
     @Test
-    @DisplayName("식별자를 아는 다른 팀 브리프는 조회와 비교에서 감추고 비교 호출을 막는다")
-    void rejectsForeignEditionBeforeComparison() {
+    @DisplayName("식별자를 아는 다른 팀 브리프는 본문을 읽는 단건·지난주 조회에서 감춘다")
+    void hidesForeignEditionFromBodyReads() {
         when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(UUID.randomUUID(), SEASON_ID), "etag", false));
         assertThatThrownBy(() -> service.findEdition(EDITION_SCOPE, EDITION_ID))
-                .isInstanceOf(BriefEditionNotFoundException.class);
-        assertThatThrownBy(() -> service.compareEditions(EDITION_SCOPE, EDITION_ID, UUID.randomUUID()))
-                .isInstanceOf(BriefEditionNotFoundException.class);
-        assertThatThrownBy(() -> service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID))
                 .isInstanceOf(BriefEditionNotFoundException.class);
         assertThatThrownBy(() -> service.findPreviousWeekEdition(EDITION_SCOPE, EDITION_ID))
                 .isInstanceOf(BriefEditionNotFoundException.class);
         verify(client, never()).findLatestEditionForWeek(any(), any(), any(), any());
-        verifyNoInteractions(executionPort);
-        when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));
-        UUID foreignId = UUID.randomUUID();
-        when(client.findEdition(foreignId)).thenReturn(Result.completed(snapshot(TEAM_ID, UUID.randomUUID()), "etag", false));
-        assertThatThrownBy(() -> service.compareEditions(EDITION_SCOPE, EDITION_ID, foreignId))
-                .isInstanceOf(BriefEditionNotFoundException.class);
-        verify(client, never()).compareEditions(any(), any());
-        service.compareEditions(EDITION_SCOPE, EDITION_ID, EDITION_ID);
-        verify(client).compareEditions(EDITION_ID, EDITION_ID);
     }
 
     @Test
-    @DisplayName("브리프 추가 전달 안내는 생성 근거 없음과 추가 전달 유무를 구분한다")
+    @DisplayName("비교와 저장 이후 변경 확인은 확인한 팀·시즌으로 BRIEF 범위 지정 조회만 호출하고 없음 응답을 감추지 않는다")
+    void delegatesEditionScopeToBrief() {
+        UUID baseId = UUID.randomUUID();
+        service.compareEditions(EDITION_SCOPE, baseId, EDITION_ID);
+        verify(client).compareEditions(TEAM_ID, SEASON_ID, baseId, EDITION_ID);
+        when(client.checkEditionFreshness(TEAM_ID, SEASON_ID, EDITION_ID)).thenThrow(new BriefEditionNotFoundException());
+        assertThatThrownBy(() -> service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        verify(client, never()).findEdition(any());
+        verifyNoInteractions(executionPort);
+    }
+
+    @Test
+    @DisplayName("브리프 추가 전달 안내는 생성 근거 없음과 추가 전달 유무를 구분하고 BRIEF 내용 판정을 함께 전한다")
     void reportsEditionDeliveryEvidence() {
-        when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));
+        when(client.checkEditionFreshness(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(new BriefEditionFreshness(EDITION_ID, false, true, NOW));
         when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.empty());
         var unknown = service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID);
         assertThat(unknown.editionId()).isEqualTo(EDITION_ID);
         assertThat(unknown.status()).isEqualTo(BriefEditionDeliveryStatus.Status.UNKNOWN);
+        assertThat(unknown.upToDate()).isFalse();
+        assertThat(unknown.ruleVersionChanged()).isTrue();
         assertThat(unknown.checkedAt()).isEqualTo(NOW);
         when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.of(false));
         assertThat(service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID).status())

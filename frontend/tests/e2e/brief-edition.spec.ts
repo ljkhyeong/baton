@@ -18,7 +18,7 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
     const path = new URL(request.url()).pathname
     expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
     expect(request.headers().authorization).toBeUndefined()
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', upToDate: generations >= 3, ruleVersionChanged: false, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
     if (path.endsWith('/resolutions')) { relatedReads.resolutions += 1; return route.fulfill({ json: weeklyResolutions }) }
@@ -101,7 +101,7 @@ for (const access of ['ended', 'viewer'] as const) {
       const path = new URL(route.request().url()).pathname
       expect(route.request().method()).toBe('GET')
       if (access === 'viewer') expect(route.request().headers()['x-baton-access-key']).toBeFalsy()
-      if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: 'UNKNOWN', checkedAt: '2026-09-05T00:00:00Z' } })
+      if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: 'UNKNOWN', upToDate: true, ruleVersionChanged: false, checkedAt: '2026-09-05T00:00:00Z' } })
       if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
       if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
       if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })

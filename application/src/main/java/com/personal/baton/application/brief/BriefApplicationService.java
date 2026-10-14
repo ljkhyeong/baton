@@ -200,12 +200,13 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     @Override
     public BriefEditionDeliveryStatus findEditionDeliveryStatus(LatestEditionQuery scope, UUID editionId) {
         verifyEditionAccess(scope);
-        readScopedEdition(scope, editionId);
+        // BRIEF의 범위 지정 최신 여부 확인이 팀·시즌 소속도 확인하므로 본문을 따로 읽지 않는다.
+        var freshness = client.checkEditionFreshness(scope.teamId(), scope.seasonId(), editionId);
         var status = executionPort.findAdditionalDeliveries(scope.teamId(), scope.seasonId(), editionId)
                 .map(additional -> additional ? BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES
                         : BriefEditionDeliveryStatus.Status.NO_ADDITIONAL_DELIVERIES)
                 .orElse(BriefEditionDeliveryStatus.Status.UNKNOWN);
-        return new BriefEditionDeliveryStatus(editionId, status, clock.instant());
+        return new BriefEditionDeliveryStatus(editionId, status, freshness.upToDate(), freshness.ruleVersionChanged(), clock.instant());
     }
 
     private LatestEditionResult readScopedEdition(LatestEditionQuery scope, UUID editionId) {
@@ -224,9 +225,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     @Override
     public BriefEditionComparison compareEditions(LatestEditionQuery scope, UUID fromEditionId, UUID toEditionId) {
         verifyEditionAccess(scope);
-        readScopedEdition(scope, fromEditionId);
-        if (!fromEditionId.equals(toEditionId)) readScopedEdition(scope, toEditionId);
-        return client.compareEditions(fromEditionId, toEditionId);
+        return client.compareEditions(scope.teamId(), scope.seasonId(), fromEditionId, toEditionId);
     }
 
     @Override

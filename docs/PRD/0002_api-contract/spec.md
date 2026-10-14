@@ -1207,7 +1207,7 @@ CSRF 없이 조회한다.
 | `GET` | `/editions/{editionId}` | UUID 식별자 | 저장된 본문·ETag, 조건 일치 시 `304` |
 | `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 주간 요약과 같은 시간대의 지난주 마지막 저장 본문·ETag |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
-| `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
+| `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `upToDate`, `ruleVersionChanged`, `checkedAt`, ETag 없음 |
 | `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 `eventType`·`sourceReference`와 nullable `target` 목록 |
 | `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
 
@@ -1218,7 +1218,9 @@ CSRF 없이 조회한다.
 추가 전달 상태는 `ADDITIONAL_DELIVERIES`, `NO_ADDITIONAL_DELIVERIES`, `UNKNOWN`이다.
 같은 주간 요약의 생성·재사용 성공 기록 중 최대 `deliveryWatermark` 뒤에 같은 팀·시즌의
 `DELIVERED` 아웃박스가 있는지만 확인한다. 생성 성공 근거가 없으면 `UNKNOWN`이며 원본 전체
-반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
+반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 항목이 지금 다시 만들어도 같은지는 BRIEF 범위 지정
+최신 여부 확인의 `upToDate`·`ruleVersionChanged`로 함께 반환한다. 비교도 BRIEF 범위 지정 비교로 팀·시즌을
+확인한다. 세부 의미는 PRD-0010을 따른다.
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신

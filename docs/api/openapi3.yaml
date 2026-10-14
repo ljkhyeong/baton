@@ -3304,7 +3304,7 @@ paths:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/delivery-status:
     get:
-      description: 선택한 주간 요약의 권한을 확인하고 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
+      description: 선택한 주간 요약의 권한을 확인하고 BRIEF 범위 지정 최신 여부와 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 추가 전달 근거가 없으면 UNKNOWN이다.
       operationId: getBriefEditionDeliveryStatus
       parameters:
         - description: 팀 UUID
@@ -3346,11 +3346,13 @@ paths:
                     {
                       "editionId" : "00000000-0000-0000-0000-000000002645",
                       "status" : "ADDITIONAL_DELIVERIES",
+                      "upToDate" : true,
+                      "ruleVersionChanged" : false,
                       "checkedAt" : "2026-08-29T03:00:00Z"
                     }
               schema:
-                $ref: '#/components/schemas/Schema_49a6bffb47d61ba7'
-      summary: BRIEF 추가 전달 확인
+                $ref: '#/components/schemas/Schema_20ea836cd9d53fcd'
+      summary: BRIEF 저장 이후 변경 확인
       tags:
         - api
   /api/v1/teams/{teamId}/seasons/{seasonId}/brief/editions/{editionId}/previous-week:
@@ -10666,6 +10668,36 @@ components:
       required:
         - accessKey
       type: object
+    Schema_20ea836cd9d53fcd:
+      properties:
+        checkedAt:
+          description: BATON 확인 UTC 시각
+          format: date-time
+          type: string
+        editionId:
+          description: 확인한 주간 요약 UUID
+          format: uuid
+          type: string
+        ruleVersionChanged:
+          description: 저장된 선정 규칙 버전이 현재와 다르면 true. 이때 upToDate는 false
+          type: boolean
+        status:
+          description: 추가 전달 있음·없음 또는 확인 근거 없음
+          enum:
+            - ADDITIONAL_DELIVERIES
+            - NO_ADDITIONAL_DELIVERIES
+            - UNKNOWN
+          type: string
+        upToDate:
+          description: BRIEF가 받은 변경으로 같은 주간을 지금 다시 선정해도 저장된 항목과 같으면 true
+          type: boolean
+      required:
+        - checkedAt
+        - editionId
+        - ruleVersionChanged
+        - status
+        - upToDate
+      type: object
     Schema_254976d61d5d5175:
       properties:
         accountId:
@@ -11336,28 +11368,6 @@ components:
         - seasonName
         - startDate
         - teamName
-      type: object
-    Schema_49a6bffb47d61ba7:
-      properties:
-        checkedAt:
-          description: BATON 확인 UTC 시각
-          format: date-time
-          type: string
-        editionId:
-          description: 확인한 주간 요약 UUID
-          format: uuid
-          type: string
-        status:
-          description: 추가 전달 있음·없음 또는 확인 근거 없음
-          enum:
-            - ADDITIONAL_DELIVERIES
-            - NO_ADDITIONAL_DELIVERIES
-            - UNKNOWN
-          type: string
-      required:
-        - checkedAt
-        - editionId
-        - status
       type: object
     Schema_4abb9640ae4170a2:
       properties:

@@ -32,7 +32,7 @@ test('지난 주간 요약을 탐색·비교하고 현재 업무로 이동한다
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'NO_ADDITIONAL_DELIVERIES', upToDate: true, ruleVersionChanged: false, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/sources/query')) {
       expect(request.headers()['x-csrf-token']).toBe('test-token')
       const sources = request.postDataJSON().sources as { eventType: string; sourceReference: string }[]
@@ -145,7 +145,7 @@ test('현재 점검 항목에서 보관된 원본 루틴으로 이동한다 @smo
 })
 
 
-test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 대상·오류·권한 거부를 감춘다 @smoke', async ({ page }) => {
+test('선택한 주간 요약의 내용 일치와 추가 전달 상태를 구분하고 잘못된 대상·오류·권한 거부를 감춘다 @smoke', async ({ page }) => {
   await installApi(page); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   let mode = 'ADDITIONAL_DELIVERIES'
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
@@ -162,7 +162,7 @@ test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 
       const requestedId = path.split('/').at(-2)
       return route.fulfill({ json: { editionId: mode === 'WRONG_EDITION' ? LATEST : requestedId,
         status: requestedId === OLD ? 'UNKNOWN' : mode === 'WRONG_EDITION' ? 'NO_ADDITIONAL_DELIVERIES' : mode,
-        checkedAt: '2026-09-05T00:00:00Z' } })
+        upToDate: requestedId === LATEST, ruleVersionChanged: requestedId === OLD, checkedAt: '2026-09-05T00:00:00Z' } })
     }
     return route.fulfill({ json: edition(path.endsWith('/latest') ? LATEST : path.split('/').at(-1)!) })
   })
@@ -170,17 +170,24 @@ test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 
   const panel = page.locator('.brief-attention'); await panel.locator('summary').click()
   await panel.getByText('저장된 주간 요약', { exact: true }).click()
   const delivery = panel.getByRole('region', { name: '저장 이후 변경 확인' })
+  const regenerateHint = delivery.getByText('현재 점검 항목을 확인하고, 생성 준비가 끝나면 이번 주 요약을 요청할 수 있습니다.')
+  // 새 변경이 전달됐어도 BRIEF 판정상 내용이 같으면 다시 만들기를 권하지 않는다.
+  await expect(delivery).toContainText('지금 점검 상태로 다시 만들어도 이 요약과 내용이 같습니다.')
   await expect(delivery).toContainText('마지막 생성 확인 이후 새 변경이 전달됐습니다.')
+  await expect(regenerateHint).toHaveCount(0)
   await panel.getByRole('combobox', { name: '조회할 요약' }).selectOption(OLD)
+  await expect(delivery).toContainText('선정 기준이 바뀌어 지금 다시 만들면 이 요약과 내용이 달라집니다.')
   await expect(delivery).toContainText('생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.')
+  await expect(regenerateHint).toBeVisible()
   await expect(panel.getByRole('button', { name: '이번 주 요약 만들기', exact: true })).toBeEnabled()
   mode = 'NO_ADDITIONAL_DELIVERIES'
   await panel.getByRole('combobox', { name: '조회할 요약' }).selectOption(MIDDLE)
+  await expect(delivery).toContainText('지금 점검 상태로 다시 만들면 이 요약과 내용이 달라집니다.')
   await expect(delivery).toContainText('마지막 생성 확인 이후 추가 전달 기록이 없습니다.')
   const refresh = delivery.getByRole('button', { name: '저장 이후 변경 새로고침' })
   for (const error of ['WRONG_EDITION', 'UNAVAILABLE']) {
     mode = error; await refresh.click()
-    await expect(delivery).toContainText('추가 전달 기록을 불러오지 못했습니다.')
+    await expect(delivery).toContainText('저장 이후 변경을 확인하지 못했습니다.')
     await expect(delivery.getByText('마지막 생성 확인 이후 추가 전달 기록이 없습니다.')).toHaveCount(0)
   }
   mode = 'DENIED'; await refresh.click()
@@ -204,7 +211,7 @@ test('이번 주 해결과 지난주 비교에서 결과·없음·장애·권한
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', upToDate: true, ruleVersionChanged: false, checkedAt: weeklyResolutions.evaluatedAt } })
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source, target: null })) } })
     if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [summaries[0]], nextBeforeGeneration: null } })
     if (path.endsWith('/previous-week')) {
@@ -286,7 +293,7 @@ test('해결 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 �
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: request.postDataJSON().sources.map((source: object) => ({ ...source,
       target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: LATEST, status: 'NO_ADDITIONAL_DELIVERIES', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: LATEST, status: 'NO_ADDITIONAL_DELIVERIES', upToDate: true, ruleVersionChanged: false, checkedAt: weeklyResolutions.evaluatedAt } })
     if (path.endsWith('/editions') && request.method() === 'POST') {
       generated = true
       return route.fulfill({ status: 201, json: { executionId: ACCOUNT_ID, editionId: LATEST, generation: 3, deliveryWatermark: 3, sourceCursor: 3, created: true } })
@@ -353,7 +360,7 @@ async function installSharedEdition(page: Page, options: { printItems?: boolean 
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', upToDate: true, ruleVersionChanged: false, checkedAt: weeklyResolutions.evaluatedAt } })
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source,
       target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
     if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [summaries[0]], nextBeforeGeneration: null } })

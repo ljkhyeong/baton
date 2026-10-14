@@ -864,8 +864,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * BRIEF 추가 전달 확인
-         * @description 선택한 주간 요약의 권한을 확인하고 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 근거가 없으면 UNKNOWN이다.
+         * BRIEF 저장 이후 변경 확인
+         * @description 선택한 주간 요약의 권한을 확인하고 BRIEF 범위 지정 최신 여부와 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 추가 전달 근거가 없으면 UNKNOWN이다.
          */
         get: operations["getBriefEditionDeliveryStatus"];
         put?: never;
@@ -2426,6 +2426,27 @@ export interface components {
             /** @description BRIEF 로컬 수신 순서 커서 */
             sourceCursor: number;
         };
+        Schema_20ea836cd9d53fcd: {
+            /**
+             * Format: date-time
+             * @description BATON 확인 UTC 시각
+             */
+            checkedAt: string;
+            /**
+             * Format: uuid
+             * @description 확인한 주간 요약 UUID
+             */
+            editionId: string;
+            /** @description 저장된 선정 규칙 버전이 현재와 다르면 true. 이때 upToDate는 false */
+            ruleVersionChanged: boolean;
+            /**
+             * @description 추가 전달 있음·없음 또는 확인 근거 없음
+             * @enum {string}
+             */
+            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
+            /** @description BRIEF가 받은 변경으로 같은 주간을 지금 다시 선정해도 저장된 항목과 같으면 true */
+            upToDate: boolean;
+        };
         Schema_022e517c9925a05a: {
             /** @description 최신순 이력 */
             changes: {
@@ -2573,23 +2594,6 @@ export interface components {
              * @description 요청한 자료 UUID
              */
             resourceId: string;
-        };
-        Schema_49a6bffb47d61ba7: {
-            /**
-             * Format: date-time
-             * @description BATON 확인 UTC 시각
-             */
-            checkedAt: string;
-            /**
-             * Format: uuid
-             * @description 확인한 주간 요약 UUID
-             */
-            editionId: string;
-            /**
-             * @description 추가 전달 있음·없음 또는 확인 근거 없음
-             * @enum {string}
-             */
-            status: "ADDITIONAL_DELIVERIES" | "NO_ADDITIONAL_DELIVERIES" | "UNKNOWN";
         };
         Schema_52a89d3094b88db6: {
             /** @description delivered, soft_bounce, hard_bounce, blocked, invalid_email, error, deferred, spam. 나머지는 무시 */
@@ -7063,7 +7067,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_49a6bffb47d61ba7"];
+                    "application/json": components["schemas"]["Schema_20ea836cd9d53fcd"];
                 };
             };
         };

@@ -438,7 +438,13 @@ class BriefEditionHttpsEndToEndTest {
                         assertThat(contexts.path("sources").get(0).path("target").path("roleId").asText()).isEqualTo(role.path("id").asText());
                         assertThat(json(currentSession.send("GET", contextBase + "/generation-readiness", secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("DELIVERY_PENDING");
                         String deliveryPath = changedPath + "/delivery-status";
-                        assertThat(json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200)).path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
+                        JsonNode changedDelivery = json(currentSession.send("GET", deliveryPath, secondHeaders, null, false, 200));
+                        assertThat(changedDelivery.path("status").asText()).isEqualTo("NO_ADDITIONAL_DELIVERIES");
+                        assertThat(changedDelivery.path("upToDate").asBoolean()).isTrue();
+                        // 심각도가 바뀌기 전 요약은 실제 BRIEF 판정상 지금 다시 만들면 내용이 달라진다.
+                        JsonNode staleDelivery = json(currentSession.send("GET", secondPath + "/delivery-status", secondHeaders, null, false, 200));
+                        assertThat(staleDelivery.path("upToDate").asBoolean()).isFalse();
+                        assertThat(staleDelivery.path("ruleVersionChanged").asBoolean()).isFalse();
                         // 추가 전달 조회용 완료 기록만 준비한다. 실제 이벤트 송신 검증은 포함하지 않는다.
                         batonDatabase.update("UPDATE brief_continuity_outbox SET delivery_status = 'DELIVERED', completed_at = occurred_at WHERE workspace_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)",
                                 secondWorkspace.teamId().toString(), secondWorkspace.seasonId().toString());

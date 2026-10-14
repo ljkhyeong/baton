@@ -13,6 +13,7 @@ import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
+import com.personal.baton.application.brief.error.BriefEditionNotFoundException;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import java.io.IOException;
@@ -188,6 +189,35 @@ class RestClientBriefServiceClientTest {
         assertThat(edition.outcome()).isEqualTo(Outcome.COMPLETED);
         assertThat(edition.edition().items()).extracting(BriefEditionSnapshot.Item::activeSince)
                 .containsExactly(Instant.parse("2026-08-14T00:00:00Z"), null);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("비교와 최신 여부 확인은 팀·시즌 경로로 요청하고 범위 밖 요약의 404를 없음으로 처리한다")
+    void readsEditionsWithinScope() {
+        UUID baseId = UUID.fromString("00000000-0000-0000-0000-000000002614");
+        UUID editionId = UUID.fromString("00000000-0000-0000-0000-000000002613");
+        String editionPath = BASE_URL + "/api/v1/workspaces/" + TEAM_ID + "/seasons/" + SEASON_ID + "/editions/" + editionId;
+        String freshness = """
+                {"editionId":"%s","upToDate":false,"ruleVersionChanged":true,"evaluatedAt":"2026-08-31T00:00:00Z"}
+                """.formatted(editionId);
+        server.expect(requestTo(editionPath + "/changes?fromEditionId=" + baseId)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(requestTo(editionPath + "/freshness"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(freshness));
+        // 규칙 버전이 바뀐 요약을 최신이라고 하면 BRIEF 계약 위반이다.
+        server.expect(requestTo(editionPath + "/freshness")).andRespond(withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON).body(freshness.replace("\"upToDate\":false", "\"upToDate\":true")));
+        server.expect(requestTo(editionPath + "/freshness")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> client.compareEditions(TEAM_ID, SEASON_ID, baseId, editionId))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        var result = client.checkEditionFreshness(TEAM_ID, SEASON_ID, editionId);
+        assertThat(result.upToDate()).isFalse();
+        assertThat(result.ruleVersionChanged()).isTrue();
+        assertThatThrownBy(() -> client.checkEditionFreshness(TEAM_ID, SEASON_ID, editionId))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        assertThatThrownBy(() -> client.checkEditionFreshness(TEAM_ID, SEASON_ID, editionId))
+                .isInstanceOf(BriefEditionNotFoundException.class);
         server.verify();
     }
 

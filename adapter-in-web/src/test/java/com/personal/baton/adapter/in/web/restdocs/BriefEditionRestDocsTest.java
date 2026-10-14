@@ -392,17 +392,22 @@ class BriefEditionRestDocsTest {
     @DisplayName("추가 전달 조회는 선택한 주간 요약과 상태·확인 시각을 별도 응답으로 반환한다")
     void documentsEditionDeliveryStatus() throws Exception {
         when(briefEditionUseCase.findEditionDeliveryStatus(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
-                .thenReturn(new BriefEditionDeliveryStatus(EDITION_ID, BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES, edition().generatedAt()));
+                .thenReturn(new BriefEditionDeliveryStatus(EDITION_ID, BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES,
+                        true, false, edition().generatedAt()));
         mockMvc.perform(RestDocumentationRequestBuilders.get(BriefEditionController.DELIVERY_STATUS_PATH, TEAM_ID, SEASON_ID, EDITION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().doesNotExist(HttpHeaders.ETAG))
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
+                .andExpect(jsonPath("$.upToDate").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefEditionDeliveryStatus",
-                        "선택한 주간 요약의 권한을 확인하고 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 근거가 없으면 UNKNOWN이다.", "BRIEF 추가 전달 확인",
+                        "선택한 주간 요약의 권한을 확인하고 BRIEF 범위 지정 최신 여부와 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 추가 전달 근거가 없으면 UNKNOWN이다.",
+                        "BRIEF 저장 이후 변경 확인",
                         editionPaths(), readHeaders(), responseFields(
                                 fieldWithPath("editionId").description("확인한 주간 요약 UUID"),
                                 new EnumFields(BriefEditionDeliveryStatus.Status.class).withPath("status").description("추가 전달 있음·없음 또는 확인 근거 없음"),
+                                fieldWithPath("upToDate").description("BRIEF가 받은 변경으로 같은 주간을 지금 다시 선정해도 저장된 항목과 같으면 true"),
+                                fieldWithPath("ruleVersionChanged").description("저장된 선정 규칙 버전이 현재와 다르면 true. 이때 upToDate는 false"),
                                 fieldWithPath("checkedAt").description("BATON 확인 UTC 시각"))));
     }
 

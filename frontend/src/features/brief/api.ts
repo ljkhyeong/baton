@@ -287,8 +287,10 @@ export function getEditionDeliveryStatus(scope: BriefScope, editionId: string, s
     method: 'GET', signal, headers: accessKeyHeader(scope), decode: (value): BriefDeliveryStatus => {
       if (!isJsonObject(value) || !isUuid(value.editionId) || !isSameUuid(value.editionId, editionId)
         || !['ADDITIONAL_DELIVERIES', 'NO_ADDITIONAL_DELIVERIES', 'UNKNOWN'].includes(value.status as string)
-        || !isInstant(value.checkedAt)) throw new Error('선택한 주간 요약의 추가 전달 기록을 확인할 수 없습니다.')
-      return { editionId: value.editionId, status: value.status as BriefDeliveryStatus['status'], checkedAt: value.checkedAt }
+        || typeof value.upToDate !== 'boolean' || typeof value.ruleVersionChanged !== 'boolean'
+        || !isInstant(value.checkedAt)) throw new Error('선택한 주간 요약의 저장 이후 변경을 확인할 수 없습니다.')
+      return { editionId: value.editionId, status: value.status as BriefDeliveryStatus['status'],
+        upToDate: value.upToDate, ruleVersionChanged: value.ruleVersionChanged, checkedAt: value.checkedAt }
     },
   })
 }
