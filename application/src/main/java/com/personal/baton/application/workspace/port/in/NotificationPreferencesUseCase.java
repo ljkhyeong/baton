@@ -6,7 +6,7 @@ public interface NotificationPreferencesUseCase {
     PreferencesResult get(UUID accountId);
     PreferencesResult configure(UUID accountId, ConfigurePreferencesCommand command);
     record ConfigurePreferencesCommand(long expectedVersion, boolean deadlineSoonEnabled, boolean overdueEnabled,
-            boolean handoffEnabled, int deadlineLeadHours) {}
+            boolean handoffEnabled, boolean resourceReviewEnabled, int deadlineLeadHours) {}
     record PreferencesResult(UUID accountId, long version, boolean deadlineSoonEnabled, boolean overdueEnabled,
-            boolean handoffEnabled, int deadlineLeadHours) {}
+            boolean handoffEnabled, boolean resourceReviewEnabled, int deadlineLeadHours) {}
 }

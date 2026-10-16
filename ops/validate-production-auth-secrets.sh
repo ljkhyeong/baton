@@ -196,9 +196,8 @@ validate_bearer_token_file() {
 
   validate_scalar_secret_file "$name" "$target"
   value="$(< "$target")"
-  if [[ ${#value} -lt 32 || ${#value} -gt 200 || ! "$value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
-    fail "$name must contain 32-200 URL-safe ASCII characters"
-  fi
+  production_validation_is_url_safe_secret "$value" \
+    || fail "$name must contain 32-200 URL-safe ASCII characters"
 }
 
 validate_truststore_file() {
@@ -346,8 +345,7 @@ fi
 if [[ -n "$cal_bearer_token_file" ]]; then
   validate_bearer_token_file BATON_CAL_BEARER_TOKEN_FILE "$cal_bearer_token_file"
 fi
-[[ "$holidays_enabled" == true || "$holidays_enabled" == false ]] \
-  || fail "BATON_HOLIDAYS_ENABLED must be true or false"
+production_validation_validate_boolean fail BATON_HOLIDAYS_ENABLED "$holidays_enabled"
 if [[ "$holidays_enabled" == true ]]; then
   require_value BATON_HOLIDAYS_SERVICE_KEY_FILE "$holidays_service_key_file"
 fi
@@ -355,8 +353,7 @@ if [[ -n "$holidays_service_key_file" ]]; then
   validate_scalar_secret_file BATON_HOLIDAYS_SERVICE_KEY_FILE "$holidays_service_key_file"
 fi
 
-[[ "$brevo_webhook_enabled" == true || "$brevo_webhook_enabled" == false ]] \
-  || fail "BATON_BREVO_WEBHOOK_ENABLED must be true or false"
+production_validation_validate_boolean fail BATON_BREVO_WEBHOOK_ENABLED "$brevo_webhook_enabled"
 if [[ "$brevo_webhook_enabled" == true ]]; then
   require_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE "$brevo_webhook_secret_file"
   [[ "$email_delivery" == smtp && "$smtp_host" == smtp-relay.brevo.com ]] \
@@ -366,8 +363,7 @@ if [[ -n "$brevo_webhook_secret_file" ]]; then
   validate_bearer_token_file BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE "$brevo_webhook_secret_file"
 fi
 
-[[ "$turnstile_enabled" == true || "$turnstile_enabled" == false ]] \
-  || fail "BATON_TURNSTILE_ENABLED must be true or false"
+production_validation_validate_boolean fail BATON_TURNSTILE_ENABLED "$turnstile_enabled"
 if [[ "$turnstile_enabled" == true ]]; then
   require_value BATON_TURNSTILE_SITE_KEY "$turnstile_site_key"
   require_value BATON_TURNSTILE_SECRET_KEY_FILE "$turnstile_secret_file"
@@ -466,47 +462,28 @@ if [[ -n "$round_previous_kid" || -n "$round_previous_public_key_file" ]]; then
     "$round_previous_public_key_file"
 fi
 
+# 이메일 아웃박스 키는 필수이므로 목록은 비지 않는다.
 scalar_secret_files=()
-scalar_secret_count=0
-if [[ -n "$brevo_webhook_secret_file" ]]; then
-  scalar_secret_files+=("$brevo_webhook_secret_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-if [[ -n "$turnstile_secret_file" ]]; then
-  scalar_secret_files+=("$turnstile_secret_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-scalar_secret_files+=("$email_outbox_encryption_key_file")
-scalar_secret_count=$((scalar_secret_count + 1))
-if [[ -n "$google_client_secret_file" ]]; then
-  scalar_secret_files+=("$google_client_secret_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-if [[ -n "$naver_client_secret_file" ]]; then
-  scalar_secret_files+=("$naver_client_secret_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-if [[ -n "$smtp_password_file" ]]; then
-  scalar_secret_files+=("$smtp_password_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-if [[ -n "$brief_bearer_token_file" ]]; then
-  scalar_secret_files+=("$brief_bearer_token_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-if [[ -n "$cal_bearer_token_file" ]]; then
-  scalar_secret_files+=("$cal_bearer_token_file")
-  scalar_secret_count=$((scalar_secret_count + 1))
-fi
-if (( scalar_secret_count > 0 )); then
-  for ((left = 0; left < scalar_secret_count; left += 1)); do
-    for ((right = left + 1; right < scalar_secret_count; right += 1)); do
-      if cmp -s -- "${scalar_secret_files[$left]}" "${scalar_secret_files[$right]}"; then
-        fail "production scalar secrets must be independently generated"
-      fi
-    done
+for scalar_secret_file in \
+  "$brevo_webhook_secret_file" \
+  "$turnstile_secret_file" \
+  "$email_outbox_encryption_key_file" \
+  "$google_client_secret_file" \
+  "$naver_client_secret_file" \
+  "$smtp_password_file" \
+  "$brief_bearer_token_file" \
+  "$cal_bearer_token_file"; do
+  if [[ -n "$scalar_secret_file" ]]; then
+    scalar_secret_files+=("$scalar_secret_file")
+  fi
+done
+for ((left = 0; left < ${#scalar_secret_files[@]}; left += 1)); do
+  for ((right = left + 1; right < ${#scalar_secret_files[@]}; right += 1)); do
+    if cmp -s -- "${scalar_secret_files[$left]}" "${scalar_secret_files[$right]}"; then
+      fail "production scalar secrets must be independently generated"
+    fi
   done
-fi
+done
 
 existing_secrets=(
   "$db_password"
@@ -516,13 +493,11 @@ existing_secrets=(
   "$watch_bearer_token"
   "$watch_receiver_bearer_token"
 )
-if (( scalar_secret_count > 0 )); then
-  for secret_file in "${scalar_secret_files[@]}"; do
-    secret_value="$(< "$secret_file")"
-    for existing_secret in "${existing_secrets[@]}"; do
-      if [[ -n "$existing_secret" && "$secret_value" == "$existing_secret" ]]; then
-        fail "production scalar secrets must differ from existing production secrets"
-      fi
-    done
+for secret_file in "${scalar_secret_files[@]}"; do
+  secret_value="$(< "$secret_file")"
+  for existing_secret in "${existing_secrets[@]}"; do
+    if [[ -n "$existing_secret" && "$secret_value" == "$existing_secret" ]]; then
+      fail "production scalar secrets must differ from existing production secrets"
+    fi
   done
-fi
+done

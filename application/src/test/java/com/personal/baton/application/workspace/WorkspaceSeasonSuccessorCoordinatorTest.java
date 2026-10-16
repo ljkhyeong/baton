@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
@@ -12,7 +10,6 @@ import com.personal.baton.application.workspace.port.out.WorkspacePeopleReposito
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
-import com.personal.baton.domain.workspace.ContentCreationIdempotency;
 import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.Routine;
 import com.personal.baton.domain.workspace.RoutinePhase;
@@ -37,7 +34,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -93,8 +89,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
         AtomicReference<List<Role>> savedRoles = new AtomicReference<>(List.of());
         AtomicReference<List<Routine>> savedRoutines = new AtomicReference<>(List.of());
 
-        when(accessRepository.findContentCreationIdempotency(eq(teamId), anyString()))
-                .thenReturn(Optional.empty());
         when(seasonRepository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
         when(peopleRepository.findRolesByTeamIdAndSeasonId(eq(teamId), any(UUID.class)))
                 .thenAnswer(invocation -> savedRoles.get());
@@ -105,8 +99,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
         when(operationsRepository.findActiveRoutinesBySeasonIdAndIds(eq(sourceSeasonId), anyList()))
                 .thenReturn(sourceRoutines);
         when(seasonRepository.saveSeason(any(Season.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(accessRepository.saveContentCreationIdempotency(any(ContentCreationIdempotency.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(peopleRepository.saveRoles(anyList())).thenAnswer(invocation -> {
             List<Role> roles = List.copyOf(invocation.getArgument(0));
@@ -134,7 +126,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 );
 
         NextSeasonResult result = coordinator.createNext(
-                teamId,
                 sourceSeason,
                 "next-season-batch-idempotency-key-0001",
                 new CreateNextSeasonCommand(
@@ -193,8 +184,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
         );
         Role sourceRole = role(teamId, sourceSeasonId, "진행자");
         UUID missingRoutineId = UUID.randomUUID();
-        when(accessRepository.findContentCreationIdempotency(eq(teamId), anyString()))
-                .thenReturn(Optional.empty());
         when(seasonRepository.findActiveSeasonByTeamId(teamId)).thenReturn(Optional.of(sourceSeason));
         when(peopleRepository.findRolesByTeamIdAndSeasonIdAndIds(teamId, sourceSeasonId, List.of(sourceRole.getId())))
                 .thenReturn(List.of(sourceRole));
@@ -215,7 +204,6 @@ final class WorkspaceSeasonSuccessorCoordinatorTest {
                 );
 
         assertThatThrownBy(() -> coordinator.createNext(
-                teamId,
                 sourceSeason,
                 "next-season-missing-routine-key-001",
                 new CreateNextSeasonCommand(

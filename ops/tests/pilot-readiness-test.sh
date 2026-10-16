@@ -132,7 +132,6 @@ if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
   exit 0
 fi
 if [[ "${1:-}" == "network" && "${2:-}" == "inspect" ]]; then
-  [[ "${FAKE_DOCKER_MODE:-healthy}" != "brief-network-missing" ]] || exit 1
   if [[ "${FAKE_DOCKER_MODE:-healthy}" == "brief-network-noninternal" ]]; then
     printf 'false\n'
   else
@@ -142,14 +141,9 @@ if [[ "${1:-}" == "network" && "${2:-}" == "inspect" ]]; then
 fi
 if [[ "${1:-}" == "pull" ]]; then
   [[ "${2:-}" == "--quiet" && "${3:-}" == *@sha256:* ]] || exit 75
-  [[ "${FAKE_DOCKER_MODE:-healthy}" != "round-pull-failure" ]] || exit 76
   exit 0
 fi
 if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
-  [[ "${FAKE_DOCKER_MODE:-healthy}" != "round-inspect-failure" ]] || exit 77
-  if [[ "${3:-}" != "--format" ]]; then
-    exit 0
-  fi
   image="${5:-}"
   case "${4:-}" in
     *.RepoDigests*)
@@ -282,6 +276,18 @@ for forbidden_name in \
 	  BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE \
 	  BATON_AUTH_LOCAL_REGISTRATION_ENABLED \
 	  BATON_AUTH_PASSWORD_RESET_ENABLED \
+  BATON_SENTRY_DSN \
+  BATON_SENTRY_BROWSER_DSN \
+  BATON_SENTRY_ENVIRONMENT \
+  BATON_SENTRY_ORG \
+  BATON_SENTRY_PROJECT \
+  BATON_SENTRY_SOURCEMAPS_UPLOAD \
+  BATON_SENTRY_AUTH_TOKEN_FILE \
+  BATON_STATUS_PAGE_ENABLED \
+  BATON_BREVO_WEBHOOK_ENABLED \
+  BATON_TURNSTILE_ENABLED \
+  BATON_TURNSTILE_SITE_KEY \
+  BATON_TURNSTILE_EXPECTED_HOSTNAME \
 	  BATON_EMAIL_VERIFICATION_DELIVERY \
 	  BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE \
 	  BATON_EMAIL_FROM_ADDRESS \
@@ -301,7 +307,6 @@ for forbidden_name in \
 	  BATON_ROUND_RELEASE_REVISION \
 	  BATON_ROUND_TURN_URLS \
 	  BATON_ROUND_TURN_SHARED_SECRET_FILE \
-  BATON_SECRET_ROUND_TURN_SHARED_SECRET \
   BATON_HTTP_PUBLISH \
   BATON_HTTPS_TCP_PUBLISH \
   BATON_HTTPS_UDP_PUBLISH \
@@ -328,6 +333,11 @@ done
 if [[ "${COMPOSE_MENU:-}" != "false" ]]; then
   printf 'Production wrapper did not pin the Compose interactive menu off.\n' >&2
   exit 88
+fi
+
+if [[ "${BUILDX_BAKE_ENTITLEMENTS_FS:-}" != "0" ]]; then
+  printf 'Production wrapper did not let bake read its pinned build secret files.\n' >&2
+  exit 91
 fi
 
 for required_secret_name in \
@@ -480,7 +490,18 @@ fi
 exit "${FAKE_FLOCK_EXIT:-0}"
 SCRIPT
 
-chmod +x "$fake_bin/docker" "$fake_bin/curl" "$fake_bin/flock"
+cat > "$fake_bin/env" <<'SCRIPT'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# 비밀값이 env 인자로 프로세스 목록에 남는지 확인할 수 있게 인자를 기록하고 실제 env로 넘긴다.
+if [[ -n "${FAKE_ENV_ARGUMENT_LOG:-}" ]]; then
+  printf '%s\n' "$*" >> "$FAKE_ENV_ARGUMENT_LOG"
+fi
+exec /usr/bin/env "$@"
+SCRIPT
+
+chmod +x "$fake_bin/docker" "$fake_bin/curl" "$fake_bin/flock" "$fake_bin/env"
 
 db_password="1111111111111111111111111111111111111111111111111111111111111111"
 root_password="2222222222222222222222222222222222222222222222222222222222222222"
@@ -671,12 +692,23 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_ROUND_RELEASE_REVISION=ambient-revision \
   BATON_ROUND_TURN_URLS='turn:ambient.invalid:3478?transport=udp' \
   BATON_ROUND_TURN_SHARED_SECRET_FILE=/tmp/ambient-turn-secret \
-  BATON_SECRET_ROUND_TURN_SHARED_SECRET=ambient-round-turn-secret \
   BATON_BRIEF_DELIVERY_ENABLED=true \
   BATON_BRIEF_BASE_URL=https://ambient-brief.invalid \
   BATON_BRIEF_BEARER_TOKEN_FILE=/tmp/ambient-brief-token \
   BATON_BRIEF_RECONCILIATION_INTERVAL=PT1S \
   BATON_SECRET_BRIEF_BEARER_TOKEN=ambient-brief-token \
+  BATON_SENTRY_DSN=https://ambient@sentry.invalid/1 \
+  BATON_SENTRY_BROWSER_DSN=https://ambient@sentry.invalid/2 \
+  BATON_SENTRY_ENVIRONMENT=ambient \
+  BATON_SENTRY_ORG=ambient-org \
+  BATON_SENTRY_PROJECT=ambient-project \
+  BATON_SENTRY_SOURCEMAPS_UPLOAD=true \
+  BATON_SENTRY_AUTH_TOKEN_FILE=/tmp/ambient-sentry-token \
+  BATON_STATUS_PAGE_ENABLED=true \
+  BATON_BREVO_WEBHOOK_ENABLED=true \
+  BATON_TURNSTILE_ENABLED=true \
+  BATON_TURNSTILE_SITE_KEY=ambient-site-key \
+  BATON_TURNSTILE_EXPECTED_HOSTNAME=ambient.invalid \
   BATON_HTTP_PUBLISH=127.0.0.1::80 \
   COMPOSE_ENV_FILES=/tmp/ambient.env \
   COMPOSE_PROJECT_NAME=ambient-project \
@@ -901,6 +933,7 @@ chmod 600 "$holidays_service_key_file"
 printf '%s\n' "BATON_HOLIDAYS_SERVICE_KEY_FILE=$holidays_service_key_file" >> "$holidays_enabled_env"
 holidays_preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/holidays-docker.log" \
+  FAKE_ENV_ARGUMENT_LOG="$test_root/holidays-env.log" \
   FAKE_EXPECTED_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
   BATON_SECRET_HOLIDAYS_SERVICE_KEY=ambient-invalid-key \
   "$preflight_script" "$holidays_enabled_env" 2>&1)" \
@@ -909,6 +942,9 @@ assert_contains 'Production preflight passed' "$holidays_preflight_output" \
   'enabled holidays production preflight'
 assert_not_contains "$holidays_service_key" "$holidays_preflight_output" 'holidays key output'
 assert_not_contains "$holidays_service_key" "$(cat "$test_root/holidays-docker.log")" 'holidays Docker arguments'
+assert_contains '--project-name baton-production' "$(cat "$test_root/holidays-env.log")" \
+  'holidays env arguments recorded'
+assert_not_contains "$holidays_service_key" "$(cat "$test_root/holidays-env.log")" 'holidays env arguments'
 
 cal_enabled_env="$test_root/cal-enabled.env"
 write_valid_env "$cal_enabled_env"
@@ -1411,7 +1447,6 @@ BATON_ROUND_SIGNALING_IMAGE=ambient.invalid/round/signaling:latest \
 BATON_ROUND_RELEASE_REVISION=ambient-revision \
 BATON_ROUND_TURN_URLS='turn:ambient.invalid:3478?transport=udp' \
 BATON_ROUND_TURN_SHARED_SECRET_FILE=/tmp/ambient-turn-secret \
-BATON_SECRET_ROUND_TURN_SHARED_SECRET=ambient-turn-shared-secret \
 COMPOSE_IGNORE_ORPHANS=1 \
 "$production_compose_script" ps >/dev/null \
   || fail 'enabled ROUND runtime ps failed'

@@ -6,19 +6,12 @@ import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCa
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase.ClaimMembershipCommand;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
-import com.personal.baton.application.workspace.error.SeasonEndedException;
-import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
-import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerifyResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
-import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
-import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
 import com.personal.baton.domain.identity.Account;
-import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -28,6 +21,12 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.ConfigureReviewScheduleCommand;
+import com.personal.baton.application.workspace.port.in.ResourceVerificationUseCase.VerifyResourceCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
+import com.personal.baton.domain.workspace.ResourceVerificationStatus;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateRoutineCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
@@ -59,7 +58,6 @@ import static org.assertj.core.api.Assertions.*;
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = {BatonApplication.class, WorkspaceNotificationUseCaseTest.TimeConfig.class}, properties = {
         "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
-        "baton.identity.email-verification.outbox-encryption-key=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
         "baton.round-automation.poll-interval=PT24H",
         "baton.identity.email-verification.dispatch-interval=PT24H"
 })
@@ -69,7 +67,6 @@ class WorkspaceNotificationUseCaseTest {
             .withDatabaseName("resource_verification_test").withUsername("baton").withPassword("password");
     @Autowired WorkspaceLifecycleUseCase lifecycle;
     @Autowired WorkspacePeopleUseCase people;
-    @Autowired WorkspaceRecordsUseCase records;
     @Autowired RoundAdministrationUseCase memberships;
     @Autowired IdentityRepository identities;
     @Autowired Clock clock;
@@ -77,6 +74,8 @@ class WorkspaceNotificationUseCaseTest {
     @Autowired WorkspaceOperationsUseCase operations;
     @Autowired NotificationReadReceiptPort receipts;
     @Autowired NotificationPreferencesUseCase preferences;
+    @Autowired WorkspaceRecordsUseCase records;
+    @Autowired ResourceVerificationUseCase verifications;
 
 
     private static final AtomicReference<Instant> NOW = new AtomicReference<>(Instant.parse("2026-09-05T02:00:00Z"));
@@ -105,10 +104,10 @@ class WorkspaceNotificationUseCaseTest {
         assertThat(preferences.get(account.getId()).deadlineLeadHours()).isEqualTo(24);
         NOW.set(Instant.parse("2026-09-04T01:00:00Z"));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
-        var earlier = preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, true, true, true, 48));
+        var earlier = preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, true, true, true, true, 48));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).hasSize(1);
         assertThat(preferences.get(other.getId()).deadlineLeadHours()).isEqualTo(24);
-        assertThatThrownBy(() -> preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, false, true, true, 24)))
+        assertThatThrownBy(() -> preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, false, true, true, true, 24)))
                 .isInstanceOf(WorkspaceContentConflictException.class);
         NOW.set(Instant.parse("2026-09-05T02:00:00Z"));
         var initial = notifications.getInbox(team, season, key, account.getId()).notifications().getFirst();
@@ -124,9 +123,9 @@ class WorkspaceNotificationUseCaseTest {
                 .containsExactlyInAnyOrder(initial.id(), otherReadId);
         assertThatThrownBy(() -> notifications.markRead(team, season, key, other.getId(), initial.id()))
                 .isInstanceOf(WorkspaceAccessDeniedException.class);
-        var hidden = preferences.configure(account.getId(), new ConfigurePreferencesCommand(earlier.version(), false, true, true, 1));
+        var hidden = preferences.configure(account.getId(), new ConfigurePreferencesCommand(earlier.version(), false, true, true, true, 1));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
-        var enabled = preferences.configure(account.getId(), new ConfigurePreferencesCommand(hidden.version(), true, true, true, 1));
+        var enabled = preferences.configure(account.getId(), new ConfigurePreferencesCommand(hidden.version(), true, true, true, true, 1));
         NOW.set(Instant.parse("2026-09-05T02:00:00Z").minusNanos(1));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
         NOW.set(Instant.parse("2026-09-05T02:00:00Z"));
@@ -157,9 +156,9 @@ class WorkspaceNotificationUseCaseTest {
         memberships.claimMembership(new ClaimMembershipCommand(other.getId(), team, season, outgoing.id(), key));
         assertThat(notifications.getInbox(team, season, key, other.getId()).notifications())
                 .noneMatch(value -> value.kind() == WorkspaceNotificationKind.HANDOFF_REQUEST);
-        var allOff = preferences.configure(account.getId(), new ConfigurePreferencesCommand(enabled.version(), false, false, false, 1));
+        var allOff = preferences.configure(account.getId(), new ConfigurePreferencesCommand(enabled.version(), false, false, false, false, 1));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
-        preferences.configure(account.getId(), new ConfigurePreferencesCommand(allOff.version(), true, true, true, 1));
+        preferences.configure(account.getId(), new ConfigurePreferencesCommand(allOff.version(), true, true, true, true, 1));
         people.cancelRoleHandoff(team, season, handedRole.id(), prepared.handoff().id(), key,
                 new ConfirmRoleHandoffCommand(outgoing.id()));
         assertThat(notifications.getInbox(team, season, key, account.getId()).notifications())
@@ -169,6 +168,59 @@ class WorkspaceNotificationUseCaseTest {
         var next = lifecycle.createNextSeason(team, season, UUID.randomUUID().toString(), key,
                 new CreateNextSeasonCommand("다음 시즌", LocalDate.of(2027, 1, 1), LocalDate.of(2027, 3, 31), List.of(), List.of()));
         assertThat(notifications.getInbox(team, next.season().id(), key, account.getId()).notifications()).isEmpty();
+    }
+    @Test
+    @DisplayName("내 역할 자료는 시즌 날짜로 확인일이 되면 알리고 다른 담당 자료·꺼진 설정·확인 완료를 제외한다")
+    void notifiesDueResourceReviewsOfMyRoles() {
+        NOW.set(Instant.parse("2026-09-05T02:00:00Z"));
+        var workspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
+                new CreateWorkspaceCommand("자료 알림 팀", "시즌", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31), List.of("박민서", "김준호")));
+        var team = workspace.teamId(); var season = workspace.seasonId(); var key = workspace.accessKey();
+        var members = lifecycle.getWorkspace(team, season, key).members();
+        var member = members.stream().filter(value -> value.name().equals("박민서")).findFirst().orElseThrow();
+        var colleague = members.stream().filter(value -> value.name().equals("김준호")).findFirst().orElseThrow();
+        var role = people.createRole(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleCommand("기록 담당", "자료를 관리합니다", member.id(), null, null, null, List.of(), null));
+        var otherRole = people.createRole(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleCommand("다른 담당", "다른 구성원의 자료", colleague.id(), null, null, null, List.of(), null));
+        var resource = records.createRoleResource(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleResourceCommand(role.id(), "운영 안내", "https://example.com/guide", null));
+        var otherResource = records.createRoleResource(team, season, UUID.randomUUID().toString(), key,
+                new CreateRoleResourceCommand(otherRole.id(), "다른 안내", "https://example.com/other", null));
+        var account = identities.saveAccount(Account.create(UUID.randomUUID(), "민서", clock.instant()));
+        memberships.claimMembership(new ClaimMembershipCommand(account.getId(), team, season, member.id(), key));
+        verifications.configureSchedule(team, season, resource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(-1, 7, LocalDate.of(2026, 9, 6)));
+        verifications.configureSchedule(team, season, otherResource.id(), key, account.getId(),
+                new ConfigureReviewScheduleCommand(-1, 7, LocalDate.of(2026, 9, 5)));
+
+        NOW.set(Instant.parse("2026-09-05T14:59:59Z"));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        NOW.set(Instant.parse("2026-09-05T15:00:00Z"));
+        var due = notifications.getInbox(team, season, key, account.getId()).notifications().getFirst();
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).hasSize(1);
+        assertThat(due.kind()).isEqualTo(WorkspaceNotificationKind.RESOURCE_REVIEW_DUE);
+        assertThat(due.sourceId()).isEqualTo(resource.id());
+        assertThat(due.roleId()).isEqualTo(role.id());
+        assertThat(due.roundId()).isNull();
+        assertThat(due.title()).isEqualTo("운영 안내");
+        assertThat(due.occurredAt()).isEqualTo(Instant.parse("2026-09-05T15:00:00Z"));
+        notifications.markRead(team, season, key, account.getId(), due.id());
+
+        var hidden = preferences.configure(account.getId(), new ConfigurePreferencesCommand(-1, true, true, true, false, 24));
+        assertThat(hidden.resourceReviewEnabled()).isFalse();
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
+        preferences.configure(account.getId(), new ConfigurePreferencesCommand(hidden.version(), true, true, true, true, 24));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).singleElement()
+                .satisfies(value -> {
+                    assertThat(value.id()).isEqualTo(due.id());
+                    assertThat(value.read()).isTrue();
+                });
+
+        verifications.verify(team, season, resource.id(), key, account.getId(),
+                new VerifyResourceCommand(verifications.getHistory(team, season, resource.id(), key).resourceVersion(),
+                        ResourceVerificationStatus.CONFIRMED, "내용 확인"));
+        assertThat(notifications.getInbox(team, season, key, account.getId()).notifications()).isEmpty();
     }
     @TestConfiguration(proxyBeanMethods = false)
     static class TimeConfig {

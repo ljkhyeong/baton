@@ -15,7 +15,7 @@
 - [업무 API 오류 알림](docs/runbooks/free-integrations.md#업무-api-오류-알림)은 Prometheus의 요청 지표 필터와 `baton-http-alerts.yml`을 함께 반영한다. 실행 중인 BATON의 경로 패턴·응답 건수 수집과 시험 오류·회복의 실제 채널 수신을 확인한다. 로컬 HTTP 대역·경보 검증만 완료했다.
 - [감시 시스템 하트비트](docs/runbooks/free-integrations.md#감시-시스템-하트비트)는 Better Stack 무료 슬롯·별도 비밀 URL을 준비한다. Alertmanager의 정기 신호 전용 경로를 먼저 반영한 뒤 경보 규칙을 적용한다. 첫 수신, 감시 프로세스 중단 시 누락 이메일, 재시작 후 해제를 확인한다. 기본 SMTP·Discord 예시는 외부 하트비트를 보내지 않는다.
 - [공개 인증서 만료 알림](docs/runbooks/free-integrations.md#공개-인증서-만료-알림-blackbox-exporter)의 Blackbox Exporter 내부 주소와 설정을 연결한다. 실제 만료일 수집·경보·갱신 후 해제 알림을 확인한다. Cloudflare 프록시 사용 시 원본 인증서는 별도로 확인한다. Exporter 준비 전에는 `baton-https` 작업과 해당 경보 파일을 함께 제외한다.
-- Dependabot 설정이 기본 브랜치에 반영되면 첫 `docker-compose` 점검에서 [대상 파일](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)과 그룹 PR을 확인한다. 이미지 변경 제안은 기존 CI를 통과한 뒤 검토하며, 비공개 저장소의 Actions 초과 사용 차단을 확인한다.
+- Dependabot의 첫 `docker-compose` 그룹 PR(#28)은 [대상 파일](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot) 4개만 바꾼다. `main` 품질 게이트가 복구된 뒤 다시 실행한 CI를 통과하면 검토하고, 비공개 저장소의 Actions 초과 사용 차단을 확인한다. 메이저 분리·기반 이미지 제외 설정이 `main`에 반영된 뒤에도 Node 25(#23)·Temurin 25(#12) PR이 열려 있으면 직접 닫는다.
 - [Java 의존성 취약점 알림](docs/runbooks/free-integrations.md#java-의존성-취약점-알림)은 저장소 Dependency graph·Dependabot alerts와 Actions 무료 한도·초과 사용 차단을 확인한 뒤 `BATON_DEPENDENCY_GRAPH_ENABLED=true`로 켠다. 첫 `main` 실행의 제출 성공, 실제 버전·간접 의존성과 알림 설정을 확인한다. 기본 비활성이며 실제 GitHub 전송은 아직 실행하지 않았다.
 - 파일럿 데이터를 넣기 전에 암호화 원격 백업을 별도 환경에 복구한다. `last-restore-recovery-targets.tsv`의 팀별로 새 키를 발급하고 이전 링크의 `403`, 새 링크의 접근과 복구 후 재백업을 확인한다.
 - [홈서버 저장 공간 감시](docs/runbooks/free-integrations.md#홈서버-저장-공간-감시-node-exporter)는 node_exporter 내부 주소와 호스트 파일시스템 접근을 준비한다. 실제 DB·백업 디스크의 지표를 대조한 뒤 선택 수집·경보 설정을 연결하고 시험 경보·해제의 수신을 확인한다. 기본 미연결이며 홈서버·수집기 설치는 실행하지 않았다.
@@ -26,6 +26,8 @@
 
 - 공개 이벤트 전달 주소는 `https://brief.b4ton.com`이다. 서버 위치·접속 방법·IP·공인 HTTPS를 준비해야 한다. 같은 호스트를 사용하면 Caddy의 80·443 포트를 먼저 통합한다.
 - BRIEF 선정 규칙 v2와 주간 해결 상세 API를 먼저 배포한 뒤 BATON을 적용한다. 조회·생성은 내부 `brief-service:8443`과 별도 서비스 인증을 사용하며 공개 Caddy에는 조회 경로를 추가하지 않는다.
+- 주간 요약 비교와 저장 이후 변경 확인은 BRIEF 범위 지정 비교·최신 여부 확인(BRIEF PRD-0031·0032, BRIEF `main`의 `0a73635` 이후)을 호출한다. 이 경로가 없는 BRIEF에서는 두 기능이 요약 없음(`404`)으로 보이므로 BRIEF를 먼저 배포한다.
+- 미해결 기간 표시는 BRIEF의 `activeSince`(BRIEF PRD-0033, 브랜치 `codex/attention-active-since`)가 배포된 뒤에 나타난다. 이전 BRIEF에서는 값이 `null`이라 표시하지 않으므로 배포 순서와 무관하게 동작하지만, BRIEF 변경의 병합·배포를 확인해야 한다.
 - 전용 Bearer 토큰 파일, HTTPS 원본 주소와 truststore를 준비한다. 전달을 끈 채 재조정 작업을 한 번 실행해 초기 점검 이벤트와 아웃박스를 확인한 뒤 전달을 켠다. `./ops/check-integration-delivery.sh`와 `integration="brief"` 지표에서 전달 상태를 확인한다.
 - 실제 HTTPS에서 장애 재시도·동일 이벤트 재전달·심각도 변경·해결 반영을 확인한다. 새 토큰과 직전 토큰을 함께 허용하는 교체 기간도 검증한다. 전달 진단·지표는 실제 수집·경보 시스템에 연결한다.
 - 로그인한 사용자로 점검·해결 상세, 요약 조회·생성·재사용·비교, 종료 시즌 조회, 특정 요약 링크의 로그인 복귀와 인쇄·PDF 저장을 확인한다.
@@ -73,7 +75,7 @@
 
 - 공개 HTTPS의 iOS·Android에서 작업 공간 `공유`의 앱 선택·취소와 전달된 링크의 접속을 확인한다. 공유 키 팀은 현재 키가 유지되고, 계정 권한 팀은 로그인·팀 권한이 적용돼야 한다. 현재는 브라우저 API 대역 검증이며 외부 앱의 실제 수신은 확인하지 않았다. [지원 조건](docs/runbooks/free-integrations.md#기기-앱-공유-web-share-api)
 - 무료 공휴일 연동은 공공데이터포털 ‘한국천문연구원_특일 정보’ 활용 신청과 일반 인증키(Decoding) 파일이 필요하다. [README](README.md#무료-공휴일-연동)에 따라 설정하고 HTTPS에서 공휴일 이름·월 전환·장애 표시를 확인한다. 현재는 XML 대역 검증만 했으며 기본 비활성이다.
-- 공개 HTTPS의 두 기기에서 내 팀 전환·모든 팀의 내 할 일·권한 회수, 자료 재확인 날짜·오늘 목록, 개인 알림 설정·읽음 유지와 모든 시즌 검색을 확인한다.
+- 공개 HTTPS의 두 기기에서 내 팀 전환·모든 팀의 내 할 일·권한 회수, 자료 재확인 날짜·오늘 목록·내 알림, 개인 알림 설정·읽음 유지와 모든 시즌 검색을 확인한다.
 - 스터디·팀 운영 템플릿 선택과 본문 초안 복구를 확인한다. 결정·자료·체크리스트 초안은 같은 탭에서 새로고침 후 복구되고 계정 전환 시 섞이지 않아야 한다.
 
 ## 파일럿 관찰

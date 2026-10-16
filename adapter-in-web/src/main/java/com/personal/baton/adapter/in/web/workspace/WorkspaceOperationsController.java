@@ -2,9 +2,9 @@ package com.personal.baton.adapter.in.web.workspace;
 
 import com.personal.baton.adapter.in.web.AccessKeyHeader;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.ArchiveRequest;
+import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.CreateSeasonRoundRequest;
-import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineExecutionCompletionRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateRoutineRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceRequests.UpdateSeasonRoundRequest;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceResponses.RoutineExecutionResponse;
@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/teams/{teamId}/seasons/{seasonId}")
 public class WorkspaceOperationsController {
 
     private final WorkspaceOperationsUseCase operationsUseCase;
@@ -36,7 +36,7 @@ public class WorkspaceOperationsController {
         this.operationsUseCase = operationsUseCase;
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/routines")
+    @PostMapping("/routines")
     @ResponseStatus(HttpStatus.CREATED)
     public RoutineResponse createRoutine(
             @PathVariable UUID teamId,
@@ -69,7 +69,7 @@ public class WorkspaceOperationsController {
         return RoutineResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}")
+    @PutMapping("/routines/{routineId}")
     public RoutineResponse updateRoutine(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -97,7 +97,7 @@ public class WorkspaceOperationsController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/routines/{routineId}/archive")
+    @PatchMapping("/routines/{routineId}/archive")
     public RoutineResponse updateRoutineArchive(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -117,7 +117,7 @@ public class WorkspaceOperationsController {
         ));
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/rounds")
+    @PostMapping("/rounds")
     @ResponseStatus(HttpStatus.CREATED)
     public SeasonRoundResponse createSeasonRound(
             @PathVariable UUID teamId,
@@ -142,7 +142,7 @@ public class WorkspaceOperationsController {
         return SeasonRoundResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}")
+    @PutMapping("/rounds/{roundId}")
     public SeasonRoundResponse updateSeasonRound(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -162,7 +162,7 @@ public class WorkspaceOperationsController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}/archive")
+    @PatchMapping("/rounds/{roundId}/archive")
     public SeasonRoundResponse updateSeasonRoundArchive(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -182,10 +182,7 @@ public class WorkspaceOperationsController {
         ));
     }
 
-    @PatchMapping(
-            "/teams/{teamId}/seasons/{seasonId}/rounds/{roundId}"
-                    + "/routine-executions/{executionId}/completion"
-    )
+    @PatchMapping("/rounds/{roundId}/routine-executions/{executionId}/completion")
     public RoutineExecutionResponse updateRoutineExecutionCompletion(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -195,7 +192,7 @@ public class WorkspaceOperationsController {
                     name = AccessKeyHeader.NAME,
                     required = false
             ) String accessKey,
-            @Valid @RequestBody UpdateRoutineExecutionCompletionRequest request
+            @Valid @RequestBody CompletionRequest request
     ) {
         return RoutineExecutionResponse.from(operationsUseCase.updateRoutineExecutionCompletion(
                 teamId,

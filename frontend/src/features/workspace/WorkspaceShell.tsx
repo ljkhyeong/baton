@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import '@/features/team-access/my-teams.scss'
 import { Icon } from '@/shared/ui/Icon'
 import type { WorkspaceConflictRecoveryStatus } from './useWorkspaceConflictRecovery'
 import { PageHeader, PrimaryButton } from './WorkspaceViews'
@@ -34,9 +33,48 @@ function hasHandoffToCheck(workspace: WorkspaceProjection) {
     || workspace.handoffItems.some((candidate) => !candidate.completed)
 }
 
-// 점은 버튼 이름에 섞이지 않게 숨기고, 설명 문구는 버튼 밖에 둔 뒤 aria-describedby로 연결한다.
-function HandoffDotDescription({ id }: { id: string }) {
-  return <span id={id} className="visually-hidden">확인할 인수인계 있음</span>
+// 머리 영역과 모바일 하단의 주 메뉴. 인수인계 점은 버튼 이름에 섞이지 않게 숨기고,
+// 설명 문구는 버튼 밖에 둔 뒤 aria-describedby로 연결한다.
+function MainNav({
+  workspace,
+  view,
+  onNavigate,
+  className,
+  label,
+  dotDescriptionId,
+  showIcons = false,
+}: {
+  workspace: WorkspaceProjection
+  view: ViewKey
+  onNavigate: (key: ViewKey) => void
+  className: string
+  label: string
+  dotDescriptionId: string
+  showIcons?: boolean
+}) {
+  const handoffWaiting = hasHandoffToCheck(workspace)
+  return (
+    <nav className={className} aria-label={label}>
+      {navItems.map((item) => {
+        const current = navKey(view) === item.key
+        const showDot = item.key === 'roles' && handoffWaiting
+        return (
+          <button
+            type="button"
+            className={current ? 'active' : ''}
+            key={item.key}
+            aria-current={current ? 'page' : undefined}
+            aria-describedby={showDot ? dotDescriptionId : undefined}
+            onClick={() => onNavigate(item.key)}
+          >
+            {showIcons ? <><Icon name={item.icon} size={20} /><span>{item.label}</span></> : item.label}
+            {showDot && <span className="nav-dot" aria-hidden="true" />}
+          </button>
+        )
+      })}
+      {handoffWaiting && <span id={dotDescriptionId} className="visually-hidden">확인할 인수인계 있음</span>}
+    </nav>
+  )
 }
 
 function formatSyncTime(value: number) {
@@ -82,7 +120,6 @@ export function WorkspaceHeader({
   onShare: () => void
   onManageAccess: () => void
 }) {
-  const handoffWaiting = hasHandoffToCheck(workspace)
   return (
     <header className="workspace-header">
       <span className="brand"><span className="brand-mark" aria-hidden="true" /><span className="visually-hidden">BATON</span></span>
@@ -95,22 +132,14 @@ export function WorkspaceHeader({
         <strong>{workspace.team.name}</strong><small>{workspace.season.name}</small>
         <Icon name="chevron" size={15} />
       </button>
-      <nav className="header-nav" aria-label="주 메뉴">
-        {navItems.map((item) => (
-          <button
-            type="button"
-            className={navKey(view) === item.key ? 'active' : ''}
-            key={item.key}
-            aria-current={navKey(view) === item.key ? 'page' : undefined}
-            aria-describedby={item.key === 'roles' && handoffWaiting ? 'header-handoff-dot' : undefined}
-            onClick={() => onNavigate(item.key)}
-          >
-            {item.label}
-            {item.key === 'roles' && handoffWaiting && <span className="nav-dot" aria-hidden="true" />}
-          </button>
-        ))}
-        {handoffWaiting && <HandoffDotDescription id="header-handoff-dot" />}
-      </nav>
+      <MainNav
+        workspace={workspace}
+        view={view}
+        onNavigate={onNavigate}
+        className="header-nav"
+        label="주 메뉴"
+        dotDescriptionId="header-handoff-dot"
+      />
       <span className="header-actions">
         <Link className="team-list-link" to="/my-teams">내 팀</Link>
         <button type="button" onClick={onShare} title="작업 공간 공유">공유</button>
@@ -121,20 +150,18 @@ export function WorkspaceHeader({
 }
 
 export function MobileTopbar({
-  accountAccessEnabled = false,
-  teamName,
-  seasonName,
+  workspace,
   onSwitchSeason,
   onShare,
   onManageAccess,
 }: {
-  accountAccessEnabled?: boolean
-  teamName: string
-  seasonName: string
+  workspace: WorkspaceProjection
   onSwitchSeason: () => void
   onShare: () => void
   onManageAccess: () => void
 }) {
+  const teamName = workspace.team.name
+  const seasonName = workspace.season.name
   return (
     <header className="mobile-topbar">
       <div className="brand"><span className="brand-mark" />BATON</div>
@@ -150,7 +177,7 @@ export function MobileTopbar({
       <span className="mobile-workspace-actions">
         <Link className="team-list-link" to="/my-teams">내 팀</Link>
         <button type="button" className="mobile-share" onClick={onShare}>공유</button>
-        <button type="button" className="mobile-share" onClick={onManageAccess}>{accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
+        <button type="button" className="mobile-share" onClick={onManageAccess}>{workspace.team.accountAccessEnabled ? '권한 관리' : '링크 관리'}</button>
       </span>
     </header>
   )
@@ -165,24 +192,16 @@ export function MobileNav({
   view: ViewKey
   onNavigate: (key: ViewKey) => void
 }) {
-  const handoffWaiting = hasHandoffToCheck(workspace)
   return (
-    <nav className="mobile-nav" aria-label="모바일 주 메뉴">
-      {navItems.map((item) => (
-        <button
-          type="button"
-          className={navKey(view) === item.key ? 'active' : ''}
-          key={item.key}
-          aria-current={navKey(view) === item.key ? 'page' : undefined}
-          aria-describedby={item.key === 'roles' && handoffWaiting ? 'mobile-handoff-dot' : undefined}
-          onClick={() => onNavigate(item.key)}
-        >
-          <Icon name={item.icon} size={20} /><span>{item.label}</span>
-          {item.key === 'roles' && handoffWaiting && <span className="nav-dot" aria-hidden="true" />}
-        </button>
-      ))}
-      {handoffWaiting && <HandoffDotDescription id="mobile-handoff-dot" />}
-    </nav>
+    <MainNav
+      workspace={workspace}
+      view={view}
+      onNavigate={onNavigate}
+      className="mobile-nav"
+      label="모바일 주 메뉴"
+      dotDescriptionId="mobile-handoff-dot"
+      showIcons
+    />
   )
 }
 
@@ -285,11 +304,16 @@ export function WorkspaceSyncStatus({
   )
 }
 
-export function ContentCreationCleanupBanner({
+// 요청 결과를 확인하지 못해 브라우저에 남은 임시 기록을 지우도록 안내한다.
+export function CleanupRequiredBanner({
+  label,
+  title,
   message,
   pending,
   onRetry,
 }: {
+  label: string
+  title: string
   message: string
   pending: boolean
   onRetry: () => void
@@ -298,12 +322,12 @@ export function ContentCreationCleanupBanner({
     <section
       className="season-ended-banner"
       role="alert"
-      aria-label="임시 기록 삭제 필요"
+      aria-label={label}
     >
       <div>
         <Icon name="alert" size={18} />
         <span>
-          <strong>새 항목을 추가하려면 남아 있는 임시 기록을 먼저 삭제하세요.</strong>
+          <strong>{title}</strong>
           <small>{message}</small>
         </span>
       </div>

@@ -85,7 +85,7 @@ class BriefContinuityOutboxPersistenceTest {
         BriefContinuityDelivery firstSignal = deliveryFor(firstClaim, FIRST_SIGNAL_ID);
         BriefContinuityDelivery secondSignal = deliveryFor(firstClaim, SECOND_SIGNAL_ID);
         assertThat(firstSignal.event().aggregateRevision()).isOne();
-        assertThat(firstSignal.attemptCount()).isOne();
+        assertThat(attemptCount(firstSignal)).isOne();
 
         assertThat(outboxPort.markRetry(
                 secondSignal.outboxId(),
@@ -101,7 +101,7 @@ class BriefContinuityOutboxPersistenceTest {
         ).getFirst();
         assertThat(reclaimed.event().sourceReference())
                 .isEqualTo(firstSignal.event().sourceReference());
-        assertThat(reclaimed.attemptCount()).isEqualTo(2);
+        assertThat(attemptCount(reclaimed)).isEqualTo(2);
         assertThat(reclaimed.leaseToken()).isNotEqualTo(firstSignal.leaseToken());
         assertThat(outboxPort.markDelivered(
                 firstSignal.outboxId(),
@@ -125,6 +125,14 @@ class BriefContinuityOutboxPersistenceTest {
                     .isEqualTo(firstSignal.event().sourceReference());
             assertThat(delivery.event().aggregateRevision()).isEqualTo(2);
         });
+    }
+
+    private int attemptCount(BriefContinuityDelivery delivery) {
+        return jdbcTemplate.queryForObject(
+                "SELECT attempt_count FROM brief_continuity_outbox WHERE id = ?",
+                Integer.class,
+                delivery.outboxId()
+        );
     }
 
     private BriefContinuityDelivery deliveryFor(

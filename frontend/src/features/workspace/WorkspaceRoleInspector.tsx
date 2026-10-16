@@ -37,10 +37,10 @@ export function RoleInspector({
   onEditResource,
   onUpdateResourceArchive,
   onManageMembership,
-  roundRoomScope,
+  scope,
   previousSeasonId,
   onCopyPreviousResource,
-  changesDisabled = false,
+  changesDisabled,
 }: {
   role: Role
   members: Member[]
@@ -59,10 +59,10 @@ export function RoleInspector({
   onEditResource: (resource: RoleResource) => void
   onUpdateResourceArchive: (resource: RoleResource, archived: boolean) => void
   onManageMembership: () => void
-  roundRoomScope: WorkspaceScope
+  scope: WorkspaceScope
   previousSeasonId: string | null
   onCopyPreviousResource: (resource: RoleResource) => void
-  changesDisabled?: boolean
+  changesDisabled: boolean
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -101,13 +101,13 @@ export function RoleInspector({
                 <span>
                   <a href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`${resource.title} 새 창에서 열기`}>{resource.title}</a>
                   {resource.description && <small>{resource.description}</small>}
-                  <ResourceHealthStatus key={`${resource.id}:${resource.url}:${roundRoomScope.accessKey}:${roundRoomScope.accountId ?? ''}`} {...roundRoomScope} resourceId={resource.id}
+                  <ResourceHealthStatus key={`${resource.id}:${resource.url}:${scope.accessKey}:${scope.accountId ?? ''}`} {...scope} resourceId={resource.id}
                     title={resource.title} targetUrl={resource.url} enabled={open && !blocked}
                     changesDisabled={changesDisabled} />
                 </span>
                 <div className="resource-row-actions">
                   <RoundRoomResourceActions
-                    {...roundRoomScope}
+                    {...scope}
                     resourceId={resource.id}
                     changesDisabled={changesDisabled}
                     onManageMembership={onManageMembership}
@@ -115,8 +115,8 @@ export function RoleInspector({
                   <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
                   <button type="button" aria-label={`${resource.title} 자료 보관`} disabled={changesDisabled} onClick={() => onUpdateResourceArchive(resource, true)}>보관</button>
                 </div>
-                <ContentChangePanel scope={roundRoomScope} kind="ROLE_RESOURCE" recordId={resource.id} />
-                <ResourceVerificationPanel scope={roundRoomScope} resourceId={resource.id}
+                <ContentChangePanel scope={scope} kind="ROLE_RESOURCE" recordId={resource.id} />
+                <ResourceVerificationPanel scope={scope} resourceId={resource.id}
                   disabled={changesDisabled} onManageMembership={onManageMembership} />
               </li>
             ))}
@@ -140,7 +140,7 @@ export function RoleInspector({
                   >
                     복원
                   </button>
-                  <ContentChangePanel scope={roundRoomScope} kind="ROLE_RESOURCE" recordId={resource.id} />
+                  <ContentChangePanel scope={scope} kind="ROLE_RESOURCE" recordId={resource.id} />
                 </li>
               ))}
             </ul>
@@ -151,8 +151,8 @@ export function RoleInspector({
       {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">관련 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
       {previousSeasonId && role.previousRoleId && (
         <PreviousRoleRecords
-          key={`${roundRoomScope.teamId}:${roundRoomScope.seasonId}:${role.id}`}
-          scope={roundRoomScope}
+          key={`${scope.teamId}:${scope.seasonId}:${role.id}`}
+          scope={scope}
           previousSeasonId={previousSeasonId}
           previousRoleId={role.previousRoleId}
           changesDisabled={changesDisabled}

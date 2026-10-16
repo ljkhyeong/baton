@@ -28,11 +28,13 @@ public class NotificationPreferencesService implements NotificationPreferencesUs
         var value = preferences.find(accountId).orElseGet(() -> NotificationPreferences.defaults(accountId));
         long version = value.getVersion() == null ? -1 : value.getVersion();
         if (version != command.expectedVersion()) throw new WorkspaceContentConflictException();
-        value.configure(command.deadlineSoonEnabled(), command.overdueEnabled(), command.handoffEnabled(), command.deadlineLeadHours());
+        value.configure(command.deadlineSoonEnabled(), command.overdueEnabled(), command.handoffEnabled(),
+                command.resourceReviewEnabled(), command.deadlineLeadHours());
         return result(preferences.save(value));
     }
     private PreferencesResult result(NotificationPreferences value) {
         return new PreferencesResult(value.getAccountId(), value.getVersion() == null ? -1 : value.getVersion(),
-                value.isDeadlineSoonEnabled(), value.isOverdueEnabled(), value.isHandoffEnabled(), value.getDeadlineLeadHours());
+                value.isDeadlineSoonEnabled(), value.isOverdueEnabled(), value.isHandoffEnabled(),
+                value.isResourceReviewEnabled(), value.getDeadlineLeadHours());
     }
 }

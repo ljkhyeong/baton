@@ -5,7 +5,6 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useWorkspaceConflictDraft, WorkspaceConflictDraft } from './WorkspaceConflictDraft'
@@ -20,14 +19,12 @@ import { CalendarSubscriptionPanel, CalendarSubscriptionCleanup } from '@/featur
 import { useBriefNavigation } from '@/features/brief/useBriefNavigation'
 import { BriefAttentionPanel } from '@/features/brief/BriefAttentionPanel'
 import type { BriefSource } from '@/features/brief/types'
-import {
-  initialRecordSearchFilters,
-} from './records/RecordSearchView'
 import { SeasonRecordSearch } from './records/SeasonRecordSearch'
 import { RecordSearchTarget } from './records/RecordSearchTarget'
-import type {
-  RecordSearchFilters,
-  RecordSearchResult,
+import {
+  initialRecordSearchFilters,
+  type RecordSearchFilters,
+  type RecordSearchResult,
 } from './records/recordSearch'
 import type { WorkspaceScope } from './api'
 import {
@@ -52,7 +49,6 @@ import {
   NextSeasonModal,
   SeasonEditModal,
   SeasonEndedBanner,
-  SeasonSuccessorCleanupBanner,
   SeasonSwitcherModal,
 } from './SeasonLifecycleModals'
 import {
@@ -95,7 +91,7 @@ import {
   WorkspaceAccessKeyRecovery,
 } from './WorkspaceAccessKeyRecovery'
 import {
-  ContentCreationCleanupBanner,
+  CleanupRequiredBanner,
   MobileNav,
   MobileTopbar,
   RecordsHeader,
@@ -131,9 +127,8 @@ type RoundSelection = {
 }
 type WorkspaceAppProps = Omit<WorkspaceScope, 'accountId'> & {
   accessDeniedAction?: ReactNode
-  onWorkspaceLoaded?: (workspace: WorkspaceProjection) => void
-  onSelectSeason: (seasonId: string, accessKey: string) => void
-  onSeasonCreated: (seasonId: string, accessKey: string) => void
+  onWorkspaceLoaded: (workspace: WorkspaceProjection) => void
+  onOpenSeason: (seasonId: string, accessKey: string) => void
 }
 
 function compareSeasonRounds(left: SeasonRound, right: SeasonRound) {
@@ -169,7 +164,7 @@ function relevantSeasonRound(rounds: SeasonRound[]) {
   })[0]
 }
 
-export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onSelectSeason, onSeasonCreated }: WorkspaceAppProps) {
+export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDeniedAction, onWorkspaceLoaded, onOpenSeason }: WorkspaceAppProps) {
   const [currentAccessKey, setCurrentAccessKey] = useState(accessKey)
   const sessionQuery = useAuthSession()
   const scope = { teamId, seasonId, accessKey: currentAccessKey,
@@ -178,9 +173,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const { memberId: currentMemberId, resolved: currentMemberResolved } = useCurrentMemberId(teamId, currentAccessKey)
   const [todayMode, setTodayMode] = useState<TodayMode>()
   const briefNavigation = useBriefNavigation(JSON.stringify([teamId, seasonId, currentAccessKey, scope.accountId]))
+  const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
   const conflictDraftFlow = useWorkspaceConflictDraft(JSON.stringify([
-    teamId, seasonId, currentAccessKey, scope.accountId,
-    workspaceQuery.error instanceof ApiError && workspaceQuery.error.code === 'WORKSPACE_ACCESS_DENIED',
+    teamId, seasonId, currentAccessKey, scope.accountId, workspaceAccessDenied,
   ]))
   const preserveConflictDraft = conflictDraftFlow.preserve
   const contentCreationCleanupCommand = usePendingContentCreationCleanupCommand()
@@ -241,11 +236,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const seasonLifecycleFlow = useWorkspaceSeasonLifecycleFlow({
     scope,
     workspace: workspaceQuery.data,
-    currentAccessKey,
     onOpenModal: openModal,
     onCloseModal: closeModal,
-    onSelectSeason,
-    onSeasonCreated,
+    onOpenSeason,
     notify: showToast,
     preserveConflictDraft,
   })
@@ -260,7 +253,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     scope,
     roles: workspaceQuery.data?.roles ?? [],
     roleHandoffs: workspaceQuery.data?.roleHandoffs ?? [],
-    modalOpen: modal === 'roleHandoff',
     onOpenModal: () => openModal('roleHandoff'),
     onCloseModal: closeModal,
     onSelectRole: setSelectedRoleId,
@@ -281,7 +273,6 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     shareUrl,
   } = useWorkspaceAccessKeyFlow({
     scope,
-    currentAccessKey,
     accountAccessEnabled: workspaceQuery.data?.team.accountAccessEnabled,
     onAccessKeyChange: setCurrentAccessKey,
     onCloseModal: closeModal,
@@ -356,7 +347,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   })
 
   useEffect(() => {
-    if (workspaceQuery.data) onWorkspaceLoaded?.(workspaceQuery.data)
+    if (workspaceQuery.data) onWorkspaceLoaded(workspaceQuery.data)
   }, [onWorkspaceLoaded, workspaceQuery.data])
 
   useLayoutEffect(() => {
@@ -370,9 +361,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   }, [conflictRecoveryStatus])
 
   useEffect(() => {
-    const rounds = sortedSeasonRounds(
-      (workspaceQuery.data?.rounds ?? []).filter((round) => !round.archivedAt),
-    )
+    const rounds = (workspaceQuery.data?.rounds ?? []).filter((round) => !round.archivedAt)
     setRoundSelection((current) => {
       if (current.source === 'user'
         && rounds.some((round) => round.id === current.roundId)) return current
@@ -384,15 +373,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     })
   }, [workspaceQuery.data?.rounds])
 
-  const workspaceAccessDenied = isWorkspaceAccessDenied(workspaceQuery.error)
-
   if (workspaceQuery.isPending) {
     return <WorkspaceState title="작업 공간을 불러오는 중입니다" description="이번 시즌의 업무와 기록을 불러오고 있습니다." busy />
   }
 
   if (!workspaceQuery.data || workspaceAccessDenied) {
-    const isAccessDenied = workspaceAccessDenied
-    const accessKeyRecovery = isAccessDenied && hasWorkspaceAccessKeyRecovery({
+    const accessKeyRecovery = workspaceAccessDenied && hasWorkspaceAccessKeyRecovery({
       pendingIdempotencyKey: pendingRotationIdempotencyKey,
       rotationError,
     })
@@ -413,10 +399,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         title="작업 공간을 불러오지 못했습니다"
         description={mutationError(workspaceQuery.error)}
         action={<>
-          {accessKeyRecovery ?? (isAccessDenied && accessDeniedAction
+          {accessKeyRecovery ?? (workspaceAccessDenied && accessDeniedAction
             ? accessDeniedAction
             : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
-          {isAccessDenied && <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />}
+          {workspaceAccessDenied && <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />}
         </>}
       />
     )
@@ -436,14 +422,13 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     roleHandoffs,
     members,
   } = workspace
-  const seasons = workspace.seasons
   const seasonEnded = Boolean(workspace.season.endedAt)
-  const accountAccessEnabled = workspace?.team.accountAccessEnabled ?? false
-  const canAdminister = !accountAccessEnabled || workspace?.team.permission === 'ADMIN'
+  const accountAccessEnabled = workspace.team.accountAccessEnabled
+  const canAdminister = !accountAccessEnabled || workspace.team.permission === 'ADMIN'
   const contentChangesDisabled = seasonEnded || Boolean(conflictRecoveryStatus)
-    || (accountAccessEnabled && workspace?.team.permission === 'VIEWER')
+    || (accountAccessEnabled && workspace.team.permission === 'VIEWER')
   const activeRoutines = routines.filter((routine) => !routine.archivedAt)
-  const archivedRoutines = [...routines]
+  const archivedRoutines = routines
     .filter((routine) => routine.archivedAt)
     .sort((left, right) => (right.archivedAt ?? '').localeCompare(left.archivedAt ?? ''))
   const activeRounds = rounds.filter((round) => !round.archivedAt)
@@ -459,6 +444,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     decisions: activeDecisions,
     handoffItems: activeHandoffItems,
   }
+  const me = activeMember(members, currentMemberId)
   const orderedActiveRounds = sortedSeasonRounds(activeRounds)
   const orderedArchivedRounds = sortedArchivedSeasonRounds(archivedRounds)
   const selectedRound = orderedActiveRounds.find((round) => round.id === selectedRoundId)
@@ -480,32 +466,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       .filter((handoff) => handoff.status === 'TRANSFERRED')
       .map((handoff) => handoff.roleId),
   )
-  const pendingCount = selectedRound?.routineExecutions.filter((execution) => execution.status !== 'DONE').length ?? 0
-  const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
-  const hasPendingRoleCreation = modal === 'role'
-    && !editingRole
-    && roleCreationCommand.hasPending()
-  const hasPendingMemberCreation = modal === 'member'
-    && !editingMember
-    && memberCreationCommand.hasPending()
   const pendingMemberDeactivationId = updateMemberDeactivationMutation.isPending
     ? updateMemberDeactivationMutation.variables?.id ?? null
     : null
-  const hasPendingRoutineCreation = modal === 'routine'
-    && !editingRoutine
-    && routineCreationCommand.hasPending()
-  const hasPendingRoundCreation = modal === 'round'
-    && !editingRound
-    && roundCreationCommand.hasPending()
-  const hasPendingDecisionCreation = modal === 'decision'
-    && !editingDecision
-    && decisionCreationCommand.hasPending()
-  const hasPendingHandoffCreation = modal === 'handoffItem'
-    && !editingHandoffItem
-    && handoffItemCreationCommand.hasPending()
-  const hasPendingRoleResourceCreation = modal === 'roleResource'
-    && !editingRoleResource
-    && roleResourceCreationCommand.hasPending()
   const selectRole = (
     roleId: string,
     options: { showInspector?: boolean; opener?: HTMLElement } = {},
@@ -525,26 +488,34 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     dismissInspector(false)
   }
 
-  const openPersonalRound = (roundId: string, executionId: string) => {
-    selectRound(roundId)
-    openView('rhythm')
+  const showRole = (roleId: string) => {
+    setView('roles')
+    selectRole(roleId)
+  }
+
+  const openHandoffView = (roleId?: string) => {
+    if (roleId) selectRole(roleId, { showInspector: false })
+    openView('handoff')
+  }
+
+  // 화면을 바꾼 다음 프레임에 대상을 가운데로 스크롤하고 초점을 옮긴다.
+  const revealAfterRender = (selector: string) => {
     window.requestAnimationFrame(() => {
-      const target = document.querySelector<HTMLElement>(
-        `[data-execution-id="${executionId}"] .routine-copy`,
-      )
+      const target = document.querySelector<HTMLElement>(selector)
       target?.scrollIntoView({ block: 'center' })
       focusWorkspaceElement(target)
     })
   }
 
+  const openPersonalRound = (roundId: string, executionId: string) => {
+    selectRound(roundId)
+    openView('rhythm')
+    revealAfterRender(`[data-execution-id="${executionId}"] .routine-copy`)
+  }
+
   const openPersonalHandoff = (roleId: string) => {
-    setSelectedRoleId(roleId)
-    openView('handoff')
-    window.requestAnimationFrame(() => {
-      const target = document.querySelector<HTMLElement>('.handoff-workspace')
-      target?.scrollIntoView({ block: 'center' })
-      focusWorkspaceElement(target)
-    })
+    openHandoffView(roleId)
+    revealAfterRender('.handoff-workspace')
   }
 
   const openResourceReview = (roleId: string, resourceId: string) => {
@@ -554,8 +525,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       showToast('자료 정보가 변경됐습니다. 작업 공간을 새로고침해 주세요.', 'error')
       return
     }
-    setView('roles')
-    selectRole(roleId)
+    showRole(roleId)
     window.requestAnimationFrame(() => {
       const row = [...document.querySelectorAll<HTMLElement>('[data-resource-id]')]
         .find((element) => element.dataset.resourceId === resourceId)
@@ -570,30 +540,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   const openRecordSearchResult = (result: RecordSearchResult) => {
     if (result.kind === 'decision') {
       openView('memory')
-      window.requestAnimationFrame(() => {
-        const target = document.querySelector<HTMLElement>(
-          `[data-decision-id="${result.id}"]`,
-        )
-        target?.scrollIntoView({ block: 'center' })
-        focusWorkspaceElement(target)
-      })
+      revealAfterRender(`[data-decision-id="${result.id}"]`)
       return
     }
     if (result.kind === 'handoff') {
-      setSelectedRoleId(result.roleId)
-      openView('handoff')
-      window.requestAnimationFrame(() => {
-        const target = document.querySelector<HTMLElement>(
-          `[data-handoff-item-id="${result.id}"]`,
-        )
-        target?.scrollIntoView({ block: 'center' })
-        focusWorkspaceElement(target)
-      })
+      openHandoffView(result.roleId)
+      revealAfterRender(`[data-handoff-item-id="${result.id}"]`)
       return
     }
 
-    setView('roles')
-    selectRole(result.roleId)
+    showRole(result.roleId)
   }
 
   const openBriefSource = (source: BriefSource) => {
@@ -618,10 +574,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         focusWorkspaceElement(focus ?? null)
       })
     } else if (source.eventType === 'HANDOFF_INCOMPLETE') {
-      setSelectedRoleId(target.roleId); openView('handoff')
+      openHandoffView(target.roleId)
       window.requestAnimationFrame(() => focusWorkspaceElement(document.querySelector<HTMLElement>('.handoff-role-tabs [aria-selected="true"]')))
     } else {
-      setView('roles'); selectRole(target.roleId)
+      showRole(target.roleId)
       window.requestAnimationFrame(() => focusWorkspaceElement(document.querySelector<HTMLElement>('.role-row.selected .role-row-open')))
     }
   }
@@ -631,11 +587,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       setSelectedRoleId(signal.roleId)
       openView('rhythm')
     } else if (signal.type === 'HANDOFF_INCOMPLETE') {
-      setSelectedRoleId(signal.roleId)
-      openView('handoff')
+      openHandoffView(signal.roleId)
     } else {
-      setView('roles')
-      selectRole(signal.roleId)
+      showRole(signal.roleId)
     }
 
     window.requestAnimationFrame(() => {
@@ -667,6 +621,33 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     return Math.round((completedItemCount / itemCount) * 100)
   }
 
+  const contentCommands = {
+    memberCreation: memberCreationCommand,
+    roleCreation: roleCreationCommand,
+    roleResourceCreation: roleResourceCreationCommand,
+    routineCreation: routineCreationCommand,
+    roundCreation: roundCreationCommand,
+    decisionCreation: decisionCreationCommand,
+    handoffItemCreation: handoffItemCreationCommand,
+  }
+  const contentMutations = {
+    memberUpdate: updateMemberMutation,
+    memberDeactivation: updateMemberDeactivationMutation,
+    roleUpdate: updateRoleMutation,
+    roleResourceUpdate: updateRoleResourceMutation,
+    roleResourceArchive: roleResourceArchiveMutation,
+    routineUpdate: updateRoutineMutation,
+    routineArchive: routineArchiveMutation,
+    roundUpdate: updateSeasonRoundMutation,
+    roundArchive: seasonRoundArchiveMutation,
+    routineExecutionCompletion: routineExecutionCompletionMutation,
+    decisionUpdate: updateDecisionMutation,
+    decisionArchive: decisionArchiveMutation,
+    handoffItemUpdate: updateHandoffItemMutation,
+    handoffCompletion: handoffCompletionMutation,
+    handoffItemArchive: handoffItemArchiveMutation,
+  }
+
   const editorActions = createWorkspaceEditorActions({
     roles,
     members,
@@ -682,25 +663,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     setSelectedRoleId,
     openModal,
     notify: showToast,
-    commands: {
-      memberCreation: memberCreationCommand,
-      roleCreation: roleCreationCommand,
-      roleResourceCreation: roleResourceCreationCommand,
-      routineCreation: routineCreationCommand,
-      roundCreation: roundCreationCommand,
-      decisionCreation: decisionCreationCommand,
-      handoffItemCreation: handoffItemCreationCommand,
-    },
-    mutations: {
-      memberUpdate: updateMemberMutation,
-      memberDeactivation: updateMemberDeactivationMutation,
-      roleUpdate: updateRoleMutation,
-      roleResourceUpdate: updateRoleResourceMutation,
-      routineUpdate: updateRoutineMutation,
-      roundUpdate: updateSeasonRoundMutation,
-      decisionUpdate: updateDecisionMutation,
-      handoffItemUpdate: updateHandoffItemMutation,
-    },
+    commands: contentCommands,
+    mutations: contentMutations,
   })
   const {
     openDecision: openDecisionModal,
@@ -731,6 +695,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     roleHandoffFlow.open(mode, role, handoff)
   }
 
+  const draftScope = sessionQuery.isSuccess ? scope : null
+  const draftModalKey = (id?: string) => JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, id ?? 'new'])
   const contentActions = createWorkspaceContentActions({
     roles,
     members,
@@ -746,39 +712,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     editingHandoffItem,
     ensureFreshWorkspace,
     preserveConflictDraft,
-    commands: {
-      memberCreation: memberCreationCommand,
-      roleCreation: roleCreationCommand,
-      roleResourceCreation: roleResourceCreationCommand,
-      routineCreation: routineCreationCommand,
-      roundCreation: roundCreationCommand,
-      decisionCreation: decisionCreationCommand,
-      handoffItemCreation: handoffItemCreationCommand,
-    },
-    mutations: {
-      memberUpdate: updateMemberMutation,
-      memberDeactivation: updateMemberDeactivationMutation,
-      roleUpdate: updateRoleMutation,
-      roleResourceUpdate: updateRoleResourceMutation,
-      roleResourceArchive: roleResourceArchiveMutation,
-      routineUpdate: updateRoutineMutation,
-      routineArchive: routineArchiveMutation,
-      roundUpdate: updateSeasonRoundMutation,
-      roundArchive: seasonRoundArchiveMutation,
-      routineExecutionCompletion: routineExecutionCompletionMutation,
-      decisionUpdate: updateDecisionMutation,
-      decisionArchive: decisionArchiveMutation,
-      handoffItemUpdate: updateHandoffItemMutation,
-      handoffCompletion: handoffCompletionMutation,
-      handoffItemArchive: handoffItemArchiveMutation,
-    },
+    commands: contentCommands,
+    mutations: contentMutations,
     setEditor,
     setView,
     setSelectedRoleId,
     closeModal,
     onRecordSaved: (kind, id) => {
-      if (!sessionQuery.isSuccess) return
-      void clearRecordDraft(scope, kind, id).catch(() => showToast('기록은 저장했지만 작성 중인 초안은 삭제하지 못했습니다. 다음 작성 전에 이전 초안을 삭제해 주세요.', 'error'))
+      if (!draftScope) return
+      void clearRecordDraft(draftScope, kind, id).catch(() => showToast('기록은 저장했지만 작성 중인 초안은 삭제하지 못했습니다. 다음 작성 전에 이전 초안을 삭제해 주세요.', 'error'))
     },
     openMemberManagement: () => openModal('members'),
     selectRound,
@@ -822,6 +764,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     updateRoutineArchive,
     updateSeasonRoundArchive,
   } = contentActions
+  // 계정 권한 팀은 구성원 관리, 공유 키 팀은 공유 링크 관리를 연다.
+  const manageAccess = () => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')
   // 넓은 화면에서는 역할 화면에만 상세를 고정하고, 다른 화면에서는 역할을 눌러 연 경우에만 표시한다.
   const roleInspectorPinned = view === 'roles'
   const showRoleInspector = Boolean(selectedRole) && view !== 'today'
@@ -835,10 +779,10 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         inert={workspaceInactive}
         aria-hidden={workspaceInactive || undefined}
       >
-        <WorkspaceHeader workspace={activeWorkspace} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+        <WorkspaceHeader workspace={activeWorkspace} view={view} onNavigate={openView} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={manageAccess} />
 
         <main className="main-surface" tabIndex={-1}>
-          <MobileTopbar accountAccessEnabled={accountAccessEnabled} teamName={workspace.team.name} seasonName={workspace.season.name} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={() => accountAccessEnabled ? openMemberManagementModal() : openModal('accessKey')} />
+          <MobileTopbar workspace={workspace} onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher} onShare={shareWorkspaceLink} onManageAccess={manageAccess} />
         <div className="workspace-toolbar">
           <button type="button" className="workspace-search-button" onClick={() => openView('records')}>
             <Icon name="search" size={16} />기록 검색
@@ -866,14 +810,19 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             />
           )}
           {contentCreationCleanupCommand.cleanupRequired && (
-            <ContentCreationCleanupBanner
+            <CleanupRequiredBanner
+              label="임시 기록 삭제 필요"
+              title="새 항목을 추가하려면 남아 있는 임시 기록을 먼저 삭제하세요."
               message={contentCreationCleanupCommand.message}
               pending={contentCreationCleanupCommand.pending}
               onRetry={retryContentCreationCleanup}
             />
           )}
           {seasonLifecycleFlow.cleanup.visible && (
-            <SeasonSuccessorCleanupBanner
+            <CleanupRequiredBanner
+              label="시즌 생성 임시 기록 삭제 필요"
+              title="다음 시즌은 이미 만들어졌습니다."
+              message="브라우저에 남은 임시 기록을 지워야 새 시즌을 만들 수 있습니다."
               pending={seasonLifecycleFlow.cleanup.pending}
               onRetry={seasonLifecycleFlow.actions.retrySuccessorCleanup}
             />
@@ -887,17 +836,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'today' && (
             <TodayView
               workspace={activeWorkspace}
-              me={activeMember(members, currentMemberId)}
+              me={me}
               meResolved={currentMemberResolved}
               chosenMode={todayMode}
               onChooseMode={setTodayMode}
-              personalWork={<><DueResourceReviewsPanel scope={scope} timeZone={workspace.season.timeZone} ended={Boolean(workspace.season.endedAt)}
+              personalWork={<><DueResourceReviewsPanel scope={scope} timeZone={workspace.season.timeZone} ended={seasonEnded}
                 onOpenResource={openResourceReview} /><PersonalWorkPanel
                 workspace={workspace}
                 accessKey={currentAccessKey}
                 onManageMembership={openMemberManagementModal}
                 onOpenRound={openPersonalRound}
                 onOpenHandoff={openPersonalHandoff}
+                onOpenResource={openResourceReview}
               /></>}
               weeklyBrief={<><BriefAttentionPanel navigation={briefNavigation} workspace={workspace} accessKey={currentAccessKey} changesDisabled={contentChangesDisabled}
                 onManageMembership={openMemberManagementModal} onOpenSource={openBriefSource} /><CalendarSubscriptionPanel
@@ -908,37 +858,27 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               /></>}
               calendarLabel={calendarLabel}
               calendarDate={calendarDate}
-              roleHandoffs={roleHandoffs}
               handoffProgress={handoffProgress}
               rounds={orderedActiveRounds}
               archivedRoundCount={orderedArchivedRounds.length}
               selectedRound={selectedRound}
-              pendingCount={pendingCount}
-              completedCount={completedCount}
               onSelectRound={selectRound}
               onAddRound={openRoundModal}
-              onSelectRole={(roleId) => { setView('roles'); selectRole(roleId) }}
+              onSelectRole={showRole}
               onToggleRoutine={toggleRoutineExecution}
               onNavigate={openView}
-              onOpenRoleHandoff={(roleId) => { selectRole(roleId, { showInspector: false }); openView('handoff') }}
+              onOpenRoleHandoff={openHandoffView}
               onOpenContinuitySignal={openContinuitySignal}
               onAddRole={openRoleModal}
               onAddRoutine={openRoutineModal}
               onEditRoutine={openRoutineEditModal}
-              selectedRoundBusy={
-                contentChangesDisabled
-                || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
-              }
-              selectedRoundOperationPending={Boolean(
-                selectedRound && busyRoundIds.has(selectedRound.id),
-              )}
               isRoundBusy={(roundId) => busyRoundIds.has(roundId)}
               changesDisabled={contentChangesDisabled}
             />
           )}
           {view === 'roles' && (
             <RolesView
-              me={activeMember(members, currentMemberId)}
+              me={me}
               roles={roles}
               roleHandoffs={roleHandoffs}
               members={members}
@@ -949,10 +889,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onManageMembers={openMemberManagementModal}
               onAddRole={openRoleModal}
               onEditRole={openRoleEditModal}
-              onOpenHandoff={(roleId) => {
-                if (roleId) selectRole(roleId, { showInspector: false })
-                openView('handoff')
-              }}
+              onOpenHandoff={openHandoffView}
               handoffProgress={handoffProgress}
               changesDisabled={contentChangesDisabled}
               memberManagementDisabled={Boolean(conflictRecoveryStatus)}
@@ -1075,13 +1012,12 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onEditResource={openRoleResourceEditModal}
             onUpdateResourceArchive={updateRoleResourceArchive}
             onManageMembership={openMemberManagementModal}
-            roundRoomScope={scope}
-            previousSeasonId={workspace.season.previousSeasonId ?? null}
+            scope={scope}
+            previousSeasonId={workspace.season.previousSeasonId}
             onCopyPreviousResource={openRoleResourceCopy}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
             onOpenHandoff={() => {
-              setView('handoff')
-              dismissInspector(false)
+              openView('handoff')
               window.requestAnimationFrame(() => {
                 focusWorkspaceElement(document.querySelector<HTMLElement>('.main-surface'))
               })
@@ -1094,8 +1030,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
 
       {modal === 'decision' && (
         <DecisionModal
-          key={JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, editingDecision?.id ?? 'new'])}
-          draftScope={sessionQuery.isSuccess ? scope : null}
+          key={draftModalKey(editingDecision?.id)}
+          draftScope={draftScope}
           roles={roles}
           members={members}
           selectedRoleId={effectiveSelectedRoleId}
@@ -1105,7 +1041,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : decisionCreationCommand.isPending}
           error={editingDecision ? updateDecisionMutation.error : decisionCreationCommand.error}
           storageError={editingDecision ? '' : decisionCreationCommand.storageError}
-          recoveryAvailable={editingDecision ? false : hasPendingDecisionCreation}
+          recoveryAvailable={!editingDecision && decisionCreationCommand.hasPending()}
           onClose={closeModal}
           onSave={editingDecision ? updateExistingDecision : addDecision}
         />
@@ -1144,7 +1080,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : memberCreationCommand.isPending}
           error={editingMember ? updateMemberMutation.error : memberCreationCommand.error}
           storageError={editingMember ? '' : memberCreationCommand.storageError}
-          recoveryAvailable={editingMember ? false : hasPendingMemberCreation}
+          recoveryAvailable={!editingMember && memberCreationCommand.hasPending()}
           onClose={() => {
             setEditor(null)
             closeModal()
@@ -1164,7 +1100,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : roleCreationCommand.isPending}
           error={editingRole ? updateRoleMutation.error : roleCreationCommand.error}
           storageError={editingRole ? '' : roleCreationCommand.storageError}
-          recoveryAvailable={editingRole ? false : hasPendingRoleCreation}
+          recoveryAvailable={!editingRole && roleCreationCommand.hasPending()}
           onClose={closeModal}
           onSave={editingRole ? updateExistingRole : addRole}
         />
@@ -1179,7 +1115,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : routineCreationCommand.isPending}
           error={editingRoutine ? updateRoutineMutation.error : routineCreationCommand.error}
           storageError={editingRoutine ? '' : routineCreationCommand.storageError}
-          recoveryAvailable={editingRoutine ? false : hasPendingRoutineCreation}
+          recoveryAvailable={!editingRoutine && routineCreationCommand.hasPending()}
           onClose={closeModal}
           onSave={editingRoutine ? updateExistingRoutine : addRoutine}
         />
@@ -1195,8 +1131,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       )}
       {modal === 'roleResource' && (
         <RoleResourceModal
-          key={JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, editingRoleResource?.id ?? 'new'])}
-          draftScope={sessionQuery.isSuccess ? scope : null}
+          key={draftModalKey(editingRoleResource?.id)}
+          draftScope={draftScope}
           roles={roles}
           lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}
@@ -1209,7 +1145,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             ? updateRoleResourceMutation.error
             : roleResourceCreationCommand.error}
           storageError={editingRoleResource ? '' : roleResourceCreationCommand.storageError}
-          recoveryAvailable={editingRoleResource ? false : hasPendingRoleResourceCreation}
+          recoveryAvailable={!editingRoleResource && roleResourceCreationCommand.hasPending()}
           onClose={closeModal}
           onSave={editingRoleResource ? updateExistingRoleResource : addRoleResource}
         />
@@ -1224,7 +1160,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             : roundCreationCommand.isPending}
           error={editingRound ? updateSeasonRoundMutation.error : roundCreationCommand.error}
           storageError={editingRound ? '' : roundCreationCommand.storageError}
-          recoveryAvailable={editingRound ? false : hasPendingRoundCreation}
+          recoveryAvailable={!editingRound && roundCreationCommand.hasPending()}
           onClose={() => {
             setEditor(null)
             closeModal()
@@ -1234,8 +1170,8 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
       )}
       {modal === 'handoffItem' && (
         <HandoffItemModal
-          key={JSON.stringify([scope.teamId, scope.seasonId, scope.accountId, scope.accessKey, editingHandoffItem?.id ?? 'new'])}
-          draftScope={sessionQuery.isSuccess ? scope : null}
+          key={draftModalKey(editingHandoffItem?.id)}
+          draftScope={draftScope}
           roles={roles}
           lockedRoleIds={lockedRoleIds}
           selectedRoleId={effectiveSelectedRoleId}
@@ -1247,7 +1183,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             ? updateHandoffItemMutation.error
             : handoffItemCreationCommand.error}
           storageError={editingHandoffItem ? '' : handoffItemCreationCommand.storageError}
-          recoveryAvailable={editingHandoffItem ? false : hasPendingHandoffCreation}
+          recoveryAvailable={!editingHandoffItem && handoffItemCreationCommand.hasPending()}
           onClose={closeModal}
           onSave={editingHandoffItem ? updateExistingHandoffItem : addHandoffItem}
         />
@@ -1266,7 +1202,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           pending={roleHandoffFlow.modalPending}
           error={roleHandoffFlow.modalError}
           storageError={roleHandoffFlow.modalStorageError}
-          recoveryAvailable={roleHandoffFlow.recoveryAvailable}
+          recoveryAvailable={roleHandoffFlow.hasPendingPreparation()}
           onClose={roleHandoffFlow.close}
           onPrepare={roleHandoffFlow.prepare}
           onTransfer={roleHandoffFlow.transfer}
@@ -1304,7 +1240,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         <SeasonSwitcherModal
           teamName={workspace.team.name}
           currentSeason={workspace.season}
-          seasons={seasons}
+          seasons={workspace.seasons}
           calendarDate={calendarDate}
           endingPending={seasonLifecycleFlow.switcher.endingPending}
           endingError={seasonLifecycleFlow.switcher.endingError}

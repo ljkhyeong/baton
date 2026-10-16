@@ -30,9 +30,12 @@ const seasonSuccessorJournalPolicy = {
 
 const storageRequiredMessage = '입력을 저장하지 못해 다음 시즌을 만들지 않았습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const differentRequestPendingMessage = '이전에 요청한 다음 시즌이 만들어졌는지 확인하지 못했습니다. 처음 입력한 내용으로 다시 시도하세요.'
-const busyMessage = '다른 탭에서 다음 시즌을 시작하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도해 주세요.'
-const lockUnsupportedMessage = '이 브라우저에서는 다음 시즌을 시작할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.'
-const lockFailedMessage = '다음 시즌을 시작할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.'
+// 탭 사이 잠금을 얻지 못한 이유별 안내
+const lockMessages = {
+  busy: '다른 탭에서 다음 시즌을 시작하고 있습니다. 그 탭의 결과를 확인한 뒤 다시 시도해 주세요.',
+  unsupported: '이 브라우저에서는 다음 시즌을 시작할 수 없습니다. 브라우저를 업데이트한 뒤 다시 시도해 주세요.',
+  failed: '다음 시즌을 시작할 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.',
+}
 const cleanupRequiredMessage = '다음 시즌 생성에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
 const cleanupCompletedMessage = '임시 기록을 삭제했습니다. 입력을 확인한 뒤 다시 제출해 주세요.'
 
@@ -82,37 +85,18 @@ export function useSeasonSuccessorCommand(
 
     return runWithSeasonSuccessorLock(
       scope.teamId,
-      async () => isJsonCleanupComplete(
-        clearPendingSeasonSuccessor(
-          cleanupRetry.teamId,
-          cleanupRetry.sourceSeasonId,
-          cleanupRetry.request,
-          cleanupRetry.idempotencyKey,
-        ),
-      ),
+      async () => isJsonCleanupComplete(clearPendingSeasonSuccessor(cleanupRetry)),
     ).then((lockResult) => {
-      if (lockResult.status === 'busy') {
-        mutation.reset()
-        setStorageError(busyMessage)
-        return false
-      }
-      if (lockResult.status === 'unsupported') {
-        mutation.reset()
-        setStorageError(lockUnsupportedMessage)
-        return false
-      }
-      if (lockResult.status === 'failed') {
-        mutation.reset()
-        setStorageError(lockFailedMessage)
+      mutation.reset()
+      if (lockResult.status !== 'completed') {
+        setStorageError(lockMessages[lockResult.status])
         return false
       }
       if (!lockResult.value) {
-        mutation.reset()
         setStorageError(cleanupRequiredMessage)
         return false
       }
 
-      mutation.reset()
       setCleanupRetry(null)
       setStorageError(cleanupCompletedMessage)
       return true
@@ -138,51 +122,30 @@ export function useSeasonSuccessorCommand(
         request,
         idempotencyKey,
       }
-      try {
-        const result = await mutation.mutateAsync({ request, idempotencyKey })
-        const cleanup = clearPendingSeasonSuccessor(
-          scope.teamId,
-          scope.seasonId,
-          request,
-          idempotencyKey,
-        )
+      const clearPendingRequest = () => {
+        const cleanup = clearPendingSeasonSuccessor(retry)
         if (!isJsonCleanupComplete(cleanup)) {
           setCleanupRetry(retry)
           setStorageError(cleanupRequiredMessage)
         }
+      }
+      try {
+        const result = await mutation.mutateAsync({ request, idempotencyKey })
+        clearPendingRequest()
         setSuccessResult(result)
       } catch (error) {
         if (resolveIdempotencyJournalFailure(
           error,
           seasonSuccessorJournalPolicy,
         ) !== 'retrySameRequest') {
-          const cleanup = clearPendingSeasonSuccessor(
-            scope.teamId,
-            scope.seasonId,
-            request,
-            idempotencyKey,
-          )
-          if (!isJsonCleanupComplete(cleanup)) {
-            setCleanupRetry(retry)
-            setStorageError(cleanupRequiredMessage)
-          }
+          clearPendingRequest()
         }
       }
       return { status: 'requested' as const }
     }).then((lockResult) => {
-      if (lockResult.status === 'busy') {
+      if (lockResult.status !== 'completed') {
         mutation.reset()
-        setStorageError(busyMessage)
-        return false
-      }
-      if (lockResult.status === 'unsupported') {
-        mutation.reset()
-        setStorageError(lockUnsupportedMessage)
-        return false
-      }
-      if (lockResult.status === 'failed') {
-        mutation.reset()
-        setStorageError(lockFailedMessage)
+        setStorageError(lockMessages[lockResult.status])
         return false
       }
       if (lockResult.value.status === 'blocked') {

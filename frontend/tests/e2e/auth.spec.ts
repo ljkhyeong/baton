@@ -3,13 +3,17 @@ import type { BrowserContext, Page, Route } from '@playwright/test'
 import {
   contrastRatio,
   ACCESS_KEY,
+  blockAccessKeyStorage,
   installApi,
   navigation,
   openSharedWorkspace,
+  recordedCalls,
   SEASON_ID,
+  storedAccessKey,
   SCOPE_PATH,
   TEAM_ID,
   WORKSPACE_PATH,
+  workspaceChrome,
 } from './support/workspaceApiHarness'
 
 const ACCOUNT_ID = '8e448211-66ae-44ab-9888-c4960648c22b'
@@ -18,7 +22,15 @@ const CSRF_TOKEN = 'e2e-csrf-token'
 const EMAIL = 'member@example.com'
 const PASSWORD = 'correct horse battery staple'
 const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
-const ROUND_ROOM_PATH = '/room/bcdf-ghjk-mnpq'
+const ROUND_ROOM_ID = 'bcdf-ghjk-mnpq'
+const ROUND_ROOM_PATH = `/room/${ROUND_ROOM_ID}`
+// 로그아웃 정리 대상인 ROUND 입장 기록의 시드 값
+const DEVICE_ROUND_SEED = {
+  teamId: TEAM_ID,
+  seasonId: SEASON_ID,
+  roomId: ROUND_ROOM_ID,
+  resourceId: '00000000-0000-4000-8000-000000000056',
+}
 
 type AuthProvider = 'google' | 'naver'
 type AccountIdentityProvider = AuthProvider | 'local_email'
@@ -41,7 +53,6 @@ type AuthApiOptions = {
   providerFailuresBeforeSuccess?: number
   providersDeferred?: boolean
   providers?: AuthProvider[]
-  registrationVerificationRequired?: boolean
   verificationFailure?: 'invalid' | 'transientOnce' | 'responseLostOnce'
   accountIdentities?: Array<{
     provider: AccountIdentityProvider
@@ -166,7 +177,7 @@ async function installAuthApi(target: Page | BrowserContext, options: AuthApiOpt
 
       if (path === '/api/v1/auth/local/registrations') {
         return json(202, {
-          verificationRequired: options.registrationVerificationRequired ?? true,
+          verificationRequired: true,
           ...responseExtension,
         })
       }
@@ -295,9 +306,40 @@ async function installTurnstileStub(page: Page, automatic = true) {
   }, automatic)
 }
 
-async function fillVerificationPassword(page: Page, password = PASSWORD) {
-  await page.locator('input[name="password"]').fill(password)
-  await page.locator('input[name="passwordConfirmation"]').fill(password)
+async function fillVerificationPassword(page: Page) {
+  await page.locator('input[name="password"]').fill(PASSWORD)
+  await page.locator('input[name="passwordConfirmation"]').fill(PASSWORD)
+}
+
+async function loginWithEmail(target: Page) {
+  await target.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
+  await target.getByLabel('비밀번호').fill(PASSWORD)
+  await target.getByRole('button', { name: '이메일로 로그인' }).click()
+}
+
+async function submitPasswordChange(
+  page: Page,
+  currentPassword: string,
+  newPassword: string,
+  confirmation = newPassword,
+) {
+  await page.getByLabel('현재 비밀번호').fill(currentPassword)
+  await page.locator('input[name="newPassword"]').fill(newPassword)
+  await page.getByLabel('새 비밀번호 확인').fill(confirmation)
+  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+}
+
+// 로그아웃이 지워야 할 팀 접속 정보와 남겨야 할 다른 설정을 함께 확인한다.
+async function expectDeviceAccessCleared(page: Page) {
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
+    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
+  )))).toEqual([])
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
+    key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
+  )))).toEqual([])
+  expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
+  expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
+    .toBe('keep')
 }
 
 async function installRoundRoomDocument(page: Page) {
@@ -327,10 +369,7 @@ test('@smoke 로그인한 이메일 계정은 비밀번호를 바꾸고 모든 �
 
   await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
   await expect(page.getByText(EMAIL)).toBeVisible()
-  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
-  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
-  await page.getByLabel('새 비밀번호 확인').fill('different new password value')
-  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await submitPasswordChange(page, PASSWORD, 'new correct horse battery staple', 'different new password value')
   await expect(page.getByRole('alert')).toContainText('새 비밀번호를 두 칸에 똑같이 입력해 주세요.')
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/password-changes')).toHaveLength(0)
 
@@ -345,8 +384,7 @@ test('@smoke 로그인한 이메일 계정은 비밀번호를 바꾸고 모든 �
     currentPassword: PASSWORD,
     newPassword: 'new correct horse battery staple',
   })
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBe(ACCESS_KEY)
+  expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
 })
 
 test('현재 비밀번호가 다르면 계정 세션과 입력 화면을 유지한다', async ({ page }) => {
@@ -355,10 +393,7 @@ test('현재 비밀번호가 다르면 계정 세션과 입력 화면을 유지�
     passwordChangeFailure: true,
   })
   await page.goto('/account')
-  await page.getByLabel('현재 비밀번호').fill('wrong current password')
-  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
-  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
-  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await submitPasswordChange(page, 'wrong current password', 'new correct horse battery staple')
 
   await expect(page.getByRole('alert')).toContainText('현재 비밀번호가 올바르지 않습니다')
   await expect(page).toHaveURL(/\/account$/)
@@ -372,10 +407,7 @@ test('@smoke 비밀번호 변경 중 세션 만료를 확인하면 로그인 화
     mutationAuthenticationRequired: 'password-change',
   })
   await page.goto('/account')
-  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
-  await page.locator('input[name="newPassword"]').fill('new correct horse battery staple')
-  await page.getByLabel('새 비밀번호 확인').fill('new correct horse battery staple')
-  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await submitPasswordChange(page, PASSWORD, 'new correct horse battery staple')
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
   await expect(page.getByRole('heading', { name: '로그인', exact: true })).toBeVisible()
@@ -418,9 +450,7 @@ test('로그인하지 않고 계정 보안 화면에 들어오면 로그인 후 
   await page.goto('/account')
 
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
 
   await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
@@ -460,17 +490,12 @@ test('@smoke 재로그인 뒤 늦은 인증 만료 응답이 새 세션을 덮�
     delayedPasswordChangeAuthenticationRequired: true,
   })
   await page.goto('/account')
-  await page.getByLabel('현재 비밀번호').fill(PASSWORD)
-  await page.locator('input[name="newPassword"]').fill(`${PASSWORD} updated`)
-  await page.getByLabel('새 비밀번호 확인').fill(`${PASSWORD} updated`)
-  await page.getByRole('button', { name: '비밀번호 변경', exact: true }).click()
+  await submitPasswordChange(page, PASSWORD, `${PASSWORD} updated`)
   await api.waitForDelayedPasswordChange()
 
   await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
   await expect(page).toHaveURL(/\/login\?returnTo=%2Faccount$/)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
   await expect(page).toHaveURL(/\/account$/)
   await expect(page.getByRole('heading', { name: '박민서' })).toBeVisible()
 
@@ -511,7 +536,6 @@ test('인증 응답의 추가 필드를 무시한다', async ({ page }) => {
   const api = await installAuthApi(page, {
     additiveResponseFields: true,
     providers: ['google', 'google'],
-    registrationVerificationRequired: false,
   })
   await page.goto('/register')
 
@@ -523,9 +547,7 @@ test('인증 응답의 추가 필드를 무시한다', async ({ page }) => {
 
   await page.goto('/login')
   await expect(page.getByRole('link', { name: 'Google로 계속하기' })).toHaveCount(2)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
   await expect(page).toHaveURL(/\/$/)
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/csrf').length)
     .toBeGreaterThanOrEqual(2)
@@ -605,9 +627,7 @@ test('OAuth login_failed를 안내한 뒤 오류 query만 지우고 안전한 �
 
   await page.reload()
   await expect(page.getByText('소셜 로그인을 완료하지 못했습니다.')).toHaveCount(0)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
 })
@@ -635,9 +655,7 @@ test('OAuth temporarily_unavailable을 안내하고 기억한 복귀 경로와 l
 
   await page.reload()
   await expect(page.getByText('현재 인증 요청을 처리할 수 없습니다.')).toHaveCount(0)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
 
   await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
 })
@@ -883,9 +901,7 @@ test('@smoke 이메일 인증 성공 응답을 잃으면 재시도 뒤 로그인
   await expect(page.getByRole('alert')).toContainText('해당 비밀번호로 먼저 로그인해 보세요.')
   await page.getByRole('link', { name: '로그인하기', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
 
   await expect(page).toHaveURL(/\/$/)
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/local/email-verifications')).toHaveLength(2)
@@ -902,9 +918,7 @@ test("@smoke 로그인 화면을 떠난 뒤 늦은 성공 응답이 현재 화�
     await route.fallback()
   }, { times: 1 })
   await page.goto("/login")
-  await page.getByLabel("이메일").fill(EMAIL)
-  await page.getByLabel("비밀번호").fill(PASSWORD)
-  await page.getByRole("button", { name: "이메일로 로그인" }).click()
+  await loginWithEmail(page)
   await requestStarted.promise
 
   await page.getByRole("link", { name: "계정 만들기" }).click()
@@ -922,9 +936,7 @@ test("@smoke 로그인 화면을 떠난 뒤 늦은 성공 응답이 현재 화�
 test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session 상태를 갱신한다', async ({ page, context }) => {
   const api = await installAuthApi(page)
   await page.goto('/login')
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
 
   await expect(page).toHaveURL(/\/$/)
   const login = requiredCall(api.calls, 'POST', '/api/v1/auth/local/session')
@@ -946,9 +958,7 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   const peer = await context.newPage()
   const workspaceApi = await installApi(peer)
   await openSharedWorkspace(peer)
-  await page.evaluate(({ teamId, seasonId }) => {
-    const roomId = 'bcdf-ghjk-mnpq'
-    const resourceId = '00000000-0000-4000-8000-000000000056'
+  await page.evaluate(({ teamId, seasonId, roomId, resourceId }) => {
     localStorage.setItem('baton-access-key:00000000-0000-4000-8000-000000000099', 'other-capability')
     localStorage.setItem('unrelated-local-setting', 'keep')
     sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
@@ -963,14 +973,12 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
       roomId,
     )
     sessionStorage.setItem('unrelated-session-setting', 'keep')
-  }, { teamId: TEAM_ID, seasonId: SEASON_ID })
+  }, DEVICE_ROUND_SEED)
   await page.getByRole('button', { name: '로그아웃' }).click()
 
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
   await expect(peer.getByText('로그인 또는 공유 링크 필요')).toBeVisible()
-  const workspaceGetCount = () => workspaceApi.calls.filter((call) =>
-    call.method === 'GET' && call.path === `${SCOPE_PATH}/workspace`,
-  ).length
+  const workspaceGetCount = () => recordedCalls(workspaceApi, 'GET', `${SCOPE_PATH}/workspace`).length
   const requestsAfterLogout = workspaceGetCount()
   await peer.evaluate(() => {
     window.dispatchEvent(new Event('focus'))
@@ -981,15 +989,7 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   const logout = requiredCall(api.calls, 'POST', '/api/v1/auth/logout')
   expect(logout.headers[CSRF_HEADER_NAME.toLowerCase()]).toBe(CSRF_TOKEN)
   expect(callsFor(api.calls, 'GET', '/api/v1/auth/csrf').length).toBeGreaterThanOrEqual(2)
-  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
-    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
-  )))).toEqual([])
-  expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
-  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
-    key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
-  )))).toEqual([])
-  expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
-    .toBe('keep')
+  await expectDeviceAccessCleared(page)
   await peer.close()
 })
 
@@ -1008,8 +1008,7 @@ for (const otherTab of [false, true]) {
       await logoutPage.goto('/login')
       await expect(logoutPage.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible()
     }
-    const chrome = testInfo.project.name === 'mobile' ? page.locator('.mobile-topbar') : page.locator('.workspace-header')
-    await chrome.getByRole('button', { name: '링크 관리' }).click()
+    await workspaceChrome(page, testInfo.project.name).getByRole('button', { name: '링크 관리' }).click()
     workspaceApi.holdAccessKeyRotations()
     try {
       const rotationStarted = page.waitForRequest(`**${SCOPE_PATH}/access-key/rotate`)
@@ -1030,9 +1029,9 @@ for (const otherTab of [false, true]) {
       await (await rotationResponse).finished()
       await page.evaluate((teamId) => navigator.locks.request(`baton-access-key-rotation:${teamId}`, () => {}), TEAM_ID)
 
-      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+      expect(await storedAccessKey(page)).toBeNull()
       await page.reload()
-      expect(await page.evaluate((teamId) => localStorage.getItem(`baton-access-key:${teamId}`), TEAM_ID)).toBeNull()
+      expect(await storedAccessKey(page)).toBeNull()
     } finally {
       workspaceApi.releaseAccessKeyRotations()
       if (otherTab) await logoutPage.close()
@@ -1104,9 +1103,7 @@ test('@smoke 로그아웃 후 늦게 도착한 세션 응답으로 이전 계정
 
 test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복하지 않는다', async ({ page }) => {
   const api = await installAuthApi(page, { authenticated: true })
-  await page.addInitScript(({ accessKeyStorageKey, accessKey, teamId, seasonId }) => {
-    const roomId = 'bcdf-ghjk-mnpq'
-    const resourceId = '00000000-0000-4000-8000-000000000056'
+  await page.addInitScript(({ accessKeyStorageKey, accessKey, teamId, seasonId, roomId, resourceId }) => {
     const originalRemoveItem = Storage.prototype.removeItem
     localStorage.setItem(accessKeyStorageKey, accessKey)
     localStorage.setItem('baton-recent-workspaces:v1', '[]')
@@ -1135,10 +1132,9 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
       originalRemoveItem.call(this, key)
     }
   }, {
+    ...DEVICE_ROUND_SEED,
     accessKeyStorageKey: `baton-access-key:${TEAM_ID}`,
     accessKey: 'device-cleanup-capability',
-    teamId: TEAM_ID,
-    seasonId: SEASON_ID,
   })
 
   await page.goto('/login')
@@ -1148,8 +1144,7 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   await expect(page.getByRole('alert')).toContainText(
     '팀 접속 정보를 모두 삭제하지 못했습니다.',
   )
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`))
-    .toBe('device-cleanup-capability')
+  expect(await storedAccessKey(page)).toBe('device-cleanup-capability')
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
 
   await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
@@ -1165,25 +1160,11 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   )
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
-  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
-    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
-  )))).toEqual([])
-  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
-    key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
-  )))).toEqual([])
-  expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
-  expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
-    .toBe('keep')
+  await expectDeviceAccessCleared(page)
 })
 
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
-  await context.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) throw new DOMException('Storage disabled', 'SecurityError')
-      originalSetItem.call(this, key, value)
-    }
-  })
+  await blockAccessKeyStorage(context)
   const sessionState = { authenticated: false }
   await installApi(page)
   await installAuthApi(page, { sessionState })
@@ -1207,9 +1188,7 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   const popup = await popupPromise
   await expect(popup).toHaveURL(/\/login$/)
   expect(await popup.evaluate(() => window.opener)).toBeNull()
-  await popup.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await popup.getByLabel('비밀번호').fill(PASSWORD)
-  await popup.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(popup)
   await expect(popup).toHaveURL(/\/$/)
   expect(requiredCall(popupApi.calls, 'POST', '/api/v1/auth/local/session').pageHash).toBe('')
 
@@ -1220,53 +1199,36 @@ test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 
   await expect(personalPanel).toContainText('먼저 이 팀에서 사용할 내 이름을 선택하세요.')
   await expect(page).toHaveURL(originalUrl)
   expect(originalUrl).toContain(`#accessKey=${ACCESS_KEY}`)
-  expect(await page.evaluate((key) => localStorage.getItem(key), `baton-access-key:${TEAM_ID}`)).toBeNull()
+  expect(await storedAccessKey(page)).toBeNull()
 })
 
-test('로그인은 검증된 내부 작업 공간 경로로 돌아가고 임시 경로를 지운다', async ({ page }) => {
-  await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
-  await installAuthApi(page)
-  await page.goto(`/login?returnTo=${encodeURIComponent(WORKSPACE_PATH)}`)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+for (const { title, returnTo } of [
+  {
+    title: '로그인은 검증된 내부 작업 공간 경로로 돌아가고 임시 경로를 지운다',
+    returnTo: WORKSPACE_PATH,
+  },
+  {
+    title: '로그인 후 특정 주간 요약 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke',
+    returnTo: `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`,
+  },
+]) {
+  test(title, async ({ page }) => {
+    await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
+    await installAuthApi(page)
+    await page.goto(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+    await loginWithEmail(page)
 
-  await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
-  await expect(page.getByText('팀 초대 또는 공유 링크로 접속해 주세요.')).toBeVisible()
-  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
-})
-
-test('로그인 후 특정 주간 요약 선택을 유지하고 접근 거부 시 공유 링크를 안내한다 @smoke', async ({ page }) => {
-  await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))
-  await installAuthApi(page)
-  const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`
-  await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
-  await expect(page).toHaveURL(new URL(target, page.url()).href)
-  await expect(page.getByText('팀 초대 또는 공유 링크로 접속해 주세요.')).toBeVisible()
-  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
-})
-
-test('주간 요약과 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke', async ({ page }) => {
-  await installAuthApi(page)
-  const target = `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221&accessKey=${ACCESS_KEY}`
-  await page.goto(`/login?returnTo=${encodeURIComponent(target)}`)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
-  await expect(page).toHaveURL(/\/$/)
-  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
-})
+    await expect(page).toHaveURL(new URL(returnTo, page.url()).href)
+    await expect(page.getByText('팀 초대 또는 공유 링크로 접속해 주세요.')).toBeVisible()
+    expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+  })
+}
 
 test('로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로를 지운다', async ({ page }) => {
   const roundDocumentRequests = await installRoundRoomDocument(page)
   await installAuthApi(page)
   await page.goto(`/login?returnTo=${encodeURIComponent(ROUND_ROOM_PATH)}`)
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+  await loginWithEmail(page)
 
   await expect(page).toHaveURL(new RegExp(`${ROUND_ROOM_PATH}$`))
   await expect(page.getByRole('heading', { name: 'ROUND document boundary' })).toBeVisible()
@@ -1274,27 +1236,29 @@ test('로그인은 canonical ROUND 경로를 새 문서로 열고 임시 경로�
   expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
 })
 
-test('canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 사용하지 않는다', async ({ page }) => {
-  await installAuthApi(page)
-  await page.goto('/login?returnTo=%2Froom%2Fbcdf-ghjk-mnpo')
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
+for (const { title, returnTo } of [
+  {
+    title: '주간 요약과 추가 쿼리가 섞인 로그인 복귀 주소는 거부한다 @smoke',
+    returnTo: `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221&accessKey=${ACCESS_KEY}`,
+  },
+  {
+    title: 'canonical 형식이 아닌 ROUND returnTo는 로그인 복귀 경로로 사용하지 않는다',
+    returnTo: '/room/bcdf-ghjk-mnpo',
+  },
+  {
+    title: '외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다',
+    returnTo: '//evil.example/steal',
+  },
+]) {
+  test(title, async ({ page }) => {
+    await installAuthApi(page)
+    await page.goto(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+    await loginWithEmail(page)
 
-  await expect(page).toHaveURL(/\/$/)
-  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
-})
-
-test('외부 returnTo는 거부하고 로그인 뒤 시작 화면으로 이동한다', async ({ page }) => {
-  await installAuthApi(page)
-  await page.goto('/login?returnTo=%2F%2Fevil.example%2Fsteal')
-  await page.getByRole('textbox', { name: '이메일', exact: true }).fill(EMAIL)
-  await page.getByLabel('비밀번호').fill(PASSWORD)
-  await page.getByRole('button', { name: '이메일로 로그인' }).click()
-
-  await expect(page).toHaveURL(/\/$/)
-  expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
-})
+    await expect(page).toHaveURL(/\/$/)
+    expect(await page.evaluate(() => Object.keys(sessionStorage))).toEqual([])
+  })
+}
 
 test('소셜 로그인 콜백 세션은 같은 탭의 검증된 작업 공간 복귀 경로를 이어 간다', async ({ page }) => {
   await page.route('**/api/v1/teams/**/workspace', route => route.fulfill({ status: 403, json: { code: 'WORKSPACE_ACCESS_DENIED', message: '팀 초대 또는 공유 링크로 접속해 주세요.' } }))

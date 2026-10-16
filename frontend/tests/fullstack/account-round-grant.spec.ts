@@ -7,21 +7,7 @@ import {
 
 import { expect, test, type Page } from '@playwright/test'
 
-import {
-  requireLoopbackHttpOrigin,
-  requireRoundEdgeHttpsOrigin,
-} from '../support/loopback-url'
-
 const roundEdgeMode = process.env.BATON_FULLSTACK_ROUND_EDGE === 'true'
-const frontendOrigin = roundEdgeMode
-  ? requireRoundEdgeHttpsOrigin(
-      process.env.BATON_FULLSTACK_BASE_URL,
-      'BATON_FULLSTACK_BASE_URL',
-    )
-  : requireLoopbackHttpOrigin(
-      process.env.BATON_FULLSTACK_BASE_URL,
-      'BATON_FULLSTACK_BASE_URL',
-    )
 const creationKey = requireValue(
   process.env.BATON_FULLSTACK_CREATION_KEY,
   'BATON_FULLSTACK_CREATION_KEY',
@@ -299,9 +285,11 @@ function verifyRoundGrant(
 }
 
 test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한다', async ({
+  baseURL,
   context,
   page,
 }) => {
+  const frontendOrigin = requireValue(baseURL, 'baseURL')
   const initialNavigation = await page.goto('/')
   expect(initialNavigation).not.toBeNull()
   if (roundEdgeMode) {
@@ -781,9 +769,7 @@ test('실제 local session과 구성원 claim으로 ROUND 참여권을 발급한
   expect(signalUrl.host).toBe(new URL(frontendOrigin).host)
   expect(signalUrl.pathname).toBe(publicSignalPath)
 
-  await expect(page.getByText('입장 완료 · 대기 중', { exact: true })).toBeVisible({
-    timeout: 15_000,
-  })
+  await expect(page.getByText('입장 완료 · 대기 중', { exact: true })).toBeVisible()
 
   const activeGrantCookie = (await context.cookies())
     .find((cookie) => cookie.name === '__Secure-round_access')

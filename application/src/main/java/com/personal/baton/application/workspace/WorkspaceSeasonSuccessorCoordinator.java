@@ -72,11 +72,11 @@ final class WorkspaceSeasonSuccessorCoordinator {
     }
 
     NextSeasonResult createNext(
-            UUID teamId,
             Season sourceSeason,
             String idempotencyKey,
             CreateNextSeasonCommand command
     ) {
+        UUID teamId = sourceSeason.getTeamId();
         UUID sourceSeasonId = sourceSeason.getId();
         if (peopleRepository.existsOpenRoleHandoffBySeasonId(sourceSeasonId)) {
             throw new RoleHandoffStateConflictException(
@@ -158,14 +158,10 @@ final class WorkspaceSeasonSuccessorCoordinator {
 
         List<Routine> copiedRoutines = new ArrayList<>(sourceRoutines.size());
         for (Routine sourceRoutine : sourceRoutines) {
-            UUID copiedOwnerRoleId = copiedRoleIds.get(sourceRoutine.getOwnerRoleId());
-            if (copiedOwnerRoleId == null) {
-                throw new IllegalStateException("복사된 반복 업무의 담당 역할 매핑을 찾을 수 없습니다");
-            }
             copiedRoutines.add(sourceRoutine.copyToSeason(
                     UUID.randomUUID(),
                     savedTargetSeason.getId(),
-                    copiedOwnerRoleId
+                    copiedRoleIds.get(sourceRoutine.getOwnerRoleId())
             ));
         }
         if (!copiedRoutines.isEmpty()) {

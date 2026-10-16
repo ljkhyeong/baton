@@ -40,9 +40,7 @@ function requireScope(
   mapping: RoundRoomMapping,
   scope: RoundRoomMappingScope,
 ) {
-  if (!isSameUuid(mapping.teamId, scope.teamId)
-    || !isSameUuid(mapping.seasonId, scope.seasonId)
-    || !isSameUuid(mapping.resourceId, scope.resourceId)) {
+  if (!isSameUuid(requireListScope(mapping, scope).resourceId, scope.resourceId)) {
     throw new Error('이 팀의 방 정보를 확인하지 못했습니다. 다시 확인해 주세요.')
   }
   return mapping

@@ -368,7 +368,7 @@ function addStringFormats(schema, propertyName) {
       schema.format = 'uuid'
     }
     if (propertyName?.endsWith('Date')) schema.format = 'date'
-    if (propertyName?.endsWith('At')) schema.format = 'date-time'
+    if (propertyName?.endsWith('At') || propertyName?.endsWith('Since')) schema.format = 'date-time'
   }
   if (schema.type === 'array' && propertyName?.endsWith('Ids') && schema.items?.type === 'string') {
     schema.items.format = 'uuid'

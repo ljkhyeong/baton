@@ -25,7 +25,7 @@ import static java.util.stream.Collectors.toSet;
 
 final class HandoffContinuitySignalAnalyzer {
 
-    private static final int SUCCESSOR_WARNING_DAYS = 14;
+    static final int SUCCESSOR_WARNING_DAYS = 14;
     private static final int HANDOFF_WARNING_DAYS = 7;
 
     Analysis analyze(
@@ -302,7 +302,7 @@ final class HandoffContinuitySignalAnalyzer {
         }
     }
 
-    private String assignmentDateDescription(LocalDate assignmentEndDate, LocalDate today) {
+    static String assignmentDateDescription(LocalDate assignmentEndDate, LocalDate today) {
         if (assignmentEndDate.isBefore(today)) {
             return ChronoUnit.DAYS.between(assignmentEndDate, today) + "일 전에 끝났지만";
         }
@@ -312,7 +312,7 @@ final class HandoffContinuitySignalAnalyzer {
         return ChronoUnit.DAYS.between(today, assignmentEndDate) + "일 뒤 끝나지만";
     }
 
-    private boolean hasEligibleNextMember(Role role, Set<UUID> activeMemberIds) {
+    static boolean hasEligibleNextMember(Role role, Set<UUID> activeMemberIds) {
         return activeMemberIds.contains(role.getNextMemberId())
                 && !Objects.equals(role.getCurrentMemberId(), role.getNextMemberId());
     }

@@ -13,7 +13,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -179,9 +178,9 @@ class WatchHealthEventInboxPersistenceTest {
         )).isOne();
     }
 
-    @DisplayName("높은 원본 리비전 뒤에 도착한 낮은 리비전의 다른 이벤트도 버리지 않는다")
+    @DisplayName("높은 원본 리비전·늦은 변경 시각의 이벤트 뒤에 도착한 낮은 리비전 이벤트도 버리지 않고 접수 순서대로 보존한다")
     @Test
-    void preservesReorderedEventsAcrossSourceRevisions() {
+    void preservesReorderedEventsAcrossRevisionsAndChangeTimes() {
         WatchHealthChangedEvent newerRevision = event(
                 UUID.fromString("00000000-0000-4000-8000-000000001721"),
                 18L,
@@ -208,6 +207,21 @@ class WatchHealthEventInboxPersistenceTest {
                 "SELECT source_revision FROM watch_health_event_inbox ORDER BY source_revision",
                 Long.class
         )).containsExactly(17L, 18L);
+        assertThat(jdbcTemplate.queryForList(
+                """
+                SELECT BIN_TO_UUID(event_id)
+                FROM watch_health_event_inbox
+                ORDER BY accepted_at
+                """,
+                String.class
+        )).containsExactly(
+                newerRevision.eventId().toString(),
+                lateOlderRevision.eventId().toString()
+        );
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM watch_health_event_inbox",
+                Long.class
+        )).isEqualTo(2L);
     }
 
     @DisplayName("원본 리비전이 같은 서로 다른 상태 이벤트를 모두 보존한다")
@@ -245,48 +259,6 @@ class WatchHealthEventInboxPersistenceTest {
         )).containsOnly(17L).hasSize(2);
     }
 
-    @DisplayName("변경 시각과 접수 순서가 엇갈린 서로 다른 event를 모두 보존한다")
-    @Test
-    void preservesEventsWhenChangedAtAndAcceptedAtOrdersDisagree() {
-        WatchHealthChangedEvent laterChangeAcceptedFirst = event(
-                UUID.fromString("00000000-0000-4000-8000-000000001725"),
-                18L,
-                ATTEMPT_ID,
-                WatchResourceHealth.DEGRADED,
-                WatchResourceHealth.BROKEN,
-                CHANGED_AT.plusSeconds(1),
-                resourceReference(RESOURCE_ID)
-        );
-        WatchHealthChangedEvent earlierChangeAcceptedLater = event(
-                UUID.fromString("00000000-0000-4000-8000-000000001726"),
-                17L,
-                null,
-                WatchResourceHealth.HEALTHY,
-                WatchResourceHealth.DEGRADED,
-                CHANGED_AT,
-                resourceReference(RESOURCE_ID)
-        );
-
-        inboxPort.accept(laterChangeAcceptedFirst, FIRST_ACCEPTED_AT);
-        inboxPort.accept(earlierChangeAcceptedLater, LATER_ACCEPTED_AT);
-
-        assertThat(jdbcTemplate.queryForList(
-                """
-                SELECT BIN_TO_UUID(event_id)
-                FROM watch_health_event_inbox
-                ORDER BY accepted_at
-                """,
-                String.class
-        )).containsExactly(
-                laterChangeAcceptedFirst.eventId().toString(),
-                earlierChangeAcceptedLater.eventId().toString()
-        );
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM watch_health_event_inbox",
-                Long.class
-        )).isEqualTo(2L);
-    }
-
     @DisplayName("같은 eventId의 canonical envelope 필드가 하나라도 다르면 최초 행을 보존하고 충돌한다")
     @ParameterizedTest(name = "{0}")
     @MethodSource("conflictingEnvelopes")
@@ -302,7 +274,6 @@ class WatchHealthEventInboxPersistenceTest {
                 LATER_ACCEPTED_AT
         );
 
-        assertThat(field).isNotBlank();
         assertThat(result.status()).isEqualTo(WatchHealthEventInboxStatus.CONFLICT);
         assertThat(result.acceptedAt()).isEqualTo(FIRST_ACCEPTED_AT);
         assertThat(jdbcTemplate.queryForObject(
@@ -357,11 +328,8 @@ class WatchHealthEventInboxPersistenceTest {
     @Test
     void atomicallyConflictsConcurrentDifferentEnvelope() throws Exception {
         WatchHealthChangedEvent original = baseEvent();
-        WatchHealthChangedEvent changed = mutate(
-                original,
-                event -> event(event.sourceRevision() + 1, event.attemptId(), event.previousHealth(),
-                        event.currentHealth(), event.changedAt(), event.resourceReference())
-        );
+        WatchHealthChangedEvent changed = event(original.sourceRevision() + 1, original.attemptId(),
+                original.previousHealth(), original.currentHealth(), original.changedAt(), original.resourceReference());
 
         List<ConcurrentReceipt> receipts = acceptConcurrently(
                 new ReceiptRequest(original, FIRST_ACCEPTED_AT),
@@ -394,62 +362,62 @@ class WatchHealthEventInboxPersistenceTest {
     private Stream<Arguments> conflictingEnvelopes() {
         WatchHealthChangedEvent base = baseEvent();
         return Stream.of(
-                Arguments.of("resourceReference", mutate(base, event -> event(
-                        event.sourceRevision(),
-                        event.attemptId(),
-                        event.previousHealth(),
-                        event.currentHealth(),
-                        event.changedAt(),
+                Arguments.of("resourceReference", event(
+                        base.sourceRevision(),
+                        base.attemptId(),
+                        base.previousHealth(),
+                        base.currentHealth(),
+                        base.changedAt(),
                         "baton-manager:pilot:role-resource:00000000-0000-4000-8000-000000001799"
-                ))),
-                Arguments.of("sourceRevision", mutate(base, event -> event(
-                        event.sourceRevision() + 1,
-                        event.attemptId(),
-                        event.previousHealth(),
-                        event.currentHealth(),
-                        event.changedAt(),
-                        event.resourceReference()
-                ))),
-                Arguments.of("attemptId", mutate(base, event -> event(
-                        event.sourceRevision(),
+                )),
+                Arguments.of("sourceRevision", event(
+                        base.sourceRevision() + 1,
+                        base.attemptId(),
+                        base.previousHealth(),
+                        base.currentHealth(),
+                        base.changedAt(),
+                        base.resourceReference()
+                )),
+                Arguments.of("attemptId", event(
+                        base.sourceRevision(),
                         UUID.fromString("00000000-0000-4000-8000-000000001798"),
-                        event.previousHealth(),
-                        event.currentHealth(),
-                        event.changedAt(),
-                        event.resourceReference()
-                ))),
-                Arguments.of("attemptId presence", mutate(base, event -> event(
-                        event.sourceRevision(),
+                        base.previousHealth(),
+                        base.currentHealth(),
+                        base.changedAt(),
+                        base.resourceReference()
+                )),
+                Arguments.of("attemptId presence", event(
+                        base.sourceRevision(),
                         null,
-                        event.previousHealth(),
-                        event.currentHealth(),
-                        event.changedAt(),
-                        event.resourceReference()
-                ))),
-                Arguments.of("previousHealth", mutate(base, event -> event(
-                        event.sourceRevision(),
-                        event.attemptId(),
+                        base.previousHealth(),
+                        base.currentHealth(),
+                        base.changedAt(),
+                        base.resourceReference()
+                )),
+                Arguments.of("previousHealth", event(
+                        base.sourceRevision(),
+                        base.attemptId(),
                         WatchResourceHealth.HEALTHY,
-                        event.currentHealth(),
-                        event.changedAt(),
-                        event.resourceReference()
-                ))),
-                Arguments.of("currentHealth", mutate(base, event -> event(
-                        event.sourceRevision(),
-                        event.attemptId(),
-                        event.previousHealth(),
+                        base.currentHealth(),
+                        base.changedAt(),
+                        base.resourceReference()
+                )),
+                Arguments.of("currentHealth", event(
+                        base.sourceRevision(),
+                        base.attemptId(),
+                        base.previousHealth(),
                         WatchResourceHealth.UNKNOWN,
-                        event.changedAt(),
-                        event.resourceReference()
-                ))),
-                Arguments.of("changedAt nanosecond", mutate(base, event -> event(
-                        event.sourceRevision(),
-                        event.attemptId(),
-                        event.previousHealth(),
-                        event.currentHealth(),
-                        event.changedAt().plusNanos(1),
-                        event.resourceReference()
-                )))
+                        base.changedAt(),
+                        base.resourceReference()
+                )),
+                Arguments.of("changedAt nanosecond", event(
+                        base.sourceRevision(),
+                        base.attemptId(),
+                        base.previousHealth(),
+                        base.currentHealth(),
+                        base.changedAt().plusNanos(1),
+                        base.resourceReference()
+                ))
         );
     }
 
@@ -512,13 +480,6 @@ class WatchHealthEventInboxPersistenceTest {
                 CHANGED_AT,
                 resourceReference(RESOURCE_ID)
         );
-    }
-
-    private WatchHealthChangedEvent mutate(
-            WatchHealthChangedEvent source,
-            UnaryOperator<WatchHealthChangedEvent> mutation
-    ) {
-        return mutation.apply(source);
     }
 
     private WatchHealthChangedEvent event(

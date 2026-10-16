@@ -23,7 +23,7 @@ public interface AccountIdentityJpaRepository extends JpaRepository<AccountIdent
             String providerSubject
     );
 
-    List<AccountIdentity> findAllByAccountIdOrderByProviderAsc(UUID accountId);
+    List<AccountIdentity> findAllByAccountId(UUID accountId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AccountIdentity> findForUpdateById(UUID identityId);

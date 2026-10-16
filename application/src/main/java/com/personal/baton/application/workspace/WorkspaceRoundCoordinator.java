@@ -15,6 +15,7 @@ import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,11 +51,11 @@ final class WorkspaceRoundCoordinator {
     }
 
     SeasonRoundResult create(
-            UUID teamId,
             Season season,
             String idempotencyKey,
             CreateSeasonRoundCommand command
     ) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         SeasonRound round = SeasonRound.create(
                 UUID.randomUUID(),
@@ -80,9 +81,7 @@ final class WorkspaceRoundCoordinator {
                     season
             );
         }
-        if (!season.contains(round.getMeetingDate())) {
-            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
-        }
+        requireMeetingDateInSeason(season, round.getMeetingDate());
         List<RoutineExecution> executions = RoutineExecution.snapshotAll(
                 round.getId(),
                 repository.findActiveRoutinesBySeasonId(seasonId),
@@ -105,9 +104,7 @@ final class WorkspaceRoundCoordinator {
         UUID seasonId = season.getId();
         SeasonRound round = roundResolver.requireActiveForUpdate(seasonId, roundId);
         boolean meetingDateChanged = !Objects.equals(round.getMeetingDate(), command.meetingDate());
-        if (!season.contains(command.meetingDate())) {
-            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
-        }
+        requireMeetingDateInSeason(season, command.meetingDate());
         round.update(command.name(), command.meetingDate(), season.getZoneId());
         SeasonRound saved = repository.saveSeasonRound(round);
         List<RoutineExecution> executions = repository.findRoutineExecutionsBySeasonRoundIds(
@@ -159,5 +156,11 @@ final class WorkspaceRoundCoordinator {
                 saved,
                 season.getZoneId()
         );
+    }
+
+    private static void requireMeetingDateInSeason(Season season, LocalDate meetingDate) {
+        if (!season.contains(meetingDate)) {
+            throw new DomainValidationException("모임 날짜는 시즌 기간 안에 있어야 합니다");
+        }
     }
 }

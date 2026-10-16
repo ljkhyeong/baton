@@ -12,7 +12,6 @@ import com.personal.baton.application.identity.error.HumanVerificationUnavailabl
 import com.personal.baton.application.identity.error.IdentityConflictException;
 import com.personal.baton.application.identity.error.IdentityOperationUnavailableException;
 import com.personal.baton.application.identity.error.LocalPasswordUnavailableException;
-import com.personal.baton.domain.identity.IdentityValidationException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -23,7 +22,6 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -153,7 +151,7 @@ public class AuthExceptionHandler {
         );
     }
 
-    @ExceptionHandler({IdentityValidationException.class, IllegalArgumentException.class})
+    @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleInvalidInput(Exception exception) {
         return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", exception.getMessage());
     }
@@ -169,11 +167,6 @@ public class AuthExceptionHandler {
                         "AUTH_RATE_LIMITED",
                         "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요"
                 ));
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied() {
-        return error(HttpStatus.FORBIDDEN, "FORBIDDEN", "인증된 계정이 필요합니다");
     }
 
     private ResponseEntity<ErrorResponse> error(

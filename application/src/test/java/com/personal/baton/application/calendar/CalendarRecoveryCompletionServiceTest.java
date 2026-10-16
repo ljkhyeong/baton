@@ -5,7 +5,7 @@ import com.personal.baton.application.calendar.port.out.CalendarRecoveryClient;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort.RecoveryState;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort.SeasonState;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryResult;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -64,11 +66,11 @@ class CalendarRecoveryCompletionServiceTest {
         when(statePort.loadReadyState()).thenReturn(Optional.of(state()));
         when(client.verifySeason(eq(recovery), any())).thenReturn(DeliveryResult.retryable("RECOVERY_MANIFEST_MISMATCH"));
         when(client.findRecoverySeason(expected.seasonId())).thenReturn(Optional.of(new CalendarRecoveryClient.SeasonState(
-                expected.seasonId(), expected.itemCount(), expected.itemDigest(), null, null)));
+                expected.itemCount(), expected.itemDigest(), null, null)));
         var result = service.complete(recovery);
         assertThat(result.status()).isEqualTo(Status.WAITING);
         assertThat(result.code()).isEqualTo("CAL_RECOVERY_METADATA_MISMATCH");
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).complete(any(), any());
+        verify(client, never()).complete(any(), any());
     }
 
     @Test
@@ -79,13 +81,13 @@ class CalendarRecoveryCompletionServiceTest {
         when(client.verifySeason(eq(recovery), any())).thenReturn(DeliveryResult.delivered("VERIFIED"));
         when(client.complete(eq(recovery), any())).thenReturn(DeliveryResult.retryable("CAL_TIMEOUT"));
         when(client.findRecoveryRun(recovery)).thenReturn(Optional.of(new CalendarRecoveryClient.RecoveryRun(
-                recovery, CalendarRecoveryClient.RunStatus.COMPLETED, true, 1, Instant.parse("2026-09-02T04:00:00Z"))));
+                CalendarRecoveryClient.RunStatus.COMPLETED)));
         var result = service.complete(recovery);
         assertThat(result.status()).isEqualTo(Status.WAITING);
         assertThat(result.code()).isEqualTo("CAL_RECOVERY_COMPLETION_RECHECK_REQUIRED");
         when(client.complete(eq(recovery), any())).thenReturn(DeliveryResult.delivered("COMPLETED"));
         assertThat(service.complete(recovery).status()).isEqualTo(Status.COMPLETED);
-        org.mockito.Mockito.verify(client, org.mockito.Mockito.times(2)).verifySeason(eq(recovery), any());
+        verify(client, times(2)).verifySeason(eq(recovery), any());
     }
 
     private RecoveryState state() {

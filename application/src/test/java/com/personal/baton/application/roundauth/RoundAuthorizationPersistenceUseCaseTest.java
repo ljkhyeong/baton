@@ -1,11 +1,10 @@
 package com.personal.baton.application.roundauth;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.adapter.out.external.roundauth.SecureRoundRoomIdGenerator;
 import com.personal.baton.adapter.out.persistence.roundauth.RoundAuthorizationPersistenceAdapter;
 import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
@@ -55,7 +54,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -332,16 +330,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
     @DisplayName("다른 계정에 연결된 구성원을 요청하면 구성원 충돌을 반환한다")
     void rejectsMembershipClaimOwnedByAnotherAccount() {
         RoundFixture fixture = createUnclaimedFixture();
-        UUID otherAccountId = UUID.randomUUID();
-        LocalDateTime accountCreatedAt = LocalDateTime.ofInstant(CREATED_AT, ZoneOffset.UTC);
-        jdbcTemplate.update(
-                "INSERT INTO accounts (id, display_name, created_at, updated_at) "
-                        + "VALUES (UUID_TO_BIN(?), ?, ?, ?)",
-                otherAccountId.toString(),
-                "ROUND 다른 테스트 계정",
-                accountCreatedAt,
-                accountCreatedAt
-        );
+        UUID otherAccountId = insertAccount("ROUND 다른 테스트 계정");
         roundAdministrationUseCase.claimMembership(new ClaimMembershipCommand(
                 fixture.accountId(),
                 fixture.workspace().teamId(),
@@ -555,17 +544,22 @@ class RoundAuthorizationPersistenceUseCaseTest {
                         "ROUND authorization transaction 검증 자료"
                 )
         ).id();
+        UUID accountId = insertAccount("ROUND 테스트 계정");
+        return new RoundFixture(workspace, accountId, memberId, role.id(), resourceId);
+    }
+
+    private UUID insertAccount(String displayName) {
         UUID accountId = UUID.randomUUID();
-        LocalDateTime accountCreatedAt = LocalDateTime.ofInstant(CREATED_AT, ZoneOffset.UTC);
+        LocalDateTime createdAt = LocalDateTime.ofInstant(CREATED_AT, ZoneOffset.UTC);
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, display_name, created_at, updated_at) "
                         + "VALUES (UUID_TO_BIN(?), ?, ?, ?)",
                 accountId.toString(),
-                "ROUND 테스트 계정",
-                accountCreatedAt,
-                accountCreatedAt
+                displayName,
+                createdAt,
+                createdAt
         );
-        return new RoundFixture(workspace, accountId, memberId, role.id(), resourceId);
+        return accountId;
     }
 
     private UUID createAdditionalResource(RoundFixture fixture) {
@@ -668,8 +662,10 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
         @Bean
         @Primary
-        ControllableRoundRoomIdGenerator controllableRoundRoomIdGenerator() {
-            return new ControllableRoundRoomIdGenerator();
+        ControllableRoundRoomIdGenerator controllableRoundRoomIdGenerator(
+                SecureRoundRoomIdGenerator delegate
+        ) {
+            return new ControllableRoundRoomIdGenerator(delegate);
         }
 
         @Bean
@@ -681,15 +677,16 @@ class RoundAuthorizationPersistenceUseCaseTest {
 
     static final class ControllableRoundRoomIdGenerator implements RoundRoomIdGenerator {
 
-        private static final char[] ALPHABET =
-                "abcdefghjkmnpqrstuvwxyz23456789".toCharArray();
-
+        private final RoundRoomIdGenerator delegate;
         private final ConcurrentLinkedQueue<String> queuedIds =
                 new ConcurrentLinkedQueue<>();
-        private final AtomicLong sequence = new AtomicLong();
         private final AtomicReference<CyclicBarrier> pairBarrier = new AtomicReference<>();
         private final AtomicReference<List<String>> pairIds = new AtomicReference<>();
         private final AtomicInteger pairIndex = new AtomicInteger();
+
+        private ControllableRoundRoomIdGenerator(RoundRoomIdGenerator delegate) {
+            this.delegate = delegate;
+        }
 
         void enqueue(String... roomIds) {
             queuedIds.addAll(List.of(roomIds));
@@ -728,21 +725,7 @@ class RoundAuthorizationPersistenceUseCaseTest {
             if (queued != null) {
                 return queued;
             }
-            return nextUniqueRoomId();
-        }
-
-        private String nextUniqueRoomId() {
-            long value = sequence.incrementAndGet();
-            char[] characters = new char[12];
-            for (int index = characters.length - 1; index >= 0; index--) {
-                characters[index] = ALPHABET[(int) (value % ALPHABET.length)];
-                value /= ALPHABET.length;
-            }
-            return new String(characters, 0, 4)
-                    + "-"
-                    + new String(characters, 4, 4)
-                    + "-"
-                    + new String(characters, 8, 4);
+            return delegate.generate();
         }
     }
 
@@ -824,8 +807,8 @@ class RoundAuthorizationPersistenceUseCaseTest {
         }
 
         @Override
-        public RoundRoomTombstone saveTombstone(RoundRoomTombstone tombstone) {
-            return delegate.saveTombstone(tombstone);
+        public void saveTombstone(RoundRoomTombstone tombstone) {
+            delegate.saveTombstone(tombstone);
         }
 
         @Override

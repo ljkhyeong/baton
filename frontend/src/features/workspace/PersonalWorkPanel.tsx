@@ -4,16 +4,17 @@ import { personalWork } from './personalWork'
 import { NotificationInbox } from '@/features/notifications/NotificationInbox'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
-import { isActiveMember } from './workspacePresentation'
+import { activeMember } from './useCurrentMember'
 import type { WorkspaceProjection } from './types'
 import WorkspaceLoginLink from './WorkspaceLoginLink'
 
-export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, onOpenRound, onOpenHandoff }: {
+export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, onOpenRound, onOpenHandoff, onOpenResource }: {
   workspace: WorkspaceProjection
   accessKey: string
   onManageMembership: () => void
   onOpenRound: (roundId: string, executionId: string) => void
   onOpenHandoff: (roleId: string) => void
+  onOpenResource: (roleId: string, resourceId: string) => void
 }) {
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''
@@ -40,9 +41,8 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
   } else if (!membership.data?.claimed) {
     content = <p>먼저 이 팀에서 사용할 내 이름을 선택하세요. <button type="button" onClick={onManageMembership}>내 이름 선택하기</button></p>
   } else {
-    const memberId = membership.data.memberId
-    const member = workspace.members.find((candidate) => candidate.id === memberId)
-    if (!member || !isActiveMember(member)) {
+    const member = activeMember(workspace.members, membership.data.memberId)
+    if (!member) {
       content = <p>연결한 구성원의 활동이 종료되었거나 현재 목록에 없습니다. 팀 전체 기록은 이 화면에서 확인할 수 있습니다.</p>
     } else {
       const { unfinished, awaiting } = personalWork(workspace, member.id)
@@ -51,7 +51,7 @@ export function PersonalWorkPanel({ workspace, accessKey, onManageMembership, on
         {workspace.season.endedAt && <p>종료된 시즌의 기록입니다. 수정할 수 없습니다.</p>}
         <NotificationInbox key={`${accountId}:${workspace.team.id}:${workspace.season.id}:${accessKey}`}
           scope={{ accountId, teamId: workspace.team.id, seasonId: workspace.season.id, accessKey }}
-          workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} />
+          workspace={workspace} onOpenRound={onOpenRound} onOpenHandoff={onOpenHandoff} onOpenResource={onOpenResource} />
         <div className="personal-work-columns">
           <div>
             <h3>남은 업무</h3>

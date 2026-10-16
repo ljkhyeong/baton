@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
 import com.personal.baton.adapter.in.web.config.BrevoWebhookSecurityConfig;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.identity.BrevoEmailEventController;
@@ -25,6 +26,7 @@ import com.personal.baton.application.identity.EmailDeliveryEvent;
 import com.personal.baton.application.identity.port.in.ReceiveEmailDeliveryReceiptUseCase;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -38,6 +40,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -55,6 +58,7 @@ import org.springframework.web.context.WebApplicationContext;
 class BrevoEmailEventRestDocsTest {
 
     private static final String TOKEN = "Bearer brevo-receiver-token-at-least-32-characters";
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private static final String DESCRIPTION = "Brevo SMTP 전달 결과를 전용 Bearer로 수신한다. 같은 메일·결과는 중복 저장하지 않는다.";
     private static final String SUMMARY = "Brevo 메일 전달 결과 수신";
     private static final String BODY = """
@@ -69,8 +73,9 @@ class BrevoEmailEventRestDocsTest {
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider documentation) {
-        mvc = webAppContextSetup(context).apply(springSecurity())
-                .apply(documentationConfiguration(documentation)).build();
+        mvc = webAppContextSetup(context).addFilters(new RequestIdFilter(() -> REQUEST_ID)).apply(springSecurity())
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test
@@ -82,6 +87,7 @@ class BrevoEmailEventRestDocsTest {
                 .andExpect(status().isNoContent())
                 .andDo(MockMvcRestDocumentationWrapper.document("receiveBrevoEmailEvent", DESCRIPTION, SUMMARY,
                         requestHeaders(headerWithName("Authorization").description("Brevo 전용 Bearer 토큰")),
+                        responseHeaders(requestIdHeader()),
                         requestFields(
                                 fields.withPath("event").description("delivered, soft_bounce, hard_bounce, blocked, invalid_email, error, deferred, spam. 나머지는 무시"),
                                 fields.addConstraints(fieldWithPath("X-Mailin-custom").optional()
@@ -89,7 +95,6 @@ class BrevoEmailEventRestDocsTest {
                                 fields.addConstraints(fieldWithPath("ts_event")
                                         .description("UTC 이벤트 시각, Unix 초 정수 1..253402300799"), "timestamp"))));
         verify(useCase).receive(42L, EmailDeliveryEvent.HARD_BOUNCE, Instant.ofEpochSecond(1789196400));
-        verifyNoInteractions(sessions);
     }
 
     @Test
@@ -100,7 +105,7 @@ class BrevoEmailEventRestDocsTest {
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(header().string("WWW-Authenticate", "Bearer"))
                 .andDo(MockMvcRestDocumentationWrapper.document("receiveBrevoEmailEventUnauthorized", DESCRIPTION, SUMMARY,
-                        responseHeaders(headerWithName("WWW-Authenticate").description("Bearer 인증 필요")),
+                        responseHeaders(requestIdHeader(), headerWithName("WWW-Authenticate").description("Bearer 인증 필요")),
                         responseFields(fieldWithPath("code").description("UNAUTHORIZED"),
                                 fieldWithPath("message").description("사용자용 오류 설명"))));
         verifyNoInteractions(useCase);
@@ -113,6 +118,7 @@ class BrevoEmailEventRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content(BODY.replace("baton-delivery-id:42", "baton-delivery-id:0")))
                 .andExpect(status().isBadRequest())
                 .andDo(MockMvcRestDocumentationWrapper.document("receiveBrevoEmailEventInvalidInput", DESCRIPTION, SUMMARY,
+                        responseHeaders(requestIdHeader()),
                         responseFields(fieldWithPath("code").description("INVALID_INPUT"),
                                 fieldWithPath("message").description("사용자용 오류 설명"))));
         verifyNoInteractions(useCase);
@@ -149,5 +155,9 @@ class BrevoEmailEventRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNoContent());
         verifyNoInteractions(useCase);
+    }
+
+    private HeaderDescriptor requestIdHeader() {
+        return headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID");
     }
 }

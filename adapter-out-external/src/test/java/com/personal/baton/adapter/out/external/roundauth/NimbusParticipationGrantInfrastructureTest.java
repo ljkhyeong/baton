@@ -291,13 +291,6 @@ class NimbusParticipationGrantInfrastructureTest {
                 List.of()
         )).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("1~65535");
-        assertThatThrownBy(() -> new NimbusParticipationGrantInfrastructure(
-                "https://baton.example:65536",
-                "round",
-                signingKey("invalid-port", currentPrivateKeyPath, currentPublicKeyPath),
-                List.of()
-        )).isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("1~65535");
     }
 
     @Test

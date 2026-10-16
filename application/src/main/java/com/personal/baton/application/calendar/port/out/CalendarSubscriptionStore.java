@@ -7,7 +7,12 @@ import java.util.UUID;
 
 public interface CalendarSubscriptionStore {
     record Owner(UUID accountId, UUID teamId, UUID seasonId) {}
-    record Stored(Owner owner, UUID subscriptionId, boolean revoked, boolean revocationPending, Instant leaseUntil) {}
+    record Stored(Owner owner, UUID subscriptionId, boolean revoked, boolean revocationPending, Instant leaseUntil) {
+        // 구독 작업의 처리 임대가 주어진 시각에 아직 유효한지 확인한다.
+        public boolean leasedAt(Instant now) {
+            return leaseUntil != null && leaseUntil.isAfter(now);
+        }
+    }
     record Claim(Stored subscription, UUID token) {}
     record NamedSubscription(Stored subscription, String teamName, String seasonName) {}
     List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, String query, boolean includeRevoked, Instant now, int limit);

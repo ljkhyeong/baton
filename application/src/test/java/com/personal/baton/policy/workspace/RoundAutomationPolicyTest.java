@@ -104,9 +104,9 @@ class RoundAutomationPolicyTest {
                 .isInstanceOf(DomainValidationException.class);
     }
 
-    @DisplayName("회차 일정은 시즌 밖의 첫 날짜와 주기에 맞지 않는 커서를 거부한다")
+    @DisplayName("회차 일정은 시즌 밖의 첫 날짜를 거부한다")
     @Test
-    void rejectsInvalidScheduleDatesAndCursor() {
+    void rejectsFirstMeetingDateOutsideSeason() {
         Season season = activeSeason();
 
         assertThatThrownBy(() -> season.configureRoundSchedule(
@@ -115,15 +115,6 @@ class RoundAutomationPolicyTest {
                 RoundRecurrence.WEEKLY,
                 7,
                 true
-        )).isInstanceOf(DomainValidationException.class);
-
-        assertThatThrownBy(() -> season.configureRoundSchedule(
-                LocalDate.of(2026, 8, 10),
-                LocalTime.of(19, 30),
-                RoundRecurrence.WEEKLY,
-                7,
-                true,
-                LocalDate.of(2026, 8, 18)
         )).isInstanceOf(DomainValidationException.class);
     }
 

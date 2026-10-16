@@ -55,7 +55,6 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(classes = {BatonApplication.class, TeamAccessUseCaseTest.TimeConfig.class}, properties = {
         "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
         "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002",
-        "baton.identity.email-verification.outbox-encryption-key=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
         "baton.round-automation.poll-interval=PT24H",
         "baton.identity.email-verification.dispatch-interval=PT24H"
 })

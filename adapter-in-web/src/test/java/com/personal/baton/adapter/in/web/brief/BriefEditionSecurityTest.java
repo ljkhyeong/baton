@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
@@ -37,33 +37,16 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-
 
 @WebMvcTest(controllers = {BriefEditionController.class, BriefAttentionController.class, BriefWorkspaceContextController.class})
-@Import({
-        SecurityConfig.class,
-        WebFilterConfig.class,
-        BriefEditionSecurityTest.PasswordEncoderTestConfig.class
-})
+@Import({SecurityConfig.class, WebFilterConfig.class})
 class BriefEditionSecurityTest {
 
     @MockitoBean
@@ -97,12 +80,15 @@ class BriefEditionSecurityTest {
     @MockitoBean
     private BriefAttentionUseCase attentionUseCase;
 
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
+
     @DisplayName("BRIEF 점검 항목 요약과 목록도 접근 키 외에 계정 세션을 요구한다")
     @Test
     void requiresSessionForAttentionReads() throws Exception {
         for (String path : List.of(BriefAttentionController.LIST_PATH, BriefAttentionController.SUMMARY_PATH,
                 BriefAttentionController.TRANSITIONS_PATH, BriefEditionController.GENERATION_PATH,
-                BriefWorkspaceContextController.READINESS_PATH)) {
+                BriefEditionController.LATEST_PATH, BriefWorkspaceContextController.READINESS_PATH)) {
             mockMvc.perform(get(path, TEAM_ID, SEASON_ID).header("X-Baton-Access-Key", ACCESS_KEY))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
@@ -136,15 +122,6 @@ class BriefEditionSecurityTest {
                         .header(HttpHeaders.ORIGIN, "http://localhost").header("Sec-Fetch-Site", "same-origin")
                         .contentType("application/json").content("{\"sources\":[{\"eventType\":\"ROLE_UNASSIGNED\",\"sourceReference\":\"role:1\"}]}"))
                 .andExpect(status().isOk());
-    }
-
-    @DisplayName("BRIEF 최신 조회는 실제 필터 체인에서 계정 세션을 요구한다")
-    @Test
-    void requiresAccountSessionForLatestEdition() throws Exception {
-        mockMvc.perform(get(BriefEditionController.LATEST_PATH, TEAM_ID, SEASON_ID)
-                        .header("X-Baton-Access-Key", ACCESS_KEY))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
 
     @DisplayName("BRIEF 조회 경로는 HEAD 요청에도 계정 세션을 요구한다")
@@ -218,7 +195,7 @@ class BriefEditionSecurityTest {
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {
         return UsernamePasswordAuthenticationToken.authenticated(
-                new TestAccountPrincipal(ACCOUNT_ID),
+                new AccountSessionPrincipal(ACCOUNT_ID, 0),
                 null,
                 List.of()
         );
@@ -239,22 +216,5 @@ class BriefEditionSecurityTest {
                 1,
                 List.of()
         );
-    }
-
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class PasswordEncoderTestConfig {
-
-        @Bean
-        PasswordEncoder passwordEncoder() {
-            return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-        }
     }
 }

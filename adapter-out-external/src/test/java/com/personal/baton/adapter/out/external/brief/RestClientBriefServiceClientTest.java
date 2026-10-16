@@ -11,12 +11,15 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.personal.baton.application.brief.port.out.BriefServiceClient.Outcome;
 import com.personal.baton.application.brief.BriefAttentionPage;
 import com.personal.baton.application.brief.BriefAttentionTransitions;
+import com.personal.baton.application.brief.BriefEditionSnapshot;
 import com.personal.baton.application.brief.error.BriefAttentionQueryRejectedException;
+import com.personal.baton.application.brief.error.BriefEditionNotFoundException;
 import com.personal.baton.application.brief.error.BriefIntegrationConfigurationException;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -158,6 +161,66 @@ class RestClientBriefServiceClientTest {
         server.verify();
     }
 
+    @Test
+    @DisplayName("미해결 시작 시각을 읽고 이 필드가 없는 이전 BRIEF 응답은 null로 받는다")
+    void readsActiveSinceAndAcceptsPreviousBrief() {
+        String item = """
+                {"reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","sourceReference":"role:%s","status":"ACTIVE",
+                 "observedAt":"2026-08-31T00:00:00Z",%s"aggregateRevision":3,"ruleVersion":1,"revisionGap":false}
+                """;
+        server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"items\":[" + item.formatted("current", "\"activeSince\":\"2026-08-24T00:00:00Z\",")
+                        + "," + item.formatted("previous", "") + "],\"nextCursor\":null}"));
+        String editionItem = """
+                {"sourceReference":"role:%s","reasonCode":"ROLE_UNASSIGNED","severity":"HIGH","status":"ACTIVE",
+                 "observedAt":"2026-08-28T00:00:00Z",%s"ruleVersion":1,"aggregateRevision":2,"revisionGap":false,"section":"CARRY_OVER"}
+                """;
+        server.expect(requestTo(BASE_URL + latestPath())).andRespond(withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON).header(HttpHeaders.ETAG, "\"brief-edition-v3-test\"")
+                .body(editionJson().replace("\"items\": []", "\"items\": [" + editionItem.formatted("current",
+                        "\"activeSince\":\"2026-08-14T00:00:00Z\",") + "," + editionItem.formatted("previous", "") + "]")));
+
+        var page = client.findAttentionItems(TEAM_ID, SEASON_ID,
+                new BriefAttentionPage.Filter(BriefAttentionPage.Status.ACTIVE, null, null, null, 20));
+        var edition = client.findLatestEdition(TEAM_ID, SEASON_ID);
+
+        assertThat(page.items()).extracting(BriefAttentionPage.Item::activeSince)
+                .containsExactly(Instant.parse("2026-08-24T00:00:00Z"), null);
+        assertThat(edition.outcome()).isEqualTo(Outcome.COMPLETED);
+        assertThat(edition.edition().items()).extracting(BriefEditionSnapshot.Item::activeSince)
+                .containsExactly(Instant.parse("2026-08-14T00:00:00Z"), null);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("비교와 최신 여부 확인은 팀·시즌 경로로 요청하고 범위 밖 요약의 404를 없음으로 처리한다")
+    void readsEditionsWithinScope() {
+        UUID baseId = UUID.fromString("00000000-0000-0000-0000-000000002614");
+        UUID editionId = UUID.fromString("00000000-0000-0000-0000-000000002613");
+        String editionPath = BASE_URL + "/api/v1/workspaces/" + TEAM_ID + "/seasons/" + SEASON_ID + "/editions/" + editionId;
+        String freshness = """
+                {"editionId":"%s","upToDate":false,"ruleVersionChanged":true,"evaluatedAt":"2026-08-31T00:00:00Z"}
+                """.formatted(editionId);
+        server.expect(requestTo(editionPath + "/changes?fromEditionId=" + baseId)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(requestTo(editionPath + "/freshness"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(freshness));
+        // 규칙 버전이 바뀐 요약을 최신이라고 하면 BRIEF 계약 위반이다.
+        server.expect(requestTo(editionPath + "/freshness")).andRespond(withStatus(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON).body(freshness.replace("\"upToDate\":false", "\"upToDate\":true")));
+        server.expect(requestTo(editionPath + "/freshness")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThatThrownBy(() -> client.compareEditions(TEAM_ID, SEASON_ID, baseId, editionId))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        var result = client.checkEditionFreshness(TEAM_ID, SEASON_ID, editionId);
+        assertThat(result.upToDate()).isFalse();
+        assertThat(result.ruleVersionChanged()).isTrue();
+        assertThatThrownBy(() -> client.checkEditionFreshness(TEAM_ID, SEASON_ID, editionId))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
+        assertThatThrownBy(() -> client.checkEditionFreshness(TEAM_ID, SEASON_ID, editionId))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        server.verify();
+    }
+
     @DisplayName("BATON이 계산한 주차와 시간대만 기존 BRIEF 생성 명령에 보낸다")
     @ParameterizedTest
     @ValueSource(ints = {200, 201})
@@ -201,8 +264,9 @@ class RestClientBriefServiceClientTest {
         server.expect(requestTo(BASE_URL + latestPath()))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
-        assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
-                .isEqualTo(Outcome.AUTHENTICATION_FAILURE);
+        var authenticationFailure = client.findLatestEdition(TEAM_ID, SEASON_ID);
+        assertThat(authenticationFailure.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(authenticationFailure.code()).isEqualTo("HTTP_401");
         assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
                 .isEqualTo(Outcome.RETRYABLE_FAILURE);
         server.verify();
@@ -221,12 +285,14 @@ class RestClientBriefServiceClientTest {
 
         assertThat(client.findLatestEdition(TEAM_ID, SEASON_ID).outcome())
                 .isEqualTo(Outcome.NOT_FOUND);
-        assertThat(client.generateEdition(
+        var generationFailure = client.generateEdition(
                 TEAM_ID,
                 SEASON_ID,
                 LocalDate.parse("2026-08-24"),
                 ZoneId.of("Asia/Seoul")
-        ).outcome()).isEqualTo(generationStatus == 400 ? Outcome.INVALID_REQUEST : Outcome.PERMANENT_FAILURE);
+        );
+        assertThat(generationFailure.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(generationFailure.code()).isEqualTo("HTTP_" + generationStatus);
         server.verify();
     }
 
@@ -270,27 +336,15 @@ class RestClientBriefServiceClientTest {
         server.verify();
     }
 
-    @DisplayName("BRIEF가 잘못된 성공 상태·필수 필드·JSON 형식으로 응답하면 영구 실패로 처리한다")
+    @DisplayName("BRIEF가 잘못된 성공 상태로 응답하면 영구 실패로 처리한다")
     @ParameterizedTest(name = "생성 요청={0}")
     @ValueSource(booleans = {false, true})
-    void rejectsUnexpectedSuccessAndIncompleteResponse(boolean generation) {
-        String generationPath = "/api/v1/workspaces/" + TEAM_ID
-                + "/seasons/" + SEASON_ID + "/editions";
-        server.expect(requestTo(BASE_URL + (generation ? generationPath : latestPath())))
+    void rejectsUnexpectedSuccessStatus(boolean generation) {
+        server.expect(requestTo(BASE_URL + (generation ? generationPath() : latestPath())))
                 .andRespond(withStatus(generation ? HttpStatus.ACCEPTED : HttpStatus.CREATED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
                         .body(editionJson()));
-        server.expect(requestTo(BASE_URL + latestPath()))
-                .andRespond(withStatus(HttpStatus.OK)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
-                        .body(editionJson().replace("\"items\": []", "\"items\": null")));
-        server.expect(requestTo(BASE_URL + generationPath))
-                .andRespond(withStatus(HttpStatus.OK)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
-                        .body("{"));
 
         var unexpectedSuccess = generation ? client.generateEdition(
                 TEAM_ID,
@@ -298,6 +352,26 @@ class RestClientBriefServiceClientTest {
                 LocalDate.parse("2026-08-24"),
                 ZoneId.of("Asia/Seoul")
         ) : client.findLatestEdition(TEAM_ID, SEASON_ID);
+
+        assertThat(unexpectedSuccess.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(unexpectedSuccess.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
+        server.verify();
+    }
+
+    @DisplayName("BRIEF 성공 응답의 필수 필드가 없거나 JSON 형식이 잘못되면 영구 실패로 처리한다")
+    @Test
+    void rejectsIncompleteOrMalformedSuccessResponse() {
+        server.expect(requestTo(BASE_URL + latestPath()))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body(editionJson().replace("\"items\": []", "\"items\": null")));
+        server.expect(requestTo(BASE_URL + generationPath()))
+                .andRespond(withStatus(HttpStatus.OK)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.ETAG, "\"brief-edition-v1-test\"")
+                        .body("{"));
+
         var incompleteResponse = client.findLatestEdition(TEAM_ID, SEASON_ID);
         var malformedResponse = client.generateEdition(
                 TEAM_ID,
@@ -306,13 +380,15 @@ class RestClientBriefServiceClientTest {
                 ZoneId.of("Asia/Seoul")
         );
 
-        assertThat(unexpectedSuccess.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
-        assertThat(unexpectedSuccess.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
         assertThat(incompleteResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
         assertThat(incompleteResponse.code()).isEqualTo("BRIEF_RESPONSE_INVALID");
         assertThat(malformedResponse.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
         assertThat(malformedResponse.code()).isEqualTo("BRIEF_RESPONSE_FAILURE");
         server.verify();
+    }
+
+    private String generationPath() {
+        return "/api/v1/workspaces/" + TEAM_ID + "/seasons/" + SEASON_ID + "/editions";
     }
 
     private String latestPath() {

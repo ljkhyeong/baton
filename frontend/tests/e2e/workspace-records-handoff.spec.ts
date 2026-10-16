@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  ACCOUNT_ID,
   TEAM_ID,
   SEASON_ID,
   MEMBER_ONE_ID,
@@ -22,14 +23,28 @@ import {
   makeProjection,
   installApi,
   openSharedWorkspace,
+  installAccountSession,
   navigation,
+  blockAccessKeyStorage,
+  disableWebLocks,
   failNextJournalCleanup,
   pendingContentCreationEntries,
   recordedCall,
+  recordedCalls,
   expectScopedCall,
   openRecordSearch,
   openHandoffView,
 } from './support/workspaceApiHarness'
+
+const PROBLEM_SELECTION_RESOURCE = {
+  id: CREATED_ROLE_RESOURCE_ID,
+  roleId: ROLE_ID,
+  title: '문제 선정 기준 문서',
+  url: 'https://docs.example.com/problem-selection',
+  description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
+  createdAt: '2026-07-06T03:00:00Z',
+  archivedAt: null,
+}
 
 test('@memory 결정과 작성자를 서버 기록으로 남긴다', async ({ page }, testInfo) => {
   const api = await installApi(page)
@@ -107,13 +122,8 @@ test('@memory 결정 기록을 수정하고 보관·복원해 원문 시각을 �
   await archiveSummary.click()
   await page.getByRole('button', { name: `${updatedTitle} 복원` }).click()
 
-  await expect.poll(() => api.calls.filter(
-    (call) => call.method === 'PATCH' && call.path === archivePath,
-  ).length).toBe(2)
-  const archiveCalls = api.calls.filter(
-    (call) => call.method === 'PATCH' && call.path === archivePath,
-  )
-  expectScopedCall(archiveCalls[0]!, { archived: true })
+  await expect.poll(() => recordedCalls(api, 'PATCH', archivePath).length).toBe(2)
+  const archiveCalls = recordedCalls(api, 'PATCH', archivePath)
   expectScopedCall(archiveCalls[1]!, { archived: false })
   await expect(page.getByRole('heading', { name: updatedTitle })).toBeVisible()
 
@@ -164,7 +174,7 @@ test('@memory 결정 저장 응답이 유실된 뒤 새로고침해도 같은 �
 
   await expect(retryDialog).toBeHidden()
   await expect(page.getByRole('heading', { name: '응답 유실 재시도 규칙을 유지한다' })).toBeVisible()
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/decisions`)
+  const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/decisions`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).toBe(firstAttempt.headers['idempotency-key'])
   expect(api.projection().decisions.filter((decision) => decision.title === '응답 유실 재시도 규칙을 유지한다')).toHaveLength(1)
@@ -555,7 +565,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await createDialog.getByRole('button', { name: '자료 추가' }).click()
   await expect(createDialog.getByRole('alert')).toContainText('자료 이름을 입력해 주세요.')
   await expect(createDialog.getByLabel('자료 이름')).toBeFocused()
-  expect(api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`)).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`)).toHaveLength(0)
 
   await createDialog.getByLabel('자료 이름').fill('문제 선정 기준 문서')
   await createDialog.getByLabel('자료 설명').fill('매주 문제 후보를 고를 때 확인하는 기준입니다.')
@@ -587,13 +597,8 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
   await expect(retryDialog.getByRole('status').filter({ hasText: '저장 결과를 확인하지 못했습니다.' })).toContainText('저장 결과를 확인하지 못했습니다.')
   await retryDialog.getByRole('button', { name: '자료 추가' }).click()
 
-  await expect.poll(() => api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`,
-  ).length).toBe(2)
-  const createAttempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/role-resources`,
-  )
-  expect(createAttempts).toHaveLength(2)
+  await expect.poll(() => recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`).length).toBe(2)
+  const createAttempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`)
   expect(createAttempts[1]?.headers['idempotency-key']).toBe(firstCreateCall.headers['idempotency-key'])
   expect(api.projection().resources.filter((resource) => resource.title === '문제 선정 기준 문서')).toHaveLength(1)
   await expect.poll(async () => (await pendingContentCreationEntries(page))
@@ -609,15 +614,7 @@ test('@handoff 역할 자료 생성 응답 유실 뒤 같은 요청으로 결과
 
 test('@handoff 역할 자료를 수정하고 인수인계 문서와 다시 불러온 화면에서 확인한다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
-  initialProjection.resources.push({
-    id: CREATED_ROLE_RESOURCE_ID,
-    roleId: ROLE_ID,
-    title: '문제 선정 기준 문서',
-    url: 'https://docs.example.com/problem-selection',
-    description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
-    createdAt: '2026-07-06T03:00:00Z',
-    archivedAt: null,
-  })
+  initialProjection.resources.push({ ...PROBLEM_SELECTION_RESOURCE })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
@@ -691,15 +688,7 @@ test('@handoff 역할 자료를 수정하고 인수인계 문서와 다시 불�
 
 test('@handoff 역할 자료를 보관함으로 옮기고 복원한다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
-  initialProjection.resources.push({
-    id: CREATED_ROLE_RESOURCE_ID,
-    roleId: ROLE_ID,
-    title: '문제 선정 기준 문서',
-    url: 'https://docs.example.com/problem-selection',
-    description: '매주 문제 후보를 고를 때 확인하는 기준입니다.',
-    createdAt: '2026-07-06T03:00:00Z',
-    archivedAt: null,
-  })
+  initialProjection.resources.push({ ...PROBLEM_SELECTION_RESOURCE })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
@@ -726,9 +715,10 @@ test('@handoff 역할 자료를 보관함으로 옮기고 복원한다', async (
   await expect(inspector.getByRole('link', {
     name: '문제 선정 기준 문서 새 창에서 열기',
   })).toBeVisible()
-  const archiveCalls = api.calls.filter(
-    (call) => call.method === 'PATCH'
-      && call.path === `${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/archive`,
+  const archiveCalls = recordedCalls(
+    api,
+    'PATCH',
+    `${SCOPE_PATH}/role-resources/${CREATED_ROLE_RESOURCE_ID}/archive`,
   )
   expect(archiveCalls.map((call) => call.body)).toEqual([
     { archived: true },
@@ -738,15 +728,7 @@ test('@handoff 역할 자료를 보관함으로 옮기고 복원한다', async (
 
 test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다시 연다', async ({ page }, testInfo) => {
   const initialProjection = makeProjection()
-  initialProjection.resources.push({
-    id: CREATED_ROLE_RESOURCE_ID,
-    roleId: ROLE_ID,
-    title: '문제 선정 기준 문서',
-    url: 'https://docs.example.com/problem-selection',
-    description: '기존 기준입니다.',
-    createdAt: '2026-07-06T03:00:00Z',
-    archivedAt: null,
-  })
+  initialProjection.resources.push({ ...PROBLEM_SELECTION_RESOURCE, description: '기존 기준입니다.' })
   const api = await installApi(page, initialProjection)
   await openSharedWorkspace(page)
   await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
@@ -759,13 +741,10 @@ test('@handoff 역할 자료 충돌은 낡은 폼을 닫고 최신 내용을 다
   await dialog.getByLabel('링크').fill('https://docs.example.com/stale-edit')
 
   api.conflictNextRoleResourceUpdate({
-    id: CREATED_ROLE_RESOURCE_ID,
-    roleId: ROLE_ID,
+    ...PROBLEM_SELECTION_RESOURCE,
     title: '다른 구성원이 갱신한 기준',
     url: 'https://docs.example.com/remote-edit',
     description: '서버의 최신 기준입니다.',
-    createdAt: '2026-07-06T03:00:00Z',
-    archivedAt: null,
   })
   await dialog.getByRole('button', { name: '변경 저장' }).click()
 
@@ -799,7 +778,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 임시 기록을 지우�
 
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
   await expect(page.getByRole('checkbox', { name: '재사용 종료 확인' })).toBeVisible()
-  const attempts = api.calls.filter((call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`)
+  const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
@@ -808,7 +787,7 @@ test('@handoff 재사용할 수 없는 생성 요청은 임시 기록을 지우�
 test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전송을 막는다', async ({ page }, testInfo) => {
   await failNextJournalCleanup(
     page,
-    { storagePrefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX },
+    PENDING_CONTENT_CREATION_STORAGE_PREFIX,
     'baton-e2e-content-terminal-cleanup-failure',
   )
   const api = await installApi(page)
@@ -834,15 +813,11 @@ test('@handoff 콘텐츠 완료 기록 삭제가 실패하면 같은 키 재전�
 
   await expect(dialog.getByRole('alert')).toContainText('임시 기록을 삭제했습니다.')
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-  )).toHaveLength(1)
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)).toHaveLength(1)
 
   await dialog.getByRole('button', { name: '항목 추가하기' }).click()
   await expect(page.getByRole('checkbox', { name: 'terminal cleanup 재전송 차단' })).toBeVisible()
-  const attempts = api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-  )
+  const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)
   expect(attempts).toHaveLength(2)
   expect(attempts[1]?.headers['idempotency-key']).not.toBe(firstAttempt.headers['idempotency-key'])
 })
@@ -873,9 +848,7 @@ test('@handoff 같은 인수인계 생성 요청의 탭 경합은 한 번만 전
     await peerDialog.getByLabel('항목 종류').selectOption('RESPONSIBILITY')
 
     await dialog.getByRole('button', { name: '항목 추가하기' }).click()
-    const handoffCreateCalls = () => api.calls.filter(
-      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-    ).length
+    const handoffCreateCalls = () => recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`).length
     await expect.poll(handoffCreateCalls).toBe(1)
 
     await peerDialog.getByRole('button', { name: '항목 추가하기' }).click()
@@ -898,12 +871,7 @@ test('@handoff 같은 인수인계 생성 요청의 탭 경합은 한 번만 전
 })
 
 test('@handoff Web Locks를 사용할 수 없으면 인수인계 생성 요청을 보내지 않는다', async ({ page }, testInfo) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'locks', {
-      configurable: true,
-      value: undefined,
-    })
-  })
+  await disableWebLocks(page)
   const api = await installApi(page)
   await openSharedWorkspace(page)
   await openHandoffView(page, testInfo.project.name)
@@ -915,9 +883,7 @@ test('@handoff Web Locks를 사용할 수 없으면 인수인계 생성 요청�
 
   await expect(dialog.getByRole('alert'))
     .toContainText('이 브라우저에서는 새 항목을 만들 수 없습니다.')
-  expect(api.calls.filter(
-    (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-  )).toHaveLength(0)
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)).toHaveLength(0)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
@@ -962,16 +928,12 @@ for (const failurePoint of ['잠금 접근', '잠금 요청', '요청 준비'] a
 
     await expect(dialog.getByRole('alert'))
       .toContainText('새 항목을 만들 수 없습니다.')
-    expect(api.calls.filter(
-      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-    )).toHaveLength(0)
+    expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)).toHaveLength(0)
     await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 
     await dialog.getByRole('button', { name: '항목 추가하기' }).click()
     await expect(page.getByRole('checkbox', { name: 'Web Locks 요청 실패 차단' })).toBeVisible()
-    expect(api.calls.filter(
-      (call) => call.method === 'POST' && call.path === `${SCOPE_PATH}/handoff-items`,
-    )).toHaveLength(1)
+    expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)).toHaveLength(1)
   })
 }
 
@@ -1023,13 +985,7 @@ test('@handoff 한 탭의 성공은 다른 탭이 보관한 같은 내용의 임
 })
 
 test('@handoff @webkit 인수인계 문서 인쇄 중에는 주소의 접근 키를 숨기고 종료 뒤 복원한다', async ({ page, browserName }, testInfo) => {
-  await page.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) throw new DOMException('저장소 사용 불가', 'SecurityError')
-      originalSetItem.call(this, key, value)
-    }
-  })
+  await blockAccessKeyStorage(page)
   await installApi(page)
   const sharedPath = `${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`
   await page.goto(sharedPath)
@@ -1190,13 +1146,8 @@ test('@handoff 완료한 인수인계 항목을 수정하고 보관·복원해 �
   await archiveSummary.click()
   await page.getByRole('button', { name: `${updatedLabel} 복원` }).click()
 
-  await expect.poll(() => api.calls.filter(
-    (call) => call.method === 'PATCH' && call.path === archivePath,
-  ).length).toBe(2)
-  const archiveCalls = api.calls.filter(
-    (call) => call.method === 'PATCH' && call.path === archivePath,
-  )
-  expectScopedCall(archiveCalls[0]!, { archived: true })
+  await expect.poll(() => recordedCalls(api, 'PATCH', archivePath).length).toBe(2)
+  const archiveCalls = recordedCalls(api, 'PATCH', archivePath)
   expectScopedCall(archiveCalls[1]!, { archived: false })
   await expect(page.getByRole('checkbox', { name: updatedLabel })).toBeChecked()
 
@@ -1252,16 +1203,7 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
     url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
   await installApi(page, projection)
-  const accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
-  await page.route('**/api/v1/auth/session', route => route.fulfill({ json: {
-    authenticated: true, accountId, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'verification-csrf',
-  } }))
-  await page.route('**/api/v1/auth/csrf', route => route.fulfill({ json: {
-    csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'verification-csrf',
-  } }))
-  await page.route('**/api/v1/account-memberships/current?*', route => route.fulfill({ json: {
-    claimed: true, accountId, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-09-05T00:00:00Z',
-  } }))
+  await installAccountSession(page, { csrfToken: 'verification-csrf', claimedMemberId: MEMBER_ONE_ID })
   const resource = projection.resources.find(item => item.roleId === ROLE_ID)!
   await page.route('**/role-resources/*/verifications/schedule', route => route.fulfill({ json: {
     teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: resource.id, version: -1,
@@ -1271,7 +1213,7 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   let verified = false
   await page.route('**/role-resources/*/verifications', route => {
     if (route.request().method() === 'POST') {
-      expect(route.request().postDataJSON()).toEqual({ expectedAccountId: accountId, resourceVersion: 0,
+      expect(route.request().postDataJSON()).toEqual({ expectedAccountId: ACCOUNT_ID, resourceVersion: 0,
         status: 'NEEDS_UPDATE', note: '접근 권한을 요청해야 합니다' })
       expect(route.request().headers()['x-csrf-token']).toBe('verification-csrf')
       verified = true

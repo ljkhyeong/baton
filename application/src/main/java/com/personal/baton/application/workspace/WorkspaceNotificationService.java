@@ -1,10 +1,9 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
-import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
+import com.personal.baton.application.workspace.port.out.ResourceVerificationRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.domain.workspace.Member;
@@ -15,6 +14,8 @@ import com.personal.baton.application.workspace.port.out.NotificationPreferences
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -27,20 +28,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WorkspaceNotificationService implements WorkspaceNotificationUseCase {
     private final WorkspaceScopeAuthorizer authorizer;
+    private final TeamAccountAccessPolicy accountAccess;
     private final WorkspaceOperationsRepository operations;
-    private final RoundAuthorizationRepository memberships;
     private final WorkspacePeopleRepository people;
     private final NotificationReadReceiptPort receipts;
     private final Clock clock;
     private final NotificationPreferencesRepository preferences;
+    private final ResourceVerificationRepository verifications;
 
-    public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, WorkspaceOperationsRepository operations,
-            RoundAuthorizationRepository memberships, WorkspacePeopleRepository people,
-            NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences) {
+    public WorkspaceNotificationService(WorkspaceScopeAuthorizer authorizer, TeamAccountAccessPolicy accountAccess,
+            WorkspaceOperationsRepository operations, WorkspacePeopleRepository people,
+            NotificationReadReceiptPort receipts, Clock clock, NotificationPreferencesRepository preferences,
+            ResourceVerificationRepository verifications) {
         this.preferences = preferences;
+        this.verifications = verifications;
         this.authorizer = authorizer;
+        this.accountAccess = accountAccess;
         this.operations = operations;
-        this.memberships = memberships;
         this.people = people;
         this.receipts = receipts;
         this.clock = clock;
@@ -49,10 +53,7 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
     @Override
     public NotificationInboxResult getInbox(UUID teamId, UUID seasonId, String accessKey, UUID accountId) {
         WorkspaceScope scope = authorizer.authorizeRead(teamId, seasonId, accessKey);
-        Member member = memberships.findMembership(accountId, teamId)
-                .flatMap(value -> people.findMemberById(value.getMemberId()))
-                .filter(value -> value.getTeamId().equals(teamId)).filter(Member::isActive)
-                .orElseThrow(WorkspaceAccessDeniedException::new);
+        Member member = accountAccess.requireActiveAccountMember(teamId, accountId);
         if (scope.season().isEnded()) return new NotificationInboxResult(accountId, teamId, seasonId, List.of());
         Instant now = clock.instant();
         var settings = preferences.find(accountId).orElseGet(() -> NotificationPreferences.defaults(accountId));
@@ -75,11 +76,20 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
                         handoff.getId(), handoff.getRoleId(), null, handoff.getRoleName(), handoff.getTransferredAt()));
             }
         }
+        if (settings.isResourceReviewEnabled()) {
+            ZoneId zone = scope.season().getZoneId();
+            for (var review : verifications.findDueReviews(teamId, seasonId, LocalDate.ofInstant(now, zone))) {
+                if (!member.getId().equals(review.getMemberId())) continue;
+                // 확인일은 시즌 시간대의 그날 시작 시각으로 정렬하고 확인일이 바뀌면 새 알림으로 식별한다.
+                pending.add(notification(accountId, teamId, seasonId, WorkspaceNotificationKind.RESOURCE_REVIEW_DUE,
+                        review.getResourceId(), review.getRoleId(), null, review.getTitle(),
+                        review.getNextReviewOn().atStartOfDay(zone).toInstant()));
+            }
+        }
         Set<UUID> read = receipts.findRead(accountId, pending.stream().map(NotificationResult::id).toList());
         List<NotificationResult> results = pending.stream()
                 .sorted(Comparator.comparing(NotificationResult::occurredAt).thenComparing(NotificationResult::id))
-                .map(value -> new NotificationResult(value.id(), value.kind(), value.sourceId(), value.roleId(),
-                        value.roundId(), value.title(), value.occurredAt(), read.contains(value.id()))).toList();
+                .map(value -> withRead(value, read.contains(value.id()))).toList();
         return new NotificationInboxResult(accountId, teamId, seasonId, results);
     }
 
@@ -92,8 +102,12 @@ public class WorkspaceNotificationService implements WorkspaceNotificationUseCas
         }
         receipts.markRead(accountId, notificationId, clock.instant());
         return new NotificationInboxResult(accountId, teamId, seasonId, inbox.notifications().stream()
-                .map(value -> new NotificationResult(value.id(), value.kind(), value.sourceId(), value.roleId(),
-                        value.roundId(), value.title(), value.occurredAt(), value.read() || value.id().equals(notificationId))).toList());
+                .map(value -> withRead(value, value.read() || value.id().equals(notificationId))).toList());
+    }
+
+    private static NotificationResult withRead(NotificationResult value, boolean read) {
+        return new NotificationResult(value.id(), value.kind(), value.sourceId(), value.roleId(),
+                value.roundId(), value.title(), value.occurredAt(), read);
     }
 
     private NotificationResult notification(UUID accountId, UUID teamId, UUID seasonId, WorkspaceNotificationKind kind,

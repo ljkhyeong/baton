@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.persistence.calendar;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.instant;
 import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
 
 import com.personal.baton.adapter.out.persistence.LeasedOutboxTable;
@@ -18,7 +19,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,13 +37,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRecoveryStatePort {
 
+    private static final String SNAPSHOT_TABLE = "calendar_snapshot_outbox";
+    private static final String METADATA_TABLE = "calendar_season_metadata_outbox";
+
     private final JdbcTemplate jdbcTemplate;
     private final SimpleJdbcInsert insert;
+    private final LeasedOutboxTable snapshotOutbox;
+    private final LeasedOutboxTable metadataOutbox;
 
     public JdbcCalendarOutboxAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.snapshotOutbox = new LeasedOutboxTable(jdbcTemplate, SNAPSHOT_TABLE);
+        this.metadataOutbox = new LeasedOutboxTable(jdbcTemplate, METADATA_TABLE);
         this.insert = new SimpleJdbcInsert(jdbcTemplate)
-                .withTableName("calendar_snapshot_outbox")
+                .withTableName(SNAPSHOT_TABLE)
                 .usingColumns(
                         "event_id",
                         "source_item_id",
@@ -176,14 +183,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
                 ) latest ON latest.id = delivery.id
                 ORDER BY delivery.season_id
                 """,
-                (row, index) -> new RecoveryMetadata(
-                        new CalendarSeasonMetadata(
-                                uuid(row.getBytes("season_id")),
-                                row.getInt("id"),
-                                row.getString("display_name")
-                        ),
-                        row.getString("delivery_status")
-                )
+                (row, index) -> new RecoveryMetadata(metadata(row), row.getString("delivery_status"))
         );
         if (snapshots.stream().anyMatch(item -> !"DELIVERED".equals(item.deliveryStatus()))
                 || metadata.stream().anyMatch(item -> !"DELIVERED".equals(item.deliveryStatus()))) {
@@ -245,21 +245,19 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
     ) {
         if (seasonMetadata) {
             return claimPending(
-                    "calendar_season_metadata_outbox", "season_id",
-                    (row, index) -> new CalendarSeasonMetadata(
-                            uuid(row.getBytes("season_id")), row.getInt("id"), row.getString("display_name")
-                    ),
-                    batchSize, claimedAt, leaseDuration
+                    METADATA_TABLE, metadataOutbox, "season_id",
+                    (row, index) -> metadata(row), batchSize, claimedAt, leaseDuration
             );
         }
         return claimPending(
-                "calendar_snapshot_outbox", "source_item_id",
+                SNAPSHOT_TABLE, snapshotOutbox, "source_item_id",
                 (row, index) -> snapshot(row), batchSize, claimedAt, leaseDuration
         );
     }
 
     private List<CalendarDelivery> claimPending(
-            String table, String sourceColumn, RowMapper<CalendarDeliveryPayload> payloadMapper,
+            String table, LeasedOutboxTable outbox, String sourceColumn,
+            RowMapper<CalendarDeliveryPayload> payloadMapper,
             int batchSize, Instant claimedAt, Duration leaseDuration
     ) {
         List<ClaimCandidate> candidates = jdbcTemplate.query(
@@ -296,7 +294,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
         List<CalendarDelivery> deliveries = new ArrayList<>(candidates.size());
         for (ClaimCandidate candidate : candidates) {
             UUID leaseToken = UUID.randomUUID();
-            if (new LeasedOutboxTable(jdbcTemplate, table).lease(candidate.payload().revision(), leaseToken, leaseExpiresAt)) {
+            if (outbox.lease(candidate.payload().revision(), leaseToken, leaseExpiresAt)) {
                 deliveries.add(new CalendarDelivery(candidate.payload(), candidate.attemptCount() + 1, leaseToken));
             }
         }
@@ -378,14 +376,7 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
                                 resultSet.getString("summary"),
                                 resultSet.getString("description"),
                                 resultSet.getString("location"),
-                                time(
-                                        resultSet.getString("time_type"),
-                                        resultSet.getObject("at_instant", LocalDateTime.class),
-                                        resultSet.getObject("at_local", LocalDateTime.class),
-                                        resultSet.getString("zone_id"),
-                                        resultSet.getObject("start_date", LocalDate.class),
-                                        resultSet.getObject("end_date", LocalDate.class)
-                                ),
+                                time(resultSet),
                                 resultSet.getObject("source_updated_at", LocalDateTime.class)
                         ),
                         uuidBytes(sourceItemId)
@@ -415,20 +406,18 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
         }
     }
 
-    private CalendarSnapshot.Time time(
-            String type,
-            LocalDateTime atInstant,
-            LocalDateTime atLocal,
-            String zoneId,
-            LocalDate startDate,
-            LocalDate endDate
-    ) {
+    private CalendarSnapshot.Time time(ResultSet row) throws SQLException {
+        String type = row.getString("time_type");
         return switch (type) {
-            case "UTC_POINT" -> new CalendarSnapshot.UtcPoint(
-                    atInstant.toInstant(ZoneOffset.UTC)
+            case "UTC_POINT" -> new CalendarSnapshot.UtcPoint(instant(row, "at_instant"));
+            case "ZONED_LOCAL_POINT" -> new CalendarSnapshot.ZonedLocalPoint(
+                    row.getObject("at_local", LocalDateTime.class),
+                    row.getString("zone_id")
             );
-            case "ZONED_LOCAL_POINT" -> new CalendarSnapshot.ZonedLocalPoint(atLocal, zoneId);
-            case "ALL_DAY" -> new CalendarSnapshot.AllDay(startDate, endDate);
+            case "ALL_DAY" -> new CalendarSnapshot.AllDay(
+                    row.getObject("start_date", LocalDate.class),
+                    row.getObject("end_date", LocalDate.class)
+            );
             default -> throw new IllegalStateException("지원하지 않는 CAL 시간 형태입니다: " + type);
         };
     }
@@ -441,28 +430,31 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
     }
 
     private LeasedOutboxTable outbox(CalendarDeliveryPayload payload) {
-        return new LeasedOutboxTable(jdbcTemplate, switch (payload) {
-            case CalendarSnapshot ignored -> "calendar_snapshot_outbox";
-            case CalendarSeasonMetadata ignored -> "calendar_season_metadata_outbox";
-        });
+        return switch (payload) {
+            case CalendarSnapshot ignored -> snapshotOutbox;
+            case CalendarSeasonMetadata ignored -> metadataOutbox;
+        };
     }
 
     private CalendarSnapshot snapshot(ResultSet row) throws SQLException {
         return new CalendarSnapshot(
                 uuid(row.getBytes("event_id")),
-                row.getObject("occurred_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                instant(row, "occurred_at"),
                 uuid(row.getBytes("source_item_id")),
                 uuid(row.getBytes("season_id")),
                 row.getInt("id"),
                 CalendarSnapshot.Status.valueOf(row.getString("calendar_status")),
                 row.getString("summary"), row.getString("description"), row.getString("location"),
-                time(
-                        row.getString("time_type"),
-                        row.getObject("at_instant", LocalDateTime.class),
-                        row.getObject("at_local", LocalDateTime.class), row.getString("zone_id"),
-                        row.getObject("start_date", LocalDate.class), row.getObject("end_date", LocalDate.class)
-                ),
-                row.getObject("source_updated_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)
+                time(row),
+                instant(row, "source_updated_at")
+        );
+    }
+
+    private CalendarSeasonMetadata metadata(ResultSet row) throws SQLException {
+        return new CalendarSeasonMetadata(
+                uuid(row.getBytes("season_id")),
+                row.getInt("id"),
+                row.getString("display_name")
         );
     }
 

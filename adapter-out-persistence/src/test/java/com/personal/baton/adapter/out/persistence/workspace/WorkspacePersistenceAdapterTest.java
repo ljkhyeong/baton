@@ -68,15 +68,6 @@ final class WorkspacePersistenceAdapterTest {
     @Mock
     private RoutineExecutionJpaRepository routineExecutionRepository;
 
-    @Mock
-    private DecisionJpaRepository decisionRepository;
-
-    @Mock
-    private HandoffItemJpaRepository handoffItemRepository;
-
-    @Mock
-    private RoleResourceJpaRepository roleResourceRepository;
-
     @InjectMocks
     private WorkspaceAccessPersistenceAdapter accessAdapter;
 
@@ -222,33 +213,27 @@ final class WorkspacePersistenceAdapterTest {
                 );
     }
 
-    @DisplayName("구성원 저장의 낙관적 잠금 충돌 원인을 콘텐츠 충돌 예외에 보존한다")
+    @DisplayName("구성원 저장의 낙관적·비관적 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
     @Test
-    void preservesOptimisticLockCauseForMemberContentConflict() {
+    void preservesLockCausesWhenSavingMember() {
         Member member = mock(Member.class);
-        OptimisticLockingFailureException cause =
+        OptimisticLockingFailureException optimisticCause =
                 new OptimisticLockingFailureException("구성원 버전 충돌");
-        when(memberRepository.saveAndFlush(member)).thenThrow(cause);
-
-        assertThatThrownBy(() -> peopleAdapter.saveMember(member))
-                .isInstanceOfSatisfying(
-                        WorkspaceContentConflictException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
-                );
-    }
-
-    @DisplayName("구성원 저장의 비관적 잠금 실패 원인을 콘텐츠 충돌 예외에 보존한다")
-    @Test
-    void preservesPessimisticLockCauseWhenSavingMember() {
-        Member member = mock(Member.class);
-        PessimisticLockingFailureException cause =
+        PessimisticLockingFailureException pessimisticCause =
                 new PessimisticLockingFailureException("구성원 저장 잠금 실패");
-        when(memberRepository.saveAndFlush(member)).thenThrow(cause);
+        when(memberRepository.saveAndFlush(member))
+                .thenThrow(optimisticCause)
+                .thenThrow(pessimisticCause);
 
         assertThatThrownBy(() -> peopleAdapter.saveMember(member))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
-                        exception -> assertThat(exception.getCause()).isSameAs(cause)
+                        exception -> assertThat(exception.getCause()).isSameAs(optimisticCause)
+                );
+        assertThatThrownBy(() -> peopleAdapter.saveMember(member))
+                .isInstanceOfSatisfying(
+                        WorkspaceContentConflictException.class,
+                        exception -> assertThat(exception.getCause()).isSameAs(pessimisticCause)
                 );
     }
 
@@ -368,13 +353,17 @@ final class WorkspacePersistenceAdapterTest {
                 );
     }
 
-    @DisplayName("콘텐츠 낙관적 잠금 충돌 원인을 콘텐츠 충돌 예외에 보존한다")
+    @DisplayName("콘텐츠 저장의 낙관적·비관적 잠금 실패 원인과 안내 문구를 콘텐츠 충돌 예외에 보존한다")
     @Test
-    void preservesOptimisticLockCauseForContentConflict() {
+    void preservesLockCausesWhenSavingContent() {
         Role role = mock(Role.class);
-        OptimisticLockingFailureException cause =
+        OptimisticLockingFailureException optimisticCause =
                 new OptimisticLockingFailureException("콘텐츠 버전 충돌");
-        when(roleRepository.saveAndFlush(role)).thenThrow(cause);
+        PessimisticLockingFailureException pessimisticCause =
+                new PessimisticLockingFailureException("콘텐츠 저장 잠금 시간 초과");
+        when(roleRepository.saveAndFlush(role))
+                .thenThrow(optimisticCause)
+                .thenThrow(pessimisticCause);
 
         assertThatThrownBy(() -> peopleAdapter.saveRole(role))
                 .isInstanceOfSatisfying(
@@ -383,19 +372,9 @@ final class WorkspacePersistenceAdapterTest {
                             assertThat(exception).hasMessage(
                                     "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
                             );
-                            assertThat(exception.getCause()).isSameAs(cause);
+                            assertThat(exception.getCause()).isSameAs(optimisticCause);
                         }
                 );
-    }
-
-    @DisplayName("콘텐츠 저장의 비관적 잠금 시간 초과 원인을 콘텐츠 충돌 예외에 보존한다")
-    @Test
-    void preservesPessimisticLockCauseWhenSavingContent() {
-        Role role = mock(Role.class);
-        PessimisticLockingFailureException cause =
-                new PessimisticLockingFailureException("콘텐츠 저장 잠금 시간 초과");
-        when(roleRepository.saveAndFlush(role)).thenThrow(cause);
-
         assertThatThrownBy(() -> peopleAdapter.saveRole(role))
                 .isInstanceOfSatisfying(
                         WorkspaceContentConflictException.class,
@@ -403,7 +382,7 @@ final class WorkspacePersistenceAdapterTest {
                             assertThat(exception).hasMessage(
                                     "다른 사용자가 먼저 내용을 변경했습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요"
                             );
-                            assertThat(exception.getCause()).isSameAs(cause);
+                            assertThat(exception.getCause()).isSameAs(pessimisticCause);
                         }
                 );
     }

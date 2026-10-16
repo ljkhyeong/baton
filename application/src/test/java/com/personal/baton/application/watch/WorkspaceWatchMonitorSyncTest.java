@@ -1,7 +1,5 @@
 package com.personal.baton.application.watch;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
@@ -270,22 +268,17 @@ class WorkspaceWatchMonitorSyncTest {
         assertThat(snapshots)
                 .extracting(StoredSnapshot::resourceReference)
                 .containsOnly("baton-manager:study-pilot:role-resource:" + resource.id());
-        assertThat(snapshots)
-                .extracting(StoredSnapshot::sourceRevision)
-                .isSorted()
-                .doesNotHaveDuplicates();
     }
 
     private List<StoredSnapshot> storedSnapshots(UUID resourceId) {
         return jdbcTemplate.query(
                 """
-                SELECT id, resource_reference, monitoring_state, target_url
+                SELECT resource_reference, monitoring_state, target_url
                 FROM watch_monitor_outbox
                 WHERE resource_id = UUID_TO_BIN(?)
                 ORDER BY id
                 """,
                 (resultSet, rowNumber) -> new StoredSnapshot(
-                        resultSet.getLong("id"),
                         resultSet.getString("resource_reference"),
                         resultSet.getString("monitoring_state"),
                         resultSet.getString("target_url")
@@ -295,7 +288,6 @@ class WorkspaceWatchMonitorSyncTest {
     }
 
     private record StoredSnapshot(
-            long sourceRevision,
             String resourceReference,
             String monitoringState,
             String targetUrl

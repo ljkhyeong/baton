@@ -57,7 +57,6 @@ class RestClientWatchMonitorClientTest {
 
     private static final String BASE_URL = "https://watch.internal";
     private static final String TOKEN = "watch-token-with-at-least-32-characters";
-    private static final UUID EVENT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID RESOURCE_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID LEASE_TOKEN = UUID.fromString("30000000-0000-0000-0000-000000000001");
     private static final String RESOURCE_REFERENCE =
@@ -312,7 +311,6 @@ class RestClientWatchMonitorClientTest {
     private WatchMonitorDelivery activeDelivery() {
         return new WatchMonitorDelivery(
                 42,
-                EVENT_ID,
                 RESOURCE_ID,
                 RESOURCE_REFERENCE,
                 WatchMonitoringState.ACTIVE,
@@ -325,7 +323,6 @@ class RestClientWatchMonitorClientTest {
     private WatchMonitorDelivery inactiveDelivery() {
         return new WatchMonitorDelivery(
                 43,
-                EVENT_ID,
                 RESOURCE_ID,
                 RESOURCE_REFERENCE,
                 WatchMonitoringState.INACTIVE,

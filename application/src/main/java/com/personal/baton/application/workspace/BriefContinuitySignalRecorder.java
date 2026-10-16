@@ -160,7 +160,7 @@ public class BriefContinuitySignalRecorder {
                         sourceSeverity,
                         teamId,
                         seasonId,
-                        "baton-continuity:" + signalId,
+                        BriefContinuityEvent.sourceReference(signalId),
                         revision,
                         occurredAt,
                         state

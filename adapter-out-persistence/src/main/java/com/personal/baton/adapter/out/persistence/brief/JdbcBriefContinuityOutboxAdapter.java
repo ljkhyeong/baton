@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.persistence.brief;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.instant;
 import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
 
 import com.personal.baton.adapter.out.persistence.LeasedOutboxTable;
@@ -10,8 +11,6 @@ import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -61,8 +60,7 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
                     candidate.source_reference,
                     candidate.aggregate_revision,
                     candidate.occurred_at,
-                    candidate.event_state,
-                    candidate.attempt_count
+                    candidate.event_state
                 FROM brief_continuity_outbox candidate
                 WHERE (
                     (candidate.delivery_status = 'PENDING' AND candidate.available_at <= ?)
@@ -95,13 +93,11 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
                                 UUID.fromString(resultSet.getString("season_id")),
                                 resultSet.getString("source_reference"),
                                 resultSet.getLong("aggregate_revision"),
-                                resultSet.getObject("occurred_at", LocalDateTime.class)
-                                        .toInstant(ZoneOffset.UTC),
+                                instant(resultSet, "occurred_at"),
                                 BriefContinuityEvent.State.valueOf(
                                         resultSet.getString("event_state")
                                 )
-                        ),
-                        resultSet.getInt("attempt_count")
+                        )
                 ),
                 utc(claimedAt),
                 utc(claimedAt),
@@ -152,19 +148,10 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
         return outbox.markFailed(outboxId, leaseToken, failedAt, errorCode);
     }
 
-    private record ClaimCandidate(
-            long outboxId,
-            BriefContinuityEvent event,
-            int attemptCount
-    ) {
+    private record ClaimCandidate(long outboxId, BriefContinuityEvent event) {
 
         private BriefContinuityDelivery toDelivery(UUID leaseToken) {
-            return new BriefContinuityDelivery(
-                    outboxId,
-                    event,
-                    attemptCount + 1,
-                    leaseToken
-            );
+            return new BriefContinuityDelivery(outboxId, event, leaseToken);
         }
     }
 }

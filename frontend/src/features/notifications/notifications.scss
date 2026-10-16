@@ -2,7 +2,7 @@
   margin: 16px 0;
   padding: 12px;
   border: 1px solid var(--rule);
-  summary { font-weight: 700; cursor: pointer; }
+  summary { font-weight: 700; }
   ul { list-style: none; padding: 0; }
   li { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--rule); padding: 10px 0; }
   li[data-read="true"] { color: var(--muted); }

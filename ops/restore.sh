@@ -14,10 +14,17 @@ if [[ $# -ne 1 || -z "$1" ]]; then
 fi
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 repo_root="$(dirname -- "$script_dir")"
 env_file="${BATON_PRODUCTION_ENV_FILE:-$repo_root/.env.production}"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
 access_key_revocation_sql="$script_dir/sql/invalidate-restored-access-keys.sql"
+
+fail() {
+  printf '%s\n' "$1" >&2
+  exit 1
+}
 
 backup_path="$1"
 case "$backup_path" in
@@ -50,37 +57,9 @@ if [[ ! -f "$access_key_revocation_sql" || ! -r "$access_key_revocation_sql" ]];
   exit 1
 fi
 
-if [[ -z "$state_dir" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR is required for the shared backup and restore lock.\n' >&2
-  exit 1
-fi
-case "$state_dir" in
-  /*) ;;
-  *)
-    printf 'BATON_BACKUP_STATE_DIR must be an absolute path: %s\n' "$state_dir" >&2
-    exit 1
-    ;;
-esac
-if [[ "$state_dir" == "/" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR must not be the filesystem root.\n' >&2
-  exit 1
-fi
-if [[ -L "$state_dir" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR must not be a symbolic link: %s\n' "$state_dir" >&2
-  exit 1
-fi
-mkdir -p -- "$state_dir"
-if [[ ! -O "$state_dir" ]]; then
-  printf 'BATON_BACKUP_STATE_DIR must be owned by the service user: %s\n' "$state_dir" >&2
-  exit 1
-fi
-chmod 700 "$state_dir"
 lock_file="$state_dir/backup-cycle.lock"
+production_validation_prepare_backup_state_dir fail "$state_dir" "$lock_file"
 recovery_targets_path="$state_dir/last-restore-recovery-targets.tsv"
-if [[ -L "$lock_file" || ( -e "$lock_file" && ( ! -f "$lock_file" || ! -O "$lock_file" ) ) ]]; then
-  printf 'Backup lock must be a regular file owned by the service user: %s\n' "$lock_file" >&2
-  exit 1
-fi
 if [[ -L "$recovery_targets_path" \
   || ( -e "$recovery_targets_path" \
     && ( ! -f "$recovery_targets_path" || ! -O "$recovery_targets_path" ) ) ]]; then
@@ -94,10 +73,6 @@ if ! flock -n 9; then
   exit 1
 fi
 
-if [[ ! -r "$env_file" ]]; then
-  printf 'Production env file is not readable: %s\n' "$env_file" >&2
-  exit 1
-fi
 if ! env_file="$("$script_dir/validate-production-env.sh" "$env_file")"; then
   exit 1
 fi
@@ -138,20 +113,7 @@ done
 compose=(
   env
   BATON_PRODUCTION_ENV_FILE="$env_file"
-  BATON_PRODUCTION_LIFECYCLE_LOCK_FD="$BATON_PRODUCTION_LIFECYCLE_LOCK_FD"
   "$script_dir/production-compose.sh"
-)
-docker_command=(
-  env
-  -u DOCKER_HOST
-  -u DOCKER_CONTEXT
-  -u DOCKER_CONFIG
-  -u DOCKER_TLS_VERIFY
-  -u DOCKER_CERT_PATH
-  -u DOCKER_API_VERSION
-  -u DOCKER_DEFAULT_PLATFORM
-  docker
-  --host unix:///var/run/docker.sock
 )
 
 "${compose[@]}" ps --all -q app web round-web round-signaling > "$compose_output_path"
@@ -162,7 +124,7 @@ while IFS= read -r container_id; do
     continue
   fi
   container_state="$(
-    "${docker_command[@]}" inspect --format '{{.Name}} {{.State.Status}}' "$container_id"
+    "${PRODUCTION_DOCKER_COMMAND[@]}" inspect --format '{{.Name}} {{.State.Status}}' "$container_id"
   )"
   if [[ "${container_state##* }" != "exited" ]]; then
     unsafe_containers+="${container_state#/}"$'\n'
@@ -301,8 +263,6 @@ fi
 
 mv -f -- "$recovery_targets_tmp" "$recovery_targets_path"
 recovery_targets_tmp=""
-rm -f -- "$restore_sql_path"
-trap - EXIT INT TERM
 printf 'Restore completed from: %s\n' "$backup_path"
 printf 'Invalidated workspace access keys: %s\n' "$invalidated_access_key_count"
 printf 'Workspace recovery targets: %s\n' "$recovery_targets_path"

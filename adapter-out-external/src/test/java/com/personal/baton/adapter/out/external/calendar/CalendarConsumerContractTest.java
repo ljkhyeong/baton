@@ -3,8 +3,8 @@ package com.personal.baton.adapter.out.external.calendar;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.personal.baton.application.calendar.CalendarSnapshot;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
+import com.personal.baton.application.delivery.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryResult.Outcome;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;

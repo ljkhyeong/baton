@@ -180,7 +180,7 @@ public class IdentityPersistenceAdapter implements IdentityRepository {
     public List<AccountIdentity> findIdentitiesByAccountId(UUID accountId) {
         return IdentityDataAccessExceptionTranslator.translateTemporaryFailure(
                 "계정 신원을 일시적으로 조회할 수 없습니다",
-                () -> identityRepository.findAllByAccountIdOrderByProviderAsc(accountId)
+                () -> identityRepository.findAllByAccountId(accountId)
         );
     }
 

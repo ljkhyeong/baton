@@ -18,7 +18,7 @@ BATON은 팀 업무와 인수인계를 관리하는 도구다. 담당자가 바�
 
 ### 그룹 스터디 파일럿
 
-팀 이름, 시즌 기간과 구성원을 입력해 작업 공간을 만든다. 빈 구성이나 스터디·팀 운영·TF 템플릿을 선택할 수 있다. 템플릿에는 역할 3개와 반복 업무 3개가 포함되며 담당자와 일정은 직접 정한다.
+팀 이름, 시즌 기간과 구성원을 입력해 작업 공간을 만든다. 빈 구성이나 스터디·팀 운영·TF·동아리·학생회/위원회 템플릿을 선택할 수 있다. 템플릿에는 역할 3개와 반복 업무 3개가 포함되며 담당자와 일정은 직접 정한다.
 
 | 화면 | 할 수 있는 일 |
 | --- | --- |
@@ -31,7 +31,7 @@ BATON은 팀 업무와 인수인계를 관리하는 도구다. 담당자가 바�
 | 검색 | 현재 시즌 또는 모든 시즌의 결정·체크리스트 항목·자료를 검색한다. 종류·역할·보관 여부·작성일로 좁힐 수 있다. |
 | 시즌 | 이전 시즌을 조회하고 현재 시즌을 종료·재개한다. 다음 시즌에는 선택한 역할과 반복 업무를 복사한다. |
 
-역할 상세에서 자료 링크 상태를 조회하고 다시 점검할 수 있다. 자동 점검과 별도로 ‘사용 가능·수정 필요’ 결과와 재확인 주기를 기록한다. 내 알림에는 마감 임박·업무 지연·수락할 인수인계를 표시한다. 읽음 상태와 알림 설정은 계정별로 저장한다. 결정·자료·체크리스트 초안은 같은 브라우저 탭에서 복구할 수 있다.
+역할 상세에서 자료 링크 상태를 조회하고 다시 점검할 수 있다. 자동 점검과 별도로 ‘사용 가능·수정 필요’ 결과와 재확인 주기를 기록한다. 내 알림에는 마감 임박·업무 지연·수락할 인수인계와 확인일이 된 담당 자료를 표시한다. 읽음 상태와 알림 설정은 계정별로 저장한다. 결정·자료·체크리스트 초안은 같은 브라우저 탭에서 복구할 수 있다.
 
 ‘내 알림’은 펼쳐둔 동안 갱신하며 ‘안 읽은 알림만’으로 좁혀 볼 수 있다.
 
@@ -43,11 +43,13 @@ BATON은 팀 업무와 인수인계를 관리하는 도구다. 담당자가 바�
 
 ‘오늘’의 ‘주간 업무 점검’에서 미해결 항목, 이번 주 해결 항목과 변경 이력을 조회한다. 로그인, 활동 중인 팀 구성원 연결, 팀 접근 권한과 BRIEF 서비스 설정이 필요하다. 공유 키 팀은 접근 키도 함께 사용한다.
 
+미해결 항목에는 BRIEF가 기록한 미해결 시작일과 지난 날 수를 표시한다. 저장된 주간 요약은 생성 시점까지의 날 수를 보여 주며, 변경 기록 누락이 있으면 누락 이후부터 센 값임을 함께 적는다. 이 값을 주지 않는 이전 BRIEF에서는 표시하지 않는다.
+
 ‘저장된 주간 요약’은 생성 당시 내용을 보존한다. 요약 버전을 선택해 비교하고, ‘지난주와 바로 비교’로 같은 시간대의 지난주 마지막 요약을 찾을 수 있다. 현재 업무명과 이동 대상은 별도로 조회하며, 원본 ID·변경 번호·집계 기준은 ‘연동 상세’에서 확인한다.
 
 진행 중인 시즌에서 변경 권한이 있고 변경사항 전달이 끝나면 ‘이번 주 요약 만들기’를 사용할 수 있다. 내용이 같으면 기존 요약을 불러오며, 종료 시즌에서는 저장된 요약만 조회한다. ‘요약 공유’, ‘요약 링크 복사’와 ‘인쇄·PDF 저장’도 제공한다. 공유 링크를 받은 사람에게도 로그인과 팀 접근 권한이 필요하다.
 
-점검 상태와 저장된 요약은 반영 시점이 다를 수 있다. 조회 실패를 빈 결과로 표시하지 않으며, 추가 전달 안내만으로 요약 내용이 바뀌었다고 판단하지 않는다. 상세 기준은 [업무 점검](docs/PRD/0009_brief-current-attention/spec.md)과 [주간 요약 탐색·공유·출력](docs/PRD/0010_brief-navigation-and-readiness/spec.md)을 따른다. 실제 공개 HTTPS 연동 검증과 운영 활성화는 남아 있다.
+점검 상태와 저장된 요약은 반영 시점이 다를 수 있다. 조회 실패를 빈 결과로 표시하지 않는다. ‘저장 이후 변경 확인’은 BRIEF가 받은 변경으로 지금 다시 만들어도 요약 내용이 같은지와 생성 이후 추가 전달이 있었는지를 함께 보여 주며, 내용이 달라질 때만 다시 만들기를 안내한다. 상세 기준은 [업무 점검](docs/PRD/0009_brief-current-attention/spec.md)과 [주간 요약 탐색·공유·출력](docs/PRD/0010_brief-navigation-and-readiness/spec.md)을 따른다. 실제 공개 HTTPS 연동 검증과 운영 활성화는 남아 있다.
 
 ### 백엔드와 외부 연동
 
@@ -269,7 +271,7 @@ openssl rand -hex 32
 | --- | --- |
 | 배포·이미지 가져오기 | `/srv/baton/state/production-lifecycle.lock`의 같은 아이노드에 `flock`을 잡아 `restore.sh`와 동시 실행을 막는다. 환경 파일·체크아웃·호출 UID가 달라도 같은 잠금을 쓴다. 상위 디렉터리는 `0700`, 파일은 `0600`이어야 한다. |
 | `up`, `create` | 일부 서비스만 지정해도 현재 설정에서 활성화한 전체 서비스를 `--remove-orphans`와 함께 적용한다. |
-| 빌드 | `up --build`로만 배포한다. 독립 `build`는 허용하지 않는다. |
+| 빌드 | `up --build`로만 배포한다. 독립 `build`는 허용하지 않는다. Compose v5의 bake는 작업 디렉터리 밖 빌드 비밀 파일(미설정 시 `/dev/null`, Sentry 토큰 파일)을 별도 권한 없이 읽지 못하므로, 고정한 Compose 파일만 쓰는 이 호출에서 `BUILDX_BAKE_ENTITLEMENTS_FS=0`으로 파일 권한 검사를 끈다. |
 | 설정 출력 | 비밀값을 출력하지 않는 `config --quiet`만 허용한다. |
 | 재조립 없는 실행 | `start`, `restart`, `pause`, `unpause`, `watch`, `up --watch`, 대화형 메뉴를 거부한다. `COMPOSE_MENU=false`로 고정한다. |
 | 그 밖의 명령·옵션 | 운영에 필요한 명령만 허용한다. `run`, `attach`, 모델 변환, 이미지 게시, 확장, 데이터 볼륨 삭제, 파일·프로필·프로젝트 변경, 고아 컨테이너 제거·재생성 우회 옵션은 거부한다. |
@@ -578,7 +580,7 @@ BATON_CAL_REPOSITORY_ROOT=/absolute/path/to/baton-cal-contracts-v1.1.0-rc.2 \
 
 교차 서비스 테스트는 기본 `test`·`build`에 외부 저장소를 암묵적으로 결합하지 않는다.
 
-BRIEF 테스트는 미리 빌드한 BRIEF 실행 JAR의 절대 경로를 `briefBootJar` 속성 또는 `BRIEF_BOOT_JAR` 환경 변수로 받고, BATON 실행 JAR은 현재 저장소에서 빌드한다. 이벤트 응답 유실은 BRIEF 수신 뒤 BATON 전달 행을, 주간 요약 생성 응답 유실은 BRIEF 저장 뒤 BATON 실행 상태를 각각 재시도 상태로 되돌려 재현한다. 실제 TCP 응답 절단은 아니며 로컬 CA 결과를 공인 HTTPS 완료로 해석하지 않는다.
+BRIEF 테스트는 미리 빌드한 BRIEF 실행 JAR의 절대 경로를 `briefBootJar` 속성 또는 `BRIEF_BOOT_JAR` 환경 변수로 받고, BATON 실행 JAR은 현재 저장소에서 빌드한다. 조회 검증용 점검 항목·주간 요약 행을 BRIEF DB에 직접 넣으므로 지문 열을 제거하고 `active_since`(BRIEF PRD-0033)를 추가한 BRIEF 단일 V1 스키마의 JAR를 사용한다. 이벤트 응답 유실은 BRIEF 수신 뒤 BATON 전달 행을, 주간 요약 생성 응답 유실은 BRIEF 저장 뒤 BATON 실행 상태를 각각 재시도 상태로 되돌려 재현한다. 실제 TCP 응답 절단은 아니며 로컬 CA 결과를 공인 HTTPS 완료로 해석하지 않는다.
 
 `ROUND_REPOSITORY_ROOT`를 생략하면 BATON과 같은 상위 디렉터리의 `webRTC`를 사용하며, 이미 빌드한 JAR를 재사용하려면 `ROUND_SIGNALING_JAR` 절대 경로만 지정한다. 두 값은 동시에 사용할 수 없고 실행 로그에는 실제 검증한 JAR와 저장소를 사용한 경우 Git 리비전·변경 상태가 남는다.
 
@@ -676,6 +678,7 @@ bash ops/tests/backup-cycle-test.sh
 bash ops/tests/pilot-readiness-test.sh
 bash ops/tests/integration-delivery-check-test.sh
 bash ops/tests/integration-alerts-test.sh
+bash ops/tests/scan-images-test.sh
 bash ops/tests/production-runtime-smoke.sh
 systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup.timer ops/systemd/baton-service-health.service ops/systemd/baton-service-health.timer ops/systemd/baton-backup-freshness.service ops/systemd/baton-backup-freshness.timer ops/systemd/baton-integration-delivery.service ops/systemd/baton-integration-delivery.timer
 ./ops/production-compose.sh config --quiet
@@ -713,7 +716,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 
 네 경계가 모두 성공해야 최종 `contract` 검사가 성공한다. 원격 저장소의 규칙 집합 또는 분기 보호에서 이 검사를 필수로 지정하면 실패한 커밋의 병합을 차단할 수 있다. 이 게이트는 실제 운영 비밀을 사용하거나 이미지를 게시·배포하지 않는다. 프로덕션 이미지의 DB 설정 누락 시 폐쇄형 실패, 로컬 CA TLS 종단, 빈 DB 마이그레이션과 현재 스키마의 복원 키 무효화 SQL은 검증하지만 공인 DNS·ACME·외부 네트워크·실제 운영 데이터 전체 복원과 팀별 새 링크 배포는 배포 후 별도로 확인한다.
 
-[Dependabot](.github/dependabot.yml)은 Java·npm·GitHub Actions·Dockerfile과 Compose의 MySQL·Caddy 업데이트를 주 1회 점검한다. Compose 제안은 PR 하나로 묶어 기존 품질 게이트에서 검증한다. 대상·버전 범위·무료 사용 조건은 [운영 이미지 업데이트](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)를 따른다.
+[Dependabot](.github/dependabot.yml)은 Java·npm·GitHub Actions·Dockerfile과 Compose의 MySQL·Caddy 업데이트를 주 1회 점검한다. Compose 제안은 PR 하나로 묶어 기존 품질 게이트에서 검증한다. Java·npm 메이저 업데이트는 개별 PR로 받고 Dockerfile 실행 이미지의 메이저 전환은 제외한다. 대상·버전 범위·무료 사용 조건은 [운영 이미지 업데이트](docs/runbooks/free-integrations.md#운영-이미지-업데이트-github-dependabot)를 따른다.
 
 [Java 의존성 취약점 알림](docs/runbooks/free-integrations.md#java-의존성-취약점-알림)을 켜면 `main` 푸시의 기존 백엔드 빌드에서 실제 버전·간접 의존성을 수집해 GitHub에 전달한다. 저장소 변수 `BATON_DEPENDENCY_GRAPH_ENABLED=true`로 켜며, 무료 Actions 한도와 초과 사용 차단을 먼저 확인한다. 기본 비활성이고 PR·수동 실행에서는 제출하지 않는다.
 
@@ -774,8 +777,8 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
   열람자도 조회 권한으로 주소를 발급하며 팀 접근이 끊겨도 본인 구독을 해지할 수 있다.
   구성원 활동 중지·권한 회수·계정 전환과 같은 트랜잭션에 폐기를 기록하며 연결 실패 뒤에도 같은 구독 ID로 재전달한다.
   운영 활성화·공개 HTTPS·외부 캘린더 앱 검증은 별도다. 상세 계약은 PRD-0006을 따른다.
-- CAL 과거 백업 복구: `BATON_CAL_RECOVERY_PREPARATION_ENABLED=false`와
-  `BATON_CAL_RECOVERY_RUN_ID=`가 기본값이다. CAL을 새 구독 세대와 복구 모드로 복원한 뒤 새 UUID를
+- CAL 과거 백업 복구: 기본값은 `BATON_CAL_RECOVERY_PREPARATION_ENABLED=false`이고
+  `BATON_CAL_RECOVERY_RUN_ID`는 설정하지 않는다(운영 환경 파일에 빈 값으로 두면 사전점검이 거부한다). CAL을 새 구독 세대와 복구 모드로 복원한 뒤 새 UUID를
   복구 ID로 고정한다. 첫 기동은 캡처·일정 보정·시즌 이름·복구 준비를 켜고 이름 보정은 `REPLAY`,
   전달은 끈다. 준비 완료 뒤 같은 복구 ID와 캡처·시즌 이름을 유지하면서 보정·준비는 끄고 전달을
   켠다. 모든 최신 아웃박스가 전달되면 BATON이 시즌별 상태와 전체 시즌 집합을 CAL에 대조한다.

@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.CreateSeasonRoundCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateSeasonRoundCommand;
@@ -57,7 +55,6 @@ class WorkspaceRoundCalendarRecordingTest {
         WorkspaceRoundCoordinator coordinator = coordinator(repository, recorder);
 
         coordinator.create(
-                UUID.randomUUID(),
                 season,
                 "calendar-round-create-idempotency-0001",
                 new CreateSeasonRoundCommand("8월 회차", LocalDate.of(2026, 8, 25))

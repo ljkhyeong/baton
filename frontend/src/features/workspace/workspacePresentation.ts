@@ -78,9 +78,6 @@ export function mutationError(error: unknown) {
     && error.code === 'ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED') {
     return '미완료 항목이나 자료 없음 경고를 확인해야 인수인계를 전달할 수 있습니다.'
   }
-  if (error instanceof ApiError && error.code === 'IDEMPOTENCY_REPLAY_EXPIRED') {
-    return '공유 링크가 다시 변경되어 이전 링크를 받을 수 없습니다. 최신 공유 링크를 확인한 뒤 다시 시도하세요.'
-  }
   if (error instanceof ApiError || error instanceof ApiClientError) return error.message
   return '요청을 처리하지 못했습니다. 다시 시도해 주세요.'
 }

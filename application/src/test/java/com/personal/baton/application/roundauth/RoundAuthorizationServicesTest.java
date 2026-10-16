@@ -308,8 +308,6 @@ class RoundAuthorizationServicesTest {
     @DisplayName("room ID insert 경쟁이 여덟 번 이어지면 안정적인 방 충돌로 종료한다")
     void failsAfterEightRoomIdConflicts() {
         when(roundRepository.existsActiveTeamMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(true);
-        when(recordsRepository.findRoleResourceById(RESOURCE_ID))
-                .thenReturn(Optional.of(resource()));
         when(peopleRepository.findRoleById(ROLE_ID)).thenReturn(Optional.of(role()));
         when(roundRepository.findMappingByResourceId(RESOURCE_ID)).thenReturn(Optional.empty());
         when(roomIdGenerator.generate()).thenReturn("aaaa-aaaa-aaaa");

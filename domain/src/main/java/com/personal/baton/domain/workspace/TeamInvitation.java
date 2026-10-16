@@ -52,7 +52,12 @@ public class TeamInvitation {
         if (!isPending(now)) throw new DomainValidationException("수락할 수 없는 초대입니다");
         acceptedBy = Objects.requireNonNull(accountId); acceptedAt = Objects.requireNonNull(now);
     }
-    public void revoke(Instant now) { if (acceptedAt == null && revokedAt == null) revokedAt = Objects.requireNonNull(now); }
+    // 수락·취소 전 초대만 취소하고, 상태가 바뀌었으면 true를 돌려준다.
+    public boolean revoke(Instant now) {
+        if (acceptedAt != null || revokedAt != null) return false;
+        revokedAt = Objects.requireNonNull(now);
+        return true;
+    }
     public UUID getId() { return id; }
     public UUID getTeamId() { return teamId; }
     public UUID getMemberId() { return memberId; }

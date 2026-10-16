@@ -1,15 +1,14 @@
 import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { installApi, makeProjection, navigation, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY, WORKSPACE_PATH } from './support/workspaceApiHarness'
+import { ACCOUNT_ID, blockAccessKeyStorage, installAccountSession, installApi, makeProjection, navigation, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ROLE_ID, ROUTINE_ID, ACCESS_KEY, WORKSPACE_PATH } from './support/workspaceApiHarness'
 
-const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const OLD = '8e448211-66ae-44ab-9888-c4960648c221'
 const MIDDLE = '8e448211-66ae-44ab-9888-c4960648c222'
 const LATEST = '8e448211-66ae-44ab-9888-c4960648c223'
 const SOURCE = 'baton-continuity:8e448211-66ae-44ab-9888-c4960648c224'
 const currentItem = { reasonCode: 'ROLE_UNASSIGNED', sourceReference: SOURCE, severity: 'HIGH', status: 'ACTIVE',
-  observedAt: '2026-08-25T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }
+  observedAt: '2026-08-25T00:00:00Z', activeSince: '2026-08-18T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }
 const oldItem = { ...currentItem, section: 'CURRENT_WEEK' }
 const summaries = [LATEST, MIDDLE, OLD].map((editionId, index) => ({ editionId, generation: 3 - index,
   weekStart: index === 0 ? '2026-08-31' : '2026-08-24', zoneId: 'Asia/Seoul', generatedAt: '2026-09-05T00:00:00Z', sourceCursor: 3 - index, ruleVersion: 2, itemCount: 1 }))
@@ -19,16 +18,10 @@ function edition(id: string) {
     windowStart: summary.weekStart === '2026-08-31' ? '2026-08-30T15:00:00Z' : '2026-08-23T15:00:00Z',
     windowEnd: summary.weekStart === '2026-08-31' ? '2026-09-06T15:00:00Z' : '2026-08-30T15:00:00Z', items: [id === OLD ? oldItem : currentItem] }
 }
-async function login(page: Page) {
-  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token' } }))
-  await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: { csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token' } }))
-  await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: { claimed: true, accountId: ACCOUNT, teamId: TEAM_ID,
-    memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z' } }))
-}
 
 test('지난 주간 요약을 탐색·비교하고 현재 업무로 이동한다 @smoke', async ({ page }, testInfo) => {
   const projection = makeProjection()
-  await installApi(page, projection); await login(page)
+  await installApi(page, projection); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   const historyCursors: (string | null)[] = []
   let malformed = false
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
@@ -39,7 +32,7 @@ test('지난 주간 요약을 탐색·비교하고 현재 업무로 이동한다
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'NO_ADDITIONAL_DELIVERIES', upToDate: true, ruleVersionChanged: false, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/sources/query')) {
       expect(request.headers()['x-csrf-token']).toBe('test-token')
       const sources = request.postDataJSON().sources as { eventType: string; sourceReference: string }[]
@@ -105,7 +98,7 @@ test('지난 주간 요약을 탐색·비교하고 현재 업무로 이동한다
 })
 
 test('전달 대기와 실패를 미리 표시하고 준비 완료 때만 생성을 요청한다 @smoke', async ({ page }) => {
-  await installApi(page); await login(page)
+  await installApi(page); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   let state = 'DELIVERY_PENDING'; let calls = 0
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
@@ -134,7 +127,7 @@ test('전달 대기와 실패를 미리 표시하고 준비 완료 때만 생성
 test('현재 점검 항목에서 보관된 원본 루틴으로 이동한다 @smoke', async ({ page }) => {
   const projection = makeProjection(); const routine = projection.routines.find((entry) => entry.id === ROUTINE_ID)!
   routine.archivedAt = '2026-09-01T00:00:00Z'
-  await installApi(page, projection); await login(page)
+  await installApi(page, projection); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
@@ -152,8 +145,8 @@ test('현재 점검 항목에서 보관된 원본 루틴으로 이동한다 @smo
 })
 
 
-test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 대상·오류·권한 거부를 감춘다 @smoke', async ({ page }) => {
-  await installApi(page); await login(page)
+test('선택한 주간 요약의 내용 일치와 추가 전달 상태를 구분하고 잘못된 대상·오류·권한 거부를 감춘다 @smoke', async ({ page }) => {
+  await installApi(page); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   let mode = 'ADDITIONAL_DELIVERIES'
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
@@ -169,7 +162,7 @@ test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 
       const requestedId = path.split('/').at(-2)
       return route.fulfill({ json: { editionId: mode === 'WRONG_EDITION' ? LATEST : requestedId,
         status: requestedId === OLD ? 'UNKNOWN' : mode === 'WRONG_EDITION' ? 'NO_ADDITIONAL_DELIVERIES' : mode,
-        checkedAt: '2026-09-05T00:00:00Z' } })
+        upToDate: requestedId === LATEST, ruleVersionChanged: requestedId === OLD, checkedAt: '2026-09-05T00:00:00Z' } })
     }
     return route.fulfill({ json: edition(path.endsWith('/latest') ? LATEST : path.split('/').at(-1)!) })
   })
@@ -177,17 +170,24 @@ test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 
   const panel = page.locator('.brief-attention'); await panel.locator('summary').click()
   await panel.getByText('저장된 주간 요약', { exact: true }).click()
   const delivery = panel.getByRole('region', { name: '저장 이후 변경 확인' })
+  const regenerateHint = delivery.getByText('현재 점검 항목을 확인하고, 생성 준비가 끝나면 이번 주 요약을 요청할 수 있습니다.')
+  // 새 변경이 전달됐어도 BRIEF 판정상 내용이 같으면 다시 만들기를 권하지 않는다.
+  await expect(delivery).toContainText('지금 점검 상태로 다시 만들어도 이 요약과 내용이 같습니다.')
   await expect(delivery).toContainText('마지막 생성 확인 이후 새 변경이 전달됐습니다.')
+  await expect(regenerateHint).toHaveCount(0)
   await panel.getByRole('combobox', { name: '조회할 요약' }).selectOption(OLD)
+  await expect(delivery).toContainText('선정 기준이 바뀌어 지금 다시 만들면 이 요약과 내용이 달라집니다.')
   await expect(delivery).toContainText('생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.')
+  await expect(regenerateHint).toBeVisible()
   await expect(panel.getByRole('button', { name: '이번 주 요약 만들기', exact: true })).toBeEnabled()
   mode = 'NO_ADDITIONAL_DELIVERIES'
   await panel.getByRole('combobox', { name: '조회할 요약' }).selectOption(MIDDLE)
+  await expect(delivery).toContainText('지금 점검 상태로 다시 만들면 이 요약과 내용이 달라집니다.')
   await expect(delivery).toContainText('마지막 생성 확인 이후 추가 전달 기록이 없습니다.')
   const refresh = delivery.getByRole('button', { name: '저장 이후 변경 새로고침' })
   for (const error of ['WRONG_EDITION', 'UNAVAILABLE']) {
     mode = error; await refresh.click()
-    await expect(delivery).toContainText('추가 전달 기록을 불러오지 못했습니다.')
+    await expect(delivery).toContainText('저장 이후 변경을 확인하지 못했습니다.')
     await expect(delivery.getByText('마지막 생성 확인 이후 추가 전달 기록이 없습니다.')).toHaveCount(0)
   }
   mode = 'DENIED'; await refresh.click()
@@ -198,7 +198,7 @@ test('선택한 주간 요약의 추가 전달 상태를 구분하고 잘못된 
 
 
 test('이번 주 해결과 지난주 비교에서 결과·없음·장애·권한 거부를 구분한다 @smoke', async ({ page }) => {
-  await installApi(page); await login(page)
+  await installApi(page); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   let previousStatus = 200
   let resolutionStatus = 200
   let resolvedCount = 2
@@ -211,7 +211,7 @@ test('이번 주 해결과 지난주 비교에서 결과·없음·장애·권한
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', upToDate: true, ruleVersionChanged: false, checkedAt: weeklyResolutions.evaluatedAt } })
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source, target: null })) } })
     if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [summaries[0]], nextBeforeGeneration: null } })
     if (path.endsWith('/previous-week')) {
@@ -264,7 +264,7 @@ test('이번 주 해결과 지난주 비교에서 결과·없음·장애·권한
 test('해결 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 주간 변경을 처리한다 @smoke', async ({ page }, testInfo) => {
   test.setTimeout(60_000)
   const projection = makeProjection()
-  await installApi(page, projection); await login(page)
+  await installApi(page, projection); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   const first = { ...weeklyResolutions.items[0], sourceReference: SOURCE }
   const second = { ...weeklyResolutions.items[1], sourceReference: 'role:+& 한글' }
   const next = { eventType: first.reasonCode, sourceReference: first.sourceReference }
@@ -293,10 +293,10 @@ test('해결 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 �
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: request.postDataJSON().sources.map((source: object) => ({ ...source,
       target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: LATEST, status: 'NO_ADDITIONAL_DELIVERIES', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: LATEST, status: 'NO_ADDITIONAL_DELIVERIES', upToDate: true, ruleVersionChanged: false, checkedAt: weeklyResolutions.evaluatedAt } })
     if (path.endsWith('/editions') && request.method() === 'POST') {
       generated = true
-      return route.fulfill({ status: 201, json: { executionId: ACCOUNT, editionId: LATEST, generation: 3, deliveryWatermark: 3, sourceCursor: 3, created: true } })
+      return route.fulfill({ status: 201, json: { executionId: ACCOUNT_ID, editionId: LATEST, generation: 3, deliveryWatermark: 3, sourceCursor: 3, created: true } })
     }
     if (path.endsWith('/editions')) return route.fulfill({ json: { editions: summaries, nextBeforeGeneration: null } })
     return route.fulfill({ json: edition(LATEST) })
@@ -353,14 +353,14 @@ test('해결 업무·시점을 탐색하고 생성 후 첫 페이지 갱신과 �
 
 async function installSharedEdition(page: Page, options: { printItems?: boolean } = {}) {
   const projection = makeProjection()
-  await installApi(page, projection); await login(page)
+  await installApi(page, projection); await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
     if (path.endsWith('/summary')) return route.fulfill({ json: { highCount: 0, mediumCount: 0, revisionGapCount: 0 } })
     if (path.endsWith('/attention-items')) return route.fulfill({ json: { items: [], nextCursor: null } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: weeklyResolutions.evaluatedAt } })
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', checkedAt: weeklyResolutions.evaluatedAt } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: path.split('/').at(-2), status: 'UNKNOWN', upToDate: true, ruleVersionChanged: false, checkedAt: weeklyResolutions.evaluatedAt } })
     if (path.endsWith('/sources/query')) return route.fulfill({ json: { sources: route.request().postDataJSON().sources.map((source: object) => ({ ...source,
       target: { title: projection.roles.find((role) => role.id === ROLE_ID)!.name, roleId: ROLE_ID, routineId: null, archived: false } })) } })
     if (path.endsWith('/editions')) return route.fulfill({ json: { editions: [summaries[0]], nextBeforeGeneration: null } })
@@ -368,6 +368,7 @@ async function installSharedEdition(page: Page, options: { printItems?: boolean 
     const selected = edition(OLD)
     return route.fulfill({ json: options.printItems ? { ...selected, itemCount: 24, items: Array.from({ length: 24 }, (_, index) => ({ ...oldItem,
       sourceReference: index === 0 ? SOURCE : `role:print-${index}`, section: index % 3 === 0 ? 'CURRENT_WEEK' : index % 3 === 1 ? 'CARRY_OVER' : null,
+      activeSince: index % 3 === 2 ? null : oldItem.activeSince,
       aggregateRevision: index % 3 === 2 ? null : 1, revisionGap: index % 3 === 2 ? null : false })) } : selected })
   })
 }
@@ -472,13 +473,7 @@ test('잘못된 주간 요약 링크와 조회 거부 시 최신 주간 요약�
 })
 
 test('인쇄에는 선택한 불변 주간 요약과 현재 업무명 구분만 담는다 @smoke', async ({ page, browserName }, testInfo) => {
-  await page.addInitScript(() => {
-    const originalSetItem = Storage.prototype.setItem
-    Storage.prototype.setItem = function setItem(key, value) {
-      if (key.startsWith('baton-access-key:')) throw new DOMException('저장소 사용 불가', 'SecurityError')
-      originalSetItem.call(this, key, value)
-    }
-  })
+  await blockAccessKeyStorage(page)
   await installSharedEdition(page, { printItems: true })
   const sharedPath = `${WORKSPACE_PATH}?brief=${OLD}#accessKey=${ACCESS_KEY}`
   await page.goto(sharedPath)
@@ -500,6 +495,8 @@ test('인쇄에는 선택한 불변 주간 요약과 현재 업무명 구분만 
   await expect(printSheet).toContainText('이전 주부터 미해결 · 8건')
   await expect(printSheet).toContainText('이전 주간 요약 · 분류 미기록 · 8건')
   await expect(printSheet).toContainText('이전 주간 요약: 변경 번호·누락 여부 미기록')
+  // 미해결 기간은 생성 시각까지 세며 값을 주지 않은 이전 항목 8건에는 붙이지 않는다.
+  await expect(printSheet.getByText('미해결 시작 2026. 8. 18. · 생성 시점 기준 18일 지남', { exact: true })).toHaveCount(16)
   await expect(printSheet).toContainText(OLD)
   await expect(printSheet).not.toContainText(LATEST)
   await expect(printSheet).not.toContainText(ACCESS_KEY)

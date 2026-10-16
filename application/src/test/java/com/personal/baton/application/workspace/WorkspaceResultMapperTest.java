@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoutineExecutionResult;
 import com.personal.baton.domain.workspace.RoundTimingStatus;
 import com.personal.baton.domain.workspace.Routine;
@@ -47,8 +45,7 @@ class WorkspaceResultMapperTest {
                 teamId,
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 8, 31),
-                SEASON_ZONE.getId()
+                LocalDate.of(2026, 8, 31)
         );
         SeasonRound round = SeasonRound.create(
                 UUID.randomUUID(),

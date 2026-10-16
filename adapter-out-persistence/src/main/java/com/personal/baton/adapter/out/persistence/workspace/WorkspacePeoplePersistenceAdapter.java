@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
@@ -41,9 +40,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     @Override
     public Member saveMember(Member member) {
         try {
-            return memberRepository.saveAndFlush(member);
-        } catch (ConcurrencyFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
+            return WorkspaceConflicts.translate(() -> memberRepository.saveAndFlush(member));
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_members_team_name")) {
                 throw new MemberNameConflictException(exception);
@@ -67,9 +64,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     @Override
     public Role saveRole(Role role) {
         try {
-            return roleRepository.saveAndFlush(role);
-        } catch (ConcurrencyFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
+            return WorkspaceConflicts.translate(() -> roleRepository.saveAndFlush(role));
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_season_name")) {
                 throw new RoleNameConflictException(exception);
@@ -81,9 +76,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     @Override
     public List<Role> saveRoles(List<Role> roles) {
         try {
-            return roleRepository.saveAllAndFlush(roles);
-        } catch (ConcurrencyFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
+            return WorkspaceConflicts.translate(() -> roleRepository.saveAllAndFlush(roles));
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_roles_season_name")) {
                 throw new RoleNameConflictException(exception);
@@ -95,9 +88,7 @@ public class WorkspacePeoplePersistenceAdapter implements WorkspacePeopleReposit
     @Override
     public RoleHandoff saveRoleHandoff(RoleHandoff roleHandoff) {
         try {
-            return roleHandoffRepository.saveAndFlush(roleHandoff);
-        } catch (ConcurrencyFailureException exception) {
-            throw new WorkspaceContentConflictException(exception);
+            return WorkspaceConflicts.translate(() -> roleHandoffRepository.saveAndFlush(roleHandoff));
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, "uk_role_handoffs_active_role")) {
                 throw new WorkspaceContentConflictException(exception);

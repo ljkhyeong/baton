@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.SeasonRoundResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.WorkspaceResult;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
@@ -55,8 +53,6 @@ class WorkspaceProjectionReaderTest {
                 .thenReturn(List.of(scope.season()));
         when(operationsRepository.findSeasonRoundsBySeasonId(scope.season().getId()))
                 .thenReturn(List.of(round));
-        when(operationsRepository.findRoutineExecutionsBySeasonRoundIds(List.of(round.getId())))
-                .thenReturn(List.of());
 
         WorkspaceResult result = reader(
                 seasonRepository, peopleRepository, operationsRepository, recordsRepository, clock
@@ -123,9 +119,9 @@ class WorkspaceProjectionReaderTest {
                 teamId,
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 8, 31),
-                "Etc/UTC"
+                LocalDate.of(2026, 8, 31)
         );
+        season.updateTimeZone("Etc/UTC");
         return new WorkspaceScope(team, season);
     }
 }

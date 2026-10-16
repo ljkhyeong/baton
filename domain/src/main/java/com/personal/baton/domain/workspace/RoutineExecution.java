@@ -180,14 +180,6 @@ public class RoutineExecution {
         return dueLabel;
     }
 
-    public Integer getDeadlineDayOffset() {
-        return deadlineDayOffset;
-    }
-
-    public LocalTime getDeadlineTime() {
-        return deadlineTime;
-    }
-
     public Instant getDeadlineAt() {
         return deadlineAt;
     }

@@ -84,7 +84,7 @@ public class BriefEditionController {
         var result = briefEditionUseCase.findEditionDeliveryStatus(
                 new LatestEditionQuery(principal.accountId(), teamId, seasonId, accessKey), editionId);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(new BriefEditionResponses.DeliveryStatusResponse(result.editionId(), result.status(), result.checkedAt()));
+                .body(BriefEditionResponses.DeliveryStatusResponse.from(result));
     }
 
     @GetMapping(GENERATION_PATH)

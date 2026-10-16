@@ -1,8 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
-import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.crypto.DomainSeparatedSha256;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsCommands.UpdateRoutineCommand;
@@ -11,7 +8,6 @@ import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepo
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
-import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.Routine;
@@ -22,9 +18,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +38,6 @@ class RoutineArchiveApplicationTest {
 
     private static final String ACCESS_KEY = "routine-archive-access-key";
     private static final Instant NOW = Instant.parse("2026-08-01T00:00:00Z");
-    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
     private final WorkspaceAccessRepository accessRepository = mock(WorkspaceAccessRepository.class);
     private final WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
@@ -195,9 +188,7 @@ class RoutineArchiveApplicationTest {
                 recordsRepository,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                mock(BriefContinuitySignalRecorder.class)
         );
     }
 
@@ -206,7 +197,6 @@ class RoutineArchiveApplicationTest {
             Season season
     ) {
         when(accessRepository.findTeamByIdWithSharedLock(team.getId())).thenReturn(Optional.of(team));
-        when(accessRepository.findTeamByIdForUpdate(team.getId())).thenReturn(Optional.of(team));
         when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(team.getId(), season.getId()))
                 .thenReturn(Optional.of(season));
     }
@@ -225,8 +215,7 @@ class RoutineArchiveApplicationTest {
                 teamId,
                 "2026 여름",
                 LocalDate.of(2026, 7, 1),
-                LocalDate.of(2026, 8, 31),
-                SEOUL.getId()
+                LocalDate.of(2026, 8, 31)
         );
     }
 

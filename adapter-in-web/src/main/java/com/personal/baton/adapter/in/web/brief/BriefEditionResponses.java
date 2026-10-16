@@ -16,7 +16,14 @@ public final class BriefEditionResponses {
     private BriefEditionResponses() {
     }
 
-    public record DeliveryStatusResponse(UUID editionId, BriefEditionDeliveryStatus.Status status, Instant checkedAt) { }
+    public record DeliveryStatusResponse(
+            UUID editionId, BriefEditionDeliveryStatus.Status status, boolean upToDate, boolean ruleVersionChanged, Instant checkedAt
+    ) {
+        public static DeliveryStatusResponse from(BriefEditionDeliveryStatus result) {
+            return new DeliveryStatusResponse(result.editionId(), result.status(), result.upToDate(), result.ruleVersionChanged(),
+                    result.checkedAt());
+        }
+    }
 
     public record BriefEditionResponse(
             UUID editionId,
@@ -59,6 +66,7 @@ public final class BriefEditionResponses {
             String severity,
             String status,
             Instant observedAt,
+            Instant activeSince,
             int ruleVersion,
             Long aggregateRevision,
             Boolean revisionGap,
@@ -72,6 +80,7 @@ public final class BriefEditionResponses {
                     item.severity(),
                     item.status(),
                     item.observedAt(),
+                    item.activeSince(),
                     item.ruleVersion(),
                     item.aggregateRevision(),
                     item.revisionGap(),

@@ -29,11 +29,13 @@ public class AccountSecurityController {
     public static final String SESSION_REVOCATIONS_PATH =
             "/api/v1/auth/session-revocations";
 
-    private final AccountSecurityUseCase accountSecurityUseCase;
-    private final LogoutHandler logoutHandler = new CompositeLogoutHandler(
+    // 서버 세션 무효화와 JSESSIONID 만료. 계정 비활성화와 세션 버전 필터도 같은 처리를 쓴다.
+    static final LogoutHandler CURRENT_SESSION_LOGOUT = new CompositeLogoutHandler(
             new CookieClearingLogoutHandler("JSESSIONID"),
             new SecurityContextLogoutHandler()
     );
+
+    private final AccountSecurityUseCase accountSecurityUseCase;
 
     public AccountSecurityController(AccountSecurityUseCase accountSecurityUseCase) {
         this.accountSecurityUseCase = accountSecurityUseCase;
@@ -90,7 +92,7 @@ public class AccountSecurityController {
             HttpServletResponse response,
             Authentication authentication
     ) {
-        logoutHandler.logout(request, response, authentication);
+        CURRENT_SESSION_LOGOUT.logout(request, response, authentication);
         return ResponseEntity.noContent()
                 .cacheControl(CacheControl.noStore())
                 .build();

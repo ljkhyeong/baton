@@ -2,6 +2,7 @@ import type { operations } from '@/generated/api'
 import { csrfHeaders } from '@/features/auth/api'
 import { apiRequest } from '@/shared/api/client'
 import { isInstant, isJsonObject, isNullableInstant, isNullableUuid, isSameUuid, isUuid } from '@/shared/api/responseValidation'
+import { TOKEN_PATTERN } from './pendingTeamInvitation'
 
 type MyTeams = operations['getMyTeams']['responses'][200]['content']['application/json']
 type TeamAccess = operations['getTeamAccess']['responses'][200]['content']['application/json']
@@ -49,7 +50,7 @@ export async function changeTeamPermission(scope: AccessScope, memberId: string,
 export async function createTeamInvitation(scope: AccessScope, memberId: string, permission: Permission): Promise<Created> {
   return apiRequest(`${path(scope.teamId)}/invitations`, { method: 'POST', headers: await csrfHeaders(),
     body: { expectedAccountId: scope.accountId, memberId, permission }, decode: value => {
-      if (!isJsonObject(value) || typeof value.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(value.token)
+      if (!isJsonObject(value) || typeof value.token !== 'string' || !TOKEN_PATTERN.test(value.token)
         || !isJsonObject(value.invitation) || !isUuid(value.invitation.id) || !isSameUuid(value.invitation.memberId, memberId)
         || value.invitation.permission !== permission || !isInstant(value.invitation.createdAt) || !isInstant(value.invitation.expiresAt)
         || value.invitation.acceptedAt !== null || value.invitation.revokedAt !== null) invalid()

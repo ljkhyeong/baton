@@ -1,17 +1,12 @@
 import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
-import { installApi, openSharedWorkspace, TEAM_ID, MEMBER_ONE_ID, ACCESS_KEY } from './support/workspaceApiHarness'
-
-const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
+import { installAccountSession, installApi, openSharedWorkspace, MEMBER_ONE_ID, ACCESS_KEY, ACCOUNT_ID } from './support/workspaceApiHarness'
 
 test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초기화를 확인한다 @smoke', async ({ page }) => {
+  // 미해결 기간은 시즌 시간대(Asia/Seoul)의 오늘 날짜까지 센다.
+  await page.clock.setFixedTime(new Date('2026-09-02T09:00:00+09:00'))
   await installApi(page)
-  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: {
-    authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token',
-  } }))
-  await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
-    claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z',
-  } }))
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
   const calls: URLSearchParams[] = []
   const historyCalls: URLSearchParams[] = []
   let unavailable = false
@@ -24,7 +19,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
     if (url.pathname.endsWith('/transitions')) {
       historyCalls.push(url.searchParams)
       const older = url.searchParams.has('beforeAggregateRevision')
-      return route.fulfill({ json: { transitions: [{ eventId: ACCOUNT, aggregateRevision: older ? 2 : 3,
+      return route.fulfill({ json: { transitions: [{ eventId: ACCOUNT_ID, aggregateRevision: older ? 2 : 3,
         state: older ? 'RESOLVED' : 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', detectedRevisionGap: older, sourceSeverity: older ? 'CRITICAL' : 'WARNING' }],
       nextBeforeAggregateRevision: older ? null : 3 } })
     }
@@ -40,13 +35,15 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
     const after = url.searchParams.get('afterSourceReference')
     const sourceReference = gap ? 'role:gap' : after ? 'role:second' : 'role:+& 한글'
     return route.fulfill({ json: { items: [{ reasonCode: 'ROLE_UNASSIGNED', severity: gap ? 'MEDIUM' : 'HIGH',
-      sourceReference, status: 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', aggregateRevision: 3, ruleVersion: 1, revisionGap: gap }],
+      sourceReference, status: 'ACTIVE', observedAt: '2026-08-31T00:00:00Z', activeSince: gap ? '2026-08-31T00:00:00Z' : '2026-08-25T00:00:00Z',
+      aggregateRevision: 3, ruleVersion: 1, revisionGap: gap }],
     nextCursor: !gap && !after ? { eventType: 'ROLE_UNASSIGNED', sourceReference } : null } })
   })
   await openSharedWorkspace(page)
   const panel = page.locator('.brief-attention')
   await panel.locator('summary').click()
   await expect(panel.getByRole('button', { name: '높은 심각도 2건' })).toBeVisible()
+  await expect(panel.getByText('미해결 시작 2026. 8. 25. · 8일 지남', { exact: true })).toBeVisible()
   expect(historyCalls).toHaveLength(0)
   await panel.getByRole('button', { name: '변경 이력 보기' }).click()
   const history = panel.getByRole('region', { name: '점검 항목 변경 이력' })
@@ -75,6 +72,7 @@ test('BRIEF 요약에서 조건을 선택하고 다음 페이지와 필터 초�
   expect(calls.at(-1)?.get('revisionGap')).toBe('false')
   await panel.getByRole('button', { name: '변경 기록 누락 1건' }).click()
   await expect(panel.getByText('role:gap', { exact: true })).toBeAttached()
+  await expect(panel.getByText('미해결 시작 2026. 8. 31. · 2일 지남 · 누락 이전 기간 제외', { exact: true })).toBeVisible()
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect(calls.at(-1)?.get('afterEventType')).toBeNull()
   expect(calls.at(-1)?.get('severity')).toBeNull()

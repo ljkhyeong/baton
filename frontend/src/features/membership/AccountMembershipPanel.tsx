@@ -20,12 +20,6 @@ type AccountMembershipPanelProps = {
   seasonEnded: boolean
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : '계정 연결 상태를 확인하지 못했습니다.'
-}
-
 export default function AccountMembershipPanel({
   teamId,
   seasonId,
@@ -127,7 +121,7 @@ export default function AccountMembershipPanel({
       {membershipQuery.isError
         ? (
             <div className="account-membership-error" role="alert">
-              <p>{errorMessage(membershipQuery.error)}</p>
+              <p>{membershipQuery.error.message}</p>
               <button className="secondary-button" type="button" onClick={() => membershipQuery.refetch()}>다시 확인</button>
             </div>
           )
@@ -166,7 +160,7 @@ export default function AccountMembershipPanel({
                   {claimMutation.isPending ? '계정 연결 중…' : '이 이름으로 연결'}
                 </button>
                 {claimMutation.isError && (
-                  <p className="form-error" role="alert">{errorMessage(claimMutation.error)}</p>
+                  <p className="form-error" role="alert">{claimMutation.error.message}</p>
                 )}
               </>
             )

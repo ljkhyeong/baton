@@ -1,20 +1,24 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
-import { compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
-import { attentionReasons, editionSections } from './types'
+import { briefScopeKey, compareEditions, generateEdition, getEdition, getEditionDeliveryStatus, getEditionHistory, getGenerationReadiness, getLatestEdition, getPreviousWeekEdition } from './api'
+import { activeSinceText, attentionReasons, editionItemEvidence, editionSections, sectionNames, severityLabel, statusLabel } from './types'
 import { BriefEditionActions } from './BriefEditionActions'
 import type { BriefNavigation } from './useBriefNavigation'
 import type { AttentionItem, BriefEdition, BriefDeliveryStatus, BriefReadiness, BriefScope, BriefSource } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 
 type Props = { navigation: BriefNavigation; workspaceName: string; scope: BriefScope; timeZone: string; readOnly: boolean; changesDisabled: boolean; onGenerated: () => void; onOpenSource: (source: BriefSource) => void }
-const sectionNames = { CURRENT_WEEK: '이번 주 변경', CARRY_OVER: '이전 주부터 미해결' }
 const deliveryStatusText: Record<BriefDeliveryStatus['status'], string> = {
   ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 새 변경이 전달됐습니다.',
   NO_ADDITIONAL_DELIVERIES: '마지막 생성 확인 이후 추가 전달 기록이 없습니다.',
   UNKNOWN: '이 주간 요약의 생성 확인 기록이 없어 추가 전달 여부를 알 수 없습니다.',
 }
+// 내용 판정은 BRIEF가 받은 변경으로 같은 주간을 다시 선정한 결과다. 추가 전달 여부와 따로 보여 준다.
+const freshnessText = ({ upToDate, ruleVersionChanged }: Pick<BriefDeliveryStatus, 'upToDate' | 'ruleVersionChanged'>) =>
+  upToDate ? '지금 점검 상태로 다시 만들어도 이 요약과 내용이 같습니다.'
+    : ruleVersionChanged ? '선정 기준이 바뀌어 지금 다시 만들면 이 요약과 내용이 달라집니다.'
+      : '지금 점검 상태로 다시 만들면 이 요약과 내용이 달라집니다.'
 const readinessText: Record<BriefReadiness['status'], string> = {
   READY: '주간 요약 생성 가능', DELIVERY_PENDING: 'BRIEF로 변경사항 전송 중', DELIVERY_FAILED: '변경사항 전송 실패 · 관리자 확인 필요',
   GENERATING: '주간 요약 생성 진행 중', GENERATION_FAILED: '주간 요약 생성 오류 · 관리자 확인 필요', SEASON_ENDED: '종료된 시즌 · 조회만 가능', DISABLED: 'BRIEF 연동이 꺼져 있습니다',
@@ -33,7 +37,7 @@ export function BriefEditionSection(props: Props) {
 function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpenSource, onGenerated, navigation, workspaceName }: Props) {
   const queryClient = useQueryClient()
   const { selectedId, baseId, previousTargetId } = navigation.selection
-  const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
+  const scopeKey = briefScopeKey(scope)
   const latest = useQuery({ queryKey: [...scopeKey, 'latest-edition'], queryFn: ({ signal }) => getLatestEdition(scope, signal), retry: false, staleTime: 0 })
   const history = useInfiniteQuery({ queryKey: [...scopeKey, 'edition-history'], initialPageParam: null as number | null,
     queryFn: ({ pageParam, signal }) => getEditionHistory(scope, pageParam, signal),
@@ -127,16 +131,17 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
       <h3>{edition.weekStart} 시작 주 · 요약 버전 {edition.generation}</h3>
       <p>생성 {formatInstant(edition.generatedAt, edition.zoneId)} ({edition.zoneId})</p>
       <section className="brief-delivery-status" aria-label="저장 이후 변경 확인">
-        <strong>{deliveryData ? deliveryStatusText[deliveryData.status] : delivery.isError
-          ? '추가 전달 기록을 불러오지 못했습니다.' : '추가 전달 기록 확인 중…'}</strong>
+        <strong>{deliveryData ? freshnessText(deliveryData) : delivery.isError
+          ? '저장 이후 변경을 확인하지 못했습니다.' : '저장 이후 변경 확인 중…'}</strong>
+        {deliveryData && <p>{deliveryStatusText[deliveryData.status]}</p>}
         {deliveryData && <small>확인 {formatInstant(deliveryData.checkedAt, timeZone)} ({timeZone})</small>}
-        {deliveryData?.status === 'ADDITIONAL_DELIVERIES' && <p>{readOnly
+        {deliveryData && !deliveryData.upToDate && <p>{readOnly
           ? '종료된 시즌은 현재 점검 항목에서 이후 상태를 확인해 주세요.'
           : '현재 점검 항목을 확인하고, 생성 준비가 끝나면 이번 주 요약을 요청할 수 있습니다.'}</p>}
         <button type="button" disabled={delivery.isFetching} onClick={() => void delivery.refetch()}>저장 이후 변경 새로고침</button>
         <details className="brief-evidence"><summary>확인 기준 보기</summary>
-          <p className="brief-note">이 주간 요약을 생성하거나 재사용한 마지막 성공 요청을 기준으로 확인합니다.
-            추가 전달이 있어도 주간 요약 항목은 같을 수 있으며, 추가 전달이 없어도 원본 전체의 반영을 보장하지 않습니다.</p>
+          <p className="brief-note">내용 비교는 BRIEF가 받은 변경으로 같은 주간을 다시 선정한 결과이며, BRIEF로 아직 전달되지 않은 변경은 반영하지 않습니다.
+            추가 전달 여부는 이 주간 요약을 생성하거나 재사용한 마지막 성공 요청을 기준으로 확인하며, 추가 전달이 없어도 원본 전체의 반영을 보장하지 않습니다.</p>
         </details>
       </section>
       {effectiveBaseId && <section className="brief-comparison" aria-label="주간 요약 비교 결과">
@@ -149,13 +154,13 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
           {comparisonData.from.ruleVersion !== comparisonData.to.ruleVersion && <p className="brief-note">선정 기준이 달라 항목에 차이가 있을 수 있습니다.</p>}
           <p>추가 {comparisonData.added.length}건 · 제외 {comparisonData.removed.length}건 · 변경 {comparisonData.changed.length}건</p>
           {comparisonData.added.length + comparisonData.removed.length + comparisonData.changed.length === 0 && <p>저장된 항목의 차이가 없습니다.</p>}
-          {comparisonData.added.length > 0 && <section aria-label="주간 요약에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></section>}
-          {comparisonData.removed.length > 0 && <section aria-label="주간 요약에서 제외됨"><h5>제외</h5><EditionItems items={comparisonData.removed} zoneId={comparisonData.from.zoneId} readOnly={readOnly} /></section>}
+          {comparisonData.added.length > 0 && <section aria-label="주간 요약에 추가됨"><h5>추가</h5><EditionItems items={comparisonData.added} edition={comparisonData.to} readOnly={readOnly} /></section>}
+          {comparisonData.removed.length > 0 && <section aria-label="주간 요약에서 제외됨"><h5>제외</h5><EditionItems items={comparisonData.removed} edition={comparisonData.from} readOnly={readOnly} /></section>}
           {comparisonData.changed.map((change) => <section className="brief-change" key={`${change.after.reasonCode}:${change.after.sourceReference}`} aria-label="주간 요약 항목 변경">
             <h5>변경된 항목</h5>
             {change.before.section !== change.after.section && <p>분류 변경: {change.before.section ? sectionNames[change.before.section] : '분류 미기록'} → {change.after.section ? sectionNames[change.after.section] : '분류 미기록'}</p>}
-            <div className="brief-change-columns"><div><h6>변경 전</h6><EditionItems items={[change.before]} zoneId={comparisonData.from.zoneId} readOnly={readOnly} /></div>
-              <div><h6>변경 후</h6><EditionItems items={[change.after]} zoneId={comparisonData.to.zoneId} readOnly={readOnly} /></div></div>
+            <div className="brief-change-columns"><div><h6>변경 전</h6><EditionItems items={[change.before]} edition={comparisonData.from} readOnly={readOnly} /></div>
+              <div><h6>변경 후</h6><EditionItems items={[change.after]} edition={comparisonData.to} readOnly={readOnly} /></div></div>
           </section>)}
           <details className="brief-evidence" aria-label="비교 결과 연동 상세"><summary>연동 상세</summary>
             <h5>추가</h5><EditionEvidence items={comparisonData.added} />
@@ -173,7 +178,7 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
             .map((section) => {
               const items = edition.items.filter((item) => item.section === section.value)
               return items.length > 0 && <section key={section.value ?? 'legacy'} aria-label={section.label}>
-                <h4>{section.label} · {items.length}건</h4><EditionItems items={items} zoneId={edition.zoneId} readOnly={readOnly} />
+                <h4>{section.label} · {items.length}건</h4><EditionItems items={items} edition={edition} readOnly={readOnly} />
               </section>
             })}
         <details key={`evidence:${edition.editionId}`} className="brief-evidence" aria-label="저장된 요약 연동 상세"><summary>연동 상세</summary>
@@ -186,12 +191,15 @@ function BriefEditionResults({ scope, timeZone, readOnly, changesDisabled, onOpe
   </section>
 }
 
-function EditionItems({ items, zoneId, readOnly }: { items: BriefEdition['items']; zoneId: string; readOnly: boolean }) {
+// 항목 시각은 해당 주간 요약의 저장 시간대로, 미해결 기간은 그 요약의 생성 시각까지로 표시한다.
+function EditionItems({ items, edition, readOnly }: { items: BriefEdition['items']; edition: Pick<BriefEdition, 'zoneId' | 'generatedAt'>; readOnly: boolean }) {
+  const { zoneId, generatedAt } = edition
   return <ul className="brief-items">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <div><strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
-      <span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}</span></div>
+      <span>{severityLabel(item.severity)} · {statusLabel(item.status)}</span></div>
     <BriefSourceLink item={item} readOnly={readOnly} />
     <small>상태 기록 {formatInstant(item.observedAt, zoneId)} ({zoneId})</small>
+    {item.activeSince !== null && <small>{activeSinceText(item, zoneId, new Date(generatedAt), '생성 시점 기준 ')}</small>}
   </li>)}</ul>
 }
 
@@ -199,7 +207,6 @@ function EditionEvidence({ items }: { items: BriefEdition['items'] }) {
   return items.length === 0 ? <p>항목 없음</p> : <ul className="brief-evidence-list">{items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
     <strong>{attentionReasons[item.reasonCode as AttentionItem['reasonCode']]}</strong>
     <span>원본 항목 ID <code>{item.sourceReference}</code></span>
-    <span>{item.aggregateRevision === null ? '이전 주간 요약: 변경 번호·누락 여부 미기록'
-      : `원본 변경 번호 ${item.aggregateRevision} · ${item.revisionGap ? '변경 기록 누락 있음' : '변경 기록 누락 없음'}`}</span>
+    <span>{editionItemEvidence(item)}</span>
   </li>)}</ul>
 }

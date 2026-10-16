@@ -54,6 +54,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -531,6 +532,27 @@ class AuthSecurityTest {
                         .value("이메일 또는 비밀번호가 올바르지 않습니다"));
     }
 
+    @DisplayName("local 로그인 실패 1회는 자격 증명을 한 번만 조회한다")
+    @Test
+    void loadsLocalCredentialOncePerFailedLogin() throws Exception {
+        when(loadLocalCredentialUseCase.loadLocalCredential(EMAIL))
+                .thenReturn(Optional.of(new LocalCredentialResult(
+                        ACCOUNT_ID,
+                        passwordEncoder.encode(PASSWORD),
+                        true, 0
+                )));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_SESSION_PATH))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("email", EMAIL)
+                        .param("password", "a completely wrong password"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        verify(loadLocalCredentialUseCase, times(1)).loadLocalCredential(EMAIL);
+    }
+
     @DisplayName("인증 정보가 없는 소셜 가입은 OAuth 시작 경로를 노출하지 않는다")
     @Test
     void omitsUnavailableSocialLogin() throws Exception {
@@ -615,35 +637,6 @@ class AuthSecurityTest {
         return request
                 .header(HttpHeaders.ORIGIN, ORIGIN)
                 .header("Sec-Fetch-Site", "same-origin");
-    }
-
-    private LocalAccountPrincipal principal() {
-        return new LocalAccountPrincipal(
-                ACCOUNT_ID,
-                EMAIL,
-                passwordEncoder.encode(PASSWORD), 0
-        );
-    }
-
-    private UsernamePasswordAuthenticationToken authenticated(
-            LocalAccountPrincipal principal
-    ) {
-        return UsernamePasswordAuthenticationToken.authenticated(
-                principal,
-                null,
-                principal.getAuthorities()
-        );
-    }
-
-    private MockHttpSession authenticatedSession(LocalAccountPrincipal principal) {
-        MockHttpSession session = new MockHttpSession();
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authenticated(principal));
-        session.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                context
-        );
-        return session;
     }
 
     private String validRegistration() {

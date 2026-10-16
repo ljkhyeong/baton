@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { generatePath, Link } from 'react-router-dom'
 import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
-import { getCalendarSubscriptions } from './api'
+import { calendarKeys, getCalendarSubscriptions } from './api'
 import CalendarBulkRevocation, { MAX_BULK_REVOCATIONS } from './CalendarBulkRevocation'
 import { CalendarContent } from './CalendarSubscriptionPanel'
 import type { CalendarSubscriptionSummary, CalendarListFilters, CalendarStatus, CalendarStatusCheck } from './types'
@@ -21,7 +21,7 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
   const [bulkLocked, setBulkLocked] = useState(false)
   const [filters, setFilters] = useState<CalendarListFilters>({ query: '', includeRevoked: true })
   const query = useInfiniteQuery({
-    queryKey: ['calendar-subscriptions', accountId, filters],
+    queryKey: [...calendarKeys.list(accountId), filters],
     queryFn: ({ pageParam, signal }) => getCalendarSubscriptions(accountId, pageParam, filters, signal),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextAfterSeasonId ?? undefined,
@@ -122,7 +122,7 @@ function SubscriptionRow({ accountId, row, listedAt, selecting, selected, select
   return <li><details open={open} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>{nameAndStatus}</summary>
     {open && <div className="calendar-subscription-management">
-      <CalendarContent accountId={accountId} scope={{ accountId, teamId: row.teamId, seasonId: row.seasonId, accessKey: '' }}
+      <CalendarContent scope={{ accountId, teamId: row.teamId, seasonId: row.seasonId, accessKey: '' }}
         canIssue={false} ended={false} managementOnly onStatusChecked={setChecked} />
       <Link className="auth-secondary-link" to={generatePath(WORKSPACE_ROUTE, row)}>팀 화면으로 이동</Link>
       <p className="account-security-note">새 구독 주소가 필요하면 접근 가능한 팀 화면에서 발급해 주세요.</p>

@@ -1,13 +1,5 @@
 .brief-attention {
-  margin: 1rem 0;
-  padding: 16px 0;
-  border: 0;
-  border-top: 1px solid var(--rule);
-  border-radius: 0;
-  background: var(--paper);
-  min-width: 0;
-
-  summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+  summary { font-weight: 600; font-size: 14px; }
   p { line-height: 1.6; }
   button, select { padding: .55rem .7rem; border: 1px solid var(--rule-strong); border-radius: var(--radius); background-color: var(--paper); }
   select { padding-right: 34px; }
@@ -33,7 +25,7 @@
 
 .brief-readiness { display: grid; gap: .65rem; padding: 1rem; margin: 1rem 0; background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .brief-readiness p { margin: 0; }
-.brief-readiness button { justify-self: start; }
+.brief-readiness button, .brief-delivery-status button { justify-self: start; }
 .brief-comparison { margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule-strong); border-radius: var(--radius-lg); }
 .brief-change { border-top: 1px solid var(--rule); padding-top: .5rem; }
 .brief-change-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
@@ -49,9 +41,8 @@
 
 .brief-delivery-status { display: grid; gap: .6rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .brief-delivery-status p, .brief-delivery-status .brief-evidence { margin: 0; }
-.brief-delivery-status button { justify-self: start; }
 .brief-action-description { flex-basis: 100%; }
-.brief-evidence > small, .brief-evidence > span { display: block; margin-top: .4rem; }
+.brief-evidence > span { display: block; margin-top: .4rem; }
 
 .brief-copy-fallback { display: grid; gap: .5rem; margin: 1rem 0; }
 .brief-copy-fallback input { width: 100%; min-width: 0; padding: .65rem; }

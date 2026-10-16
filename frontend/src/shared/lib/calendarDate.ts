@@ -11,7 +11,6 @@ function normalizedCalendarDate(value: unknown) {
   const month = Number(match[2])
   const day = Number(match[3])
   const normalized = new Date(0)
-  normalized.setUTCHours(0, 0, 0, 0)
   normalized.setUTCFullYear(year, month - 1, day)
 
   return normalized.getUTCFullYear() === year
@@ -25,19 +24,20 @@ export function isCalendarDate(value: unknown): value is string {
   return normalizedCalendarDate(value) !== null
 }
 
-export function calendarDayNumber(value: string) {
+function requiredCalendarDate(value: string) {
   const normalized = normalizedCalendarDate(value)
   if (!normalized) {
     throw new RangeError(`유효하지 않은 달력 날짜입니다: ${value}`)
   }
-  return Math.floor(normalized.getTime() / MILLISECONDS_PER_DAY)
+  return normalized
+}
+
+export function calendarDayNumber(value: string) {
+  return Math.floor(requiredCalendarDate(value).getTime() / MILLISECONDS_PER_DAY)
 }
 
 export function addCalendarDays(value: string, days: number) {
-  const normalized = normalizedCalendarDate(value)
-  if (!normalized) {
-    throw new RangeError(`유효하지 않은 달력 날짜입니다: ${value}`)
-  }
+  const normalized = requiredCalendarDate(value)
   normalized.setUTCDate(normalized.getUTCDate() + days)
   return normalized.toISOString().slice(0, 10)
 }

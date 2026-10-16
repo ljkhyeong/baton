@@ -26,8 +26,7 @@ final class OutboundHttpSettings {
     static void validateTimeouts(String service, Duration connect, Duration read) {
         requirePositive(service, "연결 시간 제한", connect);
         requirePositive(service, "읽기 시간 제한", read);
-        if (connect.compareTo(MAX_REQUEST_TIMEOUT_BUDGET) >= 0
-                || read.compareTo(MAX_REQUEST_TIMEOUT_BUDGET.minus(connect)) > 0) {
+        if (read.compareTo(MAX_REQUEST_TIMEOUT_BUDGET.minus(connect)) > 0) {
             throw new IllegalStateException(
                     service + " 연결 시간 제한과 읽기 시간 제한의 합은 45초 이하여야 합니다"
             );

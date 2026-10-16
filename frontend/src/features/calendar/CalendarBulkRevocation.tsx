@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { isAccessDenied } from '@/shared/api/ApiError'
 import { isSameUuid } from '@/shared/api/responseValidation'
-import { getCalendarSubscription, revokeCalendarSubscription } from './api'
+import { calendarKeys, getCalendarSubscription, revokeCalendarSubscription } from './api'
 import type { CalendarSubscription, CalendarSubscriptionSummary } from './types'
 
 export const MAX_BULK_REVOCATIONS = 20
@@ -79,8 +79,8 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
       locked.current = false
       onLockChange(false)
       onFinished()
-      void cache.invalidateQueries({ queryKey: ['calendar-subscriptions', accountId] })
-      void cache.invalidateQueries({ queryKey: ['calendar-subscription', accountId], refetchType: 'none' })
+      void cache.invalidateQueries({ queryKey: calendarKeys.list(accountId) })
+      void cache.invalidateQueries({ queryKey: calendarKeys.status(accountId), refetchType: 'none' })
     },
   })
   function start() {

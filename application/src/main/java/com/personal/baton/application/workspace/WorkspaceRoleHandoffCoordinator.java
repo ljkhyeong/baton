@@ -58,12 +58,12 @@ final class WorkspaceRoleHandoffCoordinator {
     }
 
     RoleHandoffTransitionResult prepare(
-            UUID teamId,
             Season season,
             UUID roleId,
             String idempotencyKey,
             PrepareRoleHandoffCommand command
     ) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         Role role = roleResolver.requireRoleForUpdate(teamId, seasonId, roleId);
         UUID handoffId = UUID.randomUUID();
@@ -201,12 +201,12 @@ final class WorkspaceRoleHandoffCoordinator {
     }
 
     RoleHandoffTransitionResult accept(
-            UUID teamId,
             Season season,
             UUID roleId,
             UUID handoffId,
             ConfirmRoleHandoffCommand command
     ) {
+        UUID teamId = season.getTeamId();
         UUID seasonId = season.getId();
         Role role = roleResolver.requireRoleForUpdate(teamId, seasonId, roleId);
         RoleHandoff handoff = requireRoleHandoffForUpdate(

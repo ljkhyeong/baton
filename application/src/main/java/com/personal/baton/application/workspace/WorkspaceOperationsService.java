@@ -41,7 +41,7 @@ public class WorkspaceOperationsService implements WorkspaceOperationsUseCase {
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
         WorkspaceIdempotencyKeyPolicy.requireValid(idempotencyKey);
-        return routineCoordinator.create(teamId, scope.season(), idempotencyKey, command);
+        return routineCoordinator.create(scope.season(), idempotencyKey, command);
     }
 
     @Override
@@ -54,7 +54,7 @@ public class WorkspaceOperationsService implements WorkspaceOperationsUseCase {
             UpdateRoutineCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeMutation(teamId, seasonId, accessKey);
-        return routineCoordinator.update(teamId, scope.season(), routineId, command);
+        return routineCoordinator.update(scope.season(), routineId, command);
     }
 
     @Override
@@ -81,7 +81,7 @@ public class WorkspaceOperationsService implements WorkspaceOperationsUseCase {
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
         WorkspaceIdempotencyKeyPolicy.requireValid(idempotencyKey);
-        return roundCoordinator.create(teamId, scope.season(), idempotencyKey, command);
+        return roundCoordinator.create(scope.season(), idempotencyKey, command);
     }
 
     @Override

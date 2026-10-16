@@ -1,6 +1,5 @@
 package com.personal.baton.application.calendar;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands;
 
 import com.personal.baton.BatonApplication;

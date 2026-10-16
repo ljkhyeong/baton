@@ -1,7 +1,5 @@
 package com.personal.baton.application.calendar;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.BatonApplication;
 import com.personal.baton.adapter.out.external.calendar.RestClientCalendarClient;
 import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMetadataUseCase;
@@ -9,7 +7,7 @@ import com.personal.baton.application.calendar.port.in.MaintainCalendarSeasonMet
 import com.personal.baton.application.calendar.port.out.CalendarOutboxPort;
 import com.personal.baton.application.calendar.port.out.CalendarSeasonMetadataClient;
 import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateNextSeasonCommand;

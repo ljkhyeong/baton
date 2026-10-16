@@ -49,24 +49,22 @@ public class HandoffItem extends ArchivableRecord {
             UUID roleId,
             String label,
             HandoffCategory category,
-            boolean completed,
             Instant createdAt
     ) {
         this.id = Objects.requireNonNull(id, "인수인계 항목 식별자는 필수입니다");
         update(roleId, label, category);
-        this.completed = completed;
         this.createdAt = Objects.requireNonNull(createdAt, "인수인계 항목 생성 시각은 필수입니다");
     }
 
+    // 새 항목은 미완료로 만든다.
     public static HandoffItem create(
             UUID id,
             UUID roleId,
             String label,
             HandoffCategory category,
-            boolean completed,
             Instant createdAt
     ) {
-        return new HandoffItem(id, roleId, label, category, completed, createdAt);
+        return new HandoffItem(id, roleId, label, category, createdAt);
     }
 
     public void update(UUID roleId, String label, HandoffCategory category) {

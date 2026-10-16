@@ -16,7 +16,7 @@ public interface EmailVerificationOutboxPort {
             Instant enqueuedAt
     );
 
-    int supersedePending(UUID identityId, Instant supersededAt);
+    void supersedePending(UUID identityId, Instant supersededAt);
 
     int expireUndeliverable(Instant expiredAt);
 

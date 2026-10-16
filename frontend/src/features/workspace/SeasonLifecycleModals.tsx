@@ -3,7 +3,8 @@ import type { FormEvent } from 'react'
 import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { formatInstantDate } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
-import { FormError, ModalShell } from './WorkspaceModalPrimitives'
+import { daysUntil } from './seasonCalendar'
+import { FormActions, FormError, ModalShell } from './WorkspaceModalPrimitives'
 import { formatLocalDate } from './workspacePresentation'
 import type {
   CreateNextSeasonRequest,
@@ -187,7 +188,6 @@ export function SeasonEditModal({
               required
               value={name}
               maxLength={100}
-              autoFocus
               onChange={(event) => {
                 setName(event.target.value)
                 setValidationError('')
@@ -216,25 +216,15 @@ export function SeasonEditModal({
         </div>
         {validationError && <p className="form-error" role="alert">{validationError}</p>}
         <FormError error={error} />
-        <div className="form-actions">
-          <button type="button" className="secondary-button" disabled={pending} onClick={onClose}>
-            취소
-          </button>
-          <button type="submit" className="primary-button" disabled={pending}>
-            {pending ? '저장하는 중…' : '시즌 정보 저장'}
-          </button>
-        </div>
+        <FormActions pending={pending} submitLabel="시즌 정보 저장" pendingLabel="저장하는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
 }
 
 function defaultNextSeasonDates(source: SeasonSummary) {
-  const sourceStart = new Date(`${source.startDate}T00:00:00Z`)
-  const sourceEnd = new Date(`${source.endDate}T00:00:00Z`)
-  const durationDays = Math.round((sourceEnd.getTime() - sourceStart.getTime()) / 86_400_000)
   const startDate = addCalendarDays(source.endDate, 1)
-  return { startDate, endDate: addCalendarDays(startDate, durationDays) }
+  return { startDate, endDate: addCalendarDays(startDate, daysUntil(source.endDate, source.startDate)) }
 }
 
 export function NextSeasonModal({
@@ -355,7 +345,6 @@ export function NextSeasonModal({
             <input
               value={name}
               maxLength={100}
-              autoFocus
               onChange={(event) => setName(event.target.value)}
             />
           </label>
@@ -414,52 +403,14 @@ export function NextSeasonModal({
         {validationError && <p className="form-error" role="alert">{validationError}</p>}
         <FormError error={error} />
         {storageError && <p className="form-error" role="alert">{storageError}</p>}
-        <div className="form-actions">
-          <button type="button" className="secondary-button" disabled={pending} onClick={onClose}>
-            취소
-          </button>
-          <button type="submit" className="primary-button" disabled={pending}>
-            {pending
-              ? cleanupRequired ? '임시 기록 삭제 중…' : '다음 시즌 만드는 중…'
-              : cleanupRequired ? '임시 기록 삭제' : '현재 시즌 종료하고 만들기'}
-          </button>
-        </div>
+        <FormActions
+          pending={pending}
+          submitLabel={cleanupRequired ? '임시 기록 삭제' : '현재 시즌 종료하고 만들기'}
+          pendingLabel={cleanupRequired ? '임시 기록 삭제 중…' : '다음 시즌 만드는 중…'}
+          onClose={onClose}
+        />
       </form>
     </ModalShell>
-  )
-}
-
-export function SeasonSuccessorCleanupBanner({
-  pending,
-  onRetry,
-}: {
-  pending: boolean
-  onRetry: () => void
-}) {
-  return (
-    <section
-      className="season-ended-banner"
-      role="alert"
-      aria-label="시즌 생성 임시 기록 삭제 필요"
-    >
-      <div>
-        <Icon name="alert" size={18} />
-        <span>
-          <strong>다음 시즌은 이미 만들어졌습니다.</strong>
-          <small>브라우저에 남은 임시 기록을 지워야 새 시즌을 만들 수 있습니다.</small>
-        </span>
-      </div>
-      <div>
-        <button
-          type="button"
-          className="secondary-button"
-          disabled={pending}
-          onClick={onRetry}
-        >
-          {pending ? '임시 기록 삭제 중…' : '임시 기록 삭제'}
-        </button>
-      </div>
-    </section>
   )
 }
 

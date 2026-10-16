@@ -14,10 +14,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# 실행기 OS를 고정한다. Ubuntu 전환은 Docker Compose·buildx와 Playwright 브라우저 의존성을 확인한 뒤 바꾼다.
 jobs:
   backend_contract:
     name: 백엔드 및 API 계약
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -58,7 +59,7 @@ jobs:
     name: Java 의존성 목록을 GitHub에 연결
     needs: backend_contract
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.BATON_DEPENDENCY_GRAPH_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
@@ -76,7 +77,7 @@ jobs:
 
   frontend:
     name: 프런트엔드 프로덕션 빌드 및 E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
       CI: 'true'
@@ -118,7 +119,7 @@ jobs:
 
   fullstack_e2e:
     name: 전체 스택 파일럿 스모크
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       CI: 'true'
@@ -159,19 +160,15 @@ jobs:
 
   production_package:
     name: 프로덕션 패키지 및 런타임 스모크
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
       BATON_HOST: ci.baton.invalid
-      BATON_DB_NAME: baton
       BATON_DB_USERNAME: baton_ci
       BATON_DB_PASSWORD: ci-database-password-not-a-secret
       BATON_DB_ROOT_PASSWORD: ci-root-password-not-a-secret
       BATON_WORKSPACE_CREATION_KEY: ci-creation-key-0000000000000000000000000001
       BATON_WORKSPACE_RECOVERY_KEY: ci-recovery-key-0000000000000000000000000002
-      BATON_EFFECTIVE_ROUND_UID: 10001
-      BATON_EFFECTIVE_ROUND_GID: 10001
-      BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE: /dev/null
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: 운영 스크립트 검증 및 린트
@@ -221,7 +218,7 @@ jobs:
       - frontend
       - fullstack_e2e
       - production_package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: 모든 품질 검사 통과 확인

@@ -63,9 +63,14 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         requireConfigured(url, "DB_URL");
         requireConfigured(username, "DB_USERNAME");
         requireConfigured(password, "DB_PASSWORD");
-        rejectAlternateDatasourceConfiguration(environment);
-        rejectAlternateFlywayConfiguration(environment);
-        requireSafeConnectionInitSql(environment);
+        Binder binder = Binder.get(environment);
+        rejectAlternateProperties(
+                binder,
+                ALTERNATE_DATASOURCE_PROPERTIES,
+                "spring.datasource.hikari.data-source-properties"
+        );
+        rejectAlternateProperties(binder, ALTERNATE_FLYWAY_PROPERTIES, "spring.flyway.jdbc-properties");
+        requireSafeConnectionInitSql(binder);
         requireSecureMysqlUrl(url);
         requireSafeUsername(username);
         requireSafePassword(password);
@@ -139,48 +144,28 @@ public class ProductionDatasourceEnvironmentPostProcessor implements Environment
         }
     }
 
-    private void rejectAlternateDatasourceConfiguration(ConfigurableEnvironment environment) {
-        Binder binder = Binder.get(environment);
-        for (String propertyName : ALTERNATE_DATASOURCE_PROPERTIES) {
+    // 주 DataSource를 우회하는 단일 속성과 드라이버 속성 묶음을 차례로 거절한다.
+    private void rejectAlternateProperties(
+            Binder binder,
+            List<String> propertyNames,
+            String mapPropertyName
+    ) {
+        for (String propertyName : propertyNames) {
             if (binder.bind(propertyName, String.class).isBound()) {
                 throw alternateDatasourceProperty(propertyName);
             }
         }
 
-        Map<String, String> driverProperties = binder
-                .bind(
-                        "spring.datasource.hikari.data-source-properties",
-                        Bindable.mapOf(String.class, String.class)
-                )
+        Map<String, String> mapProperties = binder
+                .bind(mapPropertyName, Bindable.mapOf(String.class, String.class))
                 .orElse(Map.of());
-        if (!driverProperties.isEmpty()) {
-            throw alternateDatasourceProperty(
-                    "spring.datasource.hikari.data-source-properties"
-            );
+        if (!mapProperties.isEmpty()) {
+            throw alternateDatasourceProperty(mapPropertyName);
         }
     }
 
-    private void rejectAlternateFlywayConfiguration(ConfigurableEnvironment environment) {
-        Binder binder = Binder.get(environment);
-        for (String propertyName : ALTERNATE_FLYWAY_PROPERTIES) {
-            if (binder.bind(propertyName, String.class).isBound()) {
-                throw alternateDatasourceProperty(propertyName);
-            }
-        }
-
-        Map<String, String> jdbcProperties = binder
-                .bind(
-                        "spring.flyway.jdbc-properties",
-                        Bindable.mapOf(String.class, String.class)
-                )
-                .orElse(Map.of());
-        if (!jdbcProperties.isEmpty()) {
-            throw alternateDatasourceProperty("spring.flyway.jdbc-properties");
-        }
-    }
-
-    private void requireSafeConnectionInitSql(ConfigurableEnvironment environment) {
-        String connectionInitSql = Binder.get(environment)
+    private void requireSafeConnectionInitSql(Binder binder) {
+        String connectionInitSql = binder
                 .bind("spring.datasource.hikari.connection-init-sql", String.class)
                 .orElse("");
         if (!REQUIRED_CONNECTION_INIT_SQL.equals(connectionInitSql)) {

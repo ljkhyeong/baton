@@ -19,6 +19,7 @@ import com.personal.baton.application.holiday.port.in.GetPublicHolidaysUseCase;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -35,14 +36,16 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 @Tag("restdocs")
 @ExtendWith(RestDocumentationExtension.class)
 class PublicHolidayRestDocsTest {
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private final GetPublicHolidaysUseCase useCase = mock(GetPublicHolidaysUseCase.class);
     private MockMvc mvc;
 
     @BeforeEach
     void setup(RestDocumentationContextProvider documentation) {
         mvc = MockMvcBuilders.standaloneSetup(new PublicHolidayController(useCase))
-                .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter())
-                .apply(documentationConfiguration(documentation)).build();
+                .setControllerAdvice(new GlobalExceptionHandler()).addFilters(new RequestIdFilter(() -> REQUEST_ID))
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test

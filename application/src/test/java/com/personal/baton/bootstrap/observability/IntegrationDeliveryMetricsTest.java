@@ -124,20 +124,13 @@ class IntegrationDeliveryMetricsTest {
     @DisplayName("시즌 이름의 영구 실패는 일정 지표와 구분해 운영 점검에 노출한다")
     @Test
     void exposesSeasonMetadataFailure() {
-        jdbcTemplate.update(
-                """
-                INSERT INTO calendar_season_metadata_outbox
-                    (season_id, display_name, occurred_at, available_at, delivery_status, completed_at, last_error_code)
-                VALUES (UUID_TO_BIN(?), '여름 시즌', ?, ?, 'FAILED', ?, 'SEASON_METADATA_REVISION_CONFLICT')
-                """, UUID.randomUUID().toString(), LocalDateTime.ofInstant(NOW, ZoneOffset.UTC),
-                LocalDateTime.ofInstant(NOW, ZoneOffset.UTC), LocalDateTime.ofInstant(NOW, ZoneOffset.UTC)
-        );
+        insertMetadata(UUID.randomUUID(), "FAILED");
 
         metrics.refresh();
 
-        assertThat(deliveryItems(registry, "calendar_metadata", "failed")).isEqualTo(1);
-        assertThat(actionableFailedItems(registry, "calendar_metadata")).isEqualTo(1);
-        assertThat(actionableFailedItems(registry, "calendar")).isZero();
+        assertThat(deliveryItems("calendar_metadata", "failed")).isEqualTo(1);
+        assertThat(actionableFailedItems("calendar_metadata")).isEqualTo(1);
+        assertThat(actionableFailedItems("calendar")).isZero();
     }
 
     @DisplayName("시즌 이름의 과거 실패는 같은 시즌의 더 높은 개정이 전달된 뒤에만 조치 대상에서 제외한다")
@@ -149,25 +142,25 @@ class IntegrationDeliveryMetricsTest {
         insertMetadata(UUID.randomUUID(), "DELIVERED");
         insertMetadata(seasonId, "PENDING");
         metrics.refresh();
-        assertThat(actionableFailedItems(registry, "calendar_metadata")).isEqualTo(1);
+        assertThat(actionableFailedItems("calendar_metadata")).isEqualTo(1);
 
         jdbcTemplate.update("""
                 UPDATE calendar_season_metadata_outbox
                 SET delivery_status = 'DELIVERED', completed_at = ?, result_code = 'SEASON_METADATA_ACCEPTED'
                 WHERE season_id = UUID_TO_BIN(?) AND delivery_status = 'PENDING'
-                """, LocalDateTime.ofInstant(NOW, ZoneOffset.UTC), seasonId.toString());
+                """, utc(NOW), seasonId.toString());
         metrics.refresh();
-        assertThat(deliveryItems(registry, "calendar_metadata", "failed")).isEqualTo(1);
-        assertThat(actionableFailedItems(registry, "calendar_metadata")).isZero();
+        assertThat(deliveryItems("calendar_metadata", "failed")).isEqualTo(1);
+        assertThat(actionableFailedItems("calendar_metadata")).isZero();
 
         insertMetadata(seasonId, "FAILED");
         metrics.refresh();
-        assertThat(deliveryItems(registry, "calendar_metadata", "failed")).isEqualTo(2);
-        assertThat(actionableFailedItems(registry, "calendar_metadata")).isEqualTo(1);
+        assertThat(deliveryItems("calendar_metadata", "failed")).isEqualTo(2);
+        assertThat(actionableFailedItems("calendar_metadata")).isEqualTo(1);
     }
 
     private void insertMetadata(UUID seasonId, String status) {
-        LocalDateTime now = LocalDateTime.ofInstant(NOW, ZoneOffset.UTC);
+        LocalDateTime now = utc(NOW);
         jdbcTemplate.update("""
                 INSERT INTO calendar_season_metadata_outbox
                     (season_id, display_name, occurred_at, available_at, delivery_status,
@@ -204,58 +197,42 @@ class IntegrationDeliveryMetricsTest {
 
         metrics.refresh();
 
-        assertThat(deliveryItems(registry, "calendar", "pending")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "calendar", "processing")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "calendar", "failed")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "watch", "pending")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "watch", "processing")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "watch", "failed")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "brief", "pending")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "brief", "processing")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "brief", "failed")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "email", "pending")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "email", "processing")).isEqualTo(1);
-        assertThat(deliveryItems(registry, "email", "failed")).isEqualTo(2);
-        assertThat(actionableFailedItems(registry, "calendar")).isEqualTo(1);
-        assertThat(actionableFailedItems(registry, "watch")).isEqualTo(1);
-        assertThat(actionableFailedItems(registry, "brief")).isEqualTo(1);
-        assertThat(actionableFailedItems(registry, "email")).isEqualTo(1);
-        assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "calendar"))
+        assertThat(deliveryItems("calendar", "pending")).isEqualTo(1);
+        assertThat(deliveryItems("calendar", "processing")).isEqualTo(1);
+        assertThat(deliveryItems("calendar", "failed")).isEqualTo(1);
+        assertThat(deliveryItems("watch", "pending")).isEqualTo(1);
+        assertThat(deliveryItems("watch", "processing")).isEqualTo(1);
+        assertThat(deliveryItems("watch", "failed")).isEqualTo(1);
+        assertThat(deliveryItems("brief", "pending")).isEqualTo(1);
+        assertThat(deliveryItems("brief", "processing")).isEqualTo(1);
+        assertThat(deliveryItems("brief", "failed")).isEqualTo(1);
+        assertThat(deliveryItems("email", "pending")).isEqualTo(1);
+        assertThat(deliveryItems("email", "processing")).isEqualTo(1);
+        assertThat(deliveryItems("email", "failed")).isEqualTo(2);
+        assertThat(actionableFailedItems("calendar")).isEqualTo(1);
+        assertThat(actionableFailedItems("watch")).isEqualTo(1);
+        assertThat(actionableFailedItems("brief")).isEqualTo(1);
+        assertThat(actionableFailedItems("email")).isEqualTo(1);
+        assertThat(gauge("baton.integration.delivery.oldest.pending.age", "calendar"))
                 .isEqualTo(120);
-        assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "watch"))
+        assertThat(gauge("baton.integration.delivery.oldest.pending.age", "watch"))
                 .isEqualTo(240);
-        assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "brief"))
+        assertThat(gauge("baton.integration.delivery.oldest.pending.age", "brief"))
                 .isEqualTo(360);
-        assertThat(gauge(registry, "baton.integration.delivery.oldest.pending.age", "email"))
+        assertThat(gauge("baton.integration.delivery.oldest.pending.age", "email"))
                 .isEqualTo(480);
-        assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "calendar"))
+        assertThat(gauge("baton.integration.delivery.last.success.time", "calendar"))
                 .isEqualTo(NOW.minusSeconds(30).getEpochSecond());
-        assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "watch"))
+        assertThat(gauge("baton.integration.delivery.last.success.time", "watch"))
                 .isEqualTo(NOW.minusSeconds(45).getEpochSecond());
-        assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "brief"))
+        assertThat(gauge("baton.integration.delivery.last.success.time", "brief"))
                 .isEqualTo(NOW.minusSeconds(75).getEpochSecond());
-        assertThat(gauge(registry, "baton.integration.delivery.last.success.time", "email"))
+        assertThat(gauge("baton.integration.delivery.last.success.time", "email"))
                 .isEqualTo(NOW.minusSeconds(105).getEpochSecond());
-        assertThat(gauge(
-                registry,
-                "baton.integration.delivery.expired.processing.items",
-                "calendar"
-        )).isZero();
-        assertThat(gauge(
-                registry,
-                "baton.integration.delivery.expired.processing.items",
-                "watch"
-        )).isEqualTo(1);
-        assertThat(gauge(
-                registry,
-                "baton.integration.delivery.expired.processing.items",
-                "brief"
-        )).isEqualTo(1);
-        assertThat(gauge(
-                registry,
-                "baton.integration.delivery.expired.processing.items",
-                "email"
-        )).isEqualTo(1);
+        assertThat(gauge("baton.integration.delivery.expired.processing.items", "calendar")).isZero();
+        assertThat(gauge("baton.integration.delivery.expired.processing.items", "watch")).isEqualTo(1);
+        assertThat(gauge("baton.integration.delivery.expired.processing.items", "brief")).isEqualTo(1);
+        assertThat(gauge("baton.integration.delivery.expired.processing.items", "email")).isEqualTo(1);
         assertThat(registry.get("baton.integration.watch.inbox.items").gauge().value())
                 .isEqualTo(1);
         assertThat(registry.get("baton.integration.watch.inbox.last.accepted.time").gauge().value())
@@ -266,26 +243,18 @@ class IntegrationDeliveryMetricsTest {
                 .gauge().value()).isEqualTo(NOW.getEpochSecond());
     }
 
-    private double deliveryItems(
-            MeterRegistry registry,
-            String integration,
-            String status
-    ) {
+    private double deliveryItems(String integration, String status) {
         return registry.get("baton.integration.delivery.items")
                 .tags("integration", integration, "status", status)
                 .gauge()
                 .value();
     }
 
-    private double actionableFailedItems(MeterRegistry registry, String integration) {
-        return gauge(
-                registry,
-                "baton.integration.delivery.actionable.failed.items",
-                integration
-        );
+    private double actionableFailedItems(String integration) {
+        return gauge("baton.integration.delivery.actionable.failed.items", integration);
     }
 
-    private double gauge(MeterRegistry registry, String name, String integration) {
+    private double gauge(String name, String integration) {
         return registry.get(name)
                 .tag("integration", integration)
                 .gauge()
@@ -322,52 +291,7 @@ class IntegrationDeliveryMetricsTest {
                 utc(occurredAt),
                 utc(occurredAt)
         );
-        updateCalendarStatus(eventId, deliveryStatus, occurredAt);
-    }
-
-    private void updateCalendarStatus(UUID eventId, String deliveryStatus, Instant occurredAt) {
-        switch (deliveryStatus) {
-            case "PENDING" -> {
-            }
-            case "PROCESSING" -> jdbcTemplate.update(
-                    """
-                    UPDATE calendar_snapshot_outbox
-                    SET delivery_status = 'PROCESSING',
-                        attempt_count = 1,
-                        lease_token = UUID_TO_BIN(?),
-                        lease_expires_at = ?
-                    WHERE event_id = UUID_TO_BIN(?)
-                    """,
-                    UUID.randomUUID().toString(),
-                    utc(NOW.plusSeconds(30)),
-                    eventId.toString()
-            );
-            case "FAILED" -> jdbcTemplate.update(
-                    """
-                    UPDATE calendar_snapshot_outbox
-                    SET delivery_status = 'FAILED',
-                        attempt_count = 1,
-                        completed_at = ?,
-                        last_error_code = 'HTTP_422'
-                    WHERE event_id = UUID_TO_BIN(?)
-                    """,
-                    utc(occurredAt.plusSeconds(10)),
-                    eventId.toString()
-            );
-            case "DELIVERED" -> jdbcTemplate.update(
-                    """
-                    UPDATE calendar_snapshot_outbox
-                    SET delivery_status = 'DELIVERED',
-                        attempt_count = 1,
-                        completed_at = ?,
-                        result_code = 'APPLIED'
-                    WHERE event_id = UUID_TO_BIN(?)
-                    """,
-                    utc(occurredAt),
-                    eventId.toString()
-            );
-            default -> throw new IllegalArgumentException("지원하지 않는 CAL 전달 상태입니다");
-        }
+        updateDeliveryStatus("calendar_snapshot_outbox", eventId, deliveryStatus, occurredAt, NOW.plusSeconds(30));
     }
 
     private void insertWatch(String deliveryStatus, Instant occurredAt) {
@@ -393,48 +317,7 @@ class IntegrationDeliveryMetricsTest {
                 utc(occurredAt),
                 utc(occurredAt)
         );
-        switch (deliveryStatus) {
-            case "PENDING" -> {
-            }
-            case "PROCESSING" -> jdbcTemplate.update(
-                    """
-                    UPDATE watch_monitor_outbox
-                    SET delivery_status = 'PROCESSING',
-                        attempt_count = 1,
-                        lease_token = UUID_TO_BIN(?),
-                        lease_expires_at = ?
-                    WHERE event_id = UUID_TO_BIN(?)
-                    """,
-                    UUID.randomUUID().toString(),
-                    utc(NOW.minusSeconds(1)),
-                    eventId.toString()
-            );
-            case "FAILED" -> jdbcTemplate.update(
-                    """
-                    UPDATE watch_monitor_outbox
-                    SET delivery_status = 'FAILED',
-                        attempt_count = 1,
-                        completed_at = ?,
-                        last_error_code = 'HTTP_422'
-                    WHERE event_id = UUID_TO_BIN(?)
-                    """,
-                    utc(occurredAt.plusSeconds(10)),
-                    eventId.toString()
-            );
-            case "DELIVERED" -> jdbcTemplate.update(
-                    """
-                    UPDATE watch_monitor_outbox
-                    SET delivery_status = 'DELIVERED',
-                        attempt_count = 1,
-                        completed_at = ?,
-                        result_code = 'APPLIED'
-                    WHERE event_id = UUID_TO_BIN(?)
-                    """,
-                    utc(occurredAt),
-                    eventId.toString()
-            );
-            default -> throw new IllegalArgumentException("지원하지 않는 WATCH 전달 상태입니다");
-        }
+        updateDeliveryStatus("watch_monitor_outbox", eventId, deliveryStatus, occurredAt, NOW.minusSeconds(1));
     }
 
     private void insertBrief(String deliveryStatus, Instant occurredAt) {
@@ -467,51 +350,58 @@ class IntegrationDeliveryMetricsTest {
                 utc(occurredAt),
                 utc(occurredAt)
         );
-        updateBriefStatus(eventId, deliveryStatus, occurredAt);
+        updateDeliveryStatus("brief_continuity_outbox", eventId, deliveryStatus, occurredAt, NOW.minusSeconds(1));
     }
 
-    private void updateBriefStatus(UUID eventId, String deliveryStatus, Instant occurredAt) {
+    // CAL·WATCH·BRIEF 아웃박스의 전달 상태를 바꾼다. 처리 중 항목은 leaseExpiresAt에 임대가 끝난다.
+    private void updateDeliveryStatus(
+            String table,
+            UUID eventId,
+            String deliveryStatus,
+            Instant occurredAt,
+            Instant leaseExpiresAt
+    ) {
         switch (deliveryStatus) {
             case "PENDING" -> {
             }
             case "PROCESSING" -> jdbcTemplate.update(
                     """
-                    UPDATE brief_continuity_outbox
+                    UPDATE %s
                     SET delivery_status = 'PROCESSING',
                         attempt_count = 1,
                         lease_token = UUID_TO_BIN(?),
                         lease_expires_at = ?
                     WHERE event_id = UUID_TO_BIN(?)
-                    """,
+                    """.formatted(table),
                     UUID.randomUUID().toString(),
-                    utc(NOW.minusSeconds(1)),
+                    utc(leaseExpiresAt),
                     eventId.toString()
             );
             case "FAILED" -> jdbcTemplate.update(
                     """
-                    UPDATE brief_continuity_outbox
+                    UPDATE %s
                     SET delivery_status = 'FAILED',
                         attempt_count = 1,
                         completed_at = ?,
                         last_error_code = 'HTTP_422'
                     WHERE event_id = UUID_TO_BIN(?)
-                    """,
+                    """.formatted(table),
                     utc(occurredAt.plusSeconds(10)),
                     eventId.toString()
             );
             case "DELIVERED" -> jdbcTemplate.update(
                     """
-                    UPDATE brief_continuity_outbox
+                    UPDATE %s
                     SET delivery_status = 'DELIVERED',
                         attempt_count = 1,
                         completed_at = ?,
                         result_code = 'APPLIED'
                     WHERE event_id = UUID_TO_BIN(?)
-                    """,
+                    """.formatted(table),
                     utc(occurredAt),
                     eventId.toString()
             );
-            default -> throw new IllegalArgumentException("지원하지 않는 BRIEF 전달 상태입니다");
+            default -> throw new IllegalArgumentException("지원하지 않는 전달 상태입니다: " + deliveryStatus);
         }
     }
 

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ApiError } from '@/shared/api/ApiError'
+import { isWorkspaceContentConflict } from './api'
 
 type ConflictDraft = { title: string; text: string }
 type DraftField = readonly [label: string, value: string | number | null | undefined]
@@ -14,7 +14,7 @@ export function useWorkspaceConflictDraft(scopeKey: string) {
   }
 
   const preserve: PreserveConflictDraft = (submission, title, fields) => submission.catch((error: unknown) => {
-    if (error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT') {
+    if (isWorkspaceContentConflict(error)) {
       const text = fields.map(([label, value]) => `${label}\n${value === '' || value == null ? '미입력' : value}`).join('\n\n')
       setState((current) => current.scopeKey === scopeKey && current.generation === state.generation
         ? { ...current, draft: { title, text } }

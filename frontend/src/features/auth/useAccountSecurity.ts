@@ -1,4 +1,4 @@
-import { queryOptions, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { getAccountSecurity } from '@/features/auth/api'
 
 const accountSecurityKeys = {
@@ -7,11 +7,10 @@ const accountSecurityKeys = {
 }
 
 export function useAccountSecurity(accountId: string) {
-  return useQuery(queryOptions({
+  return useQuery({
     queryKey: accountSecurityKeys.current(accountId),
     queryFn: getAccountSecurity,
-    enabled: Boolean(accountId),
     retry: false,
     staleTime: 0,
-  }))
+  })
 }

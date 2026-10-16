@@ -32,11 +32,11 @@ public interface RoleHandoffJpaRepository extends JpaRepository<RoleHandoff, UUI
             List<RoleHandoffStatus> statuses
     );
 
+    // 인수인계의 팀·시즌은 외래 키로 역할·시즌과 같게 유지되므로 인수인계 열로 범위를 거른다.
     @Query("""
             select count(handoff) > 0
             from RoleHandoff handoff
-            join Role role on role.id = handoff.roleId
-            where role.teamId = :teamId and role.seasonId = :seasonId
+            where handoff.teamId = :teamId and handoff.seasonId = :seasonId
               and handoff.status in :statuses
               and (handoff.incomingAssignmentStartDate not between :startDate and :endDate
                    or handoff.incomingAssignmentEndDate not between :startDate and :endDate)
@@ -50,8 +50,8 @@ public interface RoleHandoffJpaRepository extends JpaRepository<RoleHandoff, UUI
                    handoff.transferredAt as transferredAt
             from RoleHandoff handoff
             join Role role on role.id = handoff.roleId
-            where role.teamId = :teamId and role.seasonId = :seasonId
-              and handoff.seasonId = :seasonId and handoff.toMemberId = :memberId
+            where handoff.teamId = :teamId and handoff.seasonId = :seasonId
+              and handoff.toMemberId = :memberId
               and handoff.status = com.personal.baton.domain.workspace.RoleHandoffStatus.TRANSFERRED
             """)
     List<TransferredHandoff> findTransferredHandoffs(UUID teamId, UUID seasonId, UUID memberId);

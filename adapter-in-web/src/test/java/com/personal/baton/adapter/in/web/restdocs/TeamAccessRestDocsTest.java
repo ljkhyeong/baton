@@ -4,7 +4,8 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.TeamAccessController;
 import com.personal.baton.adapter.in.web.workspace.TeamAccessRequests.ActivateTeamAccessRequest;
 import com.personal.baton.adapter.in.web.workspace.TeamAccessRequests.CreateTeamInvitationRequest;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.ArrayList;
 import org.springframework.restdocs.headers.HeaderDescriptor;
 import org.springframework.restdocs.headers.RequestHeadersSnippet;
+import org.springframework.restdocs.headers.ResponseHeadersSnippet;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -62,22 +64,23 @@ class TeamAccessRestDocsTest {
     private static final UUID SEASON = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private static final UUID RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000003");
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
+    private static final String CHANGE_PERMISSION_DESCRIPTION = "구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.";
+    private static final String CHANGE_PERMISSION_SUMMARY = "팀 구성원 권한 변경";
     private MockMvc mvc;
     private TeamAccessUseCase useCase;
 
     @BeforeEach
     void setUp(RestDocumentationContextProvider documentation) {
         useCase = mock(TeamAccessUseCase.class);
-        when(useCase.getAccess(any(), any(), any())).thenReturn(settings());
-        when(useCase.activate(any(), any(), any(), any())).thenReturn(settings());
-        when(useCase.revokeInvitation(any(), any(), any())).thenReturn(settings());
-        when(useCase.changePermission(any(), any(), any(), any())).thenReturn(settings());
         mvc = MockMvcBuilders.standaloneSetup(new TeamAccessController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test @DisplayName("내 팀 목록은 로그인 계정과 현재 권한·열 시즌을 반환한다")
@@ -91,7 +94,7 @@ class TeamAccessRestDocsTest {
                 .andExpect(jsonPath("$.teams[0].seasonEnded").value(false))
                 .andDo(MockMvcRestDocumentationWrapper.document("getMyTeams",
                         "현재 계정이 승인된 활성 구성원인 계정 권한 팀과 이동할 시즌을 조회한다.", "내 팀 목록 조회",
-                        responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")),
+                        privateCacheHeader(),
                         responseFields(fieldWithPath("accountId").description("현재 로그인 계정"),
                                 fieldWithPath("teams").type(JsonFieldType.ARRAY).attributes(key("itemsType").value(JsonFieldType.OBJECT)).description("참여 팀 목록"),
                                 fieldWithPath("teams[].teamId").description("팀 식별자"), fieldWithPath("teams[].teamName").description("팀 이름"),
@@ -104,14 +107,16 @@ class TeamAccessRestDocsTest {
 
     @Test @DisplayName("팀 접근 설정은 내 권한과 관리 가능한 구성원·초대·변경 이력을 반환한다")
     void documentsAccess() throws Exception {
+        when(useCase.getAccess(any(), any(), any())).thenReturn(settings());
         mvc.perform(get(TeamAccessController.PATH, TEAM).header("X-Baton-Access-Key", "key").with(authentication(auth())))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("getTeamAccess", "팀의 접근 방식과 현재 계정의 권한을 조회한다.", "팀 접근 설정 조회",
                         teamPath(), requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 키 팀에서 필요한 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")), settingsFields()));
+                        privateCacheHeader(), settingsFields()));
     }
     @Test @DisplayName("계정 권한 전환과 관리자 복구는 운영 복구 키와 연결된 본인 구성원을 요구한다")
     void documentsActivation() throws Exception {
+        when(useCase.activate(any(), any(), any(), any())).thenReturn(settings());
         mvc.perform(post(TeamAccessController.PATH + "/activate", TEAM).with(authentication(auth())).header("Origin", "https://baton.example").header("X-CSRF-TOKEN", "csrf-token")
                         .header("X-Baton-Recovery-Key", "operator-recovery-key").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"expectedAccountId\":\"" + ACCOUNT + "\",\"memberId\":\"" + RESOURCE + "\"}"))
@@ -120,7 +125,7 @@ class TeamAccessRestDocsTest {
                         teamPath(), accountMutationHeaders(headerWithName("X-Baton-Recovery-Key").description("운영자 복구 키")),
                         requestFields(new ConstrainedFields(ActivateTeamAccessRequest.class).withPath("expectedAccountId").description("현재 로그인 계정"),
                                 new ConstrainedFields(ActivateTeamAccessRequest.class).withPath("memberId").description("현재 계정과 연결된 구성원")),
-                        responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")), settingsFields()));
+                        privateCacheHeader(), settingsFields()));
     }
     @Test @DisplayName("관리자는 만료 기한이 있는 일회용 초대 토큰을 만든다")
     void documentsInvitation() throws Exception {
@@ -132,7 +137,7 @@ class TeamAccessRestDocsTest {
                         teamPath(), accountMutationHeaders(), requestFields(new ConstrainedFields(CreateTeamInvitationRequest.class).withPath("expectedAccountId").description("현재 로그인 계정"),
                                 new ConstrainedFields(CreateTeamInvitationRequest.class).withPath("memberId").description("초대할 기존 구성원"),
                                 new EnumFields(TeamPermission.class).withPath("permission").description("초대 권한")),
-                        responseHeaders(headerWithName("Cache-Control").description("초대 토큰 캐시 금지")),
+                        responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("초대 토큰 캐시 금지")),
                         responseFields(fieldWithPath("token").description("43자 일회용 초대 토큰"),
                                 fieldWithPath("invitation.id").description("초대 식별자"), fieldWithPath("invitation.memberId").description("초대할 구성원"),
                                 new EnumFields(TeamPermission.class).withPath("invitation.permission").description("초대 권한"),
@@ -142,24 +147,26 @@ class TeamAccessRestDocsTest {
     }
     @Test @DisplayName("관리자는 미수락 초대를 취소한다")
     void documentsRevocation() throws Exception {
+        when(useCase.revokeInvitation(any(), any(), any())).thenReturn(settings());
         mvc.perform(post(TeamAccessController.PATH + "/invitations/{invitationId}/revoke", TEAM, RESOURCE).with(authentication(auth())).header("Origin", "https://baton.example").header("X-CSRF-TOKEN", "csrf-token")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\"}"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("revokeTeamInvitation", "미수락 초대를 취소한다.", "팀 초대 취소",
                         pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("invitationId").description("초대 식별자")),
                         accountMutationHeaders(), requestFields(new ConstrainedFields(ExpectedAccountRequest.class).withPath("expectedAccountId").description("현재 로그인 계정")),
-                        responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")), settingsFields()));
+                        privateCacheHeader(), settingsFields()));
     }
     @Test @DisplayName("관리자는 구성원 권한을 바꾸거나 접근을 취소한다")
     void documentsPermission() throws Exception {
+        when(useCase.changePermission(any(), any(), any(), any())).thenReturn(settings());
         mvc.perform(put(TeamAccessController.PATH + "/members/{memberId}/permission", TEAM, RESOURCE).with(authentication(auth())).header("Origin", "https://baton.example").header("X-CSRF-TOKEN", "csrf-token")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\",\"permission\":\"VIEWER\"}"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
-                .andDo(MockMvcRestDocumentationWrapper.document("changeTeamPermission", "구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.", "팀 구성원 권한 변경",
-                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("memberId").description("구성원 식별자")),
+                .andDo(MockMvcRestDocumentationWrapper.document("changeTeamPermission", CHANGE_PERMISSION_DESCRIPTION, CHANGE_PERMISSION_SUMMARY,
+                        memberPath(),
                         accountMutationHeaders(), requestFields(new ConstrainedFields(ChangeTeamPermissionRequest.class).withPath("expectedAccountId").description("현재 로그인 계정"),
                                 new EnumFields(TeamPermission.class).withPath("permission").optional().description("새 권한, null은 접근 취소")),
-                        responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")), settingsFields()));
+                        privateCacheHeader(), settingsFields()));
     }
     @Test @DisplayName("비활성 계정에 새 팀 권한을 부여하면 안정적인 오류 코드를 반환한다")
     void documentsDeactivatedAccountPermission() throws Exception {
@@ -167,8 +174,8 @@ class TeamAccessRestDocsTest {
         mvc.perform(put(TeamAccessController.PATH + "/members/{memberId}/permission", TEAM, RESOURCE).with(authentication(auth()))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"expectedAccountId\":\"" + ACCOUNT + "\",\"permission\":\"VIEWER\"}"))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_DEACTIVATED"))
-                .andDo(MockMvcRestDocumentationWrapper.document("changeTeamPermissionDeactivatedAccount", "구성원 권한을 변경한다. null은 접근 취소이고 마지막 활성 관리자는 취소할 수 없다.", "팀 구성원 권한 변경",
-                        pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("memberId").description("구성원 식별자")),
+                .andDo(MockMvcRestDocumentationWrapper.document("changeTeamPermissionDeactivatedAccount", CHANGE_PERMISSION_DESCRIPTION, CHANGE_PERMISSION_SUMMARY,
+                        memberPath(), responseHeaders(requestIdHeader()),
                         responseFields(fieldWithPath("code").description("ACCOUNT_DEACTIVATED"), fieldWithPath("message").description("비활성 계정 안내"))));
     }
     @Test @DisplayName("초대 수락 전 팀과 구성원 및 권한을 확인한다")
@@ -178,7 +185,7 @@ class TeamAccessRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content(tokenBody()))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("previewTeamInvitation", "로그인한 계정이 초대의 팀·구성원·권한과 만료 시각을 확인한다.", "팀 초대 확인",
-                        accountMutationHeaders(), tokenFields(), responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")),
+                        accountMutationHeaders(), tokenFields(), privateCacheHeader(),
                         responseFields(fieldWithPath("teamId").description("팀 식별자"), fieldWithPath("teamName").description("팀 이름"),
                                 fieldWithPath("memberId").description("구성원 식별자"), fieldWithPath("memberName").description("구성원 이름"),
                                 new EnumFields(TeamPermission.class).withPath("permission").description("초대 권한"),
@@ -191,14 +198,13 @@ class TeamAccessRestDocsTest {
                         .contentType(MediaType.APPLICATION_JSON).content(tokenBody()))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andDo(MockMvcRestDocumentationWrapper.document("acceptTeamInvitation", "같은 초대는 같은 계정만 다시 확인할 수 있고 재수락으로 폐기된 권한을 복원하지 않는다.", "팀 초대 수락",
-                        accountMutationHeaders(), tokenFields(), responseHeaders(headerWithName("Cache-Control").description("비공개 응답 캐시 금지")),
+                        accountMutationHeaders(), tokenFields(), privateCacheHeader(),
                         responseFields(fieldWithPath("accountId").description("수락 계정"), fieldWithPath("teamId").description("팀 식별자"),
                                 fieldWithPath("seasonId").description("이동할 최신 시즌"), fieldWithPath("memberId").description("연결된 구성원"),
                                 new EnumFields(TeamPermission.class).withPath("permission").description("현재 권한"))));
     }
     private static final Instant NOW = Instant.parse("2026-09-05T03:00:00Z");
-    private UsernamePasswordAuthenticationToken auth() { return UsernamePasswordAuthenticationToken.authenticated(new Principal(ACCOUNT, 0), null, List.of()); }
-    private record Principal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
+    private UsernamePasswordAuthenticationToken auth() { return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of()); }
     private String tokenBody() { return "{\"expectedAccountId\":\"" + ACCOUNT + "\",\"token\":\"" + "a".repeat(43) + "\"}"; }
     private RequestFieldsSnippet tokenFields() {
         return requestFields(new ConstrainedFields(TeamInvitationTokenRequest.class).withPath("expectedAccountId").description("현재 로그인 계정"),
@@ -211,6 +217,13 @@ class TeamAccessRestDocsTest {
         return requestHeaders(headers);
     }
     private PathParametersSnippet teamPath() { return pathParameters(parameterWithName("teamId").description("팀 식별자")); }
+    private PathParametersSnippet memberPath() {
+        return pathParameters(parameterWithName("teamId").description("팀 식별자"), parameterWithName("memberId").description("구성원 식별자"));
+    }
+    private ResponseHeadersSnippet privateCacheHeader() {
+        return responseHeaders(requestIdHeader(), headerWithName("Cache-Control").description("비공개 응답 캐시 금지"));
+    }
+    private HeaderDescriptor requestIdHeader() { return headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"); }
     private InvitationResult invitation() { return new InvitationResult(RESOURCE, RESOURCE, TeamPermission.VIEWER, NOW, NOW.plusSeconds(604800), null, null); }
     private TeamAccessResult settings() {
         return new TeamAccessResult(TEAM, ACCOUNT, true, RESOURCE, TeamPermission.ADMIN,

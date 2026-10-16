@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuthSession } from '@/features/auth/useAuthSession'
 import { useCurrentAccountMembership } from '@/features/membership/queries'
-import { isActiveMember } from './workspacePresentation'
+import { getMember, isActiveMember } from './workspacePresentation'
 import type { Member } from './types'
 
 // 로그인한 계정이 이 팀에서 선택한 구성원 ID를 찾는다. 공유 링크로만 들어오면 알 수 없다.
@@ -20,6 +20,6 @@ export function useCurrentMemberId(teamId: string, accessKey: string) {
 }
 
 export function activeMember(members: Member[], memberId?: string) {
-  const member = members.find((candidate) => candidate.id === memberId)
+  const member = getMember(members, memberId)
   return member && isActiveMember(member) ? member : undefined
 }

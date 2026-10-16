@@ -2,13 +2,18 @@ package com.personal.baton.application.workspace;
 
 import com.personal.baton.bootstrap.config.ProductionWorkspaceSecretConfig;
 import com.personal.baton.bootstrap.config.WorkspaceSecretConfig;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 
 @Tag("usecase")
 class ProductionWorkspaceSecretConfigTest {
@@ -59,76 +64,34 @@ class ProductionWorkspaceSecretConfigTest {
                 });
     }
 
-    @DisplayName("설정한 생성 키가 32자보다 짧으면 프로필과 관계없이 바인딩을 거절한다")
-    @Test
-    void rejectsShortCreationKeyInEveryProfile() {
+    @DisplayName("설정한 워크스페이스 운영 키가 32~200자 URL 안전 ASCII가 아니면 프로필과 관계없이 바인딩을 거절한다")
+    @ParameterizedTest
+    @MethodSource("invalidWorkspaceSecrets")
+    void rejectsInvalidWorkspaceSecretInEveryProfile(String secretProperty, String boundField) {
         localContextRunner
-                .withPropertyValues(
-                        "baton.workspace.creation-key=short-creation-key"
-                )
+                .withPropertyValues(secretProperty)
                 .run(context -> {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseInstanceOf(BindValidationException.class)
-                            .hasStackTraceContaining("creationKey")
+                            .hasStackTraceContaining(boundField)
                             .hasStackTraceContaining(
                                     "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
                             );
                 });
     }
 
-    @DisplayName("설정한 복구 키가 32자보다 짧으면 프로필과 관계없이 바인딩을 거절한다")
-    @Test
-    void rejectsShortRecoveryKeyInEveryProfile() {
-        localContextRunner
-                .withPropertyValues(
-                        "baton.workspace.recovery-key=short-recovery-key"
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .hasRootCauseInstanceOf(BindValidationException.class)
-                            .hasStackTraceContaining("recoveryKey")
-                            .hasStackTraceContaining(
-                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
-                            );
-                });
-    }
-
-    @DisplayName("설정한 워크스페이스 운영 키가 200자보다 길면 바인딩을 거절한다")
-    @Test
-    void rejectsTooLongWorkspaceSecret() {
-        localContextRunner
-                .withPropertyValues(
-                        "baton.workspace.creation-key=" + "a".repeat(201)
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .hasRootCauseInstanceOf(BindValidationException.class)
-                            .hasStackTraceContaining("creationKey")
-                            .hasStackTraceContaining(
-                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
-                            );
-                });
-    }
-
-    @DisplayName("URL 안전 ASCII가 아닌 워크스페이스 운영 키는 바인딩을 거절한다")
-    @Test
-    void rejectsUnsafeWorkspaceSecret() {
-        localContextRunner
-                .withPropertyValues(
-                        "baton.workspace.creation-key=production/creation/key/000000000001"
-                )
-                .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .hasRootCauseInstanceOf(BindValidationException.class)
-                            .hasStackTraceContaining("creationKey")
-                            .hasStackTraceContaining(
-                                    "32~200자의 URL 안전 ASCII 문자이거나 비어 있어야 합니다"
-                            );
-                });
+    static Stream<Arguments> invalidWorkspaceSecrets() {
+        return Stream.of(
+                argumentSet("32자보다 짧은 생성 키",
+                        "baton.workspace.creation-key=short-creation-key", "creationKey"),
+                argumentSet("32자보다 짧은 복구 키",
+                        "baton.workspace.recovery-key=short-recovery-key", "recoveryKey"),
+                argumentSet("200자보다 긴 생성 키",
+                        "baton.workspace.creation-key=" + "a".repeat(201), "creationKey"),
+                argumentSet("URL 안전 ASCII가 아닌 생성 키",
+                        "baton.workspace.creation-key=production/creation/key/000000000001", "creationKey")
+        );
     }
 
     @DisplayName("운영 프로필은 생성 키와 복구 키가 같으면 시작을 거절한다")

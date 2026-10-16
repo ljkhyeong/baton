@@ -165,7 +165,7 @@ export function FormActions({
   onClose,
 }: {
   pending: boolean
-  closeGuardRef: RefObject<boolean>
+  closeGuardRef?: RefObject<boolean>
   submitDisabled?: boolean
   submitLabel: string
   pendingLabel: string
@@ -176,7 +176,7 @@ export function FormActions({
       <button
         type="button"
         className="secondary-button"
-        onClick={() => !closeGuardRef.current && onClose()}
+        onClick={() => !closeGuardRef?.current && onClose()}
         disabled={pending}
       >
         취소

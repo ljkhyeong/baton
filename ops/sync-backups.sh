@@ -26,26 +26,6 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-backup_epoch_from_name() {
-  local backup_name="$1"
-  local timestamp
-  local formatted
-  if [[ ! "$backup_name" =~ ^baton-([0-9]{8}T[0-9]{6}Z)-[A-Za-z0-9]+\.sql\.gz$ ]]; then
-    printf 'Backup filename does not contain a valid UTC snapshot timestamp: %s\n' "$backup_name" >&2
-    return 1
-  fi
-  timestamp="${BASH_REMATCH[1]}"
-  formatted="${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2} ${timestamp:9:2}:${timestamp:11:2}:${timestamp:13:2} UTC"
-  if date --version >/dev/null 2>&1; then
-    date -u -d "$formatted" '+%s'
-  elif date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s' >/dev/null 2>&1; then
-    date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s'
-  else
-    printf 'Unable to parse backup UTC snapshot timestamp: %s\n' "$backup_name" >&2
-    return 1
-  fi
-}
-
 encryption_is_disabled() {
   case "${1:-}" in
     ""|false|False|FALSE|0|no|No|NO|off|Off|OFF)
@@ -68,10 +48,12 @@ verify_remote_objects() {
 }
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 backup_dir="${BATON_BACKUP_DIR:-$script_dir/backups}"
 remote="${BATON_RCLONE_REMOTE:-}"
 retention_days="${BATON_BACKUP_LOCAL_RETENTION_DAYS:-14}"
-state_dir="${BATON_BACKUP_STATE_DIR:-$backup_dir/.state}"
+state_dir="${BATON_BACKUP_STATE_DIR:-}"
 
 case "$backup_dir" in
   /*) ;;
@@ -209,7 +191,10 @@ for backup_path in "${backups[@]}"; do
     uploaded=$((uploaded + 1))
   fi
 
-  backup_epoch="$(backup_epoch_from_name "$backup_name")"
+  if ! backup_epoch="$(production_validation_backup_epoch_from_name "$backup_name")"; then
+    printf 'Backup filename does not contain a valid UTC snapshot timestamp: %s\n' "$backup_name" >&2
+    exit 1
+  fi
   if [[ "$backup_epoch" -gt "$latest_backup_epoch" ]]; then
     latest_backup_epoch="$backup_epoch"
     latest_backup_name="$backup_name"

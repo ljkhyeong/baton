@@ -8,6 +8,7 @@ import com.personal.baton.application.brief.BriefAttentionTransitions;
 import com.personal.baton.application.brief.error.BriefIntegrationUnavailableException;
 import com.personal.baton.application.brief.BriefEditionHistory;
 import com.personal.baton.application.brief.BriefEditionComparison;
+import com.personal.baton.application.brief.BriefEditionFreshness;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -53,7 +54,12 @@ public final class DisabledBriefServiceClient
     }
 
     @Override
-    public BriefEditionComparison compareEditions(UUID fromEditionId, UUID toEditionId) {
+    public BriefEditionComparison compareEditions(UUID workspaceId, UUID seasonId, UUID fromEditionId, UUID toEditionId) {
+        throw new BriefIntegrationUnavailableException();
+    }
+
+    @Override
+    public BriefEditionFreshness checkEditionFreshness(UUID workspaceId, UUID seasonId, UUID editionId) {
         throw new BriefIntegrationUnavailableException();
     }
 

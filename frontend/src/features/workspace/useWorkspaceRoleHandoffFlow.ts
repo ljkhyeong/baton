@@ -4,6 +4,7 @@ import {
   useAcceptRoleHandoffMutation,
   useCancelRoleHandoffMutation,
   useTransferRoleHandoffMutation,
+  type RoleHandoffTransitionCommand,
 } from './queries'
 import { usePrepareRoleHandoffCommand } from './useContentCreationCommand'
 import type {
@@ -23,11 +24,17 @@ type RoleHandoffAction = {
   handoffId?: string
 }
 
+type RoleHandoffTransitionMutation<TRequest> = {
+  mutateAsync: (
+    command: RoleHandoffTransitionCommand<TRequest>,
+    options: { onSuccess: () => void },
+  ) => Promise<unknown>
+}
+
 type WorkspaceRoleHandoffFlowOptions = {
   scope: WorkspaceScope
   roles: Role[]
   roleHandoffs: RoleHandoff[]
-  modalOpen: boolean
   onOpenModal: () => void
   onCloseModal: () => void
   onSelectRole: (roleId: string) => void
@@ -39,7 +46,6 @@ export function useWorkspaceRoleHandoffFlow({
   scope,
   roles,
   roleHandoffs,
-  modalOpen,
   onOpenModal,
   onCloseModal,
   onSelectRole,
@@ -103,47 +109,34 @@ export function useWorkspaceRoleHandoffFlow({
     })
   }
 
-  const transfer = (request: TransferRoleHandoffRequest) => {
-    if (!actionRole || !actionTarget || action?.mode !== 'transfer') return false
-    return transferMutation.mutateAsync({
+  const runTransition = <TRequest>(
+    mode: Exclude<RoleHandoffModalMode, 'prepare'>,
+    mutation: RoleHandoffTransitionMutation<TRequest>,
+    request: TRequest,
+    successMessage: string,
+  ) => {
+    if (!actionRole || !actionTarget || action?.mode !== mode) return false
+    return mutation.mutateAsync({
       roleId: actionRole.id,
       handoffId: actionTarget.id,
       request,
     }, {
       onSuccess: () => {
         close()
-        notify('인수인계를 전달했습니다. 다음 담당자의 수락을 기다립니다.')
+        notify(successMessage)
       },
     })
   }
 
-  const accept = (request: ConfirmRoleHandoffRequest) => {
-    if (!actionRole || !actionTarget || action?.mode !== 'accept') return false
-    return acceptMutation.mutateAsync({
-      roleId: actionRole.id,
-      handoffId: actionTarget.id,
-      request,
-    }, {
-      onSuccess: () => {
-        close()
-        notify('인수인계를 수락해 다음 담당자로 교체했습니다.')
-      },
-    })
-  }
-
-  const cancel = (request: CancelRoleHandoffRequest) => {
-    if (!actionRole || !actionTarget || action?.mode !== 'cancel') return false
-    return cancelMutation.mutateAsync({
-      roleId: actionRole.id,
-      handoffId: actionTarget.id,
-      request,
-    }, {
-      onSuccess: () => {
-        close()
-        notify('인수인계를 취소했습니다. 다시 수정할 수 있습니다.')
-      },
-    })
-  }
+  const transfer = (request: TransferRoleHandoffRequest) => runTransition(
+    'transfer', transferMutation, request, '인수인계를 전달했습니다. 다음 담당자의 수락을 기다립니다.',
+  )
+  const accept = (request: ConfirmRoleHandoffRequest) => runTransition(
+    'accept', acceptMutation, request, '인수인계를 수락해 다음 담당자로 교체했습니다.',
+  )
+  const cancel = (request: CancelRoleHandoffRequest) => runTransition(
+    'cancel', cancelMutation, request, '인수인계를 취소했습니다. 다시 수정할 수 있습니다.',
+  )
 
   return {
     action,
@@ -156,9 +149,8 @@ export function useWorkspaceRoleHandoffFlow({
       ? prepareCommand.error
       : activeTransitionMutation.error,
     modalStorageError: preparing ? prepareCommand.storageError : '',
-    recoveryAvailable: Boolean(
-      modalOpen && preparing && prepareCommand.hasPending(),
-    ),
+    // 저장소 확인은 역할 인수인계 모달을 그릴 때만 한다.
+    hasPendingPreparation: () => preparing && prepareCommand.hasPending(),
     transitionPending: prepareCommand.isPending
       || transferMutation.isPending
       || acceptMutation.isPending

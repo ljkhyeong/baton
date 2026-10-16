@@ -1,10 +1,10 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
+
 import com.personal.baton.application.workspace.port.out.NotificationReadReceiptPort;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -35,6 +35,6 @@ public class JdbcNotificationReadReceiptAdapter implements NotificationReadRecei
                 VALUES (UUID_TO_BIN(:accountId), UUID_TO_BIN(:id), :readAt)
                 ON DUPLICATE KEY UPDATE read_at = notification_read_receipts.read_at
                 """, Map.of("accountId", accountId.toString(), "id", notificationId.toString(),
-                "readAt", LocalDateTime.ofInstant(readAt, ZoneOffset.UTC)));
+                "readAt", utc(readAt)));
     }
 }

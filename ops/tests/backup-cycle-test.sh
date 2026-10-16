@@ -432,14 +432,20 @@ assert_count 0 "$invalid_env_backup_artifact_count" \
 
 missing_checksum_root="$test_root/missing-checksum-restore"
 mkdir -p -- "$missing_checksum_root"
+write_valid_production_env "$missing_checksum_root/production.env"
 missing_checksum_backup="$missing_checksum_root/baton-20200101T000000Z-missing.sql.gz"
 write_valid_dump "$missing_checksum_backup"
-if PATH="$fake_bin:$PATH" \
+if missing_checksum_output="$(
+  PATH="$fake_bin:$PATH" \
+  BATON_PRODUCTION_ENV_FILE="$missing_checksum_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   BATON_BACKUP_STATE_DIR="$missing_checksum_root/state" \
-  "$fixture_restore_script" "$missing_checksum_backup" >/dev/null 2>&1; then
+  "$fixture_restore_script" "$missing_checksum_backup" 2>&1
+)"; then
   fail 'restore without checksum unexpectedly succeeded'
 fi
+[[ "$missing_checksum_output" == *'Backup checksum is required'* ]] \
+  || fail 'restore without checksum failed before the checksum check'
 
 running_guard_root="$test_root/running-container-restore"
 mkdir -p -- "$running_guard_root"
@@ -471,8 +477,11 @@ write_valid_production_env "$restore_security_root/production.env"
 restore_security_backup="$restore_security_root/baton-20200101T000000Z-restore.sql.gz"
 write_valid_backup "$restore_security_backup"
 restore_security_docker_log="$restore_security_root/docker.log"
+restore_security_tmp="$restore_security_root/tmp"
+mkdir -p -- "$restore_security_tmp"
 restore_security_output="$(
   PATH="$fake_bin:$PATH" \
+  TMPDIR="$restore_security_tmp" \
   BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
   BATON_BACKUP_STATE_DIR="$restore_security_root/state" \
@@ -481,6 +490,8 @@ restore_security_output="$(
   FAKE_RESTORE_SQL_LOG="$restore_security_root/revocation.sql" \
   "$fixture_restore_script" "$restore_security_backup"
 )"
+assert_count 0 "$(find "$restore_security_tmp" -mindepth 1 | wc -l | tr -d ' ')" \
+  'restore temporary files after success'
 if PATH="$fake_bin:$PATH" \
   BATON_PRODUCTION_ENV_FILE="$restore_security_root/production.env" \
   BATON_RESTORE_CONFIRM=RESTORE_BATON_DATABASE \
@@ -573,6 +584,22 @@ if PATH="$fake_bin:$PATH" \
   "$repo_root/ops/check-backup-freshness.sh" >/dev/null 2>&1; then
   fail 'old snapshot upload unexpectedly passed freshness check'
 fi
+
+missing_sync_state_root="$test_root/missing-sync-state"
+mkdir -p -- "$missing_sync_state_root/backups" "$missing_sync_state_root/remote"
+write_valid_backup "$missing_sync_state_root/backups/baton-20200101T000000Z-pending.sql.gz"
+if env -u BATON_BACKUP_STATE_DIR \
+  PATH="$fake_bin:$PATH" \
+  BATON_BACKUP_DIR="$missing_sync_state_root/backups" \
+  BATON_RCLONE_REMOTE=fake:daily \
+  FAKE_REMOTE_ROOT="$missing_sync_state_root/remote" \
+  FAKE_RCLONE_COUNT_FILE="$missing_sync_state_root/rclone-count" \
+  "$repo_root/ops/sync-backups.sh" >/dev/null 2>&1; then
+  fail 'backup synchronization without BATON_BACKUP_STATE_DIR unexpectedly succeeded'
+fi
+assert_count 0 "$(find "$missing_sync_state_root/remote" -type f | wc -l | tr -d ' ')" \
+  'missing synchronization state remote files'
+assert_no_file "$missing_sync_state_root/backups/.state"
 
 prune_audit_root="$test_root/prune-audit-failure"
 mkdir -p -- "$prune_audit_root/backups" "$prune_audit_root/remote"

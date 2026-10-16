@@ -26,7 +26,8 @@ public class NotificationPreferencesController {
             @Valid @RequestBody NotificationPreferencesRequest request) {
         if (!principal.accountId().equals(request.expectedAccountId())) throw new AccountMembershipConflictException("로그인 계정이 변경되었습니다. 새로고침해 주세요.");
         return ok(useCase.configure(principal.accountId(), new NotificationPreferencesUseCase.ConfigurePreferencesCommand(request.expectedVersion(),
-                request.deadlineSoonEnabled(), request.overdueEnabled(), request.handoffEnabled(), request.deadlineLeadHours())));
+                request.deadlineSoonEnabled(), request.overdueEnabled(), request.handoffEnabled(),
+                request.resourceReviewEnabled(), request.deadlineLeadHours())));
     }
     private ResponseEntity<NotificationPreferencesResponse> ok(NotificationPreferencesUseCase.PreferencesResult result) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(NotificationPreferencesResponse.from(result));

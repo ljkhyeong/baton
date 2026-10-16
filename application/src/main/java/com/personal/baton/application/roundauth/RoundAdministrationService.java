@@ -78,7 +78,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
                         query.teamId(),
                         query.seasonId()
                 ).stream()
-                .map(mapping -> mappingResult(mapping, null))
+                .map(this::mappingResult)
                 .toList();
     }
 
@@ -102,12 +102,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
                 .findMembership(command.accountId(), command.teamId())
                 .orElse(null);
         if (existing != null) {
-            if (!existing.getMemberId().equals(member.getId())) {
-                throw new AccountMembershipConflictException(
-                        "이 계정은 팀의 다른 구성원과 이미 연결되어 있습니다"
-                );
-            }
-            return membershipResult(existing);
+            return existingMembershipResult(existing, member);
         }
         MembershipClaimResult claimResult = roundRepository.claimMembership(
                 AccountTeamMembership.create(
@@ -120,14 +115,8 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
         );
         return switch (claimResult) {
             case MembershipClaimResult.Claimed result -> membershipResult(result.membership());
-            case MembershipClaimResult.AccountTeamAlreadyClaimed result -> {
-                if (!result.membership().getMemberId().equals(member.getId())) {
-                    throw new AccountMembershipConflictException(
-                            "이 계정은 팀의 다른 구성원과 이미 연결되어 있습니다"
-                    );
-                }
-                yield membershipResult(result.membership());
-            }
+            case MembershipClaimResult.AccountTeamAlreadyClaimed result ->
+                    existingMembershipResult(result.membership(), member);
             case MembershipClaimResult.MemberAlreadyClaimed ignored ->
                     throw new AccountMembershipConflictException(
                             "이 구성원은 다른 계정과 이미 연결되어 있습니다"
@@ -150,7 +139,7 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
                 .findMappingByResourceId(command.resourceId())
                 .orElse(null);
         if (existing != null) {
-            return mappingResult(existing, null);
+            return mappingResult(existing);
         }
 
         Instant createdAt = clock.instant();
@@ -174,10 +163,10 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
             RoomMappingCreationResult result = roundRepository.createMapping(tombstone, mapping);
             switch (result) {
                 case RoomMappingCreationResult.Created created -> {
-                    return mappingResult(created.mapping(), null);
+                    return mappingResult(created.mapping());
                 }
                 case RoomMappingCreationResult.ResourceAlreadyMapped concurrent -> {
-                    return mappingResult(concurrent.mapping(), null);
+                    return mappingResult(concurrent.mapping());
                 }
                 case RoomMappingCreationResult.RoomIdUnavailable ignored -> {
                     continue;
@@ -231,6 +220,16 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
                 ));
     }
 
+    // 이미 연결된 계정·팀 멤버십이 다른 구성원이면 충돌로, 같은 구성원이면 기존 연결로 처리한다.
+    private MembershipResult existingMembershipResult(AccountTeamMembership existing, Member member) {
+        if (!existing.getMemberId().equals(member.getId())) {
+            throw new AccountMembershipConflictException(
+                    "이 계정은 팀의 다른 구성원과 이미 연결되어 있습니다"
+            );
+        }
+        return membershipResult(existing);
+    }
+
     private MembershipResult membershipResult(AccountTeamMembership membership) {
         return new MembershipResult(
                 membership.getAccountId(),
@@ -240,14 +239,14 @@ public class RoundAdministrationService implements RoundAdministrationUseCase {
         );
     }
 
-    private RoomMappingResult mappingResult(RoundRoomMapping mapping, Instant endedAt) {
+    private RoomMappingResult mappingResult(RoundRoomMapping mapping) {
         return new RoomMappingResult(
                 mapping.getRoomId(),
                 mapping.getTeamId(),
                 mapping.getSeasonId(),
                 mapping.getResourceId(),
                 mapping.getCreatedAt(),
-                endedAt
+                null
         );
     }
 

@@ -17,9 +17,6 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
   lifecycle:
     timeout-per-shutdown-phase: 30s
   security:
@@ -86,8 +83,6 @@ baton:
       expected-hostname: ${BATON_TURNSTILE_EXPECTED_HOSTNAME:}
       connect-timeout: ${BATON_TURNSTILE_CONNECT_TIMEOUT:PT2S}
       read-timeout: ${BATON_TURNSTILE_READ_TIMEOUT:PT5S}
-    oauth2:
-      enabled: false
   identity:
     email-verification:
       delivery: ${BATON_EMAIL_VERIFICATION_DELIVERY:disabled}

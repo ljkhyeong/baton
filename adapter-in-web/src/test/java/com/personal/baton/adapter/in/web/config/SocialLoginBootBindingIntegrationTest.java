@@ -44,7 +44,6 @@ class SocialLoginBootBindingIntegrationTest {
                 "--BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=google-client",
                 "--BATON_AUTH_OAUTH2_NAVER_CLIENT_ID=naver-client"
         )) {
-            assertThat(context.getBean(ClientRegistrationRepository.class)).isNotNull();
             SocialLoginProviderCatalog catalog = context.getBean(
                     SocialLoginProviderCatalog.class
             );

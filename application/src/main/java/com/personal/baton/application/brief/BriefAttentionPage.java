@@ -24,6 +24,7 @@ public record BriefAttentionPage(List<Item> items, Cursor nextCursor) {
             String sourceReference,
             Status status,
             Instant observedAt,
+            Instant activeSince,
             Long aggregateRevision,
             Integer ruleVersion,
             Boolean revisionGap

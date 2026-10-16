@@ -79,11 +79,6 @@ public class AccountIdentity {
         this.emailVerified = this.emailSnapshot != null && emailVerified;
         this.createdAt = createdAt;
         this.lastAuthenticatedAt = lastAuthenticatedAt;
-        if (lastAuthenticatedAt != null && lastAuthenticatedAt.isBefore(this.createdAt)) {
-            throw new IdentityValidationException(
-                    "마지막 인증 시각은 신원 생성 시각보다 빠를 수 없습니다"
-            );
-        }
     }
 
     public static AccountIdentity createLocal(

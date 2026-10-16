@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/teams/{teamId}/seasons/{seasonId}")
 public class WorkspacePeopleController {
 
     private final WorkspacePeopleUseCase peopleUseCase;
@@ -41,7 +41,7 @@ public class WorkspacePeopleController {
         this.peopleUseCase = peopleUseCase;
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/members")
+    @PostMapping("/members")
     @ResponseStatus(HttpStatus.CREATED)
     public MemberResponse createMember(
             @PathVariable UUID teamId,
@@ -66,7 +66,7 @@ public class WorkspacePeopleController {
         return MemberResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/members/{memberId}")
+    @PutMapping("/members/{memberId}")
     public MemberResponse updateMember(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -86,7 +86,7 @@ public class WorkspacePeopleController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/members/{memberId}/deactivation")
+    @PatchMapping("/members/{memberId}/deactivation")
     public MemberResponse updateMemberDeactivation(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -106,7 +106,7 @@ public class WorkspacePeopleController {
         ));
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/roles")
+    @PostMapping("/roles")
     @ResponseStatus(HttpStatus.CREATED)
     public RoleResponse createRole(
             @PathVariable UUID teamId,
@@ -140,7 +140,7 @@ public class WorkspacePeopleController {
         return RoleResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/roles/{roleId}")
+    @PutMapping("/roles/{roleId}")
     public RoleResponse updateRole(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -169,7 +169,7 @@ public class WorkspacePeopleController {
         ));
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/roles/{roleId}/handoffs")
+    @PostMapping("/roles/{roleId}/handoffs")
     public ResponseEntity<RoleHandoffTransitionResponse> prepareRoleHandoff(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -201,10 +201,7 @@ public class WorkspacePeopleController {
                 .body(RoleHandoffTransitionResponse.from(result));
     }
 
-    @PatchMapping(
-            "/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
-                    + "/handoffs/{handoffId}/transfer"
-    )
+    @PatchMapping("/roles/{roleId}/handoffs/{handoffId}/transfer")
     public RoleHandoffTransitionResponse transferRoleHandoff(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -229,10 +226,7 @@ public class WorkspacePeopleController {
         ));
     }
 
-    @PatchMapping(
-            "/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
-                    + "/handoffs/{handoffId}/acceptance"
-    )
+    @PatchMapping("/roles/{roleId}/handoffs/{handoffId}/acceptance")
     public RoleHandoffTransitionResponse acceptRoleHandoff(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -254,10 +248,7 @@ public class WorkspacePeopleController {
         ));
     }
 
-    @PatchMapping(
-            "/teams/{teamId}/seasons/{seasonId}/roles/{roleId}"
-                    + "/handoffs/{handoffId}/cancellation"
-    )
+    @PatchMapping("/roles/{roleId}/handoffs/{handoffId}/cancellation")
     public RoleHandoffTransitionResponse cancelRoleHandoff(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,

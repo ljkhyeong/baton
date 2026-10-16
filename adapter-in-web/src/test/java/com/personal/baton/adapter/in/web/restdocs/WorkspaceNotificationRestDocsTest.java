@@ -4,7 +4,8 @@ import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.ConstrainedFields;
 import com.personal.baton.adapter.in.web.GlobalExceptionHandler;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.RequestIdFilter;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController;
 import com.personal.baton.adapter.in.web.workspace.WorkspaceNotificationController.ReadNotificationRequest;
 import com.personal.baton.application.workspace.port.in.WorkspaceNotificationUseCase;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.http.MediaType;
 import org.springframework.restdocs.RestDocumentationContextProvider;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.headers.ResponseHeadersSnippet;
 import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.restdocs.payload.ResponseFieldsSnippet;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -34,7 +36,6 @@ import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.restdocs.headers.HeaderDocumentation.*;
 import static org.springframework.restdocs.payload.PayloadDocumentation.*;
@@ -52,6 +53,9 @@ class WorkspaceNotificationRestDocsTest {
     private static final UUID SEASON = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private static final UUID RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000003");
     private static final UUID ACCOUNT = UUID.fromString("00000000-0000-4000-8000-000000000004");
+    private static final UUID REVIEW_NOTIFICATION = UUID.fromString("00000000-0000-4000-8000-000000000005");
+    private static final UUID REVIEWED_RESOURCE = UUID.fromString("00000000-0000-4000-8000-000000000006");
+    private static final UUID REQUEST_ID = UUID.fromString("00000000-0000-4000-8000-000000000099");
     private MockMvc mvc;
     private WorkspaceNotificationUseCase useCase;
 
@@ -61,9 +65,11 @@ class WorkspaceNotificationRestDocsTest {
         mvc = MockMvcBuilders.standaloneSetup(new WorkspaceNotificationController(useCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
+                .addFilters(new RequestIdFilter(() -> REQUEST_ID))
                 .apply(springSecurity(new FilterChainProxy(new DefaultSecurityFilterChain(AnyRequestMatcher.INSTANCE,
                         new SecurityContextHolderFilter(new HttpSessionSecurityContextRepository())))))
-                .apply(documentationConfiguration(documentation)).build();
+                .apply(documentationConfiguration(documentation))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString())).build();
     }
 
     @Test
@@ -74,12 +80,14 @@ class WorkspaceNotificationRestDocsTest {
                         .with(authentication(auth())))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.notifications[0].read").value(false))
+                .andExpect(jsonPath("$.notifications[1].kind").value("RESOURCE_REVIEW_DUE"))
+                .andExpect(jsonPath("$.notifications[1].roundId").isEmpty())
                 .andDo(MockMvcRestDocumentationWrapper.document("getWorkspaceNotifications",
-                        "현재 내 역할의 마감 임박·지연 업무와 수락할 인수인계를 반환한다.", "내 알림함 조회",
+                        "현재 내 역할의 마감 임박·지연 업무, 수락할 인수인계와 확인일이 된 담당 자료를 반환한다.", "내 알림함 조회",
                         pathParameters(parameterWithName("teamId").description("팀 식별자"),
                                 parameterWithName("seasonId").description("시즌 식별자")),
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
-                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+                        noStoreHeader(), fields()));
     }
 
     @Test
@@ -100,17 +108,22 @@ class WorkspaceNotificationRestDocsTest {
                         requestHeaders(headerWithName("X-Baton-Access-Key").description("공유 접근 키").optional()),
                         requestFields(new ConstrainedFields(ReadNotificationRequest.class).withPath("expectedAccountId")
                                 .description("화면에서 확인한 로그인 계정")),
-                        responseHeaders(headerWithName("Cache-Control").description("개인 데이터 캐시 금지")), fields()));
+                        noStoreHeader(), fields()));
     }
 
-    private UsernamePasswordAuthenticationToken auth() {
-        return UsernamePasswordAuthenticationToken.authenticated(new Principal(ACCOUNT, 0), null, List.of());
+    private ResponseHeadersSnippet noStoreHeader() {
+        return responseHeaders(headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"),
+                headerWithName("Cache-Control").description("개인 데이터 캐시 금지"));
     }
-    private record Principal(UUID accountId, long sessionVersion) implements AuthenticatedAccountPrincipal {}
+    private UsernamePasswordAuthenticationToken auth() {
+        return UsernamePasswordAuthenticationToken.authenticated(new AccountSessionPrincipal(ACCOUNT, 0), null, List.of());
+    }
     private NotificationInboxResult inbox(boolean read) {
         return new NotificationInboxResult(ACCOUNT, TEAM, SEASON, List.of(new NotificationResult(RESOURCE,
                 WorkspaceNotificationKind.OVERDUE, RESOURCE, RESOURCE, SEASON, "운영 자료 준비",
-                Instant.parse("2026-09-05T03:00:00Z"), read)));
+                Instant.parse("2026-09-05T03:00:00Z"), read), new NotificationResult(REVIEW_NOTIFICATION,
+                WorkspaceNotificationKind.RESOURCE_REVIEW_DUE, REVIEWED_RESOURCE, RESOURCE, null, "운영 안내",
+                Instant.parse("2026-09-05T15:00:00Z"), false)));
     }
     private ResponseFieldsSnippet fields() {
         return responseFields(fieldWithPath("accountId").description("현재 계정 식별자"),
@@ -118,11 +131,11 @@ class WorkspaceNotificationRestDocsTest {
                 fieldWithPath("notifications").type(JsonFieldType.ARRAY).description("현재 내 알림"),
                 fieldWithPath("notifications[].id").description("알림 식별자"),
                 new EnumFields(WorkspaceNotificationKind.class).withPath("notifications[].kind").description("알림 종류"),
-                fieldWithPath("notifications[].sourceId").description("반복 업무 실행 또는 역할 인수인계 식별자"),
+                fieldWithPath("notifications[].sourceId").description("반복 업무 실행, 역할 인수인계 또는 역할 자료 식별자"),
                 fieldWithPath("notifications[].roleId").description("관련 역할 식별자"),
-                fieldWithPath("notifications[].roundId").description("관련 회차 식별자, 인수인계는 null").optional(),
-                fieldWithPath("notifications[].title").description("업무 또는 역할 이름"),
-                fieldWithPath("notifications[].occurredAt").description("마감 또는 인수인계 전달 시각"),
+                fieldWithPath("notifications[].roundId").description("관련 회차 식별자, 인수인계·자료 재확인은 null").optional(),
+                fieldWithPath("notifications[].title").description("업무·역할 또는 자료 이름"),
+                fieldWithPath("notifications[].occurredAt").description("마감, 인수인계 전달 시각 또는 시즌 시간대 자료 확인일의 시작 시각"),
                 fieldWithPath("notifications[].read").description("현재 계정의 읽음 여부"));
     }
 }

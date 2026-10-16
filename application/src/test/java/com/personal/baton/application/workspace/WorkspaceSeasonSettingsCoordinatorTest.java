@@ -47,7 +47,7 @@ class WorkspaceSeasonSettingsCoordinatorTest {
         );
 
         var result = coordinator.updateSeason(
-                season.getTeamId(), season,
+                season,
                 new UpdateSeasonCommand("여름 스터디", season.getStartDate(), season.getEndDate())
         );
 

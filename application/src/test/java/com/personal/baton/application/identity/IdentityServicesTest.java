@@ -245,7 +245,12 @@ class IdentityServicesTest {
                 IdentityProvider.LOCAL_EMAIL,
                 "verified@example.com"
         )).thenReturn(Optional.of(identity));
-        LocalAccountRegistrationService service = service(repository);
+        LocalAccountRegistrationService service = service(
+                repository,
+                mock(PasswordEncoder.class),
+                mock(StringKeyGenerator.class),
+                mock(EmailVerificationOutboxPort.class)
+        );
 
         assertThatThrownBy(() -> service.registerLocalAccount(new RegisterLocalAccountCommand(
                 "verified@example.com",
@@ -267,10 +272,7 @@ class IdentityServicesTest {
                 true,
                 "동시 사용자"
         );
-        var winner = new ExternalLoginResult(
-                new AccountView(UUID.randomUUID(), "동시 사용자", List.of(), 0),
-                false
-        );
+        var winner = new ExternalLoginResult(UUID.randomUUID(), 0, false);
         when(transaction.resolve(command)).thenThrow(new IdentityConcurrentModificationException(
                         "stale identity",
                         new RuntimeException("optimistic conflict")
@@ -289,11 +291,9 @@ class IdentityServicesTest {
     void verifiesLocalEmailWithOneTimeChallenge() {
         IdentityRepository repository = mock(IdentityRepository.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        UUID accountId = UUID.randomUUID();
-        Account account = Account.create(accountId, "로컬 사용자", NOW.minusSeconds(60));
         AccountIdentity identity = AccountIdentity.createLocal(
                 UUID.randomUUID(),
-                accountId,
+                UUID.randomUUID(),
                 "local@example.com",
                 NOW.minusSeconds(60)
         );
@@ -310,8 +310,6 @@ class IdentityServicesTest {
         when(repository.findIdentityByIdForUpdate(identity.getId())).thenReturn(Optional.of(identity));
         when(repository.findLocalCredentialByIdentityIdForUpdate(identity.getId()))
                 .thenReturn(Optional.empty());
-        when(repository.findAccountById(accountId)).thenReturn(Optional.of(account));
-        when(repository.findIdentitiesByAccountId(accountId)).thenReturn(List.of(identity));
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn(PASSWORD_HASH);
         LocalAccountRegistrationService service = service(
                 repository,
@@ -321,9 +319,8 @@ class IdentityServicesTest {
         );
 
         var command = new VerifyLocalEmailCommand(VERIFICATION_TOKEN, RAW_PASSWORD);
-        var result = service.verifyLocalEmail(command);
+        service.verifyLocalEmail(command);
 
-        assertThat(result.verifiedAt()).isEqualTo(NOW);
         assertThat(identity.isEmailVerified()).isTrue();
         assertThat(challenge.getConsumedAt()).isEqualTo(NOW);
         assertThat(command.toString()).doesNotContain(VERIFICATION_TOKEN, RAW_PASSWORD);
@@ -489,17 +486,6 @@ class IdentityServicesTest {
         verify(repository, never()).saveLocalCredential(any());
     }
 
-    @DisplayName("아직 인증하지 않아 비밀번호 자격이 없는 자체 이메일은 로그인 자격 조회에서 비어 있다")
-    @Test
-    void returnsEmptyWhenUnverifiedIdentityHasNoCredential() {
-        IdentityRepository repository = mock(IdentityRepository.class);
-        when(repository.findLocalLoginCredential("local@example.com"))
-                .thenReturn(Optional.empty());
-        AccountAuthenticationService service = authenticationService(repository);
-
-        assertThat(service.loadLocalCredential("LOCAL@EXAMPLE.COM")).isEmpty();
-    }
-
     @DisplayName("로컬 로그인 자격 조회는 이메일을 정규화하고 불투명 해시와 검증 상태만 반환한다")
     @Test
     void loadsLocalCredentialByNormalizedEmail() {
@@ -518,19 +504,6 @@ class IdentityServicesTest {
         assertThat(result.toString()).doesNotContain(PASSWORD_HASH);
     }
 
-    private LocalAccountRegistrationService service(IdentityRepository repository) {
-        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        when(passwordEncoder.encode(any())).thenReturn(PASSWORD_HASH);
-        StringKeyGenerator tokenGenerator = mock(StringKeyGenerator.class);
-        when(tokenGenerator.generateKey()).thenReturn(VERIFICATION_TOKEN);
-        return service(
-                repository,
-                passwordEncoder,
-                tokenGenerator,
-                mock(EmailVerificationOutboxPort.class)
-        );
-    }
-
     private AccountAuthenticationService authenticationService(IdentityRepository repository) {
         return authenticationService(
                 repository,
@@ -545,21 +518,6 @@ class IdentityServicesTest {
         return new AccountAuthenticationService(
                 repository,
                 externalLoginTransaction
-        );
-    }
-
-    private AccountSecurityService securityService(IdentityRepository repository) {
-        EmailVerificationOutboxPort outboxPort = mock(EmailVerificationOutboxPort.class);
-        return new AccountSecurityService(
-                repository,
-                mock(PasswordEncoder.class),
-                mock(StringKeyGenerator.class),
-                outboxPort,
-                new EmailChallengeDeliveryRegistrar(
-                        outboxPort,
-                        mock(EmailVerificationOutboxPayloadProtector.class)
-                ),
-                Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
 

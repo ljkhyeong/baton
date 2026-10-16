@@ -65,8 +65,8 @@ export function HandoffView({
   onAcceptHandoff,
   onCancelHandoff,
   busyItemIds,
-  handoffTransitionPending = false,
-  changesDisabled = false,
+  handoffTransitionPending,
+  changesDisabled,
 }: {
   roles: Role[]
   roleHandoffs: RoleHandoff[]
@@ -89,13 +89,12 @@ export function HandoffView({
   onAcceptHandoff: (role: Role, handoff: RoleHandoff) => void
   onCancelHandoff: (role: Role, handoff: RoleHandoff) => void
   busyItemIds: ReadonlySet<string>
-  handoffTransitionPending?: boolean
-  changesDisabled?: boolean
+  handoffTransitionPending: boolean
+  changesDisabled: boolean
 }) {
   const tabSetId = useId()
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
-  const selectedIndex = Math.max(0, roles.findIndex((role) => role.id === selectedRoleId))
-  const selected = roles[selectedIndex] ?? roles[0]
+  const selected = roles.find((role) => role.id === selectedRoleId) ?? roles[0]
   if (!selected) {
     return <><PageHeader eyebrow="역할 인수인계" title="첫 역할부터 만들어 주세요" /><ActionableEmpty icon="handoff" title="넘겨줄 역할이 아직 없습니다" description="담당할 업무를 역할로 등록하세요." actionLabel="첫 역할 만들기" onAction={onAddRole} disabled={changesDisabled} /></>
   }
@@ -133,8 +132,10 @@ export function HandoffView({
       ? selectedHandoff.toMemberId
       : selected.nextMemberId,
   )
+  const nextName = next?.name ?? '다음 담당자'
+  const transitionDisabled = changesDisabled || handoffTransitionPending
   const handoffSummaryTitle = selectedHandoff?.status === 'ACCEPTED'
-    ? `${next?.name ?? '다음 담당자'}님이 이어받은 인수인계`
+    ? `${nextName}님이 이어받은 인수인계`
     : selectedHandoff?.status === 'CANCELLED'
       ? '취소된 인수인계'
       : next
@@ -212,7 +213,7 @@ export function HandoffView({
                   </span>
                   <strong>
                     {selectedHandoff?.status === 'ACCEPTED'
-                      ? `${next?.name ?? '다음 담당자'}님의 수락을 기록했습니다`
+                      ? `${nextName}님의 수락을 기록했습니다`
                       : '다음 담당자와 담당 기간을 정하세요'}
                   </strong>
                   <p>
@@ -223,8 +224,7 @@ export function HandoffView({
                   <button
                     type="button"
                     className="primary-button"
-                    disabled={changesDisabled
-                      || handoffTransitionPending
+                    disabled={transitionDisabled
                       || !selected.currentMemberId
                       || !selected.assignmentStartDate}
                     onClick={() => onPrepareHandoff(selected)}
@@ -235,7 +235,7 @@ export function HandoffView({
               ) : selectedHandoff.status === 'PREPARING' ? (
                 <>
                   <span className="handoff-state-label">준비 중</span>
-                  <strong>{next?.name ?? '다음 담당자'}님에게 전달할 인수인계를 검토하세요</strong>
+                  <strong>{nextName}님에게 전달할 인수인계를 검토하세요</strong>
                   <p>
                     새 담당자의 담당 기간은 {formatDateRange(
                       selectedHandoff.incomingAssignmentStartDate,
@@ -246,7 +246,7 @@ export function HandoffView({
                     <button
                       type="button"
                       className="primary-button baton-button"
-                      disabled={changesDisabled || handoffTransitionPending}
+                      disabled={transitionDisabled}
                       onClick={() => onTransferHandoff(selected, selectedHandoff)}
                     >
                       <span className="baton-glyph" aria-hidden="true" />내용 확인 후 전달
@@ -254,7 +254,7 @@ export function HandoffView({
                     <button
                       type="button"
                       className="secondary-button"
-                      disabled={changesDisabled || handoffTransitionPending}
+                      disabled={transitionDisabled}
                       onClick={() => onCancelHandoff(selected, selectedHandoff)}
                     >
                       준비 취소
@@ -264,7 +264,7 @@ export function HandoffView({
               ) : (
                 <>
                   <span className="handoff-state-label">수락 대기</span>
-                  <strong>{next?.name ?? '다음 담당자'}님의 수락을 기다리고 있습니다</strong>
+                  <strong>{nextName}님의 수락을 기다리고 있습니다</strong>
                   <p>전달한 인수인계 문서는 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
                   <dl className="handoff-transfer-snapshot" aria-label="전달 시점 체크리스트와 자료 현황">
                     <div><dt>체크리스트 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
@@ -275,7 +275,7 @@ export function HandoffView({
                     <button
                       type="button"
                       className="primary-button baton-button"
-                      disabled={changesDisabled || handoffTransitionPending}
+                      disabled={transitionDisabled}
                       onClick={() => onAcceptHandoff(selected, selectedHandoff)}
                     >
                       <span className="baton-glyph" aria-hidden="true" />인수인계 수락
@@ -283,7 +283,7 @@ export function HandoffView({
                     <button
                       type="button"
                       className="secondary-button"
-                      disabled={changesDisabled || handoffTransitionPending}
+                      disabled={transitionDisabled}
                       onClick={() => onCancelHandoff(selected, selectedHandoff)}
                     >
                       전달 취소

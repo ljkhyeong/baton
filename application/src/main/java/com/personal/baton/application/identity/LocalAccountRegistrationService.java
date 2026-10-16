@@ -28,7 +28,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
 public class LocalAccountRegistrationService implements
         RegisterLocalAccountUseCase,
         VerifyLocalEmailUseCase {
@@ -152,7 +151,7 @@ public class LocalAccountRegistrationService implements
 
     @Override
     @Transactional
-    public LocalEmailVerificationResult verifyLocalEmail(VerifyLocalEmailCommand command) {
+    public void verifyLocalEmail(VerifyLocalEmailCommand command) {
         if (command == null) {
             throw new IdentityValidationException("이메일 인증 요청은 필수입니다");
         }
@@ -185,9 +184,6 @@ public class LocalAccountRegistrationService implements
         repository.saveLocalCredential(credential);
         repository.saveEmailVerificationChallenge(challenge);
         outboxPort.supersedePending(identity.getId(), now);
-
-        Account account = findAccount(identity.getAccountId());
-        return new LocalEmailVerificationResult(currentAccountView(account), now);
     }
 
     private Account findAccount(UUID accountId) {

@@ -8,7 +8,7 @@ public interface CalendarSubscriptionClient {
     record Credential(UUID subscriptionId, URI feedUrl) {
         @Override public String toString() { return "Credential[subscriptionId=" + subscriptionId + ", feedUrl=<redacted>]"; }
     }
-    record RemoteStatus(UUID subscriptionId, UUID seasonId, boolean revoked, boolean generationMatches) {}
+    record RemoteStatus(UUID seasonId, boolean revoked, boolean generationMatches) {}
     record Result(Outcome outcome, Credential credential, RemoteStatus status) {
         public static Result of(Outcome outcome) { return new Result(outcome, null, null); }
     }

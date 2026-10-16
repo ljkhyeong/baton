@@ -30,6 +30,12 @@ final class TeamAccountAccessPolicy {
                 .filter(Member::isActive).orElseThrow(WorkspaceAccessDeniedException::new);
         return membership;
     }
+    Member requireActiveAccountMember(UUID teamId, UUID accountId) {
+        return memberships.findMembership(accountId, teamId)
+                .flatMap(membership -> people.findMemberById(membership.getMemberId()))
+                .filter(member -> member.getTeamId().equals(teamId)).filter(Member::isActive)
+                .orElseThrow(WorkspaceAccessDeniedException::new);
+    }
     void requireRead(Team team) { requireMembership(team); }
     void requireWrite(Team team) {
         if (requireMembership(team).getPermission() == TeamPermission.VIEWER) throw new WorkspaceAccessDeniedException();

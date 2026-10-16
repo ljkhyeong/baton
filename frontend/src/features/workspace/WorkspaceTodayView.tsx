@@ -13,7 +13,6 @@ import {
 import type {
   ContinuitySignal,
   Member,
-  RoleHandoff,
   Routine,
   RoutineExecution,
   RoutineTimingStatus,
@@ -27,6 +26,14 @@ const continuitySeverityCopy = {
   WARNING: '주의',
 } satisfies Record<ContinuitySignal['severity'], string>
 
+const timingPriority: Record<RoutineTimingStatus, number> = {
+  OVERDUE: 0,
+  IN_PROGRESS: 1,
+  PLANNED: 2,
+  UNSCHEDULED: 3,
+  COMPLETED: 4,
+}
+
 export type TodayMode = 'mine' | 'team'
 
 export function TodayView({
@@ -39,13 +46,10 @@ export function TodayView({
   weeklyBrief,
   calendarLabel,
   calendarDate,
-  roleHandoffs,
   handoffProgress,
   rounds,
   archivedRoundCount,
   selectedRound,
-  pendingCount,
-  completedCount,
   onSelectRound,
   onAddRound,
   onSelectRole,
@@ -56,10 +60,8 @@ export function TodayView({
   onAddRole,
   onAddRoutine,
   onEditRoutine,
-  selectedRoundBusy,
-  selectedRoundOperationPending,
   isRoundBusy,
-  changesDisabled = false,
+  changesDisabled,
 }: {
   workspace: WorkspaceProjection
   me?: Member
@@ -70,13 +72,10 @@ export function TodayView({
   weeklyBrief: ReactNode
   calendarLabel: string
   calendarDate: string
-  roleHandoffs: RoleHandoff[]
   handoffProgress: (roleId: string) => number
   rounds: SeasonRound[]
   archivedRoundCount: number
   selectedRound?: SeasonRound
-  pendingCount: number
-  completedCount: number
   onSelectRound: (roundId: string) => void
   onAddRound: () => void
   onSelectRole: (id: string) => void
@@ -87,27 +86,20 @@ export function TodayView({
   onAddRole: () => void
   onAddRoutine: () => void
   onEditRoutine: (routine: Routine) => void
-  selectedRoundBusy: boolean
-  selectedRoundOperationPending: boolean
   isRoundBusy: (roundId: string) => boolean
-  changesDisabled?: boolean
+  changesDisabled: boolean
 }) {
   // 로그인한 구성원을 알면 내 할 일을 먼저 보여 주고, 모르면 팀 전체 회차 업무를 보여 준다.
   const mode: TodayMode = me ? chosenMode ?? 'mine' : 'team'
   const mine = me && mode === 'mine' ? findPersonalWork(workspace, me.id) : undefined
   const { roles, routines, members, season } = workspace
-  const timingPriority: Record<RoutineTimingStatus, number> = {
-    OVERDUE: 0,
-    IN_PROGRESS: 1,
-    PLANNED: 2,
-    UNSCHEDULED: 3,
-    COMPLETED: 4,
-  }
   const orderedRoutines = routineTimelineItems(routines, selectedRound).sort((left, right) => {
     return timingPriority[left.execution?.timingStatus ?? 'UNSCHEDULED']
       - timingPriority[right.execution?.timingStatus ?? 'UNSCHEDULED']
   })
   const executionCount = selectedRound?.routineExecutions.length ?? 0
+  const completedCount = selectedRound?.routineExecutions.filter((execution) => execution.status === 'DONE').length ?? 0
+  const pendingCount = executionCount - completedCount
   const nextDeadline = orderedRoutines
     .flatMap(({ execution }) => execution?.deadlineAt && execution.status !== 'DONE' ? [execution.deadlineAt] : [])
     .sort((left, right) => Date.parse(left) - Date.parse(right))[0]
@@ -204,7 +196,7 @@ export function TodayView({
               className="round-completion-track"
               aria-label="이번 회차 업무 완료율"
               value={completedCount}
-              max={Math.max(1, selectedRound.routineExecutions.length)}
+              max={Math.max(1, executionCount)}
             />
             <div className="today-list-columns" aria-hidden="true"><span>업무</span><span>상태 · 마감</span><span>담당자</span></div>
             <div className="today-task-list" role="list">
@@ -221,8 +213,8 @@ export function TodayView({
                       onToggle={onToggleRoutine}
                       onSelectRole={onSelectRole}
                       onEdit={onEditRoutine}
-                      pending={selectedRoundBusy}
-                      operationPending={selectedRoundOperationPending}
+                      pending={changesDisabled || isRoundBusy(selectedRound.id)}
+                      operationPending={isRoundBusy(selectedRound.id)}
                     />
                   </div>
                 )
@@ -246,19 +238,17 @@ export function TodayView({
       <TeamBatonNotice
         roles={roles}
         members={members}
-        roleHandoffs={roleHandoffs}
+        roleHandoffs={workspace.roleHandoffs}
         calendarDate={calendarDate}
         progress={handoffProgress}
         onOpenHandoff={onOpenRoleHandoff}
       />
-      {workspace.continuitySignals.length > 0 && (
+      {signalCount > 0 && (
         <div className="today-lower">
           <section className="plain-section" aria-labelledby="continuity-radar-title" ref={signalSectionRef} tabIndex={-1}>
             <div className="section-heading compact">
               <h2 id="continuity-radar-title">조치할 항목</h2>
-              <span className="continuity-count">
-                {workspace.continuitySignals.length}개
-              </span>
+              <span className="continuity-count">{signalCount}개</span>
             </div>
             <div className="signal-list" role="list">
               {workspace.continuitySignals.map((signal) => (

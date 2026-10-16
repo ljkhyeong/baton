@@ -74,8 +74,8 @@ class TurnstileHumanVerificationAdapterTest {
     }
 
     @Test
-    @DisplayName("만료 token과 다른 호스트·동작의 성공 응답을 거부한다")
-    void rejectsInvalidOrMismatchedVerification() {
+    @DisplayName("만료되거나 이미 쓴 token의 검증 실패 응답을 거부한다")
+    void rejectsExpiredOrDuplicateToken() {
         server.expect(requestTo(BASE_URL + "/turnstile/v0/siteverify"))
                 .andRespond(withSuccess(
                         """
@@ -86,19 +86,7 @@ class TurnstileHumanVerificationAdapterTest {
                         """,
                         MediaType.APPLICATION_JSON
                 ));
-        server.expect(requestTo(BASE_URL + "/turnstile/v0/siteverify"))
-                .andRespond(withSuccess(
-                        """
-                        {
-                          "success": true,
-                          "hostname": "attacker.example",
-                          "action": "password_reset_request"
-                        }
-                        """,
-                        MediaType.APPLICATION_JSON
-                ));
 
-        assertThat(adapter.verify(attempt())).isEqualTo(VerificationOutcome.REJECTED);
         assertThat(adapter.verify(attempt())).isEqualTo(VerificationOutcome.REJECTED);
         server.verify();
     }

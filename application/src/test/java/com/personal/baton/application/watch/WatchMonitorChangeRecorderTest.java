@@ -35,8 +35,6 @@ class WatchMonitorChangeRecorderTest {
     @DisplayName("감시 적격 자료 생성은 고정된 자료 참조와 ACTIVE 스냅샷을 기록한다")
     @Test
     void recordsEligibleCreation() {
-        when(outboxPort.appendIfChanged(any())).thenReturn(true);
-
         recorder.recordCreated(resource("https://docs.example.com/study"));
 
         ArgumentCaptor<WatchMonitorChange> captor = ArgumentCaptor.forClass(
@@ -78,7 +76,6 @@ class WatchMonitorChangeRecorderTest {
     @DisplayName("적격 URL이 비적격 URL로 바뀌면 이전 monitor를 INACTIVE로 전환한다")
     @Test
     void deactivatesWhenUpdatedUrlBecomesIneligible() {
-        when(outboxPort.appendIfChanged(any())).thenReturn(true);
         RoleResource resource = resource("https://docs.example.com/study");
         resource.update(
                 resource.getRoleId(),
@@ -101,7 +98,6 @@ class WatchMonitorChangeRecorderTest {
     @DisplayName("역할 자료를 보관하면 적격 URL의 WATCH monitor를 비활성화한다")
     @Test
     void deactivatesWhenRoleResourceIsArchived() {
-        when(outboxPort.appendIfChanged(any())).thenReturn(true);
         RoleResource resource = resource("https://docs.example.com/study");
         resource.updateArchive(true, NOW);
 
@@ -119,9 +115,7 @@ class WatchMonitorChangeRecorderTest {
     @DisplayName("시즌 종료는 URL 적격 여부와 관계없이 모든 자료의 monitor를 비활성화한다")
     @Test
     void deactivatesEveryResourceWhenSeasonEnds() {
-        when(outboxPort.appendIfChanged(any())).thenReturn(true);
-
-        int appendedCount = recorder.recordSeasonState(List.of(
+        recorder.recordSeasonState(List.of(
                 resource("https://docs.example.com/study"),
                 RoleResource.create(
                         UUID.fromString("00000000-0000-0000-0000-000000000302"),
@@ -133,7 +127,6 @@ class WatchMonitorChangeRecorderTest {
                 )
         ), true);
 
-        assertThat(appendedCount).isEqualTo(2);
         ArgumentCaptor<WatchMonitorChange> captor = ArgumentCaptor.forClass(
                 WatchMonitorChange.class
         );

@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/teams/{teamId}/seasons/{seasonId}")
 public class WorkspaceRecordsController {
 
     private final WorkspaceRecordsUseCase recordsUseCase;
@@ -38,7 +38,7 @@ public class WorkspaceRecordsController {
         this.recordsUseCase = recordsUseCase;
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/decisions")
+    @PostMapping("/decisions")
     @ResponseStatus(HttpStatus.CREATED)
     public DecisionResponse createDecision(
             @PathVariable UUID teamId,
@@ -70,7 +70,7 @@ public class WorkspaceRecordsController {
         return DecisionResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}")
+    @PutMapping("/decisions/{decisionId}")
     public DecisionResponse updateDecision(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -97,7 +97,7 @@ public class WorkspaceRecordsController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/decisions/{decisionId}/archive")
+    @PatchMapping("/decisions/{decisionId}/archive")
     public DecisionResponse updateDecisionArchive(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -117,7 +117,7 @@ public class WorkspaceRecordsController {
         ));
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items")
+    @PostMapping("/handoff-items")
     @ResponseStatus(HttpStatus.CREATED)
     public HandoffItemResponse createHandoffItem(
             @PathVariable UUID teamId,
@@ -146,7 +146,7 @@ public class WorkspaceRecordsController {
         return HandoffItemResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}")
+    @PutMapping("/handoff-items/{itemId}")
     public HandoffItemResponse updateHandoffItem(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -170,7 +170,7 @@ public class WorkspaceRecordsController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/completion")
+    @PatchMapping("/handoff-items/{itemId}/completion")
     public HandoffItemResponse updateHandoffItemCompletion(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -186,7 +186,7 @@ public class WorkspaceRecordsController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/handoff-items/{itemId}/archive")
+    @PatchMapping("/handoff-items/{itemId}/archive")
     public HandoffItemResponse updateHandoffItemArchive(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -206,7 +206,7 @@ public class WorkspaceRecordsController {
         ));
     }
 
-    @PostMapping("/teams/{teamId}/seasons/{seasonId}/role-resources")
+    @PostMapping("/role-resources")
     @ResponseStatus(HttpStatus.CREATED)
     public RoleResourceResponse createRoleResource(
             @PathVariable UUID teamId,
@@ -236,7 +236,7 @@ public class WorkspaceRecordsController {
         return RoleResourceResponse.from(result);
     }
 
-    @PutMapping("/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}")
+    @PutMapping("/role-resources/{resourceId}")
     public RoleResourceResponse updateRoleResource(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,
@@ -261,7 +261,7 @@ public class WorkspaceRecordsController {
         ));
     }
 
-    @PatchMapping("/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}/archive")
+    @PatchMapping("/role-resources/{resourceId}/archive")
     public RoleResourceResponse updateRoleResourceArchive(
             @PathVariable UUID teamId,
             @PathVariable UUID seasonId,

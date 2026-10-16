@@ -10,7 +10,6 @@ import com.personal.baton.domain.identity.IdentityProvider;
 import com.personal.baton.domain.identity.IdentityValidationException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -63,10 +62,7 @@ public class ExternalLoginTransaction {
             repository.saveIdentity(existing);
             Account account = repository.findAccountByIdForUpdate(existing.getAccountId())
                     .filter(Account::isActive).orElseThrow(AccountDeactivatedException::new);
-            return new ExternalLoginResult(AccountView.from(
-                    account,
-                    repository.findIdentitiesByAccountId(account.getId())
-            ), false);
+            return new ExternalLoginResult(account.getId(), account.getSessionVersion(), false);
         }
 
         Account account = Account.create(UUID.randomUUID(), command.displayName(), now);
@@ -81,7 +77,7 @@ public class ExternalLoginTransaction {
         );
         repository.saveAccount(account);
         repository.saveIdentity(identity);
-        return new ExternalLoginResult(AccountView.from(account, List.of(identity)), true);
+        return new ExternalLoginResult(account.getId(), account.getSessionVersion(), true);
     }
 
     private void requireExternal(IdentityProvider provider) {

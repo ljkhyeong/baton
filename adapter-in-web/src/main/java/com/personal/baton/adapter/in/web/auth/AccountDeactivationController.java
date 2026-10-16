@@ -11,10 +11,6 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.web.authentication.logout.CompositeLogoutHandler;
-import org.springframework.security.web.authentication.logout.CookieClearingLogoutHandler;
-import org.springframework.security.web.authentication.logout.LogoutHandler;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +20,6 @@ public class AccountDeactivationController {
     public static final String PATH = "/api/v1/auth/account-deactivations";
     public record AccountDeactivationRequest(@NotNull UUID expectedAccountId) {}
     private final DeactivateAccountUseCase useCase;
-    private final LogoutHandler logout = new CompositeLogoutHandler(new CookieClearingLogoutHandler("JSESSIONID"), new SecurityContextLogoutHandler());
 
     public AccountDeactivationController(DeactivateAccountUseCase useCase) { this.useCase = useCase; }
 
@@ -34,7 +29,7 @@ public class AccountDeactivationController {
             HttpServletRequest request, HttpServletResponse response) {
         if (!principal.accountId().equals(input.expectedAccountId())) throw new AccountMembershipConflictException("화면에 표시된 계정과 현재 로그인 계정이 다릅니다");
         useCase.deactivateAccount(principal.accountId());
-        logout.logout(request, response, authentication);
+        AccountSecurityController.CURRENT_SESSION_LOGOUT.logout(request, response, authentication);
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
     }
 }

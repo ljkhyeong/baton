@@ -36,8 +36,9 @@ public final class AccountSessionRequestMatchers {
     private static final RequestMatcher NOTIFICATION_PREFERENCES = pathPattern(NotificationPreferencesController.PATH);
     private static final RequestMatcher TEAM_ACCESS = new OrRequestMatcher(pathPattern("/api/v1/team-access/**"), pathPattern("/api/v1/team-invitations/**"));
     private static final RequestMatcher HAS_ACCOUNT_SESSION = request -> CurrentAuthenticatedAccount.accountId().isPresent();
+    private static final RequestMatcher WORKSPACE_PATHS = pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**");
     private static final RequestMatcher WORKSPACE_ACCOUNT_MUTATION = new AndRequestMatcher(
-            pathPattern("/api/v1/teams/{teamId}/seasons/{seasonId}/**"), HAS_ACCOUNT_SESSION, DEFAULT_CSRF_MATCHER);
+            WORKSPACE_PATHS, HAS_ACCOUNT_SESSION, DEFAULT_CSRF_MATCHER);
     // 같은 경로의 조회는 공유 키로도 허용하므로 자료 재확인은 기록 요청만 계정 세션을 요구한다.
     private static final RequestMatcher RESOURCE_VERIFICATION = new OrRequestMatcher(
             pathPattern(HttpMethod.POST, ResourceVerificationController.PATH),
@@ -73,9 +74,7 @@ public final class AccountSessionRequestMatchers {
             WORKSPACE_ACCOUNT_MUTATION, new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED));
     private static final RequestMatcher WORKSPACE_CAPABILITY_WITHOUT_ACCOUNT_SESSION =
             new AndRequestMatcher(
-                    pathPattern(
-                            "/api/v1/teams/{teamId}/seasons/{seasonId}/**"
-                    ),
+                    WORKSPACE_PATHS,
                     new NegatedRequestMatcher(ACCOUNT_SESSION_REQUIRED),
                     new NegatedRequestMatcher(HAS_ACCOUNT_SESSION)
             );
@@ -83,7 +82,7 @@ public final class AccountSessionRequestMatchers {
     private AccountSessionRequestMatchers() {
     }
 
-    public static RequestMatcher workspaceAccountMutation() {
+    public static RequestMatcher workspaceAccountHeaderRequired() {
         return WORKSPACE_ACCOUNT_HEADER_REQUIRED;
     }
 

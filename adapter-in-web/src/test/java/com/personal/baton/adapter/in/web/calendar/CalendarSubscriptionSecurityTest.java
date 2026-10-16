@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.SubscriptionPage;
@@ -25,23 +25,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = CalendarSubscriptionController.class)
-@Import({
-        SecurityConfig.class,
-        WebFilterConfig.class,
-        CalendarSubscriptionSecurityTest.PasswordEncoderTestConfig.class
-})
+@Import({SecurityConfig.class, WebFilterConfig.class})
 class CalendarSubscriptionSecurityTest {
 
     @MockitoBean
@@ -68,6 +60,9 @@ class CalendarSubscriptionSecurityTest {
 
     @MockitoBean
     private com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase subscriptions;
+
+    @MockitoBean
+    private PasswordEncoder passwordEncoder;
 
     @Test
     @DisplayName("구독 조회·발급·재발급·폐기는 실제 인증 필터에서 계정 세션을 요구한다")
@@ -160,26 +155,9 @@ class CalendarSubscriptionSecurityTest {
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {
         return UsernamePasswordAuthenticationToken.authenticated(
-                new TestAccountPrincipal(ACCOUNT_ID),
+                new AccountSessionPrincipal(ACCOUNT_ID, 0),
                 null,
                 List.of()
         );
-    }
-
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class PasswordEncoderTestConfig {
-
-        @Bean
-        PasswordEncoder passwordEncoder() {
-            return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-        }
     }
 }

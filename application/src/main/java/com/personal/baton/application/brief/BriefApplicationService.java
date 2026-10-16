@@ -81,14 +81,8 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         verifyAttentionAccess(scope);
         Map<BriefSourceContext.Identity, UUID> ids = new HashMap<>();
         for (var identity : identities) {
-            String reference = identity.sourceReference();
-            if (!reference.startsWith("baton-continuity:")) continue;
-            try {
-                UUID id = UUID.fromString(reference.substring("baton-continuity:".length()));
-                if (reference.equals("baton-continuity:" + id)) ids.put(identity, id);
-            } catch (IllegalArgumentException ignored) {
-                // 이전 계약이나 연결할 수 없는 참조는 이동 대상을 만들지 않는다.
-            }
+            // 이전 계약이나 연결할 수 없는 참조는 이동 대상을 만들지 않는다.
+            BriefContinuityEvent.signalId(identity.sourceReference()).ifPresent(id -> ids.put(identity, id));
         }
         var signals = signalStore.findByIds(scope.teamId(), scope.seasonId(), ids.values().stream().distinct().toList())
                 .stream().collect(Collectors.toMap(BriefContinuitySignalState::signalId, Function.identity()));
@@ -119,8 +113,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
 
     @Override
     public BriefGenerationReadiness findGenerationReadiness(Scope scope) {
-        Season season = workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
-        requireActiveMembership(scope.accountId(), scope.teamId());
+        Season season = verifyAttentionAccess(scope);
         var boundary = executionPort.findDeliveryBoundary(scope.teamId(), scope.seasonId());
         Instant checkedAt = clock.instant();
         BriefGenerationReadiness.Status status;
@@ -130,8 +123,8 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         else if (!boundary.complete()) status = BriefGenerationReadiness.Status.DELIVERY_PENDING;
         else {
             ZoneId zone = season.getZoneId();
-            LocalDate weekStart = checkedAt.atZone(zone).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-            var execution = executionPort.findExecutionState(new GenerationTarget(scope.teamId(), scope.seasonId(), weekStart, zone, boundary.watermark()));
+            var execution = executionPort.findExecutionState(new GenerationTarget(
+                    scope.teamId(), scope.seasonId(), weekStart(checkedAt, zone), zone, boundary.watermark()));
             if (execution.filter(state -> state.status().equals("PERMANENT_FAILURE")).isPresent()) {
                 status = BriefGenerationReadiness.Status.GENERATION_FAILED;
             } else if (execution.filter(state -> state.status().equals("PROCESSING") && state.leaseExpiresAt() != null
@@ -144,12 +137,9 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
 
     @Override
     public BriefWeeklyResolutions summarizeWeeklyResolutions(Scope scope, BriefAttentionPage.Cursor after, int limit) {
-        Season season = workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
-        requireActiveMembership(scope.accountId(), scope.teamId());
-        ZoneId zone = season.getZoneId();
-        LocalDate weekStart = clock.instant().atZone(zone).toLocalDate()
-                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        return client.summarizeWeeklyResolutions(scope.teamId(), scope.seasonId(), weekStart, zone, after, limit);
+        ZoneId zone = verifyAttentionAccess(scope).getZoneId();
+        return client.summarizeWeeklyResolutions(
+                scope.teamId(), scope.seasonId(), weekStart(clock.instant(), zone), zone, after, limit);
     }
 
     @Override
@@ -164,9 +154,10 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         return client.findAttentionItems(scope.teamId(), scope.seasonId(), filter);
     }
 
-    private void verifyAttentionAccess(Scope scope) {
-        workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
+    private Season verifyAttentionAccess(Scope scope) {
+        Season season = workspaceAccess.verifyRead(scope.teamId(), scope.seasonId(), scope.workspaceAccessKey());
         requireActiveMembership(scope.accountId(), scope.teamId());
+        return season;
     }
 
     @Override
@@ -209,12 +200,13 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     @Override
     public BriefEditionDeliveryStatus findEditionDeliveryStatus(LatestEditionQuery scope, UUID editionId) {
         verifyEditionAccess(scope);
-        readScopedEdition(scope, editionId);
+        // BRIEF의 범위 지정 최신 여부 확인이 팀·시즌 소속도 확인하므로 본문을 따로 읽지 않는다.
+        var freshness = client.checkEditionFreshness(scope.teamId(), scope.seasonId(), editionId);
         var status = executionPort.findAdditionalDeliveries(scope.teamId(), scope.seasonId(), editionId)
                 .map(additional -> additional ? BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES
                         : BriefEditionDeliveryStatus.Status.NO_ADDITIONAL_DELIVERIES)
                 .orElse(BriefEditionDeliveryStatus.Status.UNKNOWN);
-        return new BriefEditionDeliveryStatus(editionId, status, clock.instant());
+        return new BriefEditionDeliveryStatus(editionId, status, freshness.upToDate(), freshness.ruleVersionChanged(), clock.instant());
     }
 
     private LatestEditionResult readScopedEdition(LatestEditionQuery scope, UUID editionId) {
@@ -233,9 +225,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
     @Override
     public BriefEditionComparison compareEditions(LatestEditionQuery scope, UUID fromEditionId, UUID toEditionId) {
         verifyEditionAccess(scope);
-        readScopedEdition(scope, fromEditionId);
-        if (!fromEditionId.equals(toEditionId)) readScopedEdition(scope, toEditionId);
-        return client.compareEditions(fromEditionId, toEditionId);
+        return client.compareEditions(scope.teamId(), scope.seasonId(), fromEditionId, toEditionId);
     }
 
     @Override
@@ -253,8 +243,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
                 yield new LatestEditionResult(result.edition(), result.etag());
             }
             case NOT_FOUND -> throw new BriefEditionNotFoundException();
-            case INVALID_REQUEST, AUTHENTICATION_FAILURE, PERMANENT_FAILURE ->
-                    throw new BriefIntegrationConfigurationException();
+            case PERMANENT_FAILURE -> throw new BriefIntegrationConfigurationException();
             case RETRYABLE_FAILURE -> throw new BriefIntegrationUnavailableException();
         };
     }
@@ -269,8 +258,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
         requireActiveMembership(command.accountId(), command.teamId());
 
         ZoneId zoneId = season.getZoneId();
-        LocalDate weekStart = LocalDate.now(clock.withZone(zoneId))
-                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekStart = weekStart(clock.instant(), zoneId);
         DeliveryBoundary boundary = executionPort.findDeliveryBoundary(
                 command.teamId(),
                 command.seasonId()
@@ -296,28 +284,20 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
                     throw new BriefGenerationInProgressException();
             case ClaimResult.PermanentlyFailed ignored ->
                     throw new BriefIntegrationConfigurationException();
-            case ClaimResult.Completed completed -> generationResult(
+            case ClaimResult.Completed completed -> new GenerationResult(
                     completed.executionId(),
-                    boundary.watermark(),
+                    target.deliveryWatermark(),
                     completed.editionId(),
                     completed.generation(),
                     completed.sourceCursor(),
                     completed.etag(),
                     completed.created()
             );
-            case ClaimResult.Claimed claimed -> executeGeneration(
-                    claimed,
-                    target,
-                    boundary.watermark()
-            );
+            case ClaimResult.Claimed claimed -> executeGeneration(claimed, target);
         };
     }
 
-    private GenerationResult executeGeneration(
-            ClaimResult.Claimed claimed,
-            GenerationTarget target,
-            long deliveryWatermark
-    ) {
+    private GenerationResult executeGeneration(ClaimResult.Claimed claimed, GenerationTarget target) {
         BriefServiceClient.Result result = client.generateEdition(
                 target.teamId(),
                 target.seasonId(),
@@ -349,9 +329,9 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
                         result.etag(),
                         result.created()
                 ));
-                yield generationResult(
+                yield new GenerationResult(
                         claimed.executionId(),
-                        deliveryWatermark,
+                        target.deliveryWatermark(),
                         edition.editionId(),
                         edition.generation(),
                         edition.sourceCursor(),
@@ -368,7 +348,7 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
                 ));
                 throw new BriefIntegrationUnavailableException();
             }
-            case NOT_FOUND, INVALID_REQUEST, AUTHENTICATION_FAILURE, PERMANENT_FAILURE -> {
+            case NOT_FOUND, PERMANENT_FAILURE -> {
                 requireMarked(executionPort.markPermanentFailure(
                         claimed.executionId(),
                         claimed.leaseToken(),
@@ -396,24 +376,9 @@ public class BriefApplicationService implements BriefEditionUseCase, BriefAttent
                 && seasonId.equals(edition.seasonId());
     }
 
-    private GenerationResult generationResult(
-            UUID executionId,
-            long deliveryWatermark,
-            UUID editionId,
-            long generation,
-            long sourceCursor,
-            String etag,
-            boolean created
-    ) {
-        return new GenerationResult(
-                executionId,
-                deliveryWatermark,
-                editionId,
-                generation,
-                sourceCursor,
-                etag,
-                created
-        );
+    // 주간 요약은 시즌 시간대의 월요일부터 한 주로 묶는다.
+    private static LocalDate weekStart(Instant at, ZoneId zone) {
+        return at.atZone(zone).toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     private void requireMarked(boolean marked) {

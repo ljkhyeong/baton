@@ -99,7 +99,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             UpdateSeasonCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeAdministratorMutation(teamId, seasonId, accessKey);
-        return seasonSettingsCoordinator.updateSeason(teamId, scope.season(), command);
+        return seasonSettingsCoordinator.updateSeason(scope.season(), command);
     }
 
     @Override
@@ -109,7 +109,6 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
         WorkspaceScope scope = scopeAuthorizer.requireSeasonForUpdate(teamId, seasonId);
         Season season = scope.season();
         return seasonSettingsCoordinator.updateSeason(
-                teamId,
                 season,
                 new UpdateSeasonCommand(name, season.getStartDate(), season.getEndDate())
         );
@@ -136,7 +135,7 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
             boolean ended
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonLifecycle(teamId, seasonId, accessKey);
-        return seasonEndingCoordinator.update(teamId, scope.season(), ended);
+        return seasonEndingCoordinator.update(scope.season(), ended);
     }
 
     @Override
@@ -155,7 +154,6 @@ public class WorkspaceLifecycleService implements WorkspaceLifecycleUseCase {
                 accessKey
         );
         return seasonSuccessorCoordinator.createNext(
-                teamId,
                 scope.season(),
                 idempotencyKey,
                 command

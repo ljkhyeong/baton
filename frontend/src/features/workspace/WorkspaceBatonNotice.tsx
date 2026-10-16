@@ -9,7 +9,7 @@ function relayDueCopy(days: number) {
 }
 
 // 담당 기간이 끝나는 날이 가장 가까운 역할을 고른다. 다가오는 날을 지난 날보다 먼저 본다.
-export function nearestRelayRole(roles: Role[], today: string) {
+function nearestRelayRole(roles: Role[], today: string) {
   return roles
     .flatMap((role) => role.currentMemberId && role.assignmentEndDate
       ? [{ role, days: daysUntil(role.assignmentEndDate, today) }]
@@ -76,7 +76,7 @@ export function TeamBatonNotice({
   )
 }
 
-// 내 할 일 보기: 나에게 넘어온 바통만 보여 준다.
+// 나에게 넘어온 바통을 보여 준다. 내 할 일 보기와 역할 화면의 내 역할에서 쓴다.
 export function ReceivedBatonNotice({
   role,
   handoff,

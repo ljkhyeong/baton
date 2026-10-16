@@ -41,7 +41,7 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
         var summaries = rows.stream().limit(pageSize).map(row -> {
             var stored = row.subscription();
             var state = stored.revocationPending() ? ManagementStatus.REVOCATION_PENDING
-                    : stored.leaseUntil() != null && stored.leaseUntil().isAfter(now) ? ManagementStatus.IN_PROGRESS
+                    : stored.leasedAt(now) ? ManagementStatus.IN_PROGRESS
                     : stored.revoked() ? ManagementStatus.REVOKED : ManagementStatus.CHECK_REQUIRED;
             return new Summary(stored.subscriptionId(), stored.owner().teamId(), stored.owner().seasonId(),
                     row.teamName(), row.seasonName(), state);
@@ -54,7 +54,7 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
         Stored stored = store.find(owner(scope)).orElse(null);
         if (stored == null) return new Subscription(null, scope.seasonId(), Status.NOT_CREATED);
         if (stored.revocationPending()) return status(stored, Status.REVOCATION_PENDING);
-        if (stored.leaseUntil() != null && stored.leaseUntil().isAfter(clock.instant())) return status(stored, Status.IN_PROGRESS);
+        if (stored.leasedAt(clock.instant())) return status(stored, Status.IN_PROGRESS);
         if (stored.revoked()) return status(stored, Status.REVOKED);
         Result result = client.findSubscription(stored.subscriptionId());
         if (result.outcome() == Outcome.NOT_FOUND) return status(stored, Status.NOT_CREATED);

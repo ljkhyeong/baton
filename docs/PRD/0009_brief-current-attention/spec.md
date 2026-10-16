@@ -93,10 +93,17 @@ BATON은 팀·시즌과 접근 권한을 확인한 뒤에만 BRIEF를 호출한�
 두 커서 필드는 함께 제공하거나 함께 생략한다. 원본 참조는 내부 형식을 해석하지 않고 BRIEF가 반환한 값을 그대로 사용한다. BRIEF의 문자·길이 규칙을 BATON 검증기로 복제하지 않고, BRIEF의 잘못된
 조회 조건 `400`을 안전한 `400 INVALID_INPUT`으로 변환한다.
 
-`items`의 각 항목은 `reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`,
+`items`의 각 항목은 `reasonCode`, `severity`, `sourceReference`, `status`, `observedAt`, `activeSince`,
 `aggregateRevision`, `ruleVersion`, `revisionGap`을 반환한다. `nextCursor`는 항상 존재하며
 마지막 페이지는 `null`이다. 상태·심각도·원본 리비전은 BRIEF 값을 그대로 표시한다.
 BATON 이벤트 v1 세 종류와 v2 다섯 종류를 모두 읽되 새로운 신호 의미를 만들지 않는다.
+
+`activeSince`는 BRIEF `PRD-0033: 점검 항목 연속 활성 시작 시각`의 값을 그대로 중계한다. 변경 기록 누락 없이
+이어진 현재 미해결 구간의 첫 원본 시각이며, 누락이 있었다면 누락 이후의 첫 미해결 시각이다. 해결 항목과
+이 값을 주지 않는 이전 BRIEF는 `null`이고 BATON은 `observedAt`이나 변경 이력으로 추정하지 않는다.
+화면은 미해결 항목에 ‘미해결 시작 {날짜} · N일 지남’을 표시한다. 날짜와 N은 시즌 시간대의 달력 날짜로
+계산하며 N은 오늘과 시작일의 차이다. 0 이하이면 날짜만 표시하고, `revisionGap`이 있으면
+‘누락 이전 기간 제외’를 덧붙인다. `null`이면 기간을 표시하지 않는다.
 
 목록과 요약은 서로 다른 요청 시점의 값이다. 개수 일치나 요청 간 스냅샷을 보장하지 않는다.
 필터·팀·시즌이 바뀌거나 최신 상태를 새로고침하면 커서를 버리고 첫 페이지부터 읽는다.

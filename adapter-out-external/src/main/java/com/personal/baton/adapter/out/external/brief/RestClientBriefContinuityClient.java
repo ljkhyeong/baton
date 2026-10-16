@@ -2,6 +2,7 @@ package com.personal.baton.adapter.out.external.brief;
 
 import com.personal.baton.application.brief.BriefContinuityDelivery;
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
+import com.personal.baton.application.delivery.DeliveryResult;
 import java.util.Objects;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;

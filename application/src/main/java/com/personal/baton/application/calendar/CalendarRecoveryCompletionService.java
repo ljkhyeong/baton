@@ -3,11 +3,11 @@ package com.personal.baton.application.calendar;
 import com.personal.baton.application.calendar.port.in.CompleteCalendarRecoveryUseCase;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryClient;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryStatePort;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.DeliveryResult;
+import com.personal.baton.application.delivery.DeliveryResult;
 import java.util.UUID;
 import java.util.Objects;
 import com.personal.baton.application.calendar.port.out.CalendarRecoveryClient.RunStatus;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
+import com.personal.baton.application.delivery.DeliveryResult.Outcome;
 import org.springframework.stereotype.Service;
 
 @Service

@@ -39,14 +39,14 @@ import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-
-
 
 class BriefApplicationServiceTest {
 
@@ -72,6 +72,11 @@ class BriefApplicationServiceTest {
             "00000000-0000-0000-0000-000000002607"
     );
     private static final Instant NOW = Instant.parse("2026-08-29T03:00:00Z");
+    private static final String ACCESS_KEY = "workspace-access-key";
+    private static final BriefAttentionUseCase.Scope ATTENTION_SCOPE =
+            new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY);
+    private static final LatestEditionQuery EDITION_SCOPE =
+            new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY);
 
     private final VerifyWorkspaceAccessUseCase workspaceAccess = mock(
             VerifyWorkspaceAccessUseCase.class
@@ -106,18 +111,17 @@ class BriefApplicationServiceTest {
     @Test
     @DisplayName("해소 요약의 이번 주는 시즌 시간대에서 정하고 권한 거부 전에 외부를 조회하지 않는다")
     void resolvesCurrentWeekInSeasonZone() {
-        var scope = new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
         var season = mock(Season.class);
         when(season.getZoneId()).thenReturn(ZoneId.of("America/Los_Angeles"));
-        when(workspaceAccess.verifyRead(TEAM_ID, SEASON_ID, "workspace-access-key")).thenReturn(season);
+        when(workspaceAccess.verifyRead(TEAM_ID, SEASON_ID, ACCESS_KEY)).thenReturn(season);
         var boundaryService = new BriefApplicationService(workspaceAccess, peopleRepository, operationsRepository, membershipVerifier,
                 client, executionPort, Clock.fixed(Instant.parse("2026-08-31T01:00:00Z"), ZoneOffset.UTC), signalStore, true);
-        boundaryService.summarizeWeeklyResolutions(scope, null, 20);
+        boundaryService.summarizeWeeklyResolutions(ATTENTION_SCOPE, null, 20);
         verify(client).summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-08-24"), season.getZoneId(), null, 20);
         when(membershipVerifier.hasActiveMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(false);
-        org.mockito.Mockito.clearInvocations(client);
-        assertThatThrownBy(() -> boundaryService.summarizeWeeklyResolutions(scope, null, 20)).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.findPreviousWeekEdition(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key"), EDITION_ID))
+        clearInvocations(client);
+        assertThatThrownBy(() -> boundaryService.summarizeWeeklyResolutions(ATTENTION_SCOPE, null, 20)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(EDITION_SCOPE, EDITION_ID))
                 .isInstanceOf(BriefAccessDeniedException.class);
         verifyNoInteractions(client);
     }
@@ -125,71 +129,68 @@ class BriefApplicationServiceTest {
     @Test
     @DisplayName("지난주 조회는 선택한 브리프의 주차와 시간대를 유지하고 잘못된 결과나 없는 주차를 구분한다")
     void findsPreviousWeekFromSavedEdition() {
-        var scope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
         var selected = snapshot(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-09"), ZoneId.of("America/New_York"));
         var previous = snapshot(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), selected.zoneId());
         when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(selected, "selected", false));
         when(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, previous.weekStart(), selected.zoneId()))
                 .thenReturn(Result.completed(previous, "previous", false));
-        assertThat(service.findPreviousWeekEdition(scope, EDITION_ID).edition()).isEqualTo(previous);
+        assertThat(service.findPreviousWeekEdition(EDITION_SCOPE, EDITION_ID).edition()).isEqualTo(previous);
         when(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, previous.weekStart(), selected.zoneId()))
                 .thenReturn(Result.completed(selected, "wrong-week", false));
-        assertThatThrownBy(() -> service.findPreviousWeekEdition(scope, EDITION_ID)).isInstanceOf(BriefIntegrationConfigurationException.class);
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(EDITION_SCOPE, EDITION_ID)).isInstanceOf(BriefIntegrationConfigurationException.class);
         when(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, previous.weekStart(), selected.zoneId()))
                 .thenReturn(Result.failure(BriefServiceClient.Outcome.NOT_FOUND, "missing"));
-        assertThatThrownBy(() -> service.findPreviousWeekEdition(scope, EDITION_ID)).isInstanceOf(BriefEditionNotFoundException.class);
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(EDITION_SCOPE, EDITION_ID)).isInstanceOf(BriefEditionNotFoundException.class);
         verify(client, never()).findLatestEdition(any(), any());
     }
 
     @Test
-    @DisplayName("식별자를 아는 다른 팀 브리프는 조회와 비교에서 감추고 비교 호출을 막는다")
-    void rejectsForeignEditionBeforeComparison() {
-        var scope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
+    @DisplayName("식별자를 아는 다른 팀 브리프는 본문을 읽는 단건·지난주 조회에서 감춘다")
+    void hidesForeignEditionFromBodyReads() {
         when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(UUID.randomUUID(), SEASON_ID), "etag", false));
-        assertThatThrownBy(() -> service.findEdition(scope, EDITION_ID))
+        assertThatThrownBy(() -> service.findEdition(EDITION_SCOPE, EDITION_ID))
                 .isInstanceOf(BriefEditionNotFoundException.class);
-        assertThatThrownBy(() -> service.compareEditions(scope, EDITION_ID, UUID.randomUUID()))
-                .isInstanceOf(BriefEditionNotFoundException.class);
-        assertThatThrownBy(() -> service.findEditionDeliveryStatus(scope, EDITION_ID))
-                .isInstanceOf(BriefEditionNotFoundException.class);
-        assertThatThrownBy(() -> service.findPreviousWeekEdition(scope, EDITION_ID))
+        assertThatThrownBy(() -> service.findPreviousWeekEdition(EDITION_SCOPE, EDITION_ID))
                 .isInstanceOf(BriefEditionNotFoundException.class);
         verify(client, never()).findLatestEditionForWeek(any(), any(), any(), any());
-        verifyNoInteractions(executionPort);
-        verify(client, never()).compareEditions(any(), any());
-        when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));
-        UUID foreignId = UUID.randomUUID();
-        when(client.findEdition(foreignId)).thenReturn(Result.completed(snapshot(TEAM_ID, UUID.randomUUID()), "etag", false));
-        assertThatThrownBy(() -> service.compareEditions(scope, EDITION_ID, foreignId))
-                .isInstanceOf(BriefEditionNotFoundException.class);
-        verify(client, never()).compareEditions(any(), any());
-        service.compareEditions(scope, EDITION_ID, EDITION_ID);
-        verify(client).compareEditions(EDITION_ID, EDITION_ID);
     }
 
     @Test
-    @DisplayName("브리프 추가 전달 안내는 생성 근거 없음과 추가 전달 유무를 구분한다")
+    @DisplayName("비교와 저장 이후 변경 확인은 확인한 팀·시즌으로 BRIEF 범위 지정 조회만 호출하고 없음 응답을 감추지 않는다")
+    void delegatesEditionScopeToBrief() {
+        UUID baseId = UUID.randomUUID();
+        service.compareEditions(EDITION_SCOPE, baseId, EDITION_ID);
+        verify(client).compareEditions(TEAM_ID, SEASON_ID, baseId, EDITION_ID);
+        when(client.checkEditionFreshness(TEAM_ID, SEASON_ID, EDITION_ID)).thenThrow(new BriefEditionNotFoundException());
+        assertThatThrownBy(() -> service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID))
+                .isInstanceOf(BriefEditionNotFoundException.class);
+        verify(client, never()).findEdition(any());
+        verifyNoInteractions(executionPort);
+    }
+
+    @Test
+    @DisplayName("브리프 추가 전달 안내는 생성 근거 없음과 추가 전달 유무를 구분하고 BRIEF 내용 판정을 함께 전한다")
     void reportsEditionDeliveryEvidence() {
-        var scope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
-        when(client.findEdition(EDITION_ID)).thenReturn(Result.completed(snapshot(TEAM_ID, SEASON_ID), "etag", false));
+        when(client.checkEditionFreshness(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(new BriefEditionFreshness(EDITION_ID, false, true, NOW));
         when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.empty());
-        var unknown = service.findEditionDeliveryStatus(scope, EDITION_ID);
+        var unknown = service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID);
         assertThat(unknown.editionId()).isEqualTo(EDITION_ID);
         assertThat(unknown.status()).isEqualTo(BriefEditionDeliveryStatus.Status.UNKNOWN);
+        assertThat(unknown.upToDate()).isFalse();
+        assertThat(unknown.ruleVersionChanged()).isTrue();
         assertThat(unknown.checkedAt()).isEqualTo(NOW);
         when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.of(false));
-        assertThat(service.findEditionDeliveryStatus(scope, EDITION_ID).status())
+        assertThat(service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID).status())
                 .isEqualTo(BriefEditionDeliveryStatus.Status.NO_ADDITIONAL_DELIVERIES);
         when(executionPort.findAdditionalDeliveries(TEAM_ID, SEASON_ID, EDITION_ID)).thenReturn(Optional.of(true));
-        assertThat(service.findEditionDeliveryStatus(scope, EDITION_ID).status())
+        assertThat(service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID).status())
                 .isEqualTo(BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES);
-        verify(executionPort, never()).claim(any(), org.mockito.ArgumentMatchers.anyBoolean(), any(), any());
+        verify(executionPort, never()).claim(any(), anyBoolean(), any(), any());
     }
 
     @Test
     @DisplayName("원본 참조는 저장된 신호와 유형·시즌이 일치할 때만 현재 업무에 연결한다")
     void resolvesOnlyMatchingSourceIdentity() {
-        var scope = new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
         var identity = new BriefSourceContext.Identity(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "baton-continuity:" + EDITION_ID);
         var wrongType = new BriefSourceContext.Identity(BriefAttentionPage.EventType.HANDOFF_INCOMPLETE, identity.sourceReference());
         var legacy = new BriefSourceContext.Identity(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:" + MEMBER_ID);
@@ -200,35 +201,34 @@ class BriefApplicationServiceTest {
         when(signalStore.findByIds(TEAM_ID, SEASON_ID, List.of(EDITION_ID))).thenReturn(List.of(new BriefContinuitySignalState(
                 EDITION_ID, ContinuitySignalType.ROLE_UNASSIGNED, MEMBER_ID,
                 ContinuitySignalSeverity.WARNING, BriefContinuityEvent.State.ACTIVE, 1)));
-        var contexts = service.resolveSources(scope, List.of(identity, wrongType, legacy));
+        var contexts = service.resolveSources(ATTENTION_SCOPE, List.of(identity, wrongType, legacy));
         assertThat(contexts.getFirst().target().title()).isEqualTo("현재 홍보 담당");
         assertThat(contexts.get(1).target()).isNull(); assertThat(contexts.get(2).target()).isNull();
         when(role.getSeasonId()).thenReturn(UUID.randomUUID());
-        assertThat(service.resolveSources(scope, List.of(identity)).getFirst().target()).isNull();
+        assertThat(service.resolveSources(ATTENTION_SCOPE, List.of(identity)).getFirst().target()).isNull();
         verifyNoInteractions(client);
     }
 
     @Test
     @DisplayName("생성 준비 조회는 실패·대기·진행 상태를 구분하고 만료 실행은 다시 요청할 수 있다")
     void reportsReadinessWithoutClaimOrNetworkCall() {
-        var scope = new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
         Season season = mock(Season.class);
         when(season.getZoneId()).thenReturn(ZoneId.of("Asia/Seoul"));
-        when(workspaceAccess.verifyRead(TEAM_ID, SEASON_ID, "workspace-access-key")).thenReturn(season);
+        when(workspaceAccess.verifyRead(TEAM_ID, SEASON_ID, ACCESS_KEY)).thenReturn(season);
         when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID)).thenReturn(new DeliveryBoundary(17, 2, 1, NOW));
-        assertThat(service.findGenerationReadiness(scope).status()).isEqualTo(BriefGenerationReadiness.Status.DELIVERY_FAILED);
+        assertThat(service.findGenerationReadiness(ATTENTION_SCOPE).status()).isEqualTo(BriefGenerationReadiness.Status.DELIVERY_FAILED);
         when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID)).thenReturn(new DeliveryBoundary(17, 2, 0, NOW));
-        assertThat(service.findGenerationReadiness(scope).status()).isEqualTo(BriefGenerationReadiness.Status.DELIVERY_PENDING);
+        assertThat(service.findGenerationReadiness(ATTENTION_SCOPE).status()).isEqualTo(BriefGenerationReadiness.Status.DELIVERY_PENDING);
         when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID)).thenReturn(new DeliveryBoundary(17, 0, 0, NOW));
         when(executionPort.findExecutionState(any())).thenReturn(Optional.of(new BriefEditionGenerationExecutionPort.ExecutionState("PROCESSING", NOW.plusSeconds(1))));
-        assertThat(service.findGenerationReadiness(scope).status()).isEqualTo(BriefGenerationReadiness.Status.GENERATING);
+        assertThat(service.findGenerationReadiness(ATTENTION_SCOPE).status()).isEqualTo(BriefGenerationReadiness.Status.GENERATING);
         when(executionPort.findExecutionState(any())).thenReturn(Optional.of(new BriefEditionGenerationExecutionPort.ExecutionState("PROCESSING", NOW)));
-        assertThat(service.findGenerationReadiness(scope).status()).isEqualTo(BriefGenerationReadiness.Status.READY);
+        assertThat(service.findGenerationReadiness(ATTENTION_SCOPE).status()).isEqualTo(BriefGenerationReadiness.Status.READY);
         when(executionPort.findExecutionState(any())).thenReturn(Optional.of(new BriefEditionGenerationExecutionPort.ExecutionState("PERMANENT_FAILURE", null)));
-        assertThat(service.findGenerationReadiness(scope).status()).isEqualTo(BriefGenerationReadiness.Status.GENERATION_FAILED);
+        assertThat(service.findGenerationReadiness(ATTENTION_SCOPE).status()).isEqualTo(BriefGenerationReadiness.Status.GENERATION_FAILED);
         when(season.isEnded()).thenReturn(true);
-        assertThat(service.findGenerationReadiness(scope).status()).isEqualTo(BriefGenerationReadiness.Status.SEASON_ENDED);
-        verify(executionPort, never()).claim(any(), org.mockito.ArgumentMatchers.anyBoolean(), any(), any());
+        assertThat(service.findGenerationReadiness(ATTENTION_SCOPE).status()).isEqualTo(BriefGenerationReadiness.Status.SEASON_ENDED);
+        verify(executionPort, never()).claim(any(), anyBoolean(), any(), any());
         verifyNoInteractions(client);
     }
 
@@ -236,21 +236,19 @@ class BriefApplicationServiceTest {
     @DisplayName("활동 종료된 계정 구성원은 BRIEF 요약과 목록 및 상태 전이를 호출할 수 없다")
     void deniesAttentionReadsBeforeExternalCall() {
         when(membershipVerifier.hasActiveMembership(ACCOUNT_ID, TEAM_ID)).thenReturn(false);
-        var scope = new BriefAttentionUseCase.Scope(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
-        assertThatThrownBy(() -> service.summarizeAttention(scope)).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.findAttentionItems(scope,
+        assertThatThrownBy(() -> service.summarizeAttention(ATTENTION_SCOPE)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findAttentionItems(ATTENTION_SCOPE,
                 new BriefAttentionPage.Filter(BriefAttentionPage.Status.ACTIVE, null, null, null, 20)))
                 .isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.findAttentionTransitions(scope,
+        assertThatThrownBy(() -> service.findAttentionTransitions(ATTENTION_SCOPE,
                 new BriefAttentionTransitions.Query(BriefAttentionPage.EventType.ROLE_UNASSIGNED, "role:1", null, 20)))
                 .isInstanceOf(BriefAccessDeniedException.class);
-        var editionScope = new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, "workspace-access-key");
-        assertThatThrownBy(() -> service.findEditionHistory(editionScope, new BriefEditionHistory.Query(null, 20))).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.findEdition(editionScope, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.findEditionDeliveryStatus(editionScope, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.compareEditions(editionScope, EDITION_ID, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.resolveSources(scope, List.of())).isInstanceOf(BriefAccessDeniedException.class);
-        assertThatThrownBy(() -> service.findGenerationReadiness(scope)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findEditionHistory(EDITION_SCOPE, new BriefEditionHistory.Query(null, 20))).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findEdition(EDITION_SCOPE, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findEditionDeliveryStatus(EDITION_SCOPE, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.compareEditions(EDITION_SCOPE, EDITION_ID, EDITION_ID)).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.resolveSources(ATTENTION_SCOPE, List.of())).isInstanceOf(BriefAccessDeniedException.class);
+        assertThatThrownBy(() -> service.findGenerationReadiness(ATTENTION_SCOPE)).isInstanceOf(BriefAccessDeniedException.class);
         verifyNoInteractions(client, signalStore, executionPort);
     }
 
@@ -259,16 +257,12 @@ class BriefApplicationServiceTest {
     void generatesEditionForAuthoritativeWeekAndZone() {
         Season season = mock(Season.class);
         when(season.getZoneId()).thenReturn(ZoneId.of("Asia/Seoul"));
-        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key"))
+        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, ACCESS_KEY))
                 .thenReturn(season);
         when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID))
                 .thenReturn(new DeliveryBoundary(17, 0, 0, null));
-        when(executionPort.claim(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.eq(true),
-                org.mockito.ArgumentMatchers.eq(NOW),
-                org.mockito.ArgumentMatchers.any()
-        )).thenReturn(new ClaimResult.Claimed(EXECUTION_ID, LEASE_TOKEN));
+        when(executionPort.claim(any(), eq(true), eq(NOW), any()))
+                .thenReturn(new ClaimResult.Claimed(EXECUTION_ID, LEASE_TOKEN));
         when(client.generateEdition(
                 TEAM_ID,
                 SEASON_ID,
@@ -294,12 +288,7 @@ class BriefApplicationServiceTest {
         ArgumentCaptor<GenerationTarget> target = ArgumentCaptor.forClass(
                 GenerationTarget.class
         );
-        verify(executionPort).claim(
-                target.capture(),
-                org.mockito.ArgumentMatchers.eq(true),
-                org.mockito.ArgumentMatchers.eq(NOW),
-                org.mockito.ArgumentMatchers.any()
-        );
+        verify(executionPort).claim(target.capture(), eq(true), eq(NOW), any());
         assertThat(target.getValue().weekStart()).isEqualTo(LocalDate.parse("2026-08-24"));
         assertThat(target.getValue().zoneId()).isEqualTo(ZoneId.of("Asia/Seoul"));
     }
@@ -316,7 +305,7 @@ class BriefApplicationServiceTest {
     ) {
         Season season = mock(Season.class);
         when(season.getZoneId()).thenReturn(ZoneId.of("Asia/Seoul"));
-        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key"))
+        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, ACCESS_KEY))
                 .thenReturn(season);
         when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID))
                 .thenReturn(new DeliveryBoundary(17, 0, 0, null));
@@ -370,26 +359,17 @@ class BriefApplicationServiceTest {
     void blocksGenerationUntilDeliveryCompletes() {
         Season season = mock(Season.class);
         when(season.getZoneId()).thenReturn(ZoneId.of("Asia/Seoul"));
-        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, "workspace-access-key"))
+        when(workspaceAccess.verifyMutation(TEAM_ID, SEASON_ID, ACCESS_KEY))
                 .thenReturn(season);
         when(executionPort.findDeliveryBoundary(TEAM_ID, SEASON_ID))
                 .thenReturn(new DeliveryBoundary(18, 1, 0, null));
-        when(executionPort.claim(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.eq(false),
-                org.mockito.ArgumentMatchers.eq(NOW),
-                org.mockito.ArgumentMatchers.any()
-        )).thenReturn(new ClaimResult.DeliveryIncomplete(EXECUTION_ID));
+        when(executionPort.claim(any(), eq(false), eq(NOW), any()))
+                .thenReturn(new ClaimResult.DeliveryIncomplete());
 
         assertThatThrownBy(() -> service.generateEdition(command()))
                 .isInstanceOf(BriefGenerationBlockedException.class);
 
-        verify(client, never()).generateEdition(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
-        );
+        verify(client, never()).generateEdition(any(), any(), any(), any());
     }
 
     @DisplayName("BRIEF 최신 응답의 작업 공간과 시즌이 권한 범위와 다르면 노출하지 않는다")
@@ -401,14 +381,10 @@ class BriefApplicationServiceTest {
                 false
         ));
 
-        assertThatThrownBy(() -> service.findLatestEdition(new LatestEditionQuery(
-                ACCOUNT_ID,
-                TEAM_ID,
-                SEASON_ID,
-                "workspace-access-key"
-        ))).isInstanceOf(BriefIntegrationConfigurationException.class);
+        assertThatThrownBy(() -> service.findLatestEdition(EDITION_SCOPE))
+                .isInstanceOf(BriefIntegrationConfigurationException.class);
 
-        verify(workspaceAccess).verifyRead(TEAM_ID, SEASON_ID, "workspace-access-key");
+        verify(workspaceAccess).verifyRead(TEAM_ID, SEASON_ID, ACCESS_KEY);
     }
 
     private GenerateEditionCommand command() {
@@ -416,7 +392,7 @@ class BriefApplicationServiceTest {
                 ACCOUNT_ID,
                 TEAM_ID,
                 SEASON_ID,
-                "workspace-access-key"
+                ACCESS_KEY
         );
     }
 

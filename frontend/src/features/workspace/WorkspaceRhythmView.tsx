@@ -1,6 +1,6 @@
 import { formatInstant, formatLocalTime } from '@/shared/lib/dateTimeFormat'
 import { PublicHolidayPanel } from '@/features/calendar/PublicHolidayPanel'
-import { clampToSeason, pilotCalendarDate, seasonProgress } from './seasonCalendar'
+import { clampToSeason, seasonProgress } from './seasonCalendar'
 import {
   ActionableEmpty,
   PageHeader,
@@ -9,8 +9,7 @@ import {
   RoutineRow,
   routineTimelineItems,
 } from './WorkspaceViews'
-import { formatLocalDate } from './workspacePresentation'
-import { phaseCopy } from './workspacePresentation'
+import { formatLocalDate, phaseCopy } from './workspacePresentation'
 import type {
   Member,
   Role,
@@ -44,7 +43,7 @@ export function RhythmView({
   onConfigureRoundSchedule,
   busyRoundIds,
   busyRoutineIds,
-  changesDisabled = false,
+  changesDisabled,
 }: {
   season: Season
   calendarDate: string
@@ -68,13 +67,16 @@ export function RhythmView({
   onConfigureRoundSchedule: () => void
   busyRoundIds: ReadonlySet<string>
   busyRoutineIds: ReadonlySet<string>
-  changesDisabled?: boolean
+  changesDisabled: boolean
 }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   const timelineItems = routineTimelineItems(routines, selectedRound)
   const roundScheduleWaitingForRoutine = Boolean(season.roundSchedule?.enabled)
     && routines.length === 0
   const progress = seasonProgress(season, calendarDate)
+  const selectedRoundOperationPending = Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
+  const selectedRoundBusy = changesDisabled || selectedRoundOperationPending
+  const holidayMeetingDate = selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate
   return (
     <>
       <PageHeader eyebrow={`시즌 ${progress.elapsedWeeks} / ${progress.totalWeeks}주 · ${formatLocalDate(season.endDate)} 종료`} title="일정" action={<PrimaryButton onClick={onAddRoutine} disabled={changesDisabled}>반복 업무 추가</PrimaryButton>} />
@@ -118,14 +120,13 @@ export function RhythmView({
         onCreate={onAddRound}
         onEdit={onEditRound}
         onArchive={(round) => onUpdateRoundArchive(round, true)}
-        selectedRoundBusy={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+        selectedRoundBusy={selectedRoundBusy}
         changesDisabled={changesDisabled}
       />
       {season.timeZone === 'Asia/Seoul' && <PublicHolidayPanel
         key={selectedRound?.id ?? season.id}
-        meetingDate={selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate}
-        date={selectedRound?.meetingDate ?? season.roundSchedule?.nextOccurrenceDate
-          ?? clampToSeason(pilotCalendarDate(), season)}
+        meetingDate={holidayMeetingDate}
+        date={holidayMeetingDate ?? clampToSeason(calendarDate, season)}
       />}
       {archivedRounds.length > 0 && (
         <details className="archive-shelf round-archive-shelf">
@@ -183,8 +184,8 @@ export function RhythmView({
                       onSelectRole={onSelectRole}
                       onEdit={onEditRoutine}
                       onArchive={onUpdateRoutineArchive}
-                      pending={changesDisabled || Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
-                      operationPending={Boolean(selectedRound && busyRoundIds.has(selectedRound.id))}
+                      pending={selectedRoundBusy}
+                      operationPending={selectedRoundOperationPending}
                       archivePending={Boolean(routine && busyRoutineIds.has(routine.id))}
                     />
                   )

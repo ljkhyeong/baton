@@ -1,19 +1,14 @@
 import { weeklyResolutions } from './support/briefFixtures'
 import { expect, test } from '@playwright/test'
-import { installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY, WORKSPACE_PATH } from './support/workspaceApiHarness'
+import { installAccountSession, installApi, makeProjection, openSharedWorkspace, TEAM_ID, SEASON_ID, MEMBER_ONE_ID, ACCESS_KEY, ACCOUNT_ID, WORKSPACE_PATH } from './support/workspaceApiHarness'
 
-const ACCOUNT = '8e448211-66ae-44ab-9888-c4960648c22b'
 const EDITION = '8e448211-66ae-44ab-9888-c4960648c22c'
 
 test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한 거부를 구분한다 @smoke', async ({ page }, testInfo) => {
   await installApi(page)
-  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: {
-    authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token',
-  } }))
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  // 생성 요청은 세션과 다른 이름·값의 새 CSRF를 받아 써야 한다.
   await page.route('**/api/v1/auth/csrf', (route) => route.fulfill({ json: { csrfHeaderName: 'X-BRIEF-CSRF', csrfToken: 'fresh-token' } }))
-  await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
-    claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z',
-  } }))
   let generations = 0
   let latestCalls = 0
   const relatedReads = { summary: 0, items: 0, resolutions: 0 }
@@ -23,7 +18,7 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
     const path = new URL(request.url()).pathname
     expect(request.headers()['x-baton-access-key']).toBe(ACCESS_KEY)
     expect(request.headers().authorization).toBeUndefined()
-    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', checkedAt: '2026-09-05T00:00:00Z' } })
+    if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: generations < 3 ? 'ADDITIONAL_DELIVERIES' : 'NO_ADDITIONAL_DELIVERIES', upToDate: generations >= 3, ruleVersionChanged: false, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
     if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
     if (path.endsWith('/resolutions')) { relatedReads.resolutions += 1; return route.fulfill({ json: weeklyResolutions }) }
@@ -35,7 +30,7 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
       expect(request.headers()['x-brief-csrf']).toBe('fresh-token')
       if (generations === 1) return route.fulfill({ status: 409, json: { code: 'BRIEF_DELIVERY_INCOMPLETE', message: '원본 이벤트 전달이 끝난 뒤 다시 생성해 주세요.' } })
       return route.fulfill({ status: generations === 2 ? 201 : 200, json: {
-        executionId: ACCOUNT, editionId: EDITION, generation: 1, deliveryWatermark: 4, sourceCursor: 4, created: generations === 2,
+        executionId: ACCOUNT_ID, editionId: EDITION, generation: 1, deliveryWatermark: 4, sourceCursor: 4, created: generations === 2,
       } })
     }
     latestCalls += 1
@@ -45,9 +40,10 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
       weekStart: '2026-08-24', zoneId: 'America/New_York', windowStart: '2026-08-24T04:00:00Z', windowEnd: '2026-08-31T04:00:00Z',
       generatedAt: '2026-08-31T00:00:00Z', sourceCursor: 4, ruleVersion: 2,
       items: [{ reasonCode: 'ROLE_UNASSIGNED', severity: 'HIGH', status: 'ACTIVE', sourceReference: 'role:current',
-        observedAt: '2026-08-30T00:00:00Z', ruleVersion: 1, aggregateRevision: 2, revisionGap: false, section: 'CURRENT_WEEK' },
+        observedAt: '2026-08-30T00:00:00Z', activeSince: '2026-08-26T12:00:00Z', ruleVersion: 1, aggregateRevision: 2, revisionGap: false, section: 'CURRENT_WEEK' },
+      // 생성 시각(뉴욕 8월 30일) 기준으로 뉴욕 날짜(8월 11일)부터 센다. UTC 날짜(8월 12일)로 세지 않는다.
       { reasonCode: 'HANDOFF_INCOMPLETE', severity: 'HIGH', status: 'ACTIVE', sourceReference: 'handoff:carry',
-        observedAt: '2026-08-20T00:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }],
+        observedAt: '2026-08-20T00:00:00Z', activeSince: '2026-08-12T02:00:00Z', ruleVersion: 1, aggregateRevision: 1, revisionGap: false, section: 'CARRY_OVER' }],
     } })
   })
   await openSharedWorkspace(page)
@@ -70,8 +66,10 @@ test('최신 주간 요약 없음과 전달 대기 뒤 생성·재사용·권한
   await expect(edition.getByRole('region', { name: '저장 이후 변경 확인' })).toContainText('새 변경이 전달됐습니다.')
   await expect(edition).toContainText('America/New_York')
   await expect(edition.getByRole('region', { name: '이번 주 변경' })).toContainText('역할 담당자 없음')
+  await expect(edition.getByRole('region', { name: '이번 주 변경' })).toContainText('미해결 시작 2026. 8. 26. · 생성 시점 기준 4일 지남')
   await expect(edition.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('role:current')
   await expect(edition.getByRole('region', { name: '이전 주부터 미해결' })).toContainText('인수인계 미완료')
+  await expect(edition.getByRole('region', { name: '이전 주부터 미해결' })).toContainText('미해결 시작 2026. 8. 11. · 생성 시점 기준 19일 지남')
   await expect(edition.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('handoff:carry')
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
   await edition.getByRole('region', { name: '이전 주부터 미해결' }).scrollIntoViewIfNeeded()
@@ -98,17 +96,12 @@ for (const access of ['ended', 'viewer'] as const) {
       projection.team.permission = 'VIEWER'
     }
     await installApi(page, projection)
-    await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: {
-      authenticated: true, accountId: ACCOUNT, csrfHeaderName: 'X-CSRF-TOKEN', csrfToken: 'test-token',
-    } }))
-    await page.route('**/api/v1/account-memberships/current?*', (route) => route.fulfill({ json: {
-      claimed: true, accountId: ACCOUNT, teamId: TEAM_ID, memberId: MEMBER_ONE_ID, claimedAt: '2026-08-31T00:00:00Z',
-    } }))
+    await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
     await page.route('**/api/v1/teams/*/seasons/*/brief/**', async (route) => {
       const path = new URL(route.request().url()).pathname
       expect(route.request().method()).toBe('GET')
       if (access === 'viewer') expect(route.request().headers()['x-baton-access-key']).toBeFalsy()
-      if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: 'UNKNOWN', checkedAt: '2026-09-05T00:00:00Z' } })
+      if (path.endsWith('/delivery-status')) return route.fulfill({ json: { editionId: EDITION, status: 'UNKNOWN', upToDate: true, ruleVersionChanged: false, checkedAt: '2026-09-05T00:00:00Z' } })
       if (path.endsWith('/generation-readiness')) return route.fulfill({ json: { status: 'READY', pendingCount: 0, failedCount: 0, lastDeliveredAt: null, checkedAt: '2026-09-05T00:00:00Z' } })
       if (path.endsWith('/editions') && route.request().method() === 'GET') return route.fulfill({ json: { editions: [], nextBeforeGeneration: null } })
       if (path.endsWith('/resolutions')) return route.fulfill({ json: weeklyResolutions })
@@ -118,7 +111,7 @@ for (const access of ['ended', 'viewer'] as const) {
         weekStart: '2026-08-24', zoneId: 'Asia/Seoul', windowStart: '2026-08-23T15:00:00Z', windowEnd: '2026-08-30T15:00:00Z',
         generatedAt: '2026-08-29T00:00:00Z', sourceCursor: 1, ruleVersion: 1,
         items: [{ reasonCode: 'ROUTINE_MISSED', severity: 'MEDIUM', status: 'ACTIVE', sourceReference: 'legacy:+& 한글',
-          observedAt: '2026-08-28T00:00:00Z', ruleVersion: 1, aggregateRevision: null, revisionGap: null, section: null }],
+          observedAt: '2026-08-28T00:00:00Z', activeSince: null, ruleVersion: 1, aggregateRevision: null, revisionGap: null, section: null }],
       } })
     })
     if (access === 'viewer') await page.goto(WORKSPACE_PATH)
@@ -127,6 +120,8 @@ for (const access of ['ended', 'viewer'] as const) {
     await panel.locator('summary').click()
     await panel.getByText('저장된 주간 요약', { exact: true }).click()
     await expect(panel.getByRole('region', { name: '이전 주간 요약 · 분류 미기록' })).toContainText('반복 업무 누락')
+    // 미해결 시작 시각을 주지 않은 이전 BRIEF 주간 요약은 기간을 추정해 표시하지 않는다.
+    await expect(panel.getByRole('region', { name: '이전 주간 요약 · 분류 미기록' })).not.toContainText('미해결 시작')
     await expect(panel.locator('details[aria-label="저장된 요약 연동 상세"]')).toContainText('legacy:+& 한글')
     await expect(panel.getByText('이전 주간 요약: 변경 번호·누락 여부 미기록')).not.toBeVisible()
     await panel.getByText('연동 상세', { exact: true }).click()

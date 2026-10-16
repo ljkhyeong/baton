@@ -7,7 +7,6 @@ import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,11 +40,7 @@ public class CalendarSnapshotRecorder implements CalendarChangeRecorder {
         if (!captureState.enabled()) {
             return;
         }
-        Instant occurredAt = Instant.now(clock);
-        outboxPort.appendIfChanged(snapshotFactory.fromRound(UUID.randomUUID(), occurredAt, season, round));
-        for (RoutineExecution execution : executions) {
-            snapshotFactory.fromExecution(UUID.randomUUID(), occurredAt, round, execution)
-                    .ifPresent(outboxPort::appendIfChanged);
-        }
+        snapshotFactory.roundSnapshots(Instant.now(clock), season, round, executions)
+                .forEach(outboxPort::appendIfChanged);
     }
 }

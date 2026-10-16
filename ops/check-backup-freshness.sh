@@ -2,27 +2,16 @@
 
 set -Eeuo pipefail
 
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$script_dir/production-validation-common.sh"
 state_dir="${BATON_BACKUP_STATE_DIR:-}"
 max_age_hours="${BATON_BACKUP_MAX_AGE_HOURS:-36}"
 success_file="$state_dir/last-success"
 
-backup_epoch_from_name() {
-  local backup_name="$1"
-  local timestamp
-  local formatted
-
-  if [[ ! "$backup_name" =~ ^baton-([0-9]{8}T[0-9]{6}Z)-[A-Za-z0-9]+\.sql\.gz$ ]]; then
-    return 1
-  fi
-  timestamp="${BASH_REMATCH[1]}"
-  formatted="${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2} ${timestamp:9:2}:${timestamp:11:2}:${timestamp:13:2} UTC"
-  if date --version >/dev/null 2>&1; then
-    date -u -d "$formatted" '+%s'
-  elif date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s' >/dev/null 2>&1; then
-    date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s'
-  else
-    return 1
-  fi
+fail() {
+  printf '%s\n' "$1" >&2
+  exit 1
 }
 
 verified_epoch_from_time() {
@@ -38,21 +27,6 @@ verified_epoch_from_time() {
   else
     return 1
   fi
-}
-
-permission_mode() {
-  local target="$1"
-  local mode
-
-  if mode="$(stat -f '%Lp' "$target" 2>/dev/null)"; then
-    :
-  elif mode="$(stat -c '%a' "$target" 2>/dev/null)"; then
-    :
-  else
-    return 1
-  fi
-  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
-  printf '%s\n' "$mode"
 }
 
 if [[ ! "$max_age_hours" =~ ^[1-9][0-9]{0,3}$ ]] \
@@ -78,10 +52,9 @@ if [[ "$state_dir" == "/" \
     "$state_dir" >&2
   exit 1
 fi
-if ! state_dir_mode="$(permission_mode "$state_dir")"; then
-  printf 'BATON_BACKUP_STATE_DIR permissions could not be inspected: %s\n' \
-    "$state_dir" >&2
-  exit 1
+if ! state_dir_mode="$(production_validation_portable_mode fail "$state_dir")" \
+  || [[ ! "$state_dir_mode" =~ ^[0-7]{3,4}$ ]]; then
+  fail "BATON_BACKUP_STATE_DIR permissions could not be inspected: $state_dir"
 fi
 if (( (8#$state_dir_mode & 077) != 0 )); then
   printf 'BATON_BACKUP_STATE_DIR must not grant group or other permissions: %s\n' \
@@ -92,10 +65,9 @@ if [[ -L "$success_file" || ! -f "$success_file" || ! -r "$success_file" || ! -O
   printf 'No successful off-site backup state found: %s\n' "$success_file" >&2
   exit 1
 fi
-if ! success_file_mode="$(permission_mode "$success_file")"; then
-  printf 'Successful backup state permissions could not be inspected: %s\n' \
-    "$success_file" >&2
-  exit 1
+if ! success_file_mode="$(production_validation_portable_mode fail "$success_file")" \
+  || [[ ! "$success_file_mode" =~ ^[0-7]{3,4}$ ]]; then
+  fail "Successful backup state permissions could not be inspected: $success_file"
 fi
 if (( (8#$success_file_mode & 077) != 0 )); then
   printf 'Successful backup state must not grant group or other permissions: %s\n' \
@@ -133,7 +105,7 @@ if [[ ! "$backup_epoch" =~ ^[0-9]{1,11}$ \
   printf 'Successful backup state is invalid: %s\n' "$success_file" >&2
   exit 1
 fi
-if ! name_epoch="$(backup_epoch_from_name "$backup_name")" \
+if ! name_epoch="$(production_validation_backup_epoch_from_name "$backup_name")" \
   || [[ "$name_epoch" != "$backup_epoch" ]]; then
   printf 'Successful backup state timestamp does not match its snapshot name: %s\n' \
     "$success_file" >&2
@@ -150,9 +122,10 @@ if [[ "$verified_epoch" -lt "$backup_epoch" || "$verified_epoch" -gt "$now_epoch
     "$success_file" >&2
   exit 1
 fi
+# 위 검사로 backup_epoch <= verified_epoch <= now_epoch이므로 age_seconds는 음수가 아니다.
 age_seconds=$((now_epoch - backup_epoch))
 max_age_seconds=$((max_age_hours * 60 * 60))
-if [[ $age_seconds -lt 0 || $age_seconds -gt $max_age_seconds ]]; then
+if [[ $age_seconds -gt $max_age_seconds ]]; then
   printf 'Latest off-site backup is stale: snapshot=%s, verified=%s, remote=%s, age_seconds=%d\n' \
     "$backup_name" "$verified_time" "$success_remote" "$age_seconds" >&2
   exit 1

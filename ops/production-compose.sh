@@ -166,13 +166,6 @@ if ! production_validation_parse_literal_env "$env_file"; then
   exit 1
 fi
 
-env_value() {
-  local wanted_key="$1"
-
-  production_validation_read_env_value "$wanted_key"
-  printf '%s' "$PRODUCTION_VALIDATION_VALUE"
-}
-
 case "$compose_command" in
   up|create|pull)
     if ! "$script_dir/verify-production-round-images.sh" "$env_file"; then
@@ -183,50 +176,57 @@ case "$compose_command" in
     ;;
 esac
 
-canonical_file() {
-  local target="$1"
-  local directory
-
-  directory="$(CDPATH= cd -- "$(dirname -- "$target")" && pwd -P)"
-  printf '%s/%s' "$directory" "$(basename -- "$target")"
+fail() {
+  printf 'Production Compose failed: %s\n' "$1" >&2
+  exit 1
 }
 
 read_secret_or_placeholder() {
   local target="$1"
   local placeholder="$2"
+  local value
 
   if [[ -z "$target" ]]; then
     printf '%s' "$placeholder"
     return 0
   fi
-  target="$(canonical_file "$target")"
-  printf '%s' "$(< "$target")"
+  target="$(production_validation_canonical_file fail "$target")" || exit 1
+  value="$(< "$target")" || fail "could not read secret file: $target"
+  printf '%s' "$value"
 }
 
-brevo_webhook_secret_file="$(env_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE)"
-turnstile_secret_file="$(env_value BATON_TURNSTILE_SECRET_KEY_FILE)"
-google_secret_file="$(env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
-naver_secret_file="$(env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
-cal_bearer_token_file="$(env_value BATON_CAL_BEARER_TOKEN_FILE)"
-holidays_service_key_file="$(env_value BATON_HOLIDAYS_SERVICE_KEY_FILE)"
-smtp_password_file="$(env_value BATON_SMTP_PASSWORD_FILE)"
-email_outbox_encryption_key_file="$(env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE)"
-brief_bearer_token_file="$(env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
-round_private_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE)"
-round_public_key_file="$(env_value BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE)"
-round_previous_public_key_file="$(
-  env_value BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE
+brevo_webhook_secret_file="$(production_validation_env_value BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE)"
+turnstile_secret_file="$(production_validation_env_value BATON_TURNSTILE_SECRET_KEY_FILE)"
+google_secret_file="$(production_validation_env_value BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE)"
+naver_secret_file="$(production_validation_env_value BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE)"
+cal_bearer_token_file="$(production_validation_env_value BATON_CAL_BEARER_TOKEN_FILE)"
+holidays_service_key_file="$(production_validation_env_value BATON_HOLIDAYS_SERVICE_KEY_FILE)"
+smtp_password_file="$(production_validation_env_value BATON_SMTP_PASSWORD_FILE)"
+email_outbox_encryption_key_file="$(
+  production_validation_env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE
 )"
-round_runtime_enabled="$(env_value BATON_ROUND_RUNTIME_ENABLED)"
+brief_bearer_token_file="$(production_validation_env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
+round_private_key_file="$(
+  production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE
+)"
+round_public_key_file="$(
+  production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PUBLIC_KEY_FILE
+)"
+round_previous_public_key_file="$(
+  production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PREVIOUS_PUBLIC_KEY_FILE
+)"
+round_runtime_enabled="$(production_validation_env_value BATON_ROUND_RUNTIME_ENABLED)"
 round_runtime_enabled="${round_runtime_enabled:-false}"
-oauth2_enabled="$(env_value BATON_AUTH_OAUTH2_ENABLED)"
+oauth2_enabled="$(production_validation_env_value BATON_AUTH_OAUTH2_ENABLED)"
 oauth2_enabled="${oauth2_enabled:-false}"
-brief_service_api_enabled="$(env_value BATON_BRIEF_SERVICE_API_ENABLED)"
+brief_service_api_enabled="$(production_validation_env_value BATON_BRIEF_SERVICE_API_ENABLED)"
 brief_service_api_enabled="${brief_service_api_enabled:-false}"
-round_turn_shared_secret_file="$(env_value BATON_ROUND_TURN_SHARED_SECRET_FILE)"
+round_turn_shared_secret_file="$(
+  production_validation_env_value BATON_ROUND_TURN_SHARED_SECRET_FILE
+)"
 round_runtime_uid="$(id -u)"
 round_runtime_gid="$(id -g)"
-email_delivery="$(env_value BATON_EMAIL_VERIFICATION_DELIVERY)"
+email_delivery="$(production_validation_env_value BATON_EMAIL_VERIFICATION_DELIVERY)"
 email_delivery="${email_delivery:-disabled}"
 
 if [[ "$round_runtime_enabled" == "true" \
@@ -254,7 +254,10 @@ smtp_password="$(
 holidays_service_key="$(
   read_secret_or_placeholder "$holidays_service_key_file" disabled-holidays-service-key
 )"
-email_outbox_encryption_key="$(< "$(canonical_file "$email_outbox_encryption_key_file")")"
+email_outbox_encryption_key_file="$(
+  production_validation_canonical_file fail "$email_outbox_encryption_key_file"
+)"
+email_outbox_encryption_key="$(< "$email_outbox_encryption_key_file")"
 brief_bearer_token="$(
   read_secret_or_placeholder "$brief_bearer_token_file" disabled-brief-bearer-token
 )"
@@ -271,7 +274,9 @@ round_previous_public_key="$(
 )"
 round_turn_shared_secret_path=/dev/null
 if [[ -n "$round_turn_shared_secret_file" ]]; then
-  round_turn_shared_secret_path="$(canonical_file "$round_turn_shared_secret_file")"
+  round_turn_shared_secret_path="$(
+    production_validation_canonical_file fail "$round_turn_shared_secret_file"
+  )"
 fi
 
 smtp_test_connection=false
@@ -319,6 +324,21 @@ elif [[ "$compose_command" == "down" ]]; then
   compose_arguments=("$compose_command" --remove-orphans "${@:2}")
 fi
 
+# 비밀값은 env 인자로 넘기면 잠시 프로세스 목록에 보이므로 명령 환경으로만 전달한다.
+# Compose v5의 bake는 작업 디렉터리 밖 빌드 비밀 파일(미설정 시 /dev/null)을 별도 권한 없이 읽지 못하고
+# docker compose에는 권한 옵션이 없다. 래퍼가 고정한 Compose 파일만 쓰므로 이 호출의 파일 권한 검사를 끈다.
+BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
+BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
+BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
+BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
+BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
+BATON_SECRET_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
+BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
+BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
+BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
+BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
+BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY="$round_public_key" \
+BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \
 env \
   -u BATON_HOST \
   -u BATON_DB_NAME \
@@ -363,6 +383,18 @@ env \
   -u BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET_FILE \
   -u BATON_AUTH_LOCAL_REGISTRATION_ENABLED \
   -u BATON_AUTH_PASSWORD_RESET_ENABLED \
+  -u BATON_SENTRY_DSN \
+  -u BATON_SENTRY_BROWSER_DSN \
+  -u BATON_SENTRY_ENVIRONMENT \
+  -u BATON_SENTRY_ORG \
+  -u BATON_SENTRY_PROJECT \
+  -u BATON_SENTRY_SOURCEMAPS_UPLOAD \
+  -u BATON_SENTRY_AUTH_TOKEN_FILE \
+  -u BATON_STATUS_PAGE_ENABLED \
+  -u BATON_BREVO_WEBHOOK_ENABLED \
+  -u BATON_TURNSTILE_ENABLED \
+  -u BATON_TURNSTILE_SITE_KEY \
+  -u BATON_TURNSTILE_EXPECTED_HOSTNAME \
   -u BATON_EMAIL_VERIFICATION_DELIVERY \
   -u BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE \
   -u BATON_EMAIL_FROM_ADDRESS \
@@ -384,23 +416,6 @@ env \
   -u BATON_ROUND_TURN_SHARED_SECRET_FILE \
   -u BATON_BACKUP_STATE_DIR \
   -u BATON_PRODUCTION_LIFECYCLE_LOCK_FD \
-  -u BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET \
-  -u BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET \
-  -u BATON_SECRET_CAL_BEARER_TOKEN \
-  -u BATON_SECRET_HOLIDAYS_SERVICE_KEY \
-  -u BATON_SECRET_SMTP_PASSWORD \
-  -u BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
-  -u BATON_SECRET_BRIEF_BEARER_TOKEN \
-  -u BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
-  -u BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY \
-  -u BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY \
-  -u BATON_SECRET_ROUND_TURN_SHARED_SECRET \
-  -u BATON_EFFECTIVE_ROUND_UID \
-  -u BATON_EFFECTIVE_ROUND_GID \
-  -u BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE \
-  -u BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE \
-  -u BATON_EFFECTIVE_SMTP_TEST_CONNECTION \
-  -u BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH \
   -u BATON_HTTP_PUBLISH \
   -u BATON_HTTPS_TCP_PUBLISH \
   -u BATON_HTTPS_UDP_PUBLISH \
@@ -414,42 +429,19 @@ env \
   -u COMPOSE_ANSI \
   -u COMPOSE_STATUS_STDOUT \
   -u COMPOSE_PROGRESS \
-  -u COMPOSE_MENU \
   -u COMPOSE_EXPERIMENTAL \
   -u COMPOSE_IGNORE_ORPHANS \
   -u COMPOSE_REMOVE_ORPHANS \
   -u COMPOSE_CONVERT_WINDOWS_PATHS \
-  -u DOCKER_HOST \
-  -u DOCKER_CONTEXT \
-  -u DOCKER_CONFIG \
-  -u DOCKER_TLS_VERIFY \
-  -u DOCKER_CERT_PATH \
-  -u DOCKER_API_VERSION \
-  -u DOCKER_DEFAULT_PLATFORM \
-  -u BUILDX_BUILDER \
-  -u BUILDX_CONFIG \
-  -u BUILDKIT_HOST \
-  -u DOCKER_BUILDKIT \
   COMPOSE_MENU=false \
-  BATON_SECRET_BREVO_WEBHOOK_BEARER_TOKEN="$brevo_webhook_secret" \
-  BATON_SECRET_TURNSTILE_SECRET_KEY="$turnstile_secret_key" \
-  BATON_SECRET_GOOGLE_OAUTH_CLIENT_SECRET="$google_client_secret" \
-  BATON_SECRET_NAVER_OAUTH_CLIENT_SECRET="$naver_client_secret" \
-  BATON_SECRET_CAL_BEARER_TOKEN="$cal_bearer_token" \
-  BATON_SECRET_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
-  BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
-  BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
-  BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
-  BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
-  BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY="$round_public_key" \
-  BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \
+  BUILDX_BAKE_ENTITLEMENTS_FS=0 \
   BATON_EFFECTIVE_ROUND_UID="$round_runtime_uid" \
   BATON_EFFECTIVE_ROUND_GID="$round_runtime_gid" \
   BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE="$spring_profiles_active" \
   BATON_EFFECTIVE_ROUND_TURN_SHARED_SECRET_FILE="$round_turn_shared_secret_path" \
   BATON_EFFECTIVE_SMTP_TEST_CONNECTION="$smtp_test_connection" \
   BATON_EFFECTIVE_ROUND_PREVIOUS_PUBLIC_KEY_PATH="$round_previous_container_path" \
-  docker --host unix:///var/run/docker.sock compose \
+  "${PRODUCTION_DOCKER_COMMAND[@]}" compose \
     --project-directory "$repo_root" \
     --project-name baton-production \
     --env-file "$env_file" \

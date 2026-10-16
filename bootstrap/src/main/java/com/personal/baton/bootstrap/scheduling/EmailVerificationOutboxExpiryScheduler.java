@@ -23,8 +23,7 @@ class EmailVerificationOutboxExpiryScheduler {
 
     @Scheduled(
             fixedDelayString = "${baton.identity.email-verification.expiry-interval:PT1M}",
-            initialDelayString = "${baton.identity.email-verification.expiry-interval:PT1M}",
-            scheduler = "taskScheduler"
+            initialDelayString = "${baton.identity.email-verification.expiry-interval:PT1M}"
     )
     void expireUndeliverable() {
         int expiredCount = expireEmailVerificationOutbox.expireUndeliverable();

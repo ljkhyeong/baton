@@ -2,9 +2,9 @@ package com.personal.baton.application.brief;
 
 import com.personal.baton.application.brief.port.in.DispatchBriefContinuityOutboxUseCase;
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
-import com.personal.baton.application.brief.port.out.BriefContinuityClient.DeliveryResult;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
 import com.personal.baton.application.delivery.DeliveryErrorCode;
+import com.personal.baton.application.delivery.DeliveryResult;
 import com.personal.baton.application.delivery.DispatchResult;
 import java.time.Clock;
 import java.time.Duration;

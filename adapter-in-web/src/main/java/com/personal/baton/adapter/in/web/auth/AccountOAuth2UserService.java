@@ -1,9 +1,9 @@
 package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase;
-import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.error.AccountDeactivatedException;
 import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginCommand;
+import com.personal.baton.application.identity.port.in.ResolveExternalLoginUseCase.ExternalLoginResult;
 import com.personal.baton.domain.identity.IdentityProvider;
 import java.util.Map;
 import java.util.Objects;
@@ -44,20 +44,20 @@ public final class AccountOAuth2UserService {
         String subject = requiredText(providerUser.getSubject(), "Google subject가 없습니다");
         String email = optionalText(providerUser.getEmail());
         String displayName = displayName(
+                "Google 사용자",
                 providerUser.getFullName(),
                 providerUser.getGivenName(),
                 providerUser.getPreferredUsername(),
-                email,
-                "Google 사용자"
+                email
         );
-        AccountView account = resolveIdentity(
+        ExternalLoginResult login = resolveIdentity(
                 IdentityProvider.GOOGLE,
                 subject,
                 email,
                 Boolean.TRUE.equals(providerUser.getEmailVerified()),
                 displayName
         );
-        return new OidcAccountPrincipal(account.accountId(), account.sessionVersion(), providerUser);
+        return new OidcAccountPrincipal(login.accountId(), login.sessionVersion(), providerUser);
     }
 
     public OAuth2User loadOAuth2User(OAuth2UserRequest request) {
@@ -69,22 +69,22 @@ public final class AccountOAuth2UserService {
         String subject = requiredText(profile.get("id"), "Naver profile id가 없습니다");
         String email = optionalText(profile.get("email"));
         String displayName = displayName(
+                "Naver 사용자",
                 optionalText(profile.get("name")),
                 optionalText(profile.get("nickname")),
-                email,
-                "Naver 사용자"
+                email
         );
-        AccountView account = resolveIdentity(
+        ExternalLoginResult login = resolveIdentity(
                 IdentityProvider.NAVER,
                 subject,
                 email,
                 false,
                 displayName
         );
-        return new OAuthAccountPrincipal(account.accountId(), account.sessionVersion(), providerUser);
+        return new OAuthAccountPrincipal(login.accountId(), login.sessionVersion(), providerUser);
     }
 
-    private AccountView resolveIdentity(
+    private ExternalLoginResult resolveIdentity(
             IdentityProvider provider,
             String providerSubject,
             String email,
@@ -98,7 +98,7 @@ public final class AccountOAuth2UserService {
                     email,
                     emailVerified,
                     displayName
-            )).account();
+            ));
         } catch (AccountDeactivatedException exception) {
             throw new OAuth2AuthenticationException(new OAuth2Error("account_deactivated"), exception.getMessage(), exception);
         } catch (RuntimeException exception) {
@@ -121,14 +121,14 @@ public final class AccountOAuth2UserService {
         throw invalidProviderProfile("Naver profile response가 없습니다");
     }
 
-    private String displayName(String... candidates) {
+    private String displayName(String fallback, String... candidates) {
         for (String candidate : candidates) {
             String value = optionalText(candidate);
             if (value != null) {
-                return limitDisplayName(value, MAXIMUM_DISPLAY_NAME_LENGTH);
+                return limitDisplayName(value);
             }
         }
-        throw invalidProviderProfile("표시 이름을 결정할 수 없습니다");
+        return fallback;
     }
 
     private String requiredText(Object value, String message) {
@@ -146,11 +146,11 @@ public final class AccountOAuth2UserService {
         return text.trim();
     }
 
-    private String limitDisplayName(String value, int maximumLength) {
-        if (value.length() <= maximumLength) {
+    private String limitDisplayName(String value) {
+        if (value.length() <= MAXIMUM_DISPLAY_NAME_LENGTH) {
             return value;
         }
-        int endIndex = maximumLength;
+        int endIndex = MAXIMUM_DISPLAY_NAME_LENGTH;
         if (Character.isHighSurrogate(value.charAt(endIndex - 1))
                 && Character.isLowSurrogate(value.charAt(endIndex))) {
             endIndex--;

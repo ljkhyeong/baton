@@ -51,8 +51,6 @@ public class ContentChange {
         return change;
     }
     public UUID getId() { return id; }
-    public UUID getTeamId() { return teamId; }
-    public UUID getSeasonId() { return seasonId; }
     public UUID getActorAccountId() { return actorAccountId; }
     public String getActorName() { return actorName; }
     public Instant getChangedAt() { return changedAt; }

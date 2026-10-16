@@ -7,9 +7,7 @@ import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,20 +41,10 @@ public class CalendarSnapshotBackfillWorker {
         if (round == null) {
             return;
         }
-        CalendarTextCompatibility.require(round.getId(), "summary", round.getName());
-        List<RoutineExecution> executions = operationsRepository
-                .findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()));
-        for (RoutineExecution execution : executions) {
-            if (execution.getDeadlineAt() == null) {
-                continue;
-            }
-            CalendarTextCompatibility.require(execution.getId(), "summary", execution.getTitle());
-            CalendarTextCompatibility.require(
-                    execution.getId(),
-                    "description",
-                    execution.getDetail()
-            );
-        }
+        requireTextCompatibility(
+                round,
+                operationsRepository.findRoutineExecutionsBySeasonRoundIds(List.of(round.getId()))
+        );
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -76,25 +64,37 @@ public class CalendarSnapshotBackfillWorker {
                 ));
         List<RoutineExecution> executions = operationsRepository
                 .findRoutineExecutionsBySeasonRoundIdWithSharedLock(round.getId());
-        Instant occurredAt = clock.instant();
-        int appendedCount = outboxPort.appendIfChanged(snapshotFactory.fromRound(
-                UUID.randomUUID(),
-                occurredAt,
+        // 사전 점검 이후 변경될 수 있으므로 잠금으로 확정한 현재 문자열을 검사한다.
+        requireTextCompatibility(round, executions);
+        int appendedCount = 0;
+        for (CalendarSnapshotDraft snapshot : snapshotFactory.roundSnapshots(
+                clock.instant(),
                 season,
-                round
-        )) ? 1 : 0;
-        for (RoutineExecution execution : executions) {
-            var snapshot = snapshotFactory.fromExecution(
-                    UUID.randomUUID(),
-                    occurredAt,
-                    round,
-                    execution
-            );
-            if (snapshot.isPresent() && outboxPort.appendIfChanged(snapshot.get())) {
+                round,
+                executions
+        )) {
+            if (outboxPort.appendIfChanged(snapshot)) {
                 appendedCount++;
             }
         }
         return appendedCount;
     }
 
+    private static void requireTextCompatibility(
+            SeasonRound round,
+            List<RoutineExecution> executions
+    ) {
+        CalendarTextCompatibility.require(round.getId(), "summary", round.getName());
+        for (RoutineExecution execution : executions) {
+            if (execution.getDeadlineAt() == null) {
+                continue;
+            }
+            CalendarTextCompatibility.require(execution.getId(), "summary", execution.getTitle());
+            CalendarTextCompatibility.require(
+                    execution.getId(),
+                    "description",
+                    execution.getDetail()
+            );
+        }
+    }
 }

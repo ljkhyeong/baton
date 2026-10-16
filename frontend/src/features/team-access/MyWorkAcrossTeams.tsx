@@ -2,7 +2,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { generatePath, Link } from 'react-router-dom'
 import { WORKSPACE_ROUTE } from '@/shared/lib/workspaceRoute'
-import { getNotificationPreferences } from '@/features/notifications/api'
+import { notificationPreferencesQueryOptions } from '@/features/notifications/api'
 import { isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import type { WorkspaceScope } from '@/features/workspace/api'
@@ -19,8 +19,7 @@ const workspaceOptions = (scope: WorkspaceScope) => ({ ...workspaceQueryOptions(
 
 export function MyWorkAcrossTeams({ accountId, teams }: { accountId: string; teams: Teams }) {
   const [filter, setFilter] = useState('all')
-  const preferences = useQuery({ queryKey: ['auth', 'notification-preferences', accountId],
-    queryFn: () => getNotificationPreferences(accountId), staleTime: 0 })
+  const preferences = useQuery(notificationPreferencesQueryOptions(accountId))
   const primary = useQueries({ queries: teams.map(team => workspaceOptions({ accountId, teamId: team.teamId, seasonId: team.seasonId, accessKey: '' })) })
   const otherScopes = primary.flatMap((query, index) => query.data && !query.isError
     ? query.data.seasons.filter(season => !season.endedAt && season.id !== teams[index]!.seasonId)

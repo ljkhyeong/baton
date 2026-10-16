@@ -266,8 +266,10 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       BATON_SENTRY_ENVIRONMENT|\
       BATON_SENTRY_ORG|\
       BATON_SENTRY_PROJECT|\
-      BATON_SENTRY_AUTH_TOKEN_FILE|\
-      BATON_BREVO_WEBHOOK_ENABLED|\
+      BATON_SENTRY_AUTH_TOKEN_FILE)
+      # Sentry 값의 형식은 검사하지 않는다. 소스맵 업로드 필수값은 웹 이미지 빌드가 확인한다.
+      ;;
+    BATON_BREVO_WEBHOOK_ENABLED|\
       BATON_BREVO_WEBHOOK_BEARER_TOKEN_FILE|\
       BATON_TURNSTILE_ENABLED|\
       BATON_TURNSTILE_SITE_KEY|\
@@ -333,9 +335,8 @@ validate_secret() {
   local name="$1"
   local value="$2"
 
-  if [[ ${#value} -lt 32 || ${#value} -gt 200 || ! "$value" =~ ^[A-Za-z0-9._~-]+$ ]]; then
-    fail "$name must be 32-200 URL-safe ASCII characters"
-  fi
+  production_validation_is_url_safe_secret "$value" \
+    || fail "$name must be 32-200 URL-safe ASCII characters"
 }
 
 validate_https_origin() {

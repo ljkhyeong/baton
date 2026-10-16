@@ -1,12 +1,12 @@
 package com.personal.baton.adapter.out.persistence.brief;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.instant;
 import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
 
 import com.personal.baton.application.brief.port.out.BriefEditionGenerationExecutionPort;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,8 +43,7 @@ public class JdbcBriefEditionGenerationExecutionAdapter
                         resultSet.getLong("watermark"),
                         resultSet.getLong("pending_count"),
                         resultSet.getLong("failed_count"),
-                        resultSet.getObject("last_delivered_at", LocalDateTime.class) == null ? null
-                                : resultSet.getObject("last_delivered_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)
+                        instant(resultSet, "last_delivered_at")
                 ),
                 teamId.toString(),
                 seasonId.toString()
@@ -76,8 +75,7 @@ public class JdbcBriefEditionGenerationExecutionAdapter
                 WHERE team_id = UUID_TO_BIN(?) AND season_id = UUID_TO_BIN(?)
                 AND week_start = ? AND zone_id = ? AND delivery_watermark = ?
                 """, (rs, row) -> new ExecutionState(rs.getString("execution_status"),
-                        rs.getObject("lease_expires_at", LocalDateTime.class) == null ? null
-                                : rs.getObject("lease_expires_at", LocalDateTime.class).toInstant(ZoneOffset.UTC)),
+                        instant(rs, "lease_expires_at")),
                 target.teamId().toString(), target.seasonId().toString(), target.weekStart(),
                 target.zoneId().getId(), target.deliveryWatermark()).stream().findFirst();
     }
@@ -139,8 +137,7 @@ public class JdbcBriefEditionGenerationExecutionAdapter
                     edition_generation,
                     source_cursor,
                     edition_etag,
-                    created_new,
-                    result_code
+                    created_new
                 FROM brief_edition_generation_execution
                 WHERE team_id = UUID_TO_BIN(?)
                 AND season_id = UUID_TO_BIN(?)
@@ -159,8 +156,7 @@ public class JdbcBriefEditionGenerationExecutionAdapter
                         resultSet.getObject("edition_generation", Long.class),
                         resultSet.getObject("source_cursor", Long.class),
                         resultSet.getString("edition_etag"),
-                        resultSet.getObject("created_new", Boolean.class),
-                        resultSet.getString("result_code")
+                        resultSet.getObject("created_new", Boolean.class)
                 ),
                 target.teamId().toString(),
                 target.seasonId().toString(),
@@ -170,20 +166,17 @@ public class JdbcBriefEditionGenerationExecutionAdapter
         );
 
         if (!deliveryComplete) {
-            return new ClaimResult.DeliveryIncomplete(execution.executionId());
+            return new ClaimResult.DeliveryIncomplete();
         }
         if ("SUCCEEDED".equals(execution.status())) {
             return execution.completed();
         }
         if ("PERMANENT_FAILURE".equals(execution.status())) {
-            return new ClaimResult.PermanentlyFailed(
-                    execution.executionId(),
-                    execution.resultCode()
-            );
+            return new ClaimResult.PermanentlyFailed();
         }
         if ("PROCESSING".equals(execution.status())
                 && execution.leaseExpiresAt().isAfter(now)) {
-            return new ClaimResult.InProgress(execution.executionId());
+            return new ClaimResult.InProgress();
         }
 
         UUID leaseToken = UUID.randomUUID();
@@ -316,8 +309,7 @@ public class JdbcBriefEditionGenerationExecutionAdapter
             Long generation,
             Long sourceCursor,
             String etag,
-            Boolean created,
-            String resultCode
+            Boolean created
     ) {
 
         private ClaimResult.Completed completed() {

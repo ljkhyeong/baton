@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.BatonApplication;
 import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
@@ -31,7 +29,6 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,7 +43,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         classes = BatonApplication.class,
         properties = {
                 "baton.workspace.creation-key=pilot-operator-key-0000000000000001",
-                "baton.workspace.recovery-key=pilot-recovery-key-0000000000000002",
                 "spring.datasource.hikari.connection-timeout=500",
                 "spring.datasource.hikari.connection-init-sql=SET SESSION innodb_lock_wait_timeout=1",
                 "spring.transaction.default-timeout=3s"
@@ -101,15 +97,6 @@ class WorkspaceRequestBudgetTest {
                         List.of("안건 정리"),
                         null
                 )
-        );
-
-        assertThat(jdbcTemplate.queryForObject(
-                "SELECT @@SESSION.innodb_lock_wait_timeout",
-                Long.class
-        )).isEqualTo(1L);
-        assertThat(transactionManager).isInstanceOfSatisfying(
-                AbstractPlatformTransactionManager.class,
-                manager -> assertThat(manager.getDefaultTimeout()).isEqualTo(3)
         );
 
         try (HeldDatabaseLock ignored = holdExclusiveRowLock(

@@ -1,30 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
-import type {
-  Decision,
-  HandoffItem,
-  Role,
-  RoleResource,
-  Season,
-  WorkspaceProjection,
-} from '../types'
+import type { WorkspaceProjection } from '../types'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import {
   compareRecordSearchResults,
+  initialRecordSearchFilters,
   isRecordSearchDateRangeValid,
   searchWorkspaceRecords,
   type RecordSearchFilters,
   type RecordSearchResult,
 } from './recordSearch'
-
-export const initialRecordSearchFilters: RecordSearchFilters = {
-  query: '',
-  type: 'all',
-  roleId: '',
-  state: 'all',
-  fromDate: '',
-  toDate: '',
-}
 
 const kindCopy = {
   decision: '결정',
@@ -39,40 +24,30 @@ function resultActionLabel(result: RecordSearchResult) {
 }
 
 type RecordSearchViewProps = {
-  season: Season
-  otherSeasons?: WorkspaceProjection[]
-  scopeControl?: ReactNode
-  partial?: boolean
-  onOpenOtherSeason?: (result: RecordSearchResult, seasonId: string) => string
-  roles: Role[]
-  decisions: Decision[]
-  handoffItems: HandoffItem[]
-  resources: RoleResource[]
+  workspace: WorkspaceProjection
+  otherSeasons: WorkspaceProjection[]
+  scopeControl: ReactNode
+  partial: boolean
+  otherSeasonHref: (result: RecordSearchResult, seasonId: string) => string
   filters: RecordSearchFilters
   onFiltersChange: (filters: RecordSearchFilters) => void
   onOpenResult: (result: RecordSearchResult) => void
 }
 
 export function RecordSearchView({
-  season,
-  otherSeasons = [],
+  workspace,
+  otherSeasons,
   scopeControl,
-  partial = false,
-  onOpenOtherSeason,
-  roles,
-  decisions,
-  handoffItems,
-  resources,
+  partial,
+  otherSeasonHref,
   filters,
   onFiltersChange,
   onOpenResult,
 }: RecordSearchViewProps) {
-  const sources = useMemo(
-    () => [{ season, decisions, handoffItems, resources, roles }, ...otherSeasons],
-    [season, decisions, handoffItems, resources, roles, otherSeasons],
-  )
+  const season = workspace.season
+  const sources = useMemo(() => [workspace, ...otherSeasons], [workspace, otherSeasons])
   const results = useMemo(
-    () => sources.flatMap(source => searchWorkspaceRecords(source, filters, source.season.timeZone)
+    () => sources.flatMap(source => searchWorkspaceRecords(source, filters)
       .map(result => ({ ...result, originSeason: source.season }))).sort(compareRecordSearchResults),
     [filters, sources],
   )
@@ -138,7 +113,7 @@ export function RecordSearchView({
               >
                 <option value="">모든 역할</option>
                 {sources.map(source => <optgroup key={source.season.id} label={source.season.name}>
-                  {source.roles.map(role => <option key={role.id} value={role.id}>{source.season.id === season.id && sources.length === 1 ? role.name : `${source.season.name} · ${role.name}`}</option>)}
+                  {source.roles.map(role => <option key={role.id} value={role.id}>{sources.length === 1 ? role.name : `${source.season.name} · ${role.name}`}</option>)}
                 </optgroup>)}
               </select>
             </label>
@@ -253,11 +228,7 @@ export function RecordSearchView({
                           자료 새 창에서 열기
                         </a>
                       )}
-                      {!result.archivedAt && result.originSeason.id !== season.id && onOpenOtherSeason && (
-                        <a href={onOpenOtherSeason(result, result.originSeason.id)} target="_blank" rel="noopener noreferrer"
-                          aria-label={`${result.title} 원본 시즌 새 창에서 보기`}>원본 시즌 새 창에서 보기</a>
-                      )}
-                      {!result.archivedAt && result.originSeason.id === season.id && (
+                      {!result.archivedAt && (result.originSeason.id === season.id ? (
                         <button
                           type="button"
                           aria-label={`${result.title} ${resultActionLabel(result)}`}
@@ -265,7 +236,10 @@ export function RecordSearchView({
                         >
                           {resultActionLabel(result)}
                         </button>
-                      )}
+                      ) : (
+                        <a href={otherSeasonHref(result, result.originSeason.id)} target="_blank" rel="noopener noreferrer"
+                          aria-label={`${result.title} 원본 시즌 새 창에서 보기`}>원본 시즌 새 창에서 보기</a>
+                      ))}
                     </div>
                   </article>
                 </li>

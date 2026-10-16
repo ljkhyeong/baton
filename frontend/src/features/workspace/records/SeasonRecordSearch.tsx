@@ -24,11 +24,10 @@ export function SeasonRecordSearch({ scope, workspace, allSeasons, onAllSeasonsC
   const loading = queries.filter(query => query.isPending).length
   const failed = queries.flatMap((query, index) => query.isError ? [{ name: seasons[index]!.name, query }] : [])
   const available = queries.flatMap(query => query.data && !query.isError ? [query.data] : [])
-  return <RecordSearchView season={workspace.season} roles={workspace.roles} decisions={workspace.decisions}
-    handoffItems={workspace.handoffItems} resources={workspace.resources} otherSeasons={available}
+  return <RecordSearchView workspace={workspace} otherSeasons={available}
     filters={filters} onFiltersChange={onFiltersChange} onOpenResult={onOpenResult}
     partial={loading > 0 || failed.length > 0}
-    onOpenOtherSeason={(result, seasonId) => {
+    otherSeasonHref={(result, seasonId) => {
       const query = new URLSearchParams({ recordKind: result.kind, recordId: result.id })
       const fragment = scope.accessKey ? `#accessKey=${encodeURIComponent(scope.accessKey)}` : ''
       return `${generatePath(WORKSPACE_ROUTE, { teamId: scope.teamId, seasonId })}?${query}${fragment}`

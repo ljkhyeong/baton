@@ -8,9 +8,9 @@ import { isActiveMember } from '@/features/workspace/workspacePresentation'
 import { isAccessDenied } from '@/shared/api/ApiError'
 import { formatInstant } from '@/shared/lib/dateTimeFormat'
 import { isSameUuid } from '@/shared/api/responseValidation'
-import { getAttentionPage, getAttentionSummary, getAttentionTransitions, getWeeklyResolutions } from './api'
+import { briefScopeKey, getAttentionPage, getAttentionSummary, getAttentionTransitions, getWeeklyResolutions } from './api'
 import { BriefEditionSection } from './BriefEditionSection'
-import { attentionReasons } from './types'
+import { activeSinceText, attentionReasons, severityLabel, statusLabel } from './types'
 import type { AttentionCursor, AttentionFilter, BriefScope } from './types'
 import { BriefSources, BriefSourceLink } from './BriefSources'
 import type { BriefSource } from './types'
@@ -37,7 +37,7 @@ function BriefAttentionAccess({ workspace, accessKey, changesDisabled, onManageM
     <WorkspaceLoginLink teamId={workspace.team.id} seasonId={workspace.season.id} accessKey={accessKey}>로그인</WorkspaceLoginLink></p>
   if (membership.isPending) return <p role="status">팀 구성원 연결을 확인하고 있습니다.</p>
   if (membership.isError) return <p role="alert">구성원 연결을 확인하지 못했습니다. <button onClick={() => void membership.refetch()}>다시 확인</button></p>
-  if (!membership.data?.claimed) return <p>점검 항목을 보려면 계정을 팀 구성원과 연결해 주세요. <button onClick={onManageMembership}>구성원 연결하기</button></p>
+  if (!membership.data.claimed) return <p>점검 항목을 보려면 계정을 팀 구성원과 연결해 주세요. <button onClick={onManageMembership}>구성원 연결하기</button></p>
   const memberId = membership.data.memberId
   const member = workspace.members.find((candidate) => isSameUuid(candidate.id, memberId))
   if (!member || !isActiveMember(member)) return <p>활동 중인 팀 구성원만 주간 업무 점검을 볼 수 있습니다.</p>
@@ -54,7 +54,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
   const [cursor, setCursor] = useState<AttentionCursor | null>(null)
   const [selected, setSelected] = useState<AttentionCursor | null>(null)
   const [before, setBefore] = useState<number | null>(null)
-  const scopeKey = ['brief', scope.accountId, scope.teamId, scope.seasonId, { accessKey: scope.accessKey }]
+  const scopeKey = briefScopeKey(scope)
   const summary = useQuery({ queryKey: [...scopeKey, 'summary'],
     queryFn: ({ signal }) => getAttentionSummary(scope, signal), retry: false, staleTime: 0 })
   const resolutions = useQuery({ queryKey: [...scopeKey, 'weekly-resolutions', resolutionPage],
@@ -74,6 +74,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
   const resolutionWeekChanged = Boolean(resolutionPage && resolutionData
     && (resolutionPage.weekStart !== resolutionData.weekStart || resolutionPage.zoneId !== resolutionData.zoneId))
   const pageData = page.isError ? undefined : page.data
+  const now = new Date()
   const accessError = [summary.error, page.error, history.error, resolutions.error].find(isAccessDenied)
   if (accessError) return <p role="alert">{accessError.message}{' '}
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
@@ -138,9 +139,10 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
     {pageData && <BriefSources scope={scope} items={pageData.items} onOpen={onOpenSource}>
       {pageData.items.length === 0 ? <p role="status">선택한 조건에 해당하는 점검 항목이 없습니다.</p> : <ul className="brief-items">
         {pageData.items.map((item) => <li key={`${item.reasonCode}:${item.sourceReference}`}>
-          <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{item.severity === 'HIGH' ? '높음' : '보통'} · {item.status === 'ACTIVE' ? '미해결' : '해결'}{item.revisionGap && ' · 누락 있음'}</span></div>
+          <div><strong>{attentionReasons[item.reasonCode]}</strong><span>{severityLabel(item.severity)} · {statusLabel(item.status)}{item.revisionGap && ' · 누락 있음'}</span></div>
           <BriefSourceLink item={item} readOnly={readOnly} />
           <small>상태 기록 {formatInstant(item.observedAt, timeZone)} ({timeZone})</small>
+          {item.status === 'ACTIVE' && item.activeSince !== null && <small>{activeSinceText(item, timeZone, now)}</small>}
           <button type="button" aria-controls={historyId}
             aria-expanded={selected?.eventType === item.reasonCode && selected.sourceReference === item.sourceReference}
             onClick={() => { setSelected({ eventType: item.reasonCode, sourceReference: item.sourceReference }); setBefore(null) }}>
@@ -173,7 +175,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
       {!history.isError && history.data && (history.data.transitions.length === 0
         ? <p role="status">이 항목의 변경 이력이 없습니다.</p>
         : <ol className="brief-transitions">{history.data.transitions.map((entry) => <li key={entry.eventId}>
-          <strong>{entry.state === 'ACTIVE' ? '미해결' : '해결'}</strong>
+          <strong>{statusLabel(entry.state)}</strong>
           <span>{formatInstant(entry.observedAt, timeZone)} ({timeZone})</span>
           <span>원본 심각도: {entry.sourceSeverity === 'CRITICAL' ? '긴급' : entry.sourceSeverity === 'WARNING' ? '주의' : '미기록'}</span>
           <details className="brief-evidence"><summary>변경 근거 보기</summary>

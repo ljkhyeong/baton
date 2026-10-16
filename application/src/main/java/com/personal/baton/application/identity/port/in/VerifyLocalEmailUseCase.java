@@ -1,11 +1,8 @@
 package com.personal.baton.application.identity.port.in;
 
-import com.personal.baton.application.identity.AccountView;
-import java.time.Instant;
-
 public interface VerifyLocalEmailUseCase {
 
-    LocalEmailVerificationResult verifyLocalEmail(VerifyLocalEmailCommand command);
+    void verifyLocalEmail(VerifyLocalEmailCommand command);
 
     record VerifyLocalEmailCommand(
             String verificationToken,
@@ -17,11 +14,5 @@ public interface VerifyLocalEmailUseCase {
             return "VerifyLocalEmailCommand["
                     + "verificationToken=[REDACTED], rawPassword=[REDACTED]]";
         }
-    }
-
-    record LocalEmailVerificationResult(
-            AccountView account,
-            Instant verifiedAt
-    ) {
     }
 }

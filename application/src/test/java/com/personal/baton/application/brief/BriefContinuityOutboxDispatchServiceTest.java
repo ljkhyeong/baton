@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.personal.baton.application.brief.port.out.BriefContinuityClient;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
+import com.personal.baton.application.delivery.DeliveryResult;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import java.time.Clock;
@@ -38,11 +39,11 @@ class BriefContinuityOutboxDispatchServiceTest {
                 .thenReturn(List.of(retryable))
                 .thenReturn(List.of(permanent));
         when(client.deliver(delivered))
-                .thenReturn(BriefContinuityClient.DeliveryResult.delivered("HTTP_202"));
+                .thenReturn(DeliveryResult.delivered("HTTP_202"));
         when(client.deliver(retryable))
-                .thenReturn(BriefContinuityClient.DeliveryResult.retryable("HTTP_503"));
+                .thenReturn(DeliveryResult.retryable("HTTP_503"));
         when(client.deliver(permanent))
-                .thenReturn(BriefContinuityClient.DeliveryResult.permanentFailure("HTTP_422"));
+                .thenReturn(DeliveryResult.permanentFailure("HTTP_422"));
         when(outboxPort.markDelivered(
                 delivered.outboxId(),
                 delivered.leaseToken(),
@@ -89,7 +90,6 @@ class BriefContinuityOutboxDispatchServiceTest {
                         NOW,
                         BriefContinuityEvent.State.ACTIVE
                 ),
-                1,
                 UUID.randomUUID()
         );
     }

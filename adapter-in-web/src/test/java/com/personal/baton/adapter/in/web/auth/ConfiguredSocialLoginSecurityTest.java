@@ -1,15 +1,10 @@
 package com.personal.baton.adapter.in.web.auth;
 
-import static org.mockito.ArgumentMatchers.anyLong;
-
-import org.junit.jupiter.api.BeforeEach;
-
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
-import com.personal.baton.application.identity.AccountView;
 import com.personal.baton.application.identity.port.in.LoadLocalCredentialUseCase;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.PasswordResetUseCase;
@@ -90,11 +85,6 @@ class ConfiguredSocialLoginSecurityTest {
 
     @MockitoBean
     private HumanVerificationUseCase humanVerificationUseCase;
-
-    @BeforeEach
-    void acceptCurrentAccountSessions() {
-        when(validateAccountSessionUseCase.isAccountSessionCurrent(any(), anyLong())).thenReturn(true);
-    }
 
     private static final UUID ACCOUNT_ID =
             UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
@@ -226,10 +216,7 @@ class ConfiguredSocialLoginSecurityTest {
         when(oidcUserService.loadUser(any(OidcUserRequest.class)))
                 .thenAnswer(invocation -> providerUser(invocation.getArgument(0)));
         when(resolveExternalLoginUseCase.resolveExternalLogin(any())).thenReturn(
-                new ExternalLoginResult(
-                        new AccountView(ACCOUNT_ID, "Google Member", List.of(), 5),
-                        true
-                )
+                new ExternalLoginResult(ACCOUNT_ID, 5, true)
         );
 
         MvcResult callbackResult = mockMvc.perform(get("/login/oauth2/code/google")

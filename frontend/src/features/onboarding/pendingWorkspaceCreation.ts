@@ -9,15 +9,17 @@ import {
 import { runWithBrowserLock } from '@/shared/lib/browserLock'
 import { isCalendarDate } from '@/shared/lib/calendarDate'
 import { isValidIdempotencyKey } from '@/shared/lib/idempotencyKey'
+import { workspaceTemplates } from './workspaceTemplates'
 import {
   MAX_INITIAL_MEMBER_COUNT,
   MAX_MEMBER_NAME_LENGTH,
+  MAX_PENDING_CREATIONS,
   MAX_WORKSPACE_NAME_LENGTH,
 } from './workspaceCreationConstraints'
 
 const PENDING_CREATION_STORAGE_PREFIX = 'baton-pending-workspace-creation:v3:'
-const MAX_PENDING_CREATIONS = 5
 const WORKSPACE_CREATION_LOCK_NAME = 'baton-workspace-creation'
+export const WORKSPACE_CREATION_BUSY_MESSAGE = '다른 탭에서 생성 결과를 확인하고 있습니다. 끝난 뒤 다시 시도해 주세요.'
 
 type PendingWorkspaceCreation = {
   normalizedPayload: string
@@ -83,13 +85,11 @@ function isNormalizedPayload(value: unknown): value is string {
       || typeof parsed.seasonName !== 'string'
       || !parsed.seasonName
       || parsed.seasonName.length > MAX_WORKSPACE_NAME_LENGTH
-      || typeof parsed.startDate !== 'string'
-      || typeof parsed.endDate !== 'string'
       || !isCalendarDate(parsed.startDate)
       || !isCalendarDate(parsed.endDate)
       || parsed.startDate > parsed.endDate
-      || !(parsed.template === undefined || parsed.template === 'STUDY_V1' || parsed.template === 'TEAM_V1'
-        || parsed.template === 'TASK_FORCE_V1')
+      || !(parsed.template === undefined
+        || (typeof parsed.template === 'string' && Object.hasOwn(workspaceTemplates, parsed.template)))
       || !Array.isArray(parsed.memberNames)
       || !parsed.memberNames.length
       || parsed.memberNames.length > MAX_INITIAL_MEMBER_COUNT
@@ -154,9 +154,7 @@ function readPendingItem(
     const serialized = window.localStorage.getItem(key)
     if (serialized === null) return { status: 'missing' }
     const parsed: unknown = JSON.parse(serialized)
-    if (!isPendingWorkspaceCreation(parsed)
-      || storageKey(parsed.idempotencyKey) !== key
-      || !pendingMatchesItem(parsed, item)) {
+    if (!isPendingWorkspaceCreation(parsed) || !pendingMatchesItem(parsed, item)) {
       return { status: 'changed' }
     }
     return { status: 'ready' }
@@ -165,11 +163,15 @@ function readPendingItem(
   }
 }
 
+// 생성 시각이 같으면 저장 키 순서로 고정한다.
+function byCreation(left: LocatedPendingCreation, right: LocatedPendingCreation) {
+  return left.pending.createdAt - right.pending.createdAt || left.storageKey.localeCompare(right.storageKey)
+}
+
 function earliestForPayload(entries: LocatedPendingCreation[], normalizedPayload: string) {
   return entries
     .filter(({ pending }) => pending.normalizedPayload === normalizedPayload)
-    .sort((left, right) => left.pending.createdAt - right.pending.createdAt
-      || left.storageKey.localeCompare(right.storageKey))[0]
+    .sort(byCreation)[0]
 }
 
 export function listPendingWorkspaceCreations(): PendingWorkspaceCreationListResult {
@@ -177,8 +179,7 @@ export function listPendingWorkspaceCreations(): PendingWorkspaceCreationListRes
   if (pendingCreations === null) return { status: 'unavailable' }
 
   const items = pendingCreations
-    .sort((left, right) => left.pending.createdAt - right.pending.createdAt
-      || left.storageKey.localeCompare(right.storageKey))
+    .sort(byCreation)
     .map(({ pending }) => ({
       request: JSON.parse(pending.normalizedPayload) as CreateWorkspaceRequest,
       idempotencyKey: pending.idempotencyKey,

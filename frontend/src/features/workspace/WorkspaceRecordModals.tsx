@@ -16,6 +16,7 @@ import type {
 } from './WorkspaceModalPrimitives'
 import {
   categoryCopy,
+  getMember,
   isActiveMember,
   memberSelectionOptions,
 } from './workspacePresentation'
@@ -76,9 +77,7 @@ export function DecisionModal({
   )
   const draft = useRecordDraft(draftScope, 'decision', decision?.id ?? 'new', { title, reason, alternative, textFormat })
   const authorOptions = memberSelectionOptions(members, decision?.authorMemberId)
-  const existingAuthor = decision
-    ? members.find((member) => member.id === decision.authorMemberId)
-    : undefined
+  const existingAuthor = getMember(members, decision?.authorMemberId)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!title.trim() || !reason.trim() || !roleIds.length || !authorMemberId
@@ -110,7 +109,6 @@ export function DecisionModal({
         <label>
           <span>무엇을 결정했나요?</span>
           <input
-            autoFocus
             required
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -207,10 +205,46 @@ export function DecisionModal({
     </ModalShell>
   )
 }
+// 전달한 인수인계로 잠긴 역할은 고를 수 없으므로 처음 값도 잠기지 않은 역할로 정한다.
+function initialUnlockedRoleId(
+  roles: Role[],
+  lockedRoleIds: ReadonlySet<string>,
+  selectedRoleId: string,
+  currentRoleId?: string,
+) {
+  return (currentRoleId ?? (lockedRoleIds.has(selectedRoleId) ? '' : selectedRoleId))
+    || roles.find((role) => !lockedRoleIds.has(role.id))?.id
+    || ''
+}
+
+function LockedRoleSelect({ roles, lockedRoleIds, value, onChange, lockedMessage }: {
+  roles: Role[]
+  lockedRoleIds: ReadonlySet<string>
+  value: string
+  onChange: (roleId: string) => void
+  lockedMessage: string
+}) {
+  return (
+    <>
+      <label>
+        <span>역할</span>
+        <select required value={value} onChange={(event) => onChange(event.target.value)}>
+          {roles.map((role) => (
+            <option key={role.id} value={role.id} disabled={lockedRoleIds.has(role.id)}>
+              {role.name}{lockedRoleIds.has(role.id) ? ' · 수락 대기' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      {lockedRoleIds.has(value) && <p className="form-error" role="alert">{lockedMessage}</p>}
+    </>
+  )
+}
+
 export function RoleResourceModal({
   draftScope,
   roles,
-  lockedRoleIds = new Set<string>(),
+  lockedRoleIds,
   selectedRoleId,
   resource,
   initialResource,
@@ -223,7 +257,7 @@ export function RoleResourceModal({
 }: CreationModalStatus & {
   draftScope: WorkspaceScope | null
   roles: Role[]
-  lockedRoleIds?: ReadonlySet<string>
+  lockedRoleIds: ReadonlySet<string>
   selectedRoleId: string
   resource?: RoleResource
   initialResource?: Pick<RoleResource, 'title' | 'url' | 'description'>
@@ -234,10 +268,7 @@ export function RoleResourceModal({
   const submission = useSubmissionLock(pending)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const [roleId, setRoleId] = useState(
-    (resource?.roleId
-      ?? (lockedRoleIds.has(selectedRoleId) ? '' : selectedRoleId))
-      || roles.find((role) => !lockedRoleIds.has(role.id))?.id
-      || '',
+    initialUnlockedRoleId(roles, lockedRoleIds, selectedRoleId, resource?.roleId),
   )
   const [title, setTitle] = useState(resource?.title ?? initialResource?.title ?? '')
   const [url, setUrl] = useState(resource?.url ?? initialResource?.url ?? '')
@@ -287,26 +318,17 @@ export function RoleResourceModal({
         <RecordDraftNotice draft={draft} pending={submission.pending} onRestore={value => {
           setTitle(value.title ?? ''); setUrl(value.url ?? ''); setDescription(value.description ?? '')
         }} />
-        <label>
-          <span>역할</span>
-          <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id} disabled={lockedRoleIds.has(role.id)}>
-                {role.name}{lockedRoleIds.has(role.id) ? ' · 수락 대기' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        {lockedRoleIds.has(roleId) && (
-          <p className="form-error" role="alert">
-            인수인계 전달 후에는 수락하거나 취소해야 자료를 수정할 수 있습니다.
-          </p>
-        )}
+        <LockedRoleSelect
+          roles={roles}
+          lockedRoleIds={lockedRoleIds}
+          value={roleId}
+          onChange={setRoleId}
+          lockedMessage="인수인계 전달 후에는 수락하거나 취소해야 자료를 수정할 수 있습니다."
+        />
         <label>
           <span>자료 이름</span>
           <input
             ref={titleInputRef}
-            autoFocus
             required
             maxLength={200}
             aria-invalid={Boolean(titleValidationMessage)}
@@ -382,7 +404,7 @@ export function RoleResourceModal({
 export function HandoffItemModal({
   draftScope,
   roles,
-  lockedRoleIds = new Set<string>(),
+  lockedRoleIds,
   selectedRoleId,
   item,
   pending,
@@ -394,7 +416,7 @@ export function HandoffItemModal({
 }: CreationModalStatus & {
   draftScope: WorkspaceScope | null
   roles: Role[]
-  lockedRoleIds?: ReadonlySet<string>
+  lockedRoleIds: ReadonlySet<string>
   selectedRoleId: string
   item?: HandoffItem
   onClose: () => void
@@ -403,10 +425,7 @@ export function HandoffItemModal({
   const editing = Boolean(item)
   const submission = useSubmissionLock(pending)
   const [roleId, setRoleId] = useState(
-    (item?.roleId
-      ?? (lockedRoleIds.has(selectedRoleId) ? '' : selectedRoleId))
-      || roles.find((role) => !lockedRoleIds.has(role.id))?.id
-      || '',
+    initialUnlockedRoleId(roles, lockedRoleIds, selectedRoleId, item?.roleId),
   )
   const [label, setLabel] = useState(item?.label ?? '')
   const [category, setCategory] = useState<HandoffCategory>(
@@ -430,25 +449,16 @@ export function HandoffItemModal({
     >
       <form className="modal-form" onSubmit={submit}>
         <RecordDraftNotice draft={draft} pending={submission.pending} onRestore={value => setLabel(value.label ?? '')} />
-        <label>
-          <span>역할</span>
-          <select required value={roleId} onChange={(event) => setRoleId(event.target.value)}>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id} disabled={lockedRoleIds.has(role.id)}>
-                {role.name}{lockedRoleIds.has(role.id) ? ' · 수락 대기' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        {lockedRoleIds.has(roleId) && (
-          <p className="form-error" role="alert">
-            인수인계 전달 후에는 수락하거나 취소해야 인수인계 문서를 수정할 수 있습니다.
-          </p>
-        )}
+        <LockedRoleSelect
+          roles={roles}
+          lockedRoleIds={lockedRoleIds}
+          value={roleId}
+          onChange={setRoleId}
+          lockedMessage="인수인계 전달 후에는 수락하거나 취소해야 인수인계 문서를 수정할 수 있습니다."
+        />
         <label>
           <span>남길 내용</span>
           <input
-            autoFocus
             required
             value={label}
             onChange={(event) => setLabel(event.target.value)}

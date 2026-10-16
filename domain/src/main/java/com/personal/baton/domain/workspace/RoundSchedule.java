@@ -51,20 +51,13 @@ public class RoundSchedule {
         LocalTime validatedMeetingTime = Objects.requireNonNull(meetingTime, "모임 시각은 필수입니다");
         RoundRecurrence validatedRecurrence = Objects.requireNonNull(recurrence, "회차 반복 주기는 필수입니다");
         int validatedGenerationLeadDays = validateGenerationLeadDays(generationLeadDays);
-        LocalDate validatedNextOccurrenceDate =
-                Objects.requireNonNull(nextOccurrenceDate, "다음 회차 예정일은 필수입니다");
-        validateOccurrenceCursor(
-                validatedFirstMeetingDate,
-                validatedNextOccurrenceDate,
-                validatedRecurrence
-        );
 
         this.firstMeetingDate = validatedFirstMeetingDate;
         this.meetingTime = validatedMeetingTime;
         this.recurrence = validatedRecurrence;
         this.generationLeadDays = validatedGenerationLeadDays;
         this.enabled = enabled;
-        this.nextOccurrenceDate = validatedNextOccurrenceDate;
+        this.nextOccurrenceDate = nextOccurrenceDate;
     }
 
     public static LocalDate occurrenceOnOrAfter(
@@ -88,6 +81,7 @@ public class RoundSchedule {
         return validatedFirstMeetingDate.plusDays(intervals * intervalDays);
     }
 
+    // 다음 회차 예정일은 Season이 occurrenceOnOrAfter로 계산해 넘기므로 첫 모임 이후의 주기 날짜다.
     static RoundSchedule configure(
             LocalDate firstMeetingDate,
             LocalTime meetingTime,
@@ -140,20 +134,6 @@ public class RoundSchedule {
             );
         }
         return generationLeadDays;
-    }
-
-    private static void validateOccurrenceCursor(
-            LocalDate firstMeetingDate,
-            LocalDate nextOccurrenceDate,
-            RoundRecurrence recurrence
-    ) {
-        if (nextOccurrenceDate.isBefore(firstMeetingDate)) {
-            throw new DomainValidationException("다음 회차 예정일은 첫 모임 날짜보다 빠를 수 없습니다");
-        }
-        long daysFromFirstMeeting = ChronoUnit.DAYS.between(firstMeetingDate, nextOccurrenceDate);
-        if (daysFromFirstMeeting % recurrence.getIntervalDays() != 0) {
-            throw new DomainValidationException("다음 회차 예정일은 반복 주기와 일치해야 합니다");
-        }
     }
 
     public LocalDate getFirstMeetingDate() {

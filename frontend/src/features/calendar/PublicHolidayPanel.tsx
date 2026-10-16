@@ -16,7 +16,7 @@ function decodeCalendar(value: unknown, year: number): HolidayCalendar {
     || (value.checkedAt !== null && !isInstant(value.checkedAt))
     || !Array.isArray(value.holidays)
     || !value.holidays.every(item => isJsonObject(item)
-      && typeof item.date === 'string' && isCalendarDate(item.date)
+      && isCalendarDate(item.date)
       && Number(item.date.slice(0, 4)) === year && isNonEmptyString(item.name))) {
     throw new Error('공휴일 응답을 확인할 수 없습니다.')
   }

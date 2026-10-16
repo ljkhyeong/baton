@@ -1,4 +1,4 @@
-type ValidatedStorageEntry<Value> = {
+export type ValidatedStorageEntry<Value> = {
   storageKey: string
   value: Value
 }

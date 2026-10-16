@@ -148,7 +148,7 @@ POST /api/v1/workspaces
 
 `teamName`과 `seasonName`은 공백만으로 구성될 수 없고 각각 100자 이하다. `startDate`와 `endDate`는 시간대 없는 ISO 8601 달력 날짜이며 시작일은 종료일보다 늦을 수 없다. `memberNames`는 1명 이상 100명 이하이고 각 이름은 공백만으로 구성될 수 없으며 100자 이하다. 앞뒤 공백을 제거한 구성원 이름은 중복될 수 없으며, 이름이 같은 사람은 역할 선택에서 구분할 수 있는 별칭을 붙인다.
 
-선택 필드 `template`은 `STUDY_V1`, `TEAM_V1`, `TASK_FORCE_V1` 중 하나이며 생략·`null`이면 기존 빈 구성으로 생성한다. 다른 값은 `400 INVALID_INPUT`이다. 각 템플릿은 역할 3개와 반복 업무 3개를 팀·시즌·구성원과 같은 트랜잭션으로 저장하고 담당자·담당 기간·실제 마감·반복 일정·회차는 만들지 않는다. 역할 공백의 연속성 신호도 같은 트랜잭션에 반영한다. 배포된 템플릿 식별자의 구성은 유지하고 변경은 새 버전으로 추가한다.
+선택 필드 `template`은 `STUDY_V1`, `TEAM_V1`, `TASK_FORCE_V1`, `CLUB_V1`, `COMMITTEE_V1` 중 하나이며 생략·`null`이면 기존 빈 구성으로 생성한다. 다른 값은 `400 INVALID_INPUT`이다. 각 템플릿은 역할 3개와 반복 업무 3개를 팀·시즌·구성원과 같은 트랜잭션으로 저장하고 담당자·담당 기간·실제 마감·반복 일정·회차는 만들지 않는다. 역할 공백의 연속성 신호도 같은 트랜잭션에 반영한다. 배포된 템플릿 식별자의 구성은 유지하고 변경은 새 버전으로 추가한다.
 
 선택한 템플릿은 멱등 요청 비교에 포함한다. 같은 키로 템플릿만 바꾸거나 빈 구성과 템플릿을 서로 바꾸면 `409 IDEMPOTENCY_KEY_REUSED`다. 생략과 `null`은 같은 빈 구성이고 기존 빈 구성의 요청 지문을 유지하므로 배포 전 미확인 생성 요청도 복구할 수 있다. 동일 재전송은 역할·반복 업무를 다시 만들지 않는다.
 
@@ -1207,7 +1207,7 @@ CSRF 없이 조회한다.
 | `GET` | `/editions/{editionId}` | UUID 식별자 | 저장된 본문·ETag, 조건 일치 시 `304` |
 | `GET` | `/editions/{editionId}/previous-week` | UUID 식별자 | 선택한 주간 요약과 같은 시간대의 지난주 마지막 저장 본문·ETag |
 | `GET` | `/editions/{editionId}/changes` | 필수 UUID `fromEditionId` | `from`, `to`, `added`, `removed`, `changed` |
-| `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `checkedAt`, ETag 없음 |
+| `GET` | `/editions/{editionId}/delivery-status` | UUID 식별자 | `editionId`, `status`, `upToDate`, `ruleVersionChanged`, `checkedAt`, ETag 없음 |
 | `POST` | `/sources/query` | `sources` 1~100건, 각 `eventType`·빈 값이 아닌 `sourceReference`(최대 512자), 세션 CSRF·동일 출처 | 같은 `eventType`·`sourceReference`와 nullable `target` 목록 |
 | `GET` | `/generation-readiness` | 본문 없음 | `status`, `pendingCount`, `failedCount`, nullable `lastDeliveredAt`, `checkedAt` |
 
@@ -1218,7 +1218,9 @@ CSRF 없이 조회한다.
 추가 전달 상태는 `ADDITIONAL_DELIVERIES`, `NO_ADDITIONAL_DELIVERIES`, `UNKNOWN`이다.
 같은 주간 요약의 생성·재사용 성공 기록 중 최대 `deliveryWatermark` 뒤에 같은 팀·시즌의
 `DELIVERED` 아웃박스가 있는지만 확인한다. 생성 성공 근거가 없으면 `UNKNOWN`이며 원본 전체
-반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 세부 의미는 PRD-0010을 따른다.
+반영이나 BRIEF 항목 변화 여부를 판정하지 않는다. 항목이 지금 다시 만들어도 같은지는 BRIEF 범위 지정
+최신 여부 확인의 `upToDate`·`ruleVersionChanged`로 함께 반환한다. 비교도 BRIEF 범위 지정 비교로 팀·시즌을
+확인한다. 세부 의미는 PRD-0010을 따른다.
 
 최신 조회는 BRIEF가 저장한 `ETag`를 유지한다. 생성은 BATON이 시즌 시간대의 현재 월요일과
 완료된 BRIEF outbox 최대 ID를 고정한 실행 기록을 먼저 사용한다. 새 생성 `201`은 최신
@@ -1230,6 +1232,8 @@ CSRF 없이 조회한다.
 `revisionGap`은 Boolean 교집합 조건이다. 두 커서 필드는 함께 제공하고 조건이 바뀌면
 첫 페이지부터 읽는다. 요약은 활성 항목만 집계하며 공백 개수는 심각도별 개수와 겹친다.
 현재 조회에는 `ETag`가 없고, BRIEF 장애를 빈 결과로 바꾸지 않는다.
+현재 점검 항목과 저장된 주간 요약·비교 항목은 nullable `activeSince`(미해결 구간 시작 UTC 시각)를
+포함한다. 해결 항목과 이 값을 주지 않는 이전 BRIEF는 `null`이며 의미와 표시는 PRD-0008·PRD-0009를 따른다.
 이번 주 해소는 BATON이 시즌 시간대와 현재 주차를 정한다. 항목은 `reasonCode`,
 `sourceReference`, `resolvedAt`, `resolvedRevision`이며 개수와 동일한 조건의 현재 해소만
 반환한다. 전체 개수는 커서와 무관하며 마지막 커서는 null이다. 페이지 사이 주차·시간대가
@@ -1272,7 +1276,7 @@ CSRF 없이 조회한다.
 
 ## 10. 계약 검증
 
-`SystemStatusRestDocsTest`, `WorkspaceRestDocsTest`, `WatchHealthEventRestDocsTest`, `AuthRestDocsTest`, `RoundAuthorizationRestDocsTest`, `BriefEditionRestDocsTest`와 `BriefAttentionRestDocsTest`가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
+`adapter-in-web`의 `restdocs` 패키지에서 `restdocs` 태그를 단 `*RestDocsTest` 클래스가 현재 애플리케이션 HTTP 계약과 스니펫을 검증한다. 성공 응답과 테스트가 명시한 대표 오류 응답은 `restdocs-api-spec` 리소스로도 기록하며, 같은 HTTP 오퍼레이션의 문서 식별자는 안정적인 `operationId` 접두사를 공유한다. 공개·캐시 가능한 `/.well-known/round-participation-jwks.json`을 제외한 모든 리소스는 실제 `X-Request-ID` 응답을 검증하고 디스크립터로 남기며, 생성 계약 검사도 같은 예외를 명시적으로 고정한다. Caddy가 애플리케이션보다 먼저 만드는 413과 업스트림 장애 502/503의 헤더·로그 상관관계는 프로덕션 런타임 스모크로 검증한다.
 
 ```bash
 ./gradlew --no-daemon :adapter-in-web:restDocsTest
@@ -1340,9 +1344,9 @@ cd frontend && npm ci && cd ..
 
 ## 내 알림함
 
-`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 계정의 사전 알림 시간(기본 24시간) 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 인수인계는 `HANDOFF_REQUEST`다. 종료 시즌은 빈 목록이다.
+`GET /api/v1/teams/{teamId}/seasons/{seasonId}/notifications`는 계정 세션과 공유 접근 권한, 활성 구성원 연결을 확인한다. `200 OK`, `Cache-Control: no-store`와 `accountId`, `teamId`, `seasonId`, `notifications`를 반환한다. 현재 담당 역할의 미완료 실행 중 계정의 사전 알림 시간(기본 24시간) 이내 마감은 `DEADLINE_SOON`, 마감 시각부터 `OVERDUE`이며 수락할 인수인계는 `HANDOFF_REQUEST`다. 현재 담당 역할의 보관하지 않은 자료 중 정기 재확인의 확인일이 시즌 현지 오늘 이하인 자료는 `RESOURCE_REVIEW_DUE`다. 종료 시즌은 빈 목록이다.
 
-항목의 `id`는 계정·팀·시즌·종류·원본·마감 또는 전달 시각에서 결정한다. `sourceId`는 실행 또는 역할 인수인계 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차다. `title`, `occurredAt`(마감 또는 전달 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
+항목의 `id`는 계정·팀·시즌·종류·원본과 마감·전달 시각 또는 확인일에서 결정하므로 확인일이 바뀌면 새 알림이다. `sourceId`는 실행, 역할 인수인계 또는 역할 자료 ID, `roleId`는 역할, nullable `roundId`는 실행의 회차이며 인수인계·자료 재확인은 null이다. `title`(업무·역할·자료 이름), `occurredAt`(마감·전달 시각 또는 시즌 시간대 확인일의 시작 시각), `read`를 포함한다. 목록은 시각·ID 오름차순이며 현재 조치 대상만 반환한다.
 
 `POST /api/v1/teams/{teamId}/seasons/{seasonId}/notifications/{notificationId}/read`는 동일 출처·CSRF와 본문 `expectedAccountId` 일치를 추가 확인한다. 현재 계정의 현재 알림만 읽음으로 기록하고 전체 알림함을 `200 OK`로 반환한다. 반복 요청은 최초 읽음 시각을 보존한다. 원본이 해소되었거나 다른 계정의 알림이면 `404 NOTIFICATION_NOT_FOUND`, 미연결·활동 종료는 `403 WORKSPACE_ACCESS_DENIED`다. 읽음 표시는 업무를 완료하거나 인수인계를 수락하지 않는다.
 
@@ -1474,9 +1478,9 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 
 ## 개인 알림 설정
 
-`GET /api/v1/notification-preferences`는 로그인 계정의 `accountId`, `version`, `deadlineSoonEnabled`, `overdueEnabled`, `handoffEnabled`, `deadlineLeadHours`를 반환한다. 저장 전 기본값은 세 종류 모두 표시, 24시간, 버전 `-1`이다.
+`GET /api/v1/notification-preferences`는 로그인 계정의 `accountId`, `version`, `deadlineSoonEnabled`, `overdueEnabled`, `handoffEnabled`, `resourceReviewEnabled`, `deadlineLeadHours`를 반환한다. 저장 전 기본값은 네 종류 모두 표시, 24시간, 버전 `-1`이다.
 
-같은 경로의 `POST`는 `expectedAccountId`, `expectedVersion`(-1 이상), 세 가지 필수 Boolean과 `deadlineLeadHours`(1~168 정수)를 받는다. 동일 출처·CSRF와 계정 일치를 검증하고 저장한 설정을 반환한다. 성공은 `200 OK`, `Cache-Control: no-store`이며 다른 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 오래된 버전은 `409 WORKSPACE_CONTENT_CONFLICT`, 잘못된 입력은 `400 INVALID_INPUT`이다.
+같은 경로의 `POST`는 `expectedAccountId`, `expectedVersion`(-1 이상), 네 가지 필수 Boolean과 `deadlineLeadHours`(1~168 정수)를 받는다. 동일 출처·CSRF와 계정 일치를 검증하고 저장한 설정을 반환한다. 성공은 `200 OK`, `Cache-Control: no-store`이며 다른 계정은 `409 ACCOUNT_MEMBERSHIP_CONFLICT`, 오래된 버전은 `409 WORKSPACE_CONTENT_CONFLICT`, 잘못된 입력은 `400 INVALID_INPUT`이다.
 
 설정은 계정 전체에 적용한다. 알림함에서 꺼진 종류를 제외하며 사전 알림 시간의 경계부터 마감 임박을 포함한다. 읽음 기록과 알림 식별자는 설정 변경으로 삭제하거나 재발급하지 않는다. 외부 전송 설정은 포함하지 않는다.
 

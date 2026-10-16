@@ -62,10 +62,6 @@ function accountSecurityNotice(search: string) {
     : null
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '로그인 요청을 처리하지 못했습니다.'
-}
-
 export default function LoginForm() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -197,7 +193,7 @@ export default function LoginForm() {
           </button>
         </div>
         {logoutMutation.isError && (
-          <p className="form-error" role="alert">{errorMessage(logoutMutation.error)}</p>
+          <p className="form-error" role="alert">{logoutMutation.error.message}</p>
         )}
       </div>
     )
@@ -274,7 +270,7 @@ export default function LoginForm() {
         </div>
       )}
 
-      {capabilitiesQuery.isSuccess && providers.length > 0 && (
+      {capabilitiesQuery.isSuccess && providers.length > 0 && (<>
         <div className="social-login-list" aria-label="소셜 로그인">
           {providers.map((provider) => (
             <a
@@ -290,11 +286,8 @@ export default function LoginForm() {
             </a>
           ))}
         </div>
-      )}
-
-      {capabilitiesQuery.isSuccess && providers.length > 0 && (
         <div className="auth-divider"><span>또는 이메일</span></div>
-      )}
+      </>)}
 
       <form
         className="auth-form"
@@ -332,10 +325,10 @@ export default function LoginForm() {
           />
         </label>
         {loginMutation.isError && (
-          <p className="form-error" role="alert">{errorMessage(loginMutation.error)}</p>
+          <p className="form-error" role="alert">{loginMutation.error.message}</p>
         )}
         {sessionQuery.isError && (
-          <p className="form-error" role="alert">{errorMessage(sessionQuery.error)}</p>
+          <p className="form-error" role="alert">{sessionQuery.error.message}</p>
         )}
         <button
           className="primary-button auth-submit"

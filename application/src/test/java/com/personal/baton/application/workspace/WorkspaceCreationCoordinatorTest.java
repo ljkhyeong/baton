@@ -1,7 +1,5 @@
 package com.personal.baton.application.workspace;
 
-import com.personal.baton.application.workspace.port.in.WorkspaceContract;
-
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CreatedWorkspaceResult;
@@ -11,7 +9,6 @@ import com.personal.baton.application.workspace.port.out.WorkspaceSeasonReposito
 import com.personal.baton.domain.workspace.Team;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -20,7 +17,6 @@ import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @Tag("policy")
 class WorkspaceCreationCoordinatorTest {
@@ -38,8 +34,6 @@ class WorkspaceCreationCoordinatorTest {
         WorkspaceAccessRepository accessRepository = mock(WorkspaceAccessRepository.class);
         WorkspaceSeasonRepository seasonRepository = mock(WorkspaceSeasonRepository.class);
         WorkspacePeopleRepository peopleRepository = mock(WorkspacePeopleRepository.class);
-        when(accessRepository.findTeamByIdempotencyKeyHash(IDEMPOTENCY_HASH))
-                .thenReturn(Optional.empty());
         WorkspaceCreationCoordinator coordinator = new WorkspaceCreationCoordinator(
                 accessRepository,
                 seasonRepository,

@@ -8,8 +8,6 @@ import com.personal.baton.application.watch.port.out.WatchHealthEventInboxPort;
 import com.personal.baton.application.watch.port.out.WatchHealthEventInboxPort.WatchHealthEventInboxResult;
 import com.personal.baton.application.watch.port.out.WatchHealthEventInboxPort.WatchHealthEventInboxStatus;
 import java.time.Clock;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -54,8 +52,7 @@ public class WatchHealthEventIngestionService implements AcceptWatchHealthEventU
                 command.currentHealth(),
                 command.changedAt()
         );
-        Instant acceptedAt = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
-        WatchHealthEventInboxResult result = inboxPort.accept(event, acceptedAt);
+        WatchHealthEventInboxResult result = inboxPort.accept(event, clock.instant());
         if (result.status() == WatchHealthEventInboxStatus.CONFLICT) {
             throw new WatchHealthEventConflictException();
         }

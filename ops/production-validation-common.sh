@@ -10,9 +10,27 @@ esac
 PRODUCTION_VALIDATION_ERROR=""
 PRODUCTION_VALIDATION_ENV_KEYS=()
 PRODUCTION_VALIDATION_ENV_VALUES=()
-# shellcheck disable=SC2034
-PRODUCTION_VALIDATION_VALUE=""
 
+# 운영 Docker 명령은 주변 Docker·BuildKit 설정을 무시하고 로컬 데몬 소켓만 사용한다.
+# shellcheck disable=SC2034  # 불러온 스크립트가 이 명령 배열을 실행한다.
+PRODUCTION_DOCKER_COMMAND=(
+  env
+  -u DOCKER_HOST
+  -u DOCKER_CONTEXT
+  -u DOCKER_CONFIG
+  -u DOCKER_TLS_VERIFY
+  -u DOCKER_CERT_PATH
+  -u DOCKER_API_VERSION
+  -u DOCKER_DEFAULT_PLATFORM
+  -u BUILDX_BUILDER
+  -u BUILDX_CONFIG
+  -u BUILDKIT_HOST
+  -u DOCKER_BUILDKIT
+  docker
+  --host unix:///var/run/docker.sock
+)
+
+# shellcheck disable=SC2034  # 함수 반환 후 호출자가 PRODUCTION_VALIDATION_ERROR를 읽는다.
 production_validation_parse_literal_env() {
   local env_file="$1"
   local key
@@ -54,18 +72,14 @@ production_validation_parse_literal_env() {
   return 0
 }
 
-production_validation_read_env_value() {
+# 해석한 환경 파일의 값을 출력한다. 키가 없으면 아무것도 출력하지 않는다.
+production_validation_env_value() {
   local index
   local wanted_key="$1"
 
-  # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 오류를 읽는다.
-  PRODUCTION_VALIDATION_ERROR=""
-  PRODUCTION_VALIDATION_VALUE=""
-
   for ((index = 0; index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; index += 1)); do
     if [[ "${PRODUCTION_VALIDATION_ENV_KEYS[$index]}" == "$wanted_key" ]]; then
-      # shellcheck disable=SC2034  # 함수 반환 후 호출자가 이 결과를 읽는다.
-      PRODUCTION_VALIDATION_VALUE="${PRODUCTION_VALIDATION_ENV_VALUES[$index]}"
+      printf '%s' "${PRODUCTION_VALIDATION_ENV_VALUES[$index]}"
       return 0
     fi
   done
@@ -108,6 +122,33 @@ production_validation_validate_boolean() {
 
   if [[ "$value" != "true" && "$value" != "false" ]]; then
     "$fail_callback" "$name must be exactly true or false"
+  fi
+}
+
+# 운영 기본 비밀값과 Bearer 토큰이 함께 따르는 32~200자 URL 안전 ASCII 정책이다.
+production_validation_is_url_safe_secret() {
+  local value="$1"
+
+  [[ ${#value} -ge 32 && ${#value} -le 200 && "$value" =~ ^[A-Za-z0-9._~-]+$ ]]
+}
+
+# 백업 파일 이름의 UTC 스냅샷 시각을 epoch 초로 출력한다. 실패 문구는 호출자가 출력한다.
+production_validation_backup_epoch_from_name() {
+  local backup_name="$1"
+  local timestamp
+  local formatted
+
+  if [[ ! "$backup_name" =~ ^baton-([0-9]{8}T[0-9]{6}Z)-[A-Za-z0-9]+\.sql\.gz$ ]]; then
+    return 1
+  fi
+  timestamp="${BASH_REMATCH[1]}"
+  formatted="${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2} ${timestamp:9:2}:${timestamp:11:2}:${timestamp:13:2} UTC"
+  if date --version >/dev/null 2>&1; then
+    date -u -d "$formatted" '+%s'
+  elif date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s' >/dev/null 2>&1; then
+    date -j -u -f '%Y%m%dT%H%M%SZ' "$timestamp" '+%s'
+  else
+    return 1
   fi
 }
 
@@ -170,4 +211,28 @@ production_validation_secret_file() {
     "$fail_callback" "$name must not grant group or other permissions"
   fi
   printf '%s' "$canonical_target"
+}
+
+# 백업 주기와 복구가 공유하는 상태 디렉터리를 만들어 0700으로 맞추고 공유 잠금 파일 경계를 확인한다.
+# 디렉터리를 만들고 권한을 바꾸므로 그 잠금을 잡는 백업·복구 스크립트만 호출한다.
+production_validation_prepare_backup_state_dir() {
+  local fail_callback="$1"
+  local state_dir="$2"
+  local lock_file="$3"
+
+  [[ -n "$state_dir" ]] \
+    || "$fail_callback" 'BATON_BACKUP_STATE_DIR is required for the shared backup and restore lock.'
+  [[ "$state_dir" == /* ]] \
+    || "$fail_callback" "BATON_BACKUP_STATE_DIR must be an absolute path: $state_dir"
+  [[ "$state_dir" != "/" ]] \
+    || "$fail_callback" 'BATON_BACKUP_STATE_DIR must not be the filesystem root.'
+  [[ ! -L "$state_dir" ]] \
+    || "$fail_callback" "BATON_BACKUP_STATE_DIR must not be a symbolic link: $state_dir"
+  mkdir -p -- "$state_dir"
+  [[ -O "$state_dir" ]] \
+    || "$fail_callback" "BATON_BACKUP_STATE_DIR must be owned by the service user: $state_dir"
+  chmod 700 "$state_dir"
+  if [[ -L "$lock_file" || ( -e "$lock_file" && ( ! -f "$lock_file" || ! -O "$lock_file" ) ) ]]; then
+    "$fail_callback" "Backup lock must be a regular file owned by the service user: $lock_file"
+  fi
 }

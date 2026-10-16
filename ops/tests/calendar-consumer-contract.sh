@@ -29,15 +29,6 @@ fail() {
 
 [[ $# -eq 0 ]] || fail '사용법: calendar-consumer-contract.sh'
 
-cleanup() {
-  docker compose \
-    --project-name "$COMPOSE_PROJECT_NAME" \
-    --file "$CAL_ROOT/compose.smoke.yml" \
-    down --volumes --remove-orphans >/dev/null 2>&1 || true
-}
-
-trap cleanup EXIT
-
 command -v docker >/dev/null 2>&1 || fail 'Docker 실행 파일을 찾지 못했습니다'
 command -v curl >/dev/null 2>&1 || fail 'curl 실행 파일을 찾지 못했습니다'
 command -v git >/dev/null 2>&1 || fail 'Git 실행 파일을 찾지 못했습니다'
@@ -46,12 +37,40 @@ command -v git >/dev/null 2>&1 || fail 'Git 실행 파일을 찾지 못했습니
 [[ -x "$CAL_ROOT/gradlew" && -f "$CAL_ROOT/compose.smoke.yml" ]] \
   || fail "BATON CAL 저장소를 찾지 못했습니다: $CAL_ROOT"
 CAL_ROOT="$(CDPATH= cd -- "$CAL_ROOT" && pwd -P)"
+cal_compose=(
+  docker compose
+  --project-name "$COMPOSE_PROJECT_NAME"
+  --file "$CAL_ROOT/compose.smoke.yml"
+)
+
+cleanup() {
+  "${cal_compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+}
+
+trap cleanup EXIT
+
+# CAL을 기동하고 준비 상태를 확인한 뒤 CAL_BASE_URL을 현재 게시 포트로 바꾼다.
+start_cal() {
+  local failure_message="$1"
+  local cal_port
+  local health_port
+
+  "${cal_compose[@]}" up --detach --wait --wait-timeout 120
+  cal_port="$("${cal_compose[@]}" port app 8080)"
+  CAL_BASE_URL="http://$cal_port"
+  health_port="$("${cal_compose[@]}" port app "$CAL_MANAGEMENT_PORT")"
+  if ! curl --fail --silent --connect-timeout 1 --max-time 2 \
+    --retry 60 --retry-all-errors --retry-delay 1 --retry-max-time 180 \
+    "http://$health_port/actuator/health/readiness" >/dev/null; then
+    "${cal_compose[@]}" logs --no-color --tail 100 app >&2 || true
+    fail "$failure_message"
+  fi
+}
 
 actual_contract_version="$(<"$CAL_ROOT/contracts/VERSION")"
 [[ "$actual_contract_version" == "$CAL_CONTRACT_VERSION" ]] \
   || fail "CAL 계약 버전이 다릅니다: $actual_contract_version"
 case "$CAL_CONTRACT_VERSION" in
-  1.1.0-rc.1) log '게시된 1.1.0-rc.1 사전 릴리스 계약을 검증합니다.' ;;
   1.1.0-rc.2)
     log '1.1.0-rc.2의 구독·복구 진단 계약을 검증합니다.'
     CONTRACT_TEST_OPTIONS+=( :application:calendarSubscriptionContractTest )
@@ -79,27 +98,7 @@ export BATON_CAL_SUBSCRIPTION_GENERATION="$CAL_GENERATION"
 export BATON_CAL_RECOVERY_MODE=false
 
 log "CAL 컨테이너를 시작합니다: $CAL_IMAGE"
-docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  up --detach --wait --wait-timeout 120
-
-CAL_PORT="$(docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  port app 8080)"
-CAL_BASE_URL="http://$CAL_PORT"
-CAL_HEALTH_PORT="$(docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  port app "$CAL_MANAGEMENT_PORT")"
-if ! curl --fail --silent --connect-timeout 1 --max-time 2 \
-  --retry 60 --retry-all-errors --retry-delay 1 --retry-max-time 180 \
-  "http://$CAL_HEALTH_PORT/actuator/health/readiness" >/dev/null; then
-  docker compose --project-name "$COMPOSE_PROJECT_NAME" \
-    --file "$CAL_ROOT/compose.smoke.yml" logs --no-color --tail 100 app >&2 || true
-  fail 'CAL 준비 상태를 확인하지 못했습니다'
-fi
+start_cal 'CAL 준비 상태를 확인하지 못했습니다'
 
 log 'BATON 운영용 직렬화와 응답 분류를 실제 CAL에 검증합니다.'
 (
@@ -114,32 +113,9 @@ log 'BATON 운영용 직렬화와 응답 분류를 실제 CAL에 검증합니다
 log 'BATON → CAL 생성·변경·취소·중복·역순 전달 계약이 통과했습니다.'
 log '시즌 이름 전달과 실제 CAL 백업 복원 뒤 같은 개정 번호의 최신 이름 재전달이 통과했습니다.'
 log 'CAL을 새 복구 모드로 다시 시작합니다.'
-docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  down --volumes --remove-orphans >/dev/null
+"${cal_compose[@]}" down --volumes --remove-orphans >/dev/null
 export BATON_CAL_RECOVERY_MODE=true
-docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  up --detach --wait --wait-timeout 120
-
-CAL_PORT="$(docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  port app 8080)"
-CAL_BASE_URL="http://$CAL_PORT"
-CAL_HEALTH_PORT="$(docker compose \
-  --project-name "$COMPOSE_PROJECT_NAME" \
-  --file "$CAL_ROOT/compose.smoke.yml" \
-  port app "$CAL_MANAGEMENT_PORT")"
-if ! curl --fail --silent --connect-timeout 1 --max-time 2 \
-  --retry 60 --retry-all-errors --retry-delay 1 --retry-max-time 180 \
-  "http://$CAL_HEALTH_PORT/actuator/health/readiness" >/dev/null; then
-  docker compose --project-name "$COMPOSE_PROJECT_NAME" \
-    --file "$CAL_ROOT/compose.smoke.yml" logs --no-color --tail 100 app >&2 || true
-  fail '복구 모드 CAL 준비 상태를 확인하지 못했습니다'
-fi
+start_cal '복구 모드 CAL 준비 상태를 확인하지 못했습니다'
 
 (
   cd "$REPOSITORY_ROOT"

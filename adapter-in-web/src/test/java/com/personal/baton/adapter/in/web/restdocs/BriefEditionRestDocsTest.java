@@ -4,7 +4,7 @@ import com.epages.restdocs.apispec.ConstrainedFields;
 import com.epages.restdocs.apispec.EnumFields;
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.brief.BriefEditionController;
 import com.personal.baton.adapter.in.web.brief.BriefWorkspaceContextController;
 import com.personal.baton.application.brief.BriefAttentionPage;
@@ -155,6 +155,7 @@ class BriefEditionRestDocsTest {
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
                 .andExpect(jsonPath("$.items[0].section").value("CURRENT_WEEK"))
                 .andExpect(jsonPath("$.items[1].section").value("CARRY_OVER"))
+                .andExpect(jsonPath("$.items[1].activeSince").value("2026-08-14T03:00:00Z"))
                 .andDo(MockMvcRestDocumentationWrapper.document(
                         "getLatestBriefEdition",
                         "인증된 BATON 계정의 활성 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF의 최신 주간 요약을 전달한다.",
@@ -321,7 +322,8 @@ class BriefEditionRestDocsTest {
     void documentsComparison() throws Exception {
         var before = edition().items().getFirst();
         var after = new BriefEditionSnapshot.Item(before.sourceReference(), before.reasonCode(), before.severity(), before.status(),
-                before.observedAt(), before.ruleVersion(), before.aggregateRevision(), before.revisionGap(), BriefEditionSnapshot.Section.CARRY_OVER);
+                before.observedAt(), before.activeSince(), before.ruleVersion(), before.aggregateRevision(), before.revisionGap(),
+                BriefEditionSnapshot.Section.CARRY_OVER);
         when(briefEditionUseCase.compareEditions(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), ACCOUNT_ID, EDITION_ID))
                 .thenReturn(new BriefEditionComparison(new BriefEditionHistory.Summary(ACCOUNT_ID, 2, summary().weekStart(), summary().zoneId(),
                         summary().generatedAt(), 16, 2, 2), summary(), List.of(before), List.of(before), List.of(new BriefEditionComparison.Change(before, after))));
@@ -390,17 +392,22 @@ class BriefEditionRestDocsTest {
     @DisplayName("추가 전달 조회는 선택한 주간 요약과 상태·확인 시각을 별도 응답으로 반환한다")
     void documentsEditionDeliveryStatus() throws Exception {
         when(briefEditionUseCase.findEditionDeliveryStatus(new LatestEditionQuery(ACCOUNT_ID, TEAM_ID, SEASON_ID, ACCESS_KEY), EDITION_ID))
-                .thenReturn(new BriefEditionDeliveryStatus(EDITION_ID, BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES, edition().generatedAt()));
+                .thenReturn(new BriefEditionDeliveryStatus(EDITION_ID, BriefEditionDeliveryStatus.Status.ADDITIONAL_DELIVERIES,
+                        true, false, edition().generatedAt()));
         mockMvc.perform(RestDocumentationRequestBuilders.get(BriefEditionController.DELIVERY_STATUS_PATH, TEAM_ID, SEASON_ID, EDITION_ID)
                         .header("X-Baton-Access-Key", ACCESS_KEY).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().doesNotExist(HttpHeaders.ETAG))
                 .andExpect(jsonPath("$.editionId").value(EDITION_ID.toString()))
+                .andExpect(jsonPath("$.upToDate").value(true))
                 .andDo(MockMvcRestDocumentationWrapper.document("getBriefEditionDeliveryStatus",
-                        "선택한 주간 요약의 권한을 확인하고 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 근거가 없으면 UNKNOWN이다.", "BRIEF 추가 전달 확인",
+                        "선택한 주간 요약의 권한을 확인하고 BRIEF 범위 지정 최신 여부와 마지막 생성·재사용 이후 추가 전달 기록을 조회한다. 추가 전달 근거가 없으면 UNKNOWN이다.",
+                        "BRIEF 저장 이후 변경 확인",
                         editionPaths(), readHeaders(), responseFields(
                                 fieldWithPath("editionId").description("확인한 주간 요약 UUID"),
                                 new EnumFields(BriefEditionDeliveryStatus.Status.class).withPath("status").description("추가 전달 있음·없음 또는 확인 근거 없음"),
+                                fieldWithPath("upToDate").description("BRIEF가 받은 변경으로 같은 주간을 지금 다시 선정해도 저장된 항목과 같으면 true"),
+                                fieldWithPath("ruleVersionChanged").description("저장된 선정 규칙 버전이 현재와 다르면 true. 이때 upToDate는 false"),
                                 fieldWithPath("checkedAt").description("BATON 확인 UTC 시각"))));
     }
 
@@ -433,6 +440,8 @@ class BriefEditionRestDocsTest {
                 fieldWithPath(prefix + "severity").description("BRIEF 표시 심각도"),
                 fieldWithPath(prefix + "status").description("생성 시점 신호 상태"),
                 fieldWithPath(prefix + "observedAt").description("원본 상태 관찰 시각"),
+                fieldWithPath(prefix + "activeSince").optional()
+                        .description("생성 당시 변경 기록 누락 없이 이어진 미해결 구간의 시작 시각. 이 값을 제공하지 않은 이전 BRIEF 주간 요약은 null"),
                 fieldWithPath(prefix + "ruleVersion").description("항목 투영 규칙 버전"),
                 fieldWithPath(prefix + "aggregateRevision").optional().description("원본 변경 번호. 이전 주간 요약의 미기록 값은 null"),
                 fieldWithPath(prefix + "revisionGap").optional().description("생성 시점의 누적 변경 번호 누락 여부. 이전 주간 요약의 미기록 값은 null"),
@@ -443,7 +452,7 @@ class BriefEditionRestDocsTest {
 
     private UsernamePasswordAuthenticationToken accountAuthentication() {
         return UsernamePasswordAuthenticationToken.authenticated(
-                new TestAccountPrincipal(ACCOUNT_ID),
+                new AccountSessionPrincipal(ACCOUNT_ID, 0),
                 null,
                 List.of()
         );
@@ -468,20 +477,14 @@ class BriefEditionRestDocsTest {
                         "MEDIUM",
                         "ACTIVE",
                         Instant.parse("2026-08-28T03:00:00Z"),
+                        Instant.parse("2026-08-20T03:00:00Z"),
                         1,
                         2L,
                         false,
                         BriefEditionSnapshot.Section.CURRENT_WEEK
                 ), new BriefEditionSnapshot.Item("routine:carry-over", "ROUTINE_MISSED", "MEDIUM", "ACTIVE",
-                        Instant.parse("2026-08-21T03:00:00Z"), 1, 1L, false, BriefEditionSnapshot.Section.CARRY_OVER))
+                        Instant.parse("2026-08-21T03:00:00Z"), Instant.parse("2026-08-14T03:00:00Z"), 1, 1L, false,
+                        BriefEditionSnapshot.Section.CARRY_OVER))
         );
-    }
-
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
     }
 }

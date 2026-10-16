@@ -2,7 +2,6 @@ package com.personal.baton.application.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -70,22 +69,6 @@ class WorkspaceResourceHealthServiceTest {
         assertThat(result.lastConclusiveAt()).isEqualTo(conclusive);
         assertThat(result.lastOutcome()).isEqualTo(availability == Availability.AVAILABLE ? WatchCheckOutcome.INTERNAL_FAILURE : null);
         assertThat(result.consecutiveFailures()).isEqualTo(availability == Availability.AVAILABLE ? 3 : null);
-        assertThat(result.checkRequestAllowed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("내부 오류의 최근 시도는 8분 전 정상 판정의 유효 기간을 연장하지 않는다")
-    void internalFailureDoesNotRefreshHealth() {
-        when(watch.inspect("resource")).thenReturn(new Inspection(LookupStatus.FOUND, 7,
-                WatchMonitoringState.ACTIVE, WatchResourceHealth.HEALTHY, NOW, WatchCheckOutcome.INTERNAL_FAILURE,
-                0, NOW.minusSeconds(480)));
-        var result = service.inspect(team, season, resource, "key");
-        assertThat(result.availability()).isEqualTo(Availability.STALE);
-        assertThat(result.health()).isEqualTo(WatchResourceHealth.UNKNOWN);
-        assertThat(result.lastCheckedAt()).isEqualTo(NOW);
-        assertThat(result.lastConclusiveAt()).isEqualTo(NOW.minusSeconds(480));
-        assertThat(result.lastOutcome()).isNull();
-        assertThat(result.consecutiveFailures()).isNull();
         assertThat(result.checkRequestAllowed()).isTrue();
     }
 

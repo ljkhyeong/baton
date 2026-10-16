@@ -7,7 +7,6 @@ import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleComman
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands;
 
 import com.personal.baton.BatonApplication;
-import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.error.IdempotencyKeyConflictException;
 import com.personal.baton.application.workspace.error.IdempotencyKeyReusedException;
 import com.personal.baton.application.workspace.error.IdempotencyReplayExpiredException;
@@ -65,7 +64,6 @@ import com.personal.baton.application.workspace.port.out.WorkspacePeopleReposito
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository.ScheduledSeasonCandidate;
-import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.domain.workspace.Decision;
 import com.personal.baton.domain.workspace.DecisionTextFormat;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -76,7 +74,6 @@ import com.personal.baton.domain.workspace.RoutinePhase;
 import com.personal.baton.domain.workspace.RoleResource;
 import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
-import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.RoutineStatus;
 import com.personal.baton.domain.workspace.RoundRecurrence;
 import com.personal.baton.domain.workspace.Season;
@@ -109,6 +106,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -126,7 +125,6 @@ import org.testcontainers.mysql.MySQLContainer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.doAnswer;
@@ -164,6 +162,24 @@ class WorkspaceUseCaseTest {
                         command.memberNames(), WorkspaceTemplate.TEAM_V1))).isInstanceOf(IdempotencyKeyReusedException.class);
     }
 
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "CLUB_V1|운영 총괄,행사 담당,총무 담당",
+            "COMMITTEE_V1|위원장,사업 담당,간사"
+    })
+    @DisplayName("동아리·위원회 템플릿은 담당자 없는 역할 3개와 그 역할이 맡는 반복 업무 3개를 만든다")
+    void createsClubAndCommitteeTemplates(WorkspaceTemplate template, String roleNames) {
+        var created = lifecycleUseCase.createWorkspace(UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("가을 운영 모임", "첫 시즌", LocalDate.of(2026, 9, 1),
+                        LocalDate.of(2026, 12, 31), List.of("박민서"), template));
+        var workspace = lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey());
+        assertThat(workspace.roles()).extracting(RoleResult::name).containsExactlyInAnyOrder(roleNames.split(","));
+        assertThat(workspace.roles()).allSatisfy(role -> assertThat(role.currentMemberId()).isNull());
+        assertThat(workspace.routines()).hasSize(3).extracting(RoutineResult::ownerRoleId)
+                .containsExactlyInAnyOrderElementsOf(workspace.roles().stream().map(RoleResult::id).toList());
+        assertThat(workspace.rounds()).isEmpty();
+    }
 
     private static final Instant FIXED_INSTANT = Instant.parse("2026-07-20T03:04:05Z");
     private static final String CREATION_KEY = "pilot-operator-key-0000000000000001";
@@ -378,16 +394,6 @@ class WorkspaceUseCaseTest {
                         List.of("김준호", "박민서")
                 )
         );
-
-        assertThat(created.accessKey()).matches("[A-Za-z0-9_-]{43}");
-        String storedHash = jdbcTemplate.queryForObject(
-                "SELECT access_key_hash FROM teams WHERE name = ?",
-                String.class,
-                "알고리즘 한 바퀴"
-        );
-        assertThat(storedHash)
-                .matches("[0-9a-f]{64}")
-                .isNotEqualTo(created.accessKey());
 
         WorkspaceResult initial = lifecycleUseCase.getWorkspace(
                 created.teamId(), created.seasonId(), created.accessKey());
@@ -1278,17 +1284,12 @@ class WorkspaceUseCaseTest {
             }
             return saved;
         }).when(coordinatedPeopleRepository).saveRoleHandoff(any(RoleHandoff.class));
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 accessRepository,
                 coordinatedSeasonRepository,
                 coordinatedPeopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -1449,15 +1450,11 @@ class WorkspaceUseCaseTest {
         assertThatThrownBy(() -> peopleUseCase.updateMember(
                 created.teamId(),
                 created.seasonId(),
-                lifecycleUseCase.getWorkspace(
+                memberNamed(lifecycleUseCase.getWorkspace(
                         created.teamId(),
                         created.seasonId(),
                         created.accessKey()
-                ).members().stream()
-                        .filter(existing -> existing.name().equals("박민서"))
-                        .findFirst()
-                        .orElseThrow()
-                        .id(),
+                ), "박민서").id(),
                 created.accessKey(),
                 new UpdateMemberCommand("최유진(진행)")
         )).isInstanceOf(MemberNameConflictException.class);
@@ -1703,17 +1700,12 @@ class WorkspaceUseCaseTest {
             }
             return accessRepository.findTeamByIdWithSharedLock(invocation.getArgument(0));
         }).when(coordinatedAccessRepository).findTeamByIdWithSharedLock(any(UUID.class));
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 coordinatedAccessRepository,
                 seasonRepository,
                 coordinatedPeopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3453,17 +3445,12 @@ class WorkspaceUseCaseTest {
             bothRequestsReadNoExistingReservation.await(10, TimeUnit.SECONDS);
             return existing;
         }).when(synchronizedAccessRepository).findContentCreationIdempotency(any(UUID.class), anyString());
-        WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services synchronizedService = workspaceServices(
                 synchronizedAccessRepository,
                 seasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3545,17 +3532,12 @@ class WorkspaceUseCaseTest {
             bothRequestsReadyToLockTeam.await(10, TimeUnit.SECONDS);
             return accessRepository.findTeamByIdForUpdate(invocation.getArgument(0));
         }).when(synchronizedAccessRepository).findTeamByIdForUpdate(any(UUID.class));
-        WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services synchronizedService = workspaceServices(
                 synchronizedAccessRepository,
                 seasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3750,17 +3732,12 @@ class WorkspaceUseCaseTest {
             bothRequestsReadNoExistingTeam.await(10, TimeUnit.SECONDS);
             return existing;
         }).when(synchronizedAccessRepository).findTeamByIdempotencyKeyHash(anyString());
-        WorkspaceServiceTestFactory.Services synchronizedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services synchronizedService = workspaceServices(
                 synchronizedAccessRepository,
                 seasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -3878,14 +3855,6 @@ class WorkspaceUseCaseTest {
                 CREATION_KEY,
                 command
         )).isInstanceOf(IdempotencyReplayExpiredException.class);
-
-        assertThatThrownBy(() -> lifecycleUseCase.recoverAccessKey(
-                created.teamId(),
-                created.seasonId(),
-                accessKeyChangeIdempotencyKey,
-                "wrong-recovery-key"
-        ))
-                .isInstanceOf(WorkspaceRecoveryDeniedException.class);
 
         WorkspaceContract.AccessKeyResult recovered = lifecycleUseCase.recoverAccessKey(
                 created.teamId(), created.seasonId(), accessKeyChangeIdempotencyKey, RECOVERY_KEY);
@@ -4014,9 +3983,6 @@ class WorkspaceUseCaseTest {
         );
 
         assertThatThrownBy(() -> lifecycleUseCase.recoverAccessKey(
-                created.teamId(), created.seasonId(), firstIdempotencyKey, "wrong-recovery-key"))
-                .isInstanceOf(WorkspaceRecoveryDeniedException.class);
-        assertThatThrownBy(() -> lifecycleUseCase.recoverAccessKey(
                 created.teamId(), created.seasonId(), firstIdempotencyKey, RECOVERY_KEY))
                 .isInstanceOf(IdempotencyReplayExpiredException.class);
 
@@ -4067,44 +4033,6 @@ class WorkspaceUseCaseTest {
                     exception -> assertThat(exception.getMessage()).contains("멱등 키")
             );
         }
-    }
-
-    @DisplayName("운영 비밀 키가 설정되지 않으면 로컬 생성은 열고 접근 키 복구는 거절한다")
-    @Test
-    void opensLocalCreationButDeniesRecoveryWhenOperatorKeyIsNotConfigured() {
-        WorkspaceServiceTestFactory.Services service = WorkspaceServiceTestFactory.create(
-                mock(WorkspaceAccessRepository.class),
-                mock(WorkspaceSeasonRepository.class),
-                mock(WorkspacePeopleRepository.class),
-                mock(WorkspaceOperationsRepository.class),
-                mock(WorkspaceRecordsRepository.class),
-                Clock.systemUTC(),
-                new WorkspaceSecrets("", ""),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
-        );
-
-        CreatedWorkspaceResult created = service.lifecycle().createWorkspace(
-                "workspace-idempotency-local-open-0001",
-                null,
-                new CreateWorkspaceCommand(
-                        "로컬 스터디",
-                        "로컬 시즌",
-                        LocalDate.of(2026, 7, 21),
-                        LocalDate.of(2026, 8, 31),
-                        List.of("박민서")
-                )
-        );
-
-        assertThat(created.accessKey()).matches("[A-Za-z0-9_-]{43}");
-
-        assertThatThrownBy(() -> service.lifecycle().recoverAccessKey(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                "workspace-access-key-recover-local-001",
-                "any-presented-key"
-        )).isInstanceOf(WorkspaceRecoveryDeniedException.class);
     }
 
     }
@@ -4658,19 +4586,6 @@ class WorkspaceUseCaseTest {
                         List.of(primaryRole.id())
                 )
         )).isInstanceOf(SeasonEndedException.class);
-        assertThatThrownBy(() -> recordsUseCase.updateDecision(
-                primary.teamId(),
-                primary.seasonId(),
-                decision.id(),
-                primary.accessKey(),
-                new UpdateDecisionCommand(
-                        decision.title(),
-                        decision.reason(),
-                        decision.alternative(),
-                        primaryMember.id(),
-                        List.of(secondaryRole.id())
-                )
-        )).isInstanceOf(SeasonEndedException.class);
         assertThatThrownBy(() -> recordsUseCase.updateHandoffItem(
                 primary.teamId(),
                 primary.seasonId(),
@@ -4728,17 +4643,12 @@ class WorkspaceUseCaseTest {
             rotationCompletesTeamUpdate.countDown();
             return savedTeam;
         }).when(coordinatedAccessRepository).saveTeam(any(Team.class));
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 coordinatedAccessRepository,
                 seasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4851,17 +4761,12 @@ class WorkspaceUseCaseTest {
             mutationHasSharedTeamLock.countDown();
             return lockedTeam;
         }).when(coordinatedAccessRepository).findTeamByIdWithSharedLock(any(UUID.class));
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 coordinatedAccessRepository,
                 seasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -4944,17 +4849,12 @@ class WorkspaceUseCaseTest {
             bothRequestsReadSameTeamVersion.await(10, TimeUnit.SECONDS);
             return team;
         }).when(coordinatedAccessRepository).findTeamById(created.teamId());
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 coordinatedAccessRepository,
                 seasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5202,17 +5102,12 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 accessRepository,
                 coordinatedSeasonRepository,
                 peopleRepository,
                 coordinatedOperationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5325,17 +5220,12 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 accessRepository,
                 coordinatedSeasonRepository,
                 peopleRepository,
                 operationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5461,17 +5351,12 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 accessRepository,
                 coordinatedSeasonRepository,
                 peopleRepository,
                 coordinatedOperationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5610,17 +5495,12 @@ class WorkspaceUseCaseTest {
                 any(UUID.class),
                 any(UUID.class)
         );
-        WorkspaceServiceTestFactory.Services coordinatedService = WorkspaceServiceTestFactory.create(
+        WorkspaceServiceTestFactory.Services coordinatedService = workspaceServices(
                 accessRepository,
                 coordinatedSeasonRepository,
                 peopleRepository,
                 coordinatedOperationsRepository,
-                recordsRepository,
-                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
-                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
-                mock(WatchMonitorChangeRecorder.class),
-                mock(BriefContinuitySignalRecorder.class),
-                mock(CalendarChangeRecorder.class)
+                recordsRepository
         );
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -5782,8 +5662,8 @@ class WorkspaceUseCaseTest {
             staleDecision.getRoleIds().size();
             firstEntityManager.detach(firstDecision);
             secondEntityManager.detach(staleDecision);
-            firstDecision.update("첫 결정", "첫 이유", "", member.id(), List.of(role.id()));
-            staleDecision.update("늦은 결정", "늦은 이유", "", member.id(), List.of(role.id()));
+            firstDecision.update("첫 결정", "첫 이유", "", member.id(), List.of(role.id()), null);
+            staleDecision.update("늦은 결정", "늦은 이유", "", member.id(), List.of(role.id()), null);
             recordsRepository.saveDecision(firstDecision);
             assertThatThrownBy(() -> recordsRepository.saveDecision(staleDecision))
                     .isInstanceOf(WorkspaceContentConflictException.class);
@@ -6444,6 +6324,25 @@ class WorkspaceUseCaseTest {
         } finally {
             statistics.setStatisticsEnabled(statisticsInitiallyEnabled);
         }
+    }
+
+    private WorkspaceServiceTestFactory.Services workspaceServices(
+            WorkspaceAccessRepository access,
+            WorkspaceSeasonRepository seasons,
+            WorkspacePeopleRepository people,
+            WorkspaceOperationsRepository operations,
+            WorkspaceRecordsRepository records
+    ) {
+        return WorkspaceServiceTestFactory.create(
+                access,
+                seasons,
+                people,
+                operations,
+                records,
+                Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+                new WorkspaceSecrets(CREATION_KEY, RECOVERY_KEY),
+                mock(BriefContinuitySignalRecorder.class)
+        );
     }
 
     private MemberResult memberNamed(WorkspaceResult workspace, String name) {

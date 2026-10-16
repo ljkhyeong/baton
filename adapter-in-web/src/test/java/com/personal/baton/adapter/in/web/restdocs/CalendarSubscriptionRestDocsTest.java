@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper;
 import com.epages.restdocs.apispec.EnumFields;
 import com.personal.baton.adapter.in.web.RequestIdFilter;
-import com.personal.baton.adapter.in.web.auth.AuthenticatedAccountPrincipal;
+import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.calendar.CalendarSubscriptionController;
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase;
 import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCase.Scope;
@@ -55,9 +55,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 @ExtendWith(RestDocumentationExtension.class)
 class CalendarSubscriptionRestDocsTest {
 
-    private static final UUID REQUEST_ID = UUID.fromString(
-            "11111111-2222-4333-8444-555555555555"
-    );
     private static final UUID ACCOUNT_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002641"
     );
@@ -67,13 +64,16 @@ class CalendarSubscriptionRestDocsTest {
     private static final UUID SEASON_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002643"
     );
-    private static final UUID EXECUTION_ID = UUID.fromString(
+    private static final UUID AFTER_SEASON_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002644"
     );
-    private static final UUID EDITION_ID = UUID.fromString(
+    private static final UUID SUBSCRIPTION_ID = UUID.fromString(
             "00000000-0000-0000-0000-000000002645"
     );
     private static final String ACCESS_KEY = "workspace-access-key";
+    private static final UUID REQUEST_ID = UUID.fromString(
+            "00000000-0000-0000-0000-000000002646"
+    );
 
     private CalendarSubscriptionUseCase subscriptions;
     private MockMvc mockMvc;
@@ -96,18 +96,19 @@ class CalendarSubscriptionRestDocsTest {
                         .operationPreprocessors()
                         .withRequestDefaults(prettyPrint())
                         .withResponseDefaults(prettyPrint()))
+                .alwaysExpect(header().string(RequestIdFilter.HEADER_NAME, REQUEST_ID.toString()))
                 .build();
     }
 
     @Test
     @DisplayName("내 구독 목록은 계정별 관리 정보와 다음 페이지를 반환하고 주소를 포함하지 않는다")
     void documentsList() throws Exception {
-        var row = new CalendarSubscriptionUseCase.Summary(EDITION_ID, TEAM_ID, SEASON_ID,
+        var row = new CalendarSubscriptionUseCase.Summary(SUBSCRIPTION_ID, TEAM_ID, SEASON_ID,
                 "인수인계 독서 팀", "가을 시즌", CalendarSubscriptionUseCase.ManagementStatus.CHECK_REQUIRED);
-        when(subscriptions.list(ACCOUNT_ID, EXECUTION_ID, "독서", false)).thenReturn(
+        when(subscriptions.list(ACCOUNT_ID, AFTER_SEASON_ID, "독서", false)).thenReturn(
                 new CalendarSubscriptionUseCase.SubscriptionPage(List.of(row), SEASON_ID));
         mockMvc.perform(get(CalendarSubscriptionController.LIST_PATH)
-                        .queryParam("afterSeasonId", EXECUTION_ID.toString()).queryParam("query", "독서").queryParam("includeRevoked", "false")
+                        .queryParam("afterSeasonId", AFTER_SEASON_ID.toString()).queryParam("query", "독서").queryParam("includeRevoked", "false")
                         .header("X-Baton-Account-Id", ACCOUNT_ID).with(authentication(accountAuthentication())))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
@@ -120,7 +121,7 @@ class CalendarSubscriptionRestDocsTest {
                                 parameterWithName("query").optional().description("팀·시즌 이름에 포함된 문자열. 최대 100자, 앞뒤 공백 제거. 생략·빈 값은 전체. %, _도 일반 문자"),
                                 parameterWithName("includeRevoked").optional().description("기본 true. false면 해제 완료 기록을 제외하며 처리 중인 기록은 유지")),
                         requestHeaders(headerWithName("X-Baton-Account-Id").description("화면의 로그인 계정 UUID. 세션 계정과 일치해야 함")),
-                        responseHeaders(headerWithName("Cache-Control").description("no-store")),
+                        noStoreHeader(),
                         responseFields(
                                 fieldWithPath("accountId").description("구독 소유 계정 UUID"),
                                 fieldWithPath("subscriptions").description("해제 기록을 포함한 본인 구독. 없으면 빈 배열")
@@ -139,13 +140,13 @@ class CalendarSubscriptionRestDocsTest {
     @Test
     @DisplayName("캘린더 구독 상태 조회는 주소를 포함하지 않는다")
     void documentsStatus() throws Exception {
-        when(subscriptions.find(scope())).thenReturn(new Subscription(EDITION_ID, SEASON_ID, Status.ACTIVE));
+        when(subscriptions.find(scope())).thenReturn(new Subscription(SUBSCRIPTION_ID, SEASON_ID, Status.ACTIVE));
         mockMvc.perform(request(org.springframework.http.HttpMethod.GET, CalendarSubscriptionController.PATH))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.feedUrl").doesNotExist())
                 .andDo(MockMvcRestDocumentationWrapper.document("getCalendarSubscription",
                         "로그인 계정 소유의 시즌 구독 상태만 조회한다. 구독 주소는 재노출하지 않는다.", "캘린더 구독 상태 조회",
-                        scopedPathParameters(), readHeaders(), responseHeaders(headerWithName("Cache-Control").description("no-store")),
+                        scopedPathParameters(), readHeaders(), noStoreHeader(),
                         responseFields(
                                 fieldWithPath("subscriptionId").optional().description("구독 UUID. 발급 전에는 null"),
                                 fieldWithPath("seasonId").description("시즌 UUID"),
@@ -156,7 +157,7 @@ class CalendarSubscriptionRestDocsTest {
     @Test
     @DisplayName("캘린더 구독 발급과 재발급은 주소를 한 번 반환한다")
     void documentsCredentials() throws Exception {
-        var credential = new Credential(EDITION_ID, SEASON_ID, URI.create("https://cal.b4ton.com/calendars/v1/" + "a".repeat(43) + ".ics"));
+        var credential = new Credential(SUBSCRIPTION_ID, SEASON_ID, URI.create("https://cal.b4ton.com/calendars/v1/" + "a".repeat(43) + ".ics"));
         when(subscriptions.create(scope())).thenReturn(credential);
         when(subscriptions.rotate(scope())).thenReturn(credential);
         documentCredential(CalendarSubscriptionController.PATH, "createCalendarSubscription", 201);
@@ -170,7 +171,7 @@ class CalendarSubscriptionRestDocsTest {
                 .andExpect(status().isNoContent())
                 .andDo(MockMvcRestDocumentationWrapper.document("revokeCalendarSubscription",
                         "로그인 계정의 구독을 폐기한다. 이미 폐기한 요청도 204를 반환한다.", "캘린더 구독 폐기",
-                        scopedPathParameters(), generationHeaders(), responseHeaders(headerWithName("Cache-Control").description("no-store"))));
+                        scopedPathParameters(), generationHeaders(), noStoreHeader()));
     }
 
     private void documentCredential(String path, String operation, int statusCode) throws Exception {
@@ -180,7 +181,7 @@ class CalendarSubscriptionRestDocsTest {
                 .andDo(MockMvcRestDocumentationWrapper.document(operation,
                         "활성 구성원과 열린 시즌의 조회 권한을 확인하고 구독 주소를 한 번 반환한다. VIEWER도 발급할 수 있다. 재발급은 이전 주소를 무효화한다. 자동 재시도하지 않는다.",
                         "캘린더 구독 주소 발급", scopedPathParameters(), generationHeaders(),
-                        responseHeaders(headerWithName("Cache-Control").description("no-store")),
+                        noStoreHeader(),
                         responseFields(
                                 fieldWithPath("subscriptionId").description("구독 UUID"),
                                 fieldWithPath("seasonId").description("시즌 UUID"),
@@ -207,7 +208,7 @@ class CalendarSubscriptionRestDocsTest {
         );
     }
 
-    private org.springframework.restdocs.snippet.Snippet readHeaders() {
+    private org.springframework.restdocs.headers.RequestHeadersSnippet readHeaders() {
         return requestHeaders(
                 headerWithName("X-Baton-Account-Id").description("화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함"),
                 headerWithName("X-Baton-Access-Key").optional()
@@ -216,10 +217,7 @@ class CalendarSubscriptionRestDocsTest {
     }
 
     private org.springframework.restdocs.snippet.Snippet generationHeaders() {
-        return requestHeaders(
-                headerWithName("X-Baton-Account-Id").description("화면에서 확인한 로그인 계정 UUID. 세션 계정과 일치해야 함"),
-                headerWithName("X-Baton-Access-Key").optional()
-                        .description("공유 키 팀의 발급·재발급에만 필요한 접근 키. 계정 권한 팀과 본인 상태 조회·폐기는 생략 가능"),
+        return readHeaders().and(
                 headerWithName(HttpHeaders.ORIGIN)
                         .description("BATON 공개 출처와 정확히 같은 브라우저 출처"),
                 headerWithName("Sec-Fetch-Site")
@@ -229,19 +227,18 @@ class CalendarSubscriptionRestDocsTest {
         );
     }
 
-    private UsernamePasswordAuthenticationToken accountAuthentication() {
-        return UsernamePasswordAuthenticationToken.authenticated(
-                new TestAccountPrincipal(ACCOUNT_ID),
-                null,
-                List.of()
+    private org.springframework.restdocs.snippet.Snippet noStoreHeader() {
+        return responseHeaders(
+                headerWithName(RequestIdFilter.HEADER_NAME).description("서버가 생성한 요청 추적 ID"),
+                headerWithName("Cache-Control").description("no-store")
         );
     }
 
-    private record TestAccountPrincipal(UUID accountId)
-            implements AuthenticatedAccountPrincipal {
-        @Override
-        public long sessionVersion() {
-            return 0;
-        }
+    private UsernamePasswordAuthenticationToken accountAuthentication() {
+        return UsernamePasswordAuthenticationToken.authenticated(
+                new AccountSessionPrincipal(ACCOUNT_ID, 0),
+                null,
+                List.of()
+        );
     }
 }

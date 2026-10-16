@@ -36,7 +36,7 @@ export default function AccountSecurityPage() {
           </div>
         ) : sessionQuery.data && (
           <AccountSecurityPanel key={`security:${sessionQuery.data.accountId}`} accountId={sessionQuery.data.accountId}>
-            <CalendarSubscriptionList key={`calendars:${sessionQuery.data.accountId}`} accountId={sessionQuery.data.accountId} />
+            <CalendarSubscriptionList accountId={sessionQuery.data.accountId} />
           </AccountSecurityPanel>
         )}
         <p className="my-teams-note">같은 이메일이어도 로그인 방법이 다르면 별도 계정입니다.</p>

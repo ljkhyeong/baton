@@ -86,24 +86,13 @@ final class WorkspaceAccessControl {
             UUID teamId,
             String idempotencyKey
     ) {
-        return deriveAccessKeyChange(
-                kind.idempotencyHashDomain,
-                kind.accessKeyDomain,
-                List.of(teamId.toString(), idempotencyKey)
-        );
-    }
-
-    private AccessKeyChange deriveAccessKeyChange(
-            String idempotencyHashDomain,
-            String accessKeyDomain,
-            List<String> values
-    ) {
+        List<String> values = List.of(teamId.toString(), idempotencyKey);
         String idempotencyHash = DomainSeparatedSha256.hashHex(
-                idempotencyHashDomain,
+                kind.idempotencyHashDomain,
                 values
         );
         String accessKey = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(DomainSeparatedSha256.hash(accessKeyDomain, values));
+                .encodeToString(DomainSeparatedSha256.hash(kind.accessKeyDomain, values));
         return new AccessKeyChange(idempotencyHash, accessKey);
     }
 

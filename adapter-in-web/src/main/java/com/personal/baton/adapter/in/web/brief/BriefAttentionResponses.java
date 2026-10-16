@@ -68,11 +68,11 @@ public final class BriefAttentionResponses {
 
     public record ItemResponse(
             EventType reasonCode, Severity severity, String sourceReference, Status status,
-            Instant observedAt, long aggregateRevision, int ruleVersion, boolean revisionGap
+            Instant observedAt, Instant activeSince, long aggregateRevision, int ruleVersion, boolean revisionGap
     ) {
         public static ItemResponse from(BriefAttentionPage.Item item) {
-            return new ItemResponse(item.reasonCode(), item.severity(), item.sourceReference(),
-                    item.status(), item.observedAt(), item.aggregateRevision(), item.ruleVersion(), item.revisionGap());
+            return new ItemResponse(item.reasonCode(), item.severity(), item.sourceReference(), item.status(),
+                    item.observedAt(), item.activeSince(), item.aggregateRevision(), item.ruleVersion(), item.revisionGap());
         }
     }
 }

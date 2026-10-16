@@ -1,7 +1,6 @@
 .gradle/
 .idea/
 .DS_Store
-.env.production
 
 # 자체 호스팅 데이터베이스 백업은 운영자 호스트에 보관한다.
 /ops/backups/
@@ -10,7 +9,6 @@
 /ops/rclone.conf
 .env
 .env.*
-!.env.example
 !.env.production.example
 
 **/build/

@@ -13,7 +13,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarRecoveryManifest;
-import com.personal.baton.application.calendar.port.out.CalendarSnapshotClient.Outcome;
+import com.personal.baton.application.delivery.DeliveryResult.Outcome;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;

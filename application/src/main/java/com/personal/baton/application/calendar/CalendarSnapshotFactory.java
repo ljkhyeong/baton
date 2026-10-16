@@ -5,10 +5,27 @@ import com.personal.baton.domain.workspace.RoutineExecution;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.SeasonRound;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public final class CalendarSnapshotFactory {
+
+    // 회차 스냅샷 다음에 마감이 있는 실행 스냅샷을 실행 목록 순서대로 둔다.
+    public List<CalendarSnapshotDraft> roundSnapshots(
+            Instant occurredAt,
+            Season season,
+            SeasonRound round,
+            List<RoutineExecution> executions
+    ) {
+        List<CalendarSnapshotDraft> snapshots = new ArrayList<>(executions.size() + 1);
+        snapshots.add(fromRound(UUID.randomUUID(), occurredAt, season, round));
+        for (RoutineExecution execution : executions) {
+            fromExecution(UUID.randomUUID(), occurredAt, round, execution).ifPresent(snapshots::add);
+        }
+        return snapshots;
+    }
 
     public CalendarSnapshotDraft fromRound(
             UUID eventId,

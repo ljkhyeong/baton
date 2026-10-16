@@ -28,15 +28,13 @@ public interface BriefEditionGenerationExecutionPort {
 
     sealed interface ClaimResult {
 
-        UUID executionId();
-
         record Claimed(UUID executionId, UUID leaseToken) implements ClaimResult {
         }
 
-        record DeliveryIncomplete(UUID executionId) implements ClaimResult {
+        record DeliveryIncomplete() implements ClaimResult {
         }
 
-        record InProgress(UUID executionId) implements ClaimResult {
+        record InProgress() implements ClaimResult {
         }
 
         record Completed(
@@ -49,7 +47,7 @@ public interface BriefEditionGenerationExecutionPort {
         ) implements ClaimResult {
         }
 
-        record PermanentlyFailed(UUID executionId, String code) implements ClaimResult {
+        record PermanentlyFailed() implements ClaimResult {
         }
     }
 

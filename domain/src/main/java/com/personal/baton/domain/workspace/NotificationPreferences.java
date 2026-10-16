@@ -18,6 +18,8 @@ public class NotificationPreferences {
     private boolean overdueEnabled = true;
     @Column(name = "handoff_enabled", nullable = false)
     private boolean handoffEnabled = true;
+    @Column(name = "resource_review_enabled", nullable = false)
+    private boolean resourceReviewEnabled = true;
     @Column(name = "deadline_lead_hours", nullable = false)
     private int deadlineLeadHours = 24;
     @Version @Column(nullable = false)
@@ -26,18 +28,24 @@ public class NotificationPreferences {
     public static NotificationPreferences defaults(UUID accountId) {
         var value = new NotificationPreferences(); value.accountId = accountId; return value;
     }
-    public void configure(boolean deadlineSoonEnabled, boolean overdueEnabled, boolean handoffEnabled, int deadlineLeadHours) {
+    public void configure(boolean deadlineSoonEnabled, boolean overdueEnabled, boolean handoffEnabled,
+            boolean resourceReviewEnabled, int deadlineLeadHours) {
         if (deadlineLeadHours < 1 || deadlineLeadHours > 168) throw new DomainValidationException("마감 알림은 1~168시간 전으로 지정해 주세요");
         this.deadlineSoonEnabled = deadlineSoonEnabled; this.overdueEnabled = overdueEnabled;
-        this.handoffEnabled = handoffEnabled; this.deadlineLeadHours = deadlineLeadHours;
+        this.handoffEnabled = handoffEnabled; this.resourceReviewEnabled = resourceReviewEnabled;
+        this.deadlineLeadHours = deadlineLeadHours;
     }
     public boolean includes(WorkspaceNotificationKind kind) {
-        return switch (kind) { case DEADLINE_SOON -> deadlineSoonEnabled; case OVERDUE -> overdueEnabled; case HANDOFF_REQUEST -> handoffEnabled; };
+        return switch (kind) {
+            case DEADLINE_SOON -> deadlineSoonEnabled; case OVERDUE -> overdueEnabled;
+            case HANDOFF_REQUEST -> handoffEnabled; case RESOURCE_REVIEW_DUE -> resourceReviewEnabled;
+        };
     }
     public UUID getAccountId() { return accountId; }
     public boolean isDeadlineSoonEnabled() { return deadlineSoonEnabled; }
     public boolean isOverdueEnabled() { return overdueEnabled; }
     public boolean isHandoffEnabled() { return handoffEnabled; }
+    public boolean isResourceReviewEnabled() { return resourceReviewEnabled; }
     public int getDeadlineLeadHours() { return deadlineLeadHours; }
     public Long getVersion() { return version; }
 }

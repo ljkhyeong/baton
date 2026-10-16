@@ -55,7 +55,7 @@
 유료 플랜·자동 결제로 전환하지 않는다. 한도 도달 시 누락될 수 있는 오류는 기존 서버 로그와 상태 감시로 확인한다.
 
 1. 무료 조직에 React와 Spring Boot 프로젝트를 만들고 각각의 공개 DSN을 복사한다. 오류 수집은 DSN만 사용하며, 아래 소스맵 업로드에는 별도 빌드 토큰이 필요하다.
-2. `.env.production`에 `BATON_SENTRY_DSN`(서버), `BATON_SENTRY_BROWSER_DSN`(브라우저), `BATON_SENTRY_ENVIRONMENT=production`을 설정한다. 두 DSN은 독립적이며 빈 값이면 해당 수집을 끈다.
+2. `.env.production`에 `BATON_SENTRY_DSN`(서버), `BATON_SENTRY_BROWSER_DSN`(브라우저), `BATON_SENTRY_ENVIRONMENT=production`을 설정한다. 두 DSN은 독립적이며 설정하지 않으면 해당 수집을 끈다.
 3. 브라우저 DSN은 **빌드 시 반영**된다. Compose의 `web` 이미지를 다시 빌드한다. k3s에서도 웹 이미지 빌드 인자 `VITE_SENTRY_DSN`·`VITE_SENTRY_ENVIRONMENT`를 사용하고, 서버 DSN은 앱 환경 변수로 주입한다.
 4. 공개 HTTPS에서 테스트 오류 1건의 수신과 실제 배포 파일·줄을 확인한다. 오류 메시지·이메일·토큰·현재 화면 주소가 보고에 없는지 확인한다.
 
@@ -398,6 +398,8 @@ Google 계정의 무료 저장 공간은 Gmail·Drive·Photos가 공유하는 [1
 - [운영 DB](../../compose.production.yml)
 - [전체 스택 테스트 DB](../../compose.fullstack-e2e.yml)
 - [ROUND 테스트 DB·Caddy](../../compose.round-fullstack-e2e.yml)
+
+Java·npm 업데이트는 minor·patch만 그룹으로 묶고, 메이저 업데이트는 그룹 전체를 막지 않도록 개별 PR로 연다. Dockerfile의 `eclipse-temurin`(Java 21 LTS)·`node`(Node 22 LTS) 메이저 전환은 제안받지 않고 별도 작업으로 검토한다.
 
 Compose 업데이트는 한 그룹으로 묶고 동시에 열린 PR을 1개로 제한한다. MySQL `8.5` 이상과 Caddy 메이저 버전 변경은 제외한다. MySQL 8.4 LTS·Caddy 2 범위 안의 제안을 기존 CI와 함께 검토하며, DB 상위 계열 전환은 별도 마이그레이션 작업으로 다룬다. 이미지 버전·해시는 이번에 변경하지 않았다.
 

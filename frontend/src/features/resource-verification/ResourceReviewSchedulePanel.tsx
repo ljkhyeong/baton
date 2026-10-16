@@ -22,7 +22,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
     <h4>재확인 주기</h4>
     {query.isPending ? <p role="status">재확인 일정을 불러오고 있습니다.</p>
       : query.isError ? <p role="alert">{query.error.message} <button className="secondary-button" type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
-        : <p>{data!.nextReviewOn ? `${data!.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(data!.nextReviewOn)}${data!.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 확인이 꺼져 있습니다.'}</p>}
+        : <p>{query.data.nextReviewOn ? `${query.data.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(query.data.nextReviewOn)}${query.data.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 확인이 꺼져 있습니다.'}</p>}
     {editable && data && <form onSubmit={event => { event.preventDefault(); if (!query.isError && !query.isFetching && !save.isPending) save.mutate() }}>
       <fieldset disabled={save.isPending || query.isError || query.isFetching}>
         <label className="review-toggle"><input type="checkbox" checked={values.enabled} onChange={event => setDraft({ ...values, enabled: event.target.checked })} />정기 확인</label>

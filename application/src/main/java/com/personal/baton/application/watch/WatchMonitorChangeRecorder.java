@@ -30,10 +30,7 @@ public class WatchMonitorChangeRecorder {
 
     public void recordCreated(RoleResource resource) {
         Objects.requireNonNull(resource, "역할 자료는 필수입니다");
-        if (source.enabled()
-                && source.monitoringEnabled()
-                && !resource.isArchived()
-                && eligibilityPolicy.isEligible(resource.getUrl())) {
+        if (source.enabled() && shouldMonitor(resource.isArchived(), resource.getUrl())) {
             appendActive(resource.getId(), resource.getUrl());
         }
     }
@@ -44,34 +41,25 @@ public class WatchMonitorChangeRecorder {
             return;
         }
         boolean previouslyEligible = eligibilityPolicy.isEligible(previousUrl);
-        boolean currentlyEligible = source.monitoringEnabled()
-                && !resource.isArchived()
-                && eligibilityPolicy.isEligible(resource.getUrl());
-        if (currentlyEligible) {
+        if (shouldMonitor(resource.isArchived(), resource.getUrl())) {
             appendActive(resource.getId(), resource.getUrl());
         } else if (previouslyEligible) {
             appendInactive(resource.getId());
         }
     }
 
-    public int recordSeasonState(List<RoleResource> resources, boolean ended) {
+    public void recordSeasonState(List<RoleResource> resources, boolean ended) {
         Objects.requireNonNull(resources, "시즌 역할 자료 목록은 필수입니다");
         if (!source.enabled()) {
-            return 0;
+            return;
         }
-        int appendedCount = 0;
         for (RoleResource resource : resources) {
-            boolean appended = ended
-                    || resource.isArchived()
-                    || !source.monitoringEnabled()
-                    || !eligibilityPolicy.isEligible(resource.getUrl())
-                    ? appendInactive(resource.getId())
-                    : appendActive(resource.getId(), resource.getUrl());
-            if (appended) {
-                appendedCount++;
+            if (shouldMonitor(ended || resource.isArchived(), resource.getUrl())) {
+                appendActive(resource.getId(), resource.getUrl());
+            } else {
+                appendInactive(resource.getId());
             }
         }
-        return appendedCount;
     }
 
     public boolean reconcile(WatchMonitorCandidate candidate) {
@@ -79,16 +67,19 @@ public class WatchMonitorChangeRecorder {
         if (!source.enabled()) {
             return false;
         }
-        WatchMonitorChange change = !source.monitoringEnabled()
-                || candidate.inactive()
-                || !eligibilityPolicy.isEligible(candidate.targetUrl())
-                ? inactiveChange(candidate.resourceId())
-                : activeChange(candidate.resourceId(), candidate.targetUrl());
+        WatchMonitorChange change = shouldMonitor(candidate.inactive(), candidate.targetUrl())
+                ? activeChange(candidate.resourceId(), candidate.targetUrl())
+                : inactiveChange(candidate.resourceId());
         return outboxPort.appendReconciledIfCurrent(candidate, change);
     }
 
-    private boolean appendActive(UUID resourceId, String targetUrl) {
-        return outboxPort.appendIfChanged(activeChange(resourceId, targetUrl));
+    // 점검이 켜져 있고 보관·종료되지 않은 자료의 적격 URL만 감시한다.
+    private boolean shouldMonitor(boolean inactive, String targetUrl) {
+        return source.monitoringEnabled() && !inactive && eligibilityPolicy.isEligible(targetUrl);
+    }
+
+    private void appendActive(UUID resourceId, String targetUrl) {
+        outboxPort.appendIfChanged(activeChange(resourceId, targetUrl));
     }
 
     private WatchMonitorChange activeChange(UUID resourceId, String targetUrl) {
@@ -102,8 +93,8 @@ public class WatchMonitorChangeRecorder {
         );
     }
 
-    private boolean appendInactive(UUID resourceId) {
-        return outboxPort.appendIfChanged(inactiveChange(resourceId));
+    private void appendInactive(UUID resourceId) {
+        outboxPort.appendIfChanged(inactiveChange(resourceId));
     }
 
     private WatchMonitorChange inactiveChange(UUID resourceId) {

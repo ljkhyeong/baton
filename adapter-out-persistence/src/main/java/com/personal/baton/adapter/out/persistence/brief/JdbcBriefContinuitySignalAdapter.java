@@ -8,8 +8,6 @@ import com.personal.baton.application.brief.BriefContinuitySignalState;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
 import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @Transactional(propagation = Propagation.MANDATORY)
 public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalStorePort {
-
-    private static final String SOURCE_REFERENCE_PREFIX = "baton-continuity:";
 
     private static final RowMapper<BriefContinuitySignalState> SIGNAL_MAPPER =
             (resultSet, rowNumber) -> new BriefContinuitySignalState(
@@ -142,7 +138,8 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
     public void append(UUID subjectId, BriefContinuityEvent event) {
         Objects.requireNonNull(subjectId, "subjectId는 필수입니다");
         Objects.requireNonNull(event, "BRIEF 연속성 이벤트는 필수입니다");
-        UUID signalId = signalId(event.sourceReference());
+        UUID signalId = BriefContinuityEvent.signalId(event.sourceReference())
+                .orElseThrow(() -> new IllegalArgumentException("BRIEF sourceReference 형식이 올바르지 않습니다"));
         if (event.aggregateRevision() == 1) {
             jdbcTemplate.update(
                     """
@@ -253,12 +250,4 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
                 utc(event.occurredAt())
         );
     }
-
-    private static UUID signalId(String sourceReference) {
-        if (!sourceReference.startsWith(SOURCE_REFERENCE_PREFIX)) {
-            throw new IllegalArgumentException("BRIEF sourceReference 형식이 올바르지 않습니다");
-        }
-        return UUID.fromString(sourceReference.substring(SOURCE_REFERENCE_PREFIX.length()));
-    }
-
 }

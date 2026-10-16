@@ -37,8 +37,6 @@ class WorkspaceContentIdempotencyTest {
     @Test
     void preservesContentIdempotencyCompatibilityVectors() {
         WorkspaceAccessRepository repository = mock(WorkspaceAccessRepository.class);
-        when(repository.findContentCreationIdempotency(TEAM_ID, IDEMPOTENCY_HASH))
-                .thenReturn(Optional.empty());
         WorkspaceContentIdempotency idempotency =
                 new WorkspaceContentIdempotency(repository);
         Member member = Member.create(RESOURCE_ID, TEAM_ID, "  김민지  ");

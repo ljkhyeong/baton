@@ -48,7 +48,7 @@ public class AccountDeactivationService implements DeactivateAccountUseCase {
         }
         var account = identities.findAccountByIdForUpdate(accountId).orElseThrow(AccountNotFoundException::new);
         if (!account.isActive()) return;
-        // 팀 잠금을 기다리는 동안 가입이 완료되었으면 현재 행을 확인하고 전체 작업을 재시도한다.
+        // 팀 잠금을 기다리는 동안 다른 팀 가입이 완료되었으면 충돌로 끝내고 호출자가 전체 작업을 다시 시도하게 한다.
         var memberships = access.lockAccountMemberships(accountId);
         if (memberships.stream().anyMatch(value -> !lockedTeams.containsKey(value.getTeamId()))) {
             throw new WorkspaceContentConflictException();

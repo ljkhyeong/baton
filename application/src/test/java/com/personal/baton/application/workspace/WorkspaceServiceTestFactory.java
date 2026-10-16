@@ -3,6 +3,7 @@ package com.personal.baton.application.workspace;
 import static org.mockito.Mockito.mock;
 
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
+import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
@@ -24,10 +25,10 @@ final class WorkspaceServiceTestFactory {
             WorkspaceRecordsRepository recordsRepository,
             Clock clock,
             WorkspaceSecrets workspaceSecrets,
-            WatchMonitorChangeRecorder watchMonitorChangeRecorder,
-            BriefContinuitySignalRecorder briefContinuitySignalRecorder,
-            CalendarChangeRecorder calendarChangeRecorder
+            BriefContinuitySignalRecorder briefContinuitySignalRecorder
     ) {
+        WatchMonitorChangeRecorder watchMonitorChangeRecorder = mock(WatchMonitorChangeRecorder.class);
+        CalendarChangeRecorder calendarChangeRecorder = mock(CalendarChangeRecorder.class);
         ContinuitySignalAnalyzer analyzer = new ContinuitySignalAnalyzer();
         WorkspaceResultMapper resultMapper = new WorkspaceResultMapper(clock);
         WorkspaceProjectionReader projectionReader = new WorkspaceProjectionReader(
@@ -71,7 +72,7 @@ final class WorkspaceServiceTestFactory {
                 memberResolver,
                 resultMapper,
                 briefContinuitySignalRecorder,
-                org.mockito.Mockito.mock(com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.class)
+                mock(CalendarSubscriptionStore.class)
         );
         WorkspaceRoleResolver roleResolver = new WorkspaceRoleResolver(peopleRepository, recordsRepository);
         WorkspaceRolePolicy rolePolicy = new WorkspaceRolePolicy(peopleRepository);

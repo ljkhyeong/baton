@@ -14,12 +14,6 @@ const identityLabels = {
   local_email: '이메일',
 } as const
 
-function errorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : '계정 보안 요청을 처리하지 못했습니다.'
-}
-
 // children은 비밀번호 변경 뒤, 로그아웃·비활성화 같은 위험 동작 앞에 둔다.
 export default function AccountSecurityPanel({ accountId, children }: { accountId: string; children?: ReactNode }) {
   const accountQuery = useAccountSecurity(accountId)
@@ -60,7 +54,7 @@ export default function AccountSecurityPanel({ accountId, children }: { accountI
       <div className="auth-result auth-result-warning" role="alert">
         <span className="auth-result-mark" aria-hidden="true">!</span>
         <h3>계정 보안 정보를 불러오지 못했습니다.</h3>
-        <p>{errorMessage(accountQuery.error)}</p>
+        <p>{accountQuery.error.message}</p>
         <div className="auth-result-actions">
           <button
             className="primary-button"
@@ -162,7 +156,7 @@ export default function AccountSecurityPanel({ accountId, children }: { accountI
             </label>
             {(validationError || passwordMutation.isError) && (
               <p className="form-error" role="alert">
-                {validationError || errorMessage(passwordMutation.error)}
+                {validationError || passwordMutation.error?.message}
               </p>
             )}
             <button
@@ -188,7 +182,7 @@ export default function AccountSecurityPanel({ accountId, children }: { accountI
         </p>
         {sessionRevocationMutation.isError && (
           <p className="form-error" role="alert">
-            {errorMessage(sessionRevocationMutation.error)}
+            {sessionRevocationMutation.error.message}
           </p>
         )}
         <button
@@ -218,7 +212,7 @@ export default function AccountSecurityPanel({ accountId, children }: { accountI
         }}>
           <label className="account-deactivation-confirm"><input type="checkbox" required checked={deactivationConfirmed}
             disabled={mutationPending} onChange={event => setDeactivationConfirmed(event.target.checked)} />기록 보존과 로그인 중지를 확인했습니다.</label>
-          {deactivationMutation.isError && <p role="alert" className="form-error">{errorMessage(deactivationMutation.error)}</p>}
+          {deactivationMutation.isError && <p role="alert" className="form-error">{deactivationMutation.error.message}</p>}
           <button type="submit" className="danger-button" disabled={!deactivationConfirmed || mutationPending || accountQuery.isFetching}>
             {deactivationMutation.isPending ? '계정 비활성화 중…' : '이 계정 비활성화'}
           </button>

@@ -1,3 +1,4 @@
+import { queryOptions } from '@tanstack/react-query'
 import type { operations } from '@/generated/api'
 import { csrfHeaders } from '@/features/auth/api'
 import type { WorkspaceScope } from '@/features/workspace/api'
@@ -15,7 +16,7 @@ function decode(value: unknown, scope: NotificationScope): NotificationInbox {
     || !value.notifications.every((item: unknown) => isJsonObject(item) && isUuid(item.id)
       && isUuid(item.sourceId) && isUuid(item.roleId) && typeof item.title === 'string'
       && typeof item.read === 'boolean' && isInstant(item.occurredAt)
-      && ((item.kind === 'HANDOFF_REQUEST' && item.roundId === null)
+      && (((item.kind === 'HANDOFF_REQUEST' || item.kind === 'RESOURCE_REVIEW_DUE') && item.roundId === null)
         || ((item.kind === 'OVERDUE' || item.kind === 'DEADLINE_SOON') && isUuid(item.roundId))))) {
     throw new Error('내 알림 응답을 읽지 못했습니다. 다시 불러와 주세요.')
   }
@@ -36,6 +37,7 @@ type ConfigurePreferences = NonNullable<operations['configureNotificationPrefere
 function decodePreferences(value: unknown, accountId: string): NotificationPreferences {
   if (!isJsonObject(value) || !isSameUuid(value.accountId, accountId) || !Number.isSafeInteger(value.version) || Number(value.version) < -1
     || typeof value.deadlineSoonEnabled !== 'boolean' || typeof value.overdueEnabled !== 'boolean' || typeof value.handoffEnabled !== 'boolean'
+    || typeof value.resourceReviewEnabled !== 'boolean'
     || !Number.isSafeInteger(value.deadlineLeadHours) || Number(value.deadlineLeadHours) < 1 || Number(value.deadlineLeadHours) > 168) {
     throw new Error('알림 설정을 읽지 못했습니다.')
   }
@@ -44,6 +46,12 @@ function decodePreferences(value: unknown, accountId: string): NotificationPrefe
 export function getNotificationPreferences(accountId: string) {
   return apiRequest('/api/v1/notification-preferences', { method: 'GET', decode: value => decodePreferences(value, accountId) })
 }
+// 설정 저장 결과가 다른 화면(모든 팀의 내 할 일)의 마감 임박 기준에도 반영되도록 같은 키를 쓴다.
+export const notificationPreferencesQueryOptions = (accountId: string) => queryOptions({
+  queryKey: ['auth', 'notification-preferences', accountId] as const,
+  queryFn: () => getNotificationPreferences(accountId),
+  staleTime: 0,
+})
 export async function configureNotificationPreferences(accountId: string, request: ConfigurePreferences) {
   return apiRequest('/api/v1/notification-preferences', { method: 'POST', body: request,
     headers: await csrfHeaders(), decode: value => decodePreferences(value, accountId) })

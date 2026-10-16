@@ -2,7 +2,6 @@ package com.personal.baton.adapter.in.web.auth;
 
 import com.personal.baton.adapter.in.web.ErrorResponse;
 import com.personal.baton.adapter.in.web.HttpObservationErrors;
-import com.personal.baton.adapter.in.web.security.AccountSessionRequestMatchers;
 import com.personal.baton.adapter.in.web.security.SecurityErrorResponseWriter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,18 +19,19 @@ public final class AccountAuthenticationFailureHandler
             "IDENTITY_TEMPORARILY_UNAVAILABLE",
             "현재 인증 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요"
     );
+    private static final ErrorResponse INVALID_CREDENTIALS = new ErrorResponse(
+            "INVALID_CREDENTIALS",
+            "이메일 또는 비밀번호가 올바르지 않습니다"
+    );
 
     private final SecurityErrorResponseWriter errorResponseWriter;
-    private final ErrorResponse authenticationFailure;
     private final AuthRateLimiter rateLimiter;
 
     public AccountAuthenticationFailureHandler(
             SecurityErrorResponseWriter errorResponseWriter,
-            ErrorResponse authenticationFailure,
             AuthRateLimiter rateLimiter
     ) {
         this.errorResponseWriter = Objects.requireNonNull(errorResponseWriter);
-        this.authenticationFailure = Objects.requireNonNull(authenticationFailure);
         this.rateLimiter = Objects.requireNonNull(rateLimiter);
     }
 
@@ -44,9 +44,7 @@ public final class AccountAuthenticationFailureHandler
         Optional<RuntimeException> infrastructureFailure =
                 IdentityInfrastructureFailures.find(exception);
         if (infrastructureFailure.isPresent()) {
-            if (AccountSessionRequestMatchers.localLogin().matches(request)) {
-                rateLimiter.recordLoginInfrastructureFailure(request.getParameter("email"));
-            }
+            rateLimiter.recordLoginInfrastructureFailure(request.getParameter("email"));
             HttpObservationErrors.mark(request, infrastructureFailure.get());
             errorResponseWriter.write(
                     response,
@@ -58,7 +56,7 @@ public final class AccountAuthenticationFailureHandler
         errorResponseWriter.write(
                 response,
                 HttpServletResponse.SC_UNAUTHORIZED,
-                authenticationFailure
+                INVALID_CREDENTIALS
         );
     }
 

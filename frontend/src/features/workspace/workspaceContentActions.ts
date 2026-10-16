@@ -52,12 +52,13 @@ import type {
 import type { WorkspaceEditor } from './workspaceEditorActions'
 import {
   categoryCopy,
+  getMember,
   isActiveMember,
   isRoleHandoffLocked,
   mutationError,
   phaseCopy,
 } from './workspacePresentation'
-import { ApiError } from '@/shared/api/ApiError'
+import { isWorkspaceContentConflict } from './api'
 
 type ContentCommands = {
   memberCreation: ReturnType<typeof useCreateMemberCommand>
@@ -122,10 +123,6 @@ type WorkspaceContentActionOptions = {
   notify: (message: string, tone?: 'success' | 'error') => void
 }
 
-function isWorkspaceContentConflict(error: unknown) {
-  return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
-}
-
 export function createWorkspaceContentActions({
   roles,
   members,
@@ -160,6 +157,12 @@ export function createWorkspaceContentActions({
   endHandoffItemOperation,
   notify,
 }: WorkspaceContentActionOptions) {
+  // 수정 충돌은 충돌 복구 흐름이 안내하므로 그 밖의 실패만 알린다.
+  const notifyFailure = (message: string) => (error: unknown) => {
+    if (isWorkspaceContentConflict(error)) return
+    notify(`${message} ${mutationError(error)}`, 'error')
+  }
+
   const addRole = (request: RoleFormRequest) => commands.roleCreation.submit(request, () => {
     closeModal()
     setView('roles')
@@ -199,10 +202,7 @@ export function createWorkspaceContentActions({
       onSuccess: (updatedMember) => notify(deactivated
         ? `${updatedMember.name}님의 활동을 종료했습니다. 기존 기록의 이름은 유지됩니다.`
         : `${updatedMember.name}님의 활동을 재개했습니다.`),
-      onError: (error) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`구성원 활동 상태를 바꾸지 못했습니다. ${mutationError(error)}`, 'error')
-      },
+      onError: notifyFailure('구성원 활동 상태를 바꾸지 못했습니다.'),
     })
   }
 
@@ -222,8 +222,8 @@ export function createWorkspaceContentActions({
       },
     }), '역할 수정', [
       ['역할 이름', request.name], ['역할 목적', request.purpose],
-      ['현재 담당자', members.find((member) => member.id === request.currentMemberId)?.name],
-      ['다음 담당자', members.find((member) => member.id === request.nextMemberId)?.name],
+      ['현재 담당자', getMember(members, request.currentMemberId)?.name],
+      ['다음 담당자', getMember(members, request.nextMemberId)?.name],
       ['담당 시작일', request.assignmentStartDate], ['담당 종료일', request.assignmentEndDate],
       ['담당 업무', request.responsibilities.join('\n')], ['주의사항', request.risk],
     ])
@@ -276,10 +276,7 @@ export function createWorkspaceContentActions({
     }
     mutations.roleResourceArchive.mutate({ id: resource.id, archived }, {
       onSuccess: () => notify(archived ? '자료를 보관함으로 옮겼습니다.' : '자료를 복원했습니다.'),
-      onError: (error) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`자료 상태를 바꾸지 못했습니다. ${mutationError(error)}`, 'error')
-      },
+      onError: notifyFailure('자료 상태를 바꾸지 못했습니다.'),
     })
   }
 
@@ -320,10 +317,7 @@ export function createWorkspaceContentActions({
           : '반복 업무를 복원했습니다. 새 회차부터 포함됩니다.')
         focusRoutineArchiveResult(updatedRoutine.id, archived)
       })
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`반복 업무를 ${archived ? '보관' : '복원'}하지 못했습니다. ${mutationError(error)}`, 'error')
-      })
+      .catch(notifyFailure(`반복 업무를 ${archived ? '보관' : '복원'}하지 못했습니다.`))
       .finally(() => endRoutineOperation(routine.id))
   }
 
@@ -372,10 +366,7 @@ export function createWorkspaceContentActions({
         setView('rhythm')
         notify('회차를 복원했습니다.')
       })
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`회차를 ${archived ? '보관' : '복원'}하지 못했습니다. ${mutationError(error)}`, 'error')
-      })
+      .catch(notifyFailure(`회차를 ${archived ? '보관' : '복원'}하지 못했습니다.`))
       .finally(() => endRoundOperation(round.id))
   }
 
@@ -389,10 +380,7 @@ export function createWorkspaceContentActions({
     void mutations.routineExecutionCompletion
       .mutateAsync({ roundId, executionId: execution.id, completed })
       .then(() => notify(completed ? '이 업무를 완료로 표시했습니다.' : '완료 표시를 되돌렸습니다.'))
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`완료 상태를 바꾸지 못했습니다. ${mutationError(error)}`, 'error')
-      })
+      .catch(notifyFailure('완료 상태를 바꾸지 못했습니다.'))
       .finally(() => endRoundOperation(roundId))
   }
 
@@ -417,7 +405,7 @@ export function createWorkspaceContentActions({
       '결정 기록 수정',
       [
         ['결정', request.title], ['선택 이유', request.reason], ['검토한 대안', request.alternative],
-        ['작성자', members.find((member) => member.id === request.authorMemberId)?.name],
+        ['작성자', getMember(members, request.authorMemberId)?.name],
         ['관련 역할', roles.filter((role) => request.roleIds.includes(role.id)).map((role) => role.name).join('\n')],
       ],
     )
@@ -429,10 +417,7 @@ export function createWorkspaceContentActions({
       onSuccess: () => notify(
         archived ? '결정 기록을 보관함으로 옮겼습니다.' : '결정 기록을 복원했습니다.',
       ),
-      onError: (error) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했습니다. ${mutationError(error)}`, 'error')
-      },
+      onError: notifyFailure(`결정 기록을 ${archived ? '보관' : '복원'}하지 못했습니다.`),
     })
   }
 
@@ -489,10 +474,7 @@ export function createWorkspaceContentActions({
       .then(() => notify(
         archived ? '인수인계 항목을 보관함으로 옮겼습니다.' : '인수인계 항목을 복원했습니다.',
       ))
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`인수인계 항목을 ${archived ? '보관' : '복원'}하지 못했습니다. ${mutationError(error)}`, 'error')
-      })
+      .catch(notifyFailure(`인수인계 항목을 ${archived ? '보관' : '복원'}하지 못했습니다.`))
       .finally(() => endHandoffItemOperation(item.id))
   }
 
@@ -507,10 +489,7 @@ export function createWorkspaceContentActions({
     const completed = !item.completed
     void mutations.handoffCompletion.mutateAsync({ id, completed })
       .then(() => notify(completed ? '인수인계 항목을 완료로 표시했습니다.' : '인수인계 항목의 완료 표시를 취소했습니다.'))
-      .catch((error: unknown) => {
-        if (isWorkspaceContentConflict(error)) return
-        notify(`인수인계 상태를 바꾸지 못했습니다. ${mutationError(error)}`, 'error')
-      })
+      .catch(notifyFailure('인수인계 상태를 바꾸지 못했습니다.'))
       .finally(() => endHandoffItemOperation(id))
   }
 

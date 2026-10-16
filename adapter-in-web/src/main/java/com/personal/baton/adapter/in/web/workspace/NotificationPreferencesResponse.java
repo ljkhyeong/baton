@@ -4,9 +4,9 @@ import com.personal.baton.application.workspace.port.in.NotificationPreferencesU
 import java.util.UUID;
 
 public record NotificationPreferencesResponse(UUID accountId, long version, boolean deadlineSoonEnabled, boolean overdueEnabled,
-        boolean handoffEnabled, int deadlineLeadHours) {
+        boolean handoffEnabled, boolean resourceReviewEnabled, int deadlineLeadHours) {
     static NotificationPreferencesResponse from(PreferencesResult value) {
         return new NotificationPreferencesResponse(value.accountId(), value.version(), value.deadlineSoonEnabled(),
-                value.overdueEnabled(), value.handoffEnabled(), value.deadlineLeadHours());
+                value.overdueEnabled(), value.handoffEnabled(), value.resourceReviewEnabled(), value.deadlineLeadHours());
     }
 }
