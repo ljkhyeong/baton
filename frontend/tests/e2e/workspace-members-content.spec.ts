@@ -499,15 +499,19 @@ for (const transition of ['계정 변경', '접근 권한 상실'] as const) {
     await openSharedWorkspace(page)
     const draft = await createRoleConflictDraft(page, api, testInfo.project.name, '이 계정에서 작성한 초안')
     if (transition === '계정 변경') {
+      // 진행 중인 세션 조회가 있으면 포커스 재조회가 그 요청에 합쳐지므로 새 조회가 올 때까지 이벤트를 다시 보낸다.
+      const refocusUntilSessionRead = async () => {
+        const readsBefore = sessionReads
+        await expect.poll(async () => {
+          await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
+          return sessionReads
+        }).toBeGreaterThan(readsBefore)
+      }
       accountId = '8e448211-66ae-44ab-9888-c4960648c22c'
-      const readsBeforeChange = sessionReads
-      await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
-      await expect.poll(() => sessionReads).toBeGreaterThan(readsBeforeChange)
+      await refocusUntilSessionRead()
       await expect(draft).toHaveCount(0)
       accountId = '8e448211-66ae-44ab-9888-c4960648c22b'
-      const readsBeforeReturn = sessionReads
-      await page.evaluate(() => window.dispatchEvent(new Event('visibilitychange')))
-      await expect.poll(() => sessionReads).toBeGreaterThan(readsBeforeReturn)
+      await refocusUntilSessionRead()
       await expect(draft).toHaveCount(0)
     } else {
       api.rotateAccessKeyFromAnotherDevice()
