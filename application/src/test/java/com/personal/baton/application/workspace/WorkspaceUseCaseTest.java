@@ -1252,6 +1252,19 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(minseo.id())
         );
+        assertThatThrownBy(() -> recordsUseCase.updateRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                created.accessKey(),
+                new UpdateRoleResourceCommand(
+                        role.id(),
+                        "보관 중에는 바꿀 수 없는 진행 문서",
+                        "https://docs.example.com/facilitation-archived",
+                        null
+                )
+        )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
         assertThat(recordsUseCase.updateRoleResourceArchive(
                 created.teamId(),
                 created.seasonId(),
