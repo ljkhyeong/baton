@@ -55,7 +55,7 @@ export function RoutineModal({
   const [phase, setPhase] = useState<RoutinePhase>(routine?.phase ?? 'BEFORE')
   const [dueLabel, setDueLabel] = useState(routine?.dueLabel ?? '')
   const [deadlineDayOffset, setDeadlineDayOffset] = useState(
-    routine?.deadlineDayOffset == null ? '-1' : String(routine.deadlineDayOffset),
+    routine ? String(routine.deadlineDayOffset ?? '') : '-1',
   )
   const [deadlineTime, setDeadlineTime] = useState(
     routine?.deadlineTime?.slice(0, 5) ?? '22:00',

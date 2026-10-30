@@ -1198,3 +1198,23 @@ test('@operations 로그인하지 않은 접근 거부는 다시 제출할 수 �
 
   expect((await pendingContentCreationEntries(page))[0]?.cleanupRequired).toBeUndefined()
 })
+
+test('@operations 마감을 정하지 않은 반복 업무는 수정해도 마감 없이 저장한다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.routines[0] = { ...projection.routines[0]!, deadlineDayOffset: null, deadlineTime: null }
+  const api = await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await page.getByRole('button', { name: '문제 5개 선정 반복 업무 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '반복 업무 수정' })
+  await expect(dialog.getByLabel('마감 기준일')).toHaveValue('')
+  await expect(dialog.getByLabel('마감 시각')).toBeDisabled()
+  await dialog.getByLabel('세부 설명').fill('마감 없이 진행 상황만 공유합니다.')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  const update = await recordedCall(api, 'PUT', `${SCOPE_PATH}/routines/${ROUTINE_ID}`)
+  expect(update.body).not.toHaveProperty('deadlineDayOffset')
+  expect(update.body).not.toHaveProperty('deadlineTime')
+})
