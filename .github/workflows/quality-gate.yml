@@ -194,10 +194,14 @@ jobs:
             ops/systemd/baton-integration-delivery.timer
           systemd-analyze calendar '*-*-* 03:15:00 Asia/Seoul'
       - name: 프로덕션 Compose 검증
+        env:
+          BATON_BRIEF_SERVICE_HOST: brief-service
+          BATON_BRIEF_PRIVATE_NETWORK: baton-brief-private
         run: >-
           docker compose
           -f compose.production.yml
           -f compose.round.production.yml
+          -f compose.brief-service.production.yml
           config --quiet
       - name: 프로덕션 런타임 스모크 빌드 및 실행
         run: bash ops/tests/production-runtime-smoke.sh

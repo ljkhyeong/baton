@@ -28,7 +28,7 @@
 - BRIEF 선정 규칙 v2와 주간 해결 상세 API를 먼저 배포한 뒤 BATON을 적용한다. 조회·생성은 내부 `brief-service:8443`과 별도 서비스 인증을 사용하며 공개 Caddy에는 조회 경로를 추가하지 않는다.
 - 주간 요약 비교와 저장 이후 변경 확인은 BRIEF 범위 지정 비교·최신 여부 확인(BRIEF PRD-0031·0032, BRIEF `main`의 `0a73635` 이후)을 호출한다. 이 경로가 없는 BRIEF에서는 두 기능이 요약 없음(`404`)으로 보이므로 BRIEF를 먼저 배포한다.
 - 미해결 기간 표시는 BRIEF의 `activeSince`(BRIEF PRD-0033, 브랜치 `codex/attention-active-since`)가 배포된 뒤에 나타난다. 이전 BRIEF에서는 값이 `null`이라 표시하지 않으므로 배포 순서와 무관하게 동작하지만, BRIEF 변경의 병합·배포를 확인해야 한다.
-- 전용 Bearer 토큰 파일, HTTPS 원본 주소와 truststore를 준비한다. 전달을 끈 채 재조정 작업을 한 번 실행해 초기 점검 이벤트와 아웃박스를 확인한 뒤 전달을 켠다. `./ops/check-integration-delivery.sh`와 `integration="brief"` 지표에서 전달 상태를 확인한다.
+- 전용 Bearer 토큰 파일, HTTPS 원본 주소와 BRIEF 서비스 인증서 PEM 파일(`BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE`)을 준비한다. 전달을 끈 채 재조정 작업을 한 번 실행해 초기 점검 이벤트와 아웃박스를 확인한 뒤 전달을 켠다. `./ops/check-integration-delivery.sh`와 `integration="brief"` 지표에서 전달 상태를 확인한다.
 - 실제 HTTPS에서 장애 재시도·동일 이벤트 재전달·심각도 변경·해결 반영을 확인한다. 새 토큰과 직전 토큰을 함께 허용하는 교체 기간도 검증한다. 전달 진단·지표는 실제 수집·경보 시스템에 연결한다.
 - 로그인한 사용자로 점검·해결 상세, 요약 조회·생성·재사용·비교, 종료 시즌 조회, 특정 요약 링크의 로그인 복귀와 인쇄·PDF 저장을 확인한다.
 - 이 검증 전에는 계약 핀 `2.0.0-rc.4`를 안정 버전으로 올리지 않는다. 기준은 [업무 점검](docs/PRD/0009_brief-current-attention/spec.md)과 [주간 요약 탐색·공유·출력](docs/PRD/0010_brief-navigation-and-readiness/spec.md)이다.

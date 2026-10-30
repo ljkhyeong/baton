@@ -25,7 +25,7 @@ BRIEF는 BATON 업무 점검 이벤트에서 점검 항목과 변경되지 않�
 - 같은 생성 요청은 `(team, season, weekStart, zoneId, deliveryWatermark)`의 생성 실행 기록으로
   보존하고 1분 처리 임대(`lease`)와 작업 구분 토큰(`fencing token`)으로 최소 한 번 호출을 제어한다.
 - 외부 호출은 MySQL 트랜잭션 밖에서 수행하고, 현재 처리 임대 토큰으로만 완료·실패를 기록한다.
-- 이벤트 수신 토큰과 다른 서비스용 Bearer 토큰, 비공개 HTTPS Caddy와 BATON truststore를 사용한다.
+- 이벤트 수신 토큰과 다른 서비스용 Bearer 토큰, 비공개 HTTPS Caddy와 BRIEF 서비스 클라이언트 전용 Spring SSL 번들을 사용한다. JVM 기본 신뢰 저장소는 공개 CA를 쓰는 다른 외부 연동을 위해 바꾸지 않는다.
 - BRIEF의 스케줄러·대상 레지스트리·사용자 인증을 추가하지 않는다.
 
 ## 결과

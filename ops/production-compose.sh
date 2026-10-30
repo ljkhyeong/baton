@@ -206,6 +206,12 @@ email_outbox_encryption_key_file="$(
   production_validation_env_value BATON_EMAIL_OUTBOX_ENCRYPTION_KEY_FILE
 )"
 brief_bearer_token_file="$(production_validation_env_value BATON_BRIEF_BEARER_TOKEN_FILE)"
+brief_service_bearer_token_file="$(
+  production_validation_env_value BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE
+)"
+brief_service_trusted_certificate_file="$(
+  production_validation_env_value BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE
+)"
 round_private_key_file="$(
   production_validation_env_value BATON_ROUND_PARTICIPATION_GRANT_PRIVATE_KEY_FILE
 )"
@@ -260,6 +266,16 @@ email_outbox_encryption_key_file="$(
 email_outbox_encryption_key="$(< "$email_outbox_encryption_key_file")"
 brief_bearer_token="$(
   read_secret_or_placeholder "$brief_bearer_token_file" disabled-brief-bearer-token
+)"
+brief_service_bearer_token="$(
+  read_secret_or_placeholder \
+    "$brief_service_bearer_token_file" \
+    disabled-brief-service-bearer-token
+)"
+brief_service_trusted_certificate="$(
+  read_secret_or_placeholder \
+    "$brief_service_trusted_certificate_file" \
+    disabled-brief-service-trusted-certificate
 )"
 round_private_key="$(
   read_secret_or_placeholder "$round_private_key_file" disabled-round-private-key
@@ -336,6 +352,8 @@ BATON_SECRET_HOLIDAYS_SERVICE_KEY="$holidays_service_key" \
 BATON_SECRET_SMTP_PASSWORD="$smtp_password" \
 BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY="$email_outbox_encryption_key" \
 BATON_SECRET_BRIEF_BEARER_TOKEN="$brief_bearer_token" \
+BATON_SECRET_BRIEF_SERVICE_API_BEARER_TOKEN="$brief_service_bearer_token" \
+BATON_SECRET_BRIEF_SERVICE_TRUSTED_CERTIFICATE="$brief_service_trusted_certificate" \
 BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY="$round_private_key" \
 BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY="$round_public_key" \
 BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY="$round_previous_public_key" \
@@ -376,7 +394,7 @@ env \
   -u BATON_BRIEF_SERVICE_HOST \
   -u BATON_BRIEF_PRIVATE_NETWORK \
   -u BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE \
-  -u BATON_BRIEF_SERVICE_TRUSTSTORE_FILE \
+  -u BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE \
   -u BATON_AUTH_OAUTH2_ENABLED \
   -u BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
   -u BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
