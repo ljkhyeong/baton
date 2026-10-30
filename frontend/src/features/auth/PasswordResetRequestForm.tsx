@@ -92,7 +92,7 @@ export default function PasswordResetRequestForm() {
           siteKey={capabilities.data.turnstileSiteKey}
         />
       )}
-      <p>이메일로 가입한 계정의 비밀번호만 바꿀 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
+      <p className="account-security-note">이메일로 가입한 계정의 비밀번호만 바꿀 수 있습니다. Google·Naver 계정은 해당 서비스에서 변경해 주세요.</p>
       {mutation.isError && (
         <p className="form-error" role="alert">
           {mutation.error.message}
@@ -105,7 +105,7 @@ export default function PasswordResetRequestForm() {
       >
         {mutation.isPending ? '메일 요청 중' : '재설정 메일 받기'}
       </button>
-      <Link className="auth-secondary-link" to="/login">로그인으로</Link>
+      <p className="auth-switch-copy"><Link to="/login">로그인으로</Link></p>
     </form>
   )
 }

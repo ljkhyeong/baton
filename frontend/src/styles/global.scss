@@ -5,6 +5,9 @@
   font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  // 한글은 어절 단위로 줄을 바꾸고, 한 줄보다 긴 낱말만 중간에서 나눈다.
+  word-break: keep-all;
+  overflow-wrap: break-word;
   --canvas: #f2f4f6;
   --paper: #ffffff;
   --ink: #191f28;
@@ -140,6 +143,9 @@ button {
 }
 
 :where(textarea) { resize: vertical; }
+
+// 브라우저 기본값(smaller)은 글자 단계를 벗어나므로 보조 글자의 기본 크기를 정한다.
+:where(small) { font-size: 12px; }
 
 :where(input[type="checkbox"], input[type="radio"]) { accent-color: var(--ink); }
 
@@ -2680,7 +2686,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 .my-work .baton-notice { margin-top: 0; }
 .baton-notice-mark { flex: 0 0 36px; width: 36px; height: 36px; background: url('/favicon.svg') center / contain no-repeat; }
 .baton-notice-copy { display: flex; flex: 1 1 260px; min-width: 0; flex-direction: column; gap: 2px; }
-.baton-notice-copy strong { font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.baton-notice-copy strong { font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
 .baton-notice-copy small { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .baton-notice-action { min-height: 44px; padding: 0 16px; border: 0; border-radius: var(--radius); color: var(--on-ink); background: var(--baton-action); font-weight: 650; cursor: pointer; }
 .baton-notice-action:hover { background: var(--baton-action-hover); }
@@ -2695,7 +2701,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 .my-role-line span,
 .my-role-handoff > span:first-child { color: var(--muted); font-size: 13px; }
 .my-role-line strong,
-.my-role-handoff strong { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.my-role-handoff strong { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .my-role-handoff { width: 100%; padding: 8px 0; border: 0; border-radius: var(--radius); background: transparent; text-align: left; cursor: pointer; }
 .my-role-handoff .thin-progress { grid-column: 2; }
 .my-role-handoff:hover strong { text-decoration: underline; text-underline-offset: 3px; }

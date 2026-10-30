@@ -78,7 +78,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
           링크가 올바르지 않거나 만료되었을 수 있습니다. 이미 인증에 사용한 링크도 다시 사용할 수 없습니다.
         </p>
         <p>
-          비밀번호를 정한 뒤 결과를 확인하지 못했다면 해당 비밀번호로 먼저 로그인해 보세요.
+          비밀번호를 정한 뒤 결과를 확인하지 못했다면 해당 비밀번호로 먼저 로그인해 보세요.{' '}
           {passwordReset ? '변경하지 못했다면 새 재설정 메일을 요청하세요.' : '아직 인증을 완료하지 않았다면 새 인증 메일을 요청하세요.'}
         </p>
         <div className="auth-result-actions">
