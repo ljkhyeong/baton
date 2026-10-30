@@ -107,10 +107,10 @@ export async function resetPassword(token: string, password: string): Promise<vo
   })
 }
 
-export function getAccountSecurity(): Promise<AccountSecurity> {
+export function getAccountSecurity(accountId: string): Promise<AccountSecurity> {
   return apiRequest(`${AUTH_ROOT}/account`, {
     method: 'GET',
-    decode: decodeAccountSecurity,
+    decode: (value) => decodeAccountSecurity(value, accountId),
   })
 }
 

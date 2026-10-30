@@ -1283,6 +1283,20 @@ for (const { title, endSession } of [
   })
 }
 
+test('@smoke 계정 보안 응답의 계정이 세션과 다르면 표시하지 않고 다시 확인을 안내한다', async ({ page }) => {
+  await installAuthApi(page, { authenticated: true })
+  await page.route('**/api/v1/auth/account', (route) => route.fulfill({ json: {
+    accountId: '8e448211-66ae-44ab-9888-c4960648c22c',
+    displayName: '다른 계정',
+    identities: [],
+  } }))
+  await page.goto('/account')
+
+  await expect(page.getByRole('alert')).toContainText('계정 보안 정보를 불러오지 못했습니다.')
+  await expect(page.getByRole('heading', { name: '다른 계정' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '다시 확인', exact: true })).toBeVisible()
+})
+
 test('@smoke URL.parse가 없는 브라우저에서도 로그인 복귀 경로를 검증한다', async ({ page }) => {
   await page.addInitScript(() => Reflect.deleteProperty(URL, 'parse'))
   await installAuthApi(page)
