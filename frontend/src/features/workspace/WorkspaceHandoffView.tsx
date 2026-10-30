@@ -15,6 +15,7 @@ import {
   latestRoleHandoff,
 } from './workspacePresentation'
 import { daysUntil } from './seasonCalendar'
+import { roleHandoffIdentityCopy } from './WorkspaceRoleHandoffModals'
 import type {
   HandoffItem,
   Member,
@@ -47,6 +48,9 @@ export function HandoffView({
   roles,
   roleHandoffs,
   members,
+  currentMember,
+  accountAccessEnabled,
+  canAdminister,
   season,
   calendarDate,
   selectedRoleId,
@@ -71,6 +75,9 @@ export function HandoffView({
   roles: Role[]
   roleHandoffs: RoleHandoff[]
   members: Member[]
+  currentMember?: Member
+  accountAccessEnabled: boolean
+  canAdminister: boolean
   season: Season
   calendarDate: string
   selectedRoleId: string
@@ -134,6 +141,11 @@ export function HandoffView({
   )
   const nextName = next?.name ?? '다음 담당자'
   const transitionDisabled = changesDisabled || handoffTransitionPending
+  // 계정 팀에서는 서버가 로그인한 구성원과 확인자를 대조한다. 공유 링크 팀은 본인을 구분할 수 없다.
+  const actsAs = (memberId: string) => !accountAccessEnabled || currentMember?.id === memberId
+  // 이전 담당자가 행동할 수 없을 때의 취소는 관리자에게도 열어 두고 서버가 판단한다.
+  const cancelDisabled = (handoff: RoleHandoff) => transitionDisabled
+    || !(canAdminister || actsAs(handoff.fromMemberId))
   const handoffSummaryTitle = selectedHandoff?.status === 'ACCEPTED'
     ? `${nextName}님이 이어받은 인수인계`
     : selectedHandoff?.status === 'CANCELLED'
@@ -242,11 +254,14 @@ export function HandoffView({
                       selectedHandoff.incomingAssignmentEndDate,
                     )}입니다.
                   </p>
+                  {!actsAs(selectedHandoff.fromMemberId) && (
+                    <p>{roleHandoffIdentityCopy(getMember(members, selectedHandoff.fromMemberId), '전달', true)}</p>
+                  )}
                   <div className="handoff-lifecycle-actions">
                     <button
                       type="button"
                       className="primary-button baton-button"
-                      disabled={transitionDisabled}
+                      disabled={transitionDisabled || !actsAs(selectedHandoff.fromMemberId)}
                       onClick={() => onTransferHandoff(selected, selectedHandoff)}
                     >
                       <span className="baton-glyph" aria-hidden="true" />내용 확인 후 전달
@@ -254,7 +269,7 @@ export function HandoffView({
                     <button
                       type="button"
                       className="secondary-button"
-                      disabled={transitionDisabled}
+                      disabled={cancelDisabled(selectedHandoff)}
                       onClick={() => onCancelHandoff(selected, selectedHandoff)}
                     >
                       준비 취소
@@ -265,17 +280,26 @@ export function HandoffView({
                 <>
                   <span className="handoff-state-label">수락 대기</span>
                   <strong>{nextName}님의 수락을 기다리고 있습니다</strong>
+                  <p>
+                    새 담당자의 담당 기간은 {formatDateRange(
+                      selectedHandoff.incomingAssignmentStartDate,
+                      selectedHandoff.incomingAssignmentEndDate,
+                    )}입니다.
+                  </p>
                   <p>전달한 인수인계 문서는 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
                   <dl className="handoff-transfer-snapshot" aria-label="전달 시점 체크리스트와 자료 현황">
                     <div><dt>체크리스트 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>
                     <div><dt>미완료</dt><dd>{selectedHandoff.incompleteItemCount ?? 0}</dd></div>
                     <div><dt>참고 자료</dt><dd>{selectedHandoff.resourceCount ?? 0}</dd></div>
                   </dl>
+                  {!actsAs(selectedHandoff.toMemberId) && (
+                    <p>{roleHandoffIdentityCopy(getMember(members, selectedHandoff.toMemberId), '수락', true)}</p>
+                  )}
                   <div className="handoff-lifecycle-actions">
                     <button
                       type="button"
                       className="primary-button baton-button"
-                      disabled={transitionDisabled}
+                      disabled={transitionDisabled || !actsAs(selectedHandoff.toMemberId)}
                       onClick={() => onAcceptHandoff(selected, selectedHandoff)}
                     >
                       <span className="baton-glyph" aria-hidden="true" />인수인계 수락
@@ -283,7 +307,7 @@ export function HandoffView({
                     <button
                       type="button"
                       className="secondary-button"
-                      disabled={transitionDisabled}
+                      disabled={cancelDisabled(selectedHandoff)}
                       onClick={() => onCancelHandoff(selected, selectedHandoff)}
                     >
                       전달 취소
@@ -348,7 +372,7 @@ export function HandoffView({
                 <span>
                   <strong>{item.label}</strong>
                   <small>
-                    {item.archivedAt ? `${formatInstant(item.archivedAt)} 보관` : '보관됨'}
+                    {item.archivedAt ? `${formatInstant(item.archivedAt, season.timeZone)} 보관` : '보관됨'}
                     {item.completed ? ' · 완료' : ''}
                   </small>
                 </span>

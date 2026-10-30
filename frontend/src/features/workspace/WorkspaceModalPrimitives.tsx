@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { ApiError } from '@/shared/api/ApiError'
 import { Icon } from '@/shared/ui/Icon'
+import { isWorkspaceAccessDenied } from './api'
 import { isTerminalContentCreationError } from './useContentCreationCommand'
 import { mutationError } from './workspacePresentation'
 
@@ -38,7 +39,9 @@ export function contentCreationError(error: unknown) {
     && (error.code === 'IDEMPOTENCY_KEY_REUSED' || error.code === 'IDEMPOTENCY_REPLAY_EXPIRED')) {
     return '이전에 추가한 항목을 다시 확인할 수 없습니다. 목록에 이미 있는지 확인한 뒤, 없으면 다시 추가하세요.'
   }
-  if (isTerminalContentCreationError(error)) return mutationError(error)
+  if (isTerminalContentCreationError(error) || isWorkspaceAccessDenied(error)) {
+    return mutationError(error)
+  }
   return `${mutationError(error)} 같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.`
 }
 

@@ -43,6 +43,7 @@ export function DecisionModal({
   draftScope,
   roles,
   members,
+  currentMemberId,
   selectedRoleId,
   decision,
   pending,
@@ -55,6 +56,7 @@ export function DecisionModal({
   draftScope: WorkspaceScope | null
   roles: Role[]
   members: Member[]
+  currentMemberId?: string
   selectedRoleId: string
   decision?: Decision
   onClose: () => void
@@ -73,15 +75,20 @@ export function DecisionModal({
       : [selectedRoleId || roles[0]?.id || ''].filter(Boolean),
   )
   const [authorMemberId, setAuthorMemberId] = useState(
-    decision?.authorMemberId ?? members.find(isActiveMember)?.id ?? '',
+    decision?.authorMemberId ?? currentMemberId ?? members.find(isActiveMember)?.id ?? '',
   )
+  const [validationMessage, setValidationMessage] = useState('')
   const draft = useRecordDraft(draftScope, 'decision', decision?.id ?? 'new', { title, reason, alternative, textFormat })
   const authorOptions = memberSelectionOptions(members, decision?.authorMemberId)
   const existingAuthor = getMember(members, decision?.authorMemberId)
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (!title.trim() || !reason.trim() || !roleIds.length || !authorMemberId
-      || submission.closeGuardRef.current) return
+    if (!roleIds.length || !authorMemberId || submission.closeGuardRef.current) return
+    const invalidMessage = !title.trim() ? '무엇을 결정했는지 입력해 주세요.'
+      : !reason.trim() ? '결정한 이유를 입력해 주세요.'
+        : ''
+    setValidationMessage(invalidMessage)
+    if (invalidMessage) return
     submission.start(onSave({
       title: title.trim(),
       ...(textFormat === 'MARKDOWN' || decision?.textFormat === 'MARKDOWN' ? { textFormat } : {}),
@@ -110,6 +117,7 @@ export function DecisionModal({
           <span>무엇을 결정했나요?</span>
           <input
             required
+            maxLength={200}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="예: 세션 시작 시간을 30분 앞당긴다"
@@ -185,6 +193,7 @@ export function DecisionModal({
           </div>
           {!roleIds.length && <small className="form-hint form-hint-warning">관련 역할을 하나 이상 선택해 주세요.</small>}
         </fieldset>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (
@@ -438,11 +447,15 @@ export function HandoffItemModal({
   const [category, setCategory] = useState<HandoffCategory>(
     item?.category ?? 'RESPONSIBILITY',
   )
+  const [validationMessage, setValidationMessage] = useState('')
   const draft = useRecordDraft(draftScope, 'handoff', item?.id ?? 'new', { label })
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current || !roleId || lockedRoleIds.has(roleId)) return
-    submission.start(onSave({ roleId, label: label.trim(), category }))
+    const normalizedLabel = label.trim()
+    setValidationMessage(normalizedLabel ? '' : '남길 내용을 입력해 주세요.')
+    if (!normalizedLabel) return
+    submission.start(onSave({ roleId, label: normalizedLabel, category }))
   }
   return (
     <ModalShell
@@ -467,6 +480,7 @@ export function HandoffItemModal({
           <span>남길 내용</span>
           <input
             required
+            maxLength={500}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             placeholder="예: 문제 선정 기준 문서 링크"
@@ -483,6 +497,7 @@ export function HandoffItemModal({
             ))}
           </select>
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (

@@ -13,6 +13,7 @@ import {
   useSubmissionLock,
 } from './WorkspaceModalPrimitives'
 import type { SaveResult } from './WorkspaceModalPrimitives'
+import { formatDateRange } from './WorkspaceViews'
 import { clampToSeason } from './seasonCalendar'
 import {
   categoryCopy,
@@ -36,7 +37,7 @@ import type {
   TransferRoleHandoffRequest,
 } from './types'
 
-function roleHandoffIdentityCopy(member: Member | undefined, action: string, accountAccessEnabled: boolean) {
+export function roleHandoffIdentityCopy(member: Member | undefined, action: string, accountAccessEnabled: boolean) {
   const memberName = member ? memberDisplayName(member) : '지정된 구성원'
   if (accountAccessEnabled) return `${memberName}님의 계정으로 로그인해야 ${action}할 수 있습니다.`
   return `공유 링크로 접속하면 본인 확인 없이 ${memberName}님이 ${action}한 것으로 기록됩니다.`
@@ -84,9 +85,9 @@ export function RoleHandoffModal({
     isActiveMember(member) && member.id !== role.currentMemberId)
   const retainedNextMember = eligibleMembers.find((member) =>
     member.id === (handoff?.toMemberId ?? role.nextMemberId))
-  const [toMemberId, setToMemberId] = useState(
-    retainedNextMember?.id ?? eligibleMembers[0]?.id ?? '',
-  )
+  const [selectedMemberId, setSelectedMemberId] = useState(eligibleMembers[0]?.id ?? '')
+  // 서버는 역할에 정한 다음 담당자와 다른 대상을 거부한다.
+  const toMemberId = retainedNextMember?.id ?? selectedMemberId
   const suggestedStartDate = clampToSeason(
     role.assignmentEndDate
       ? addCalendarDays(role.assignmentEndDate, 1)
@@ -179,14 +180,25 @@ export function RoleHandoffModal({
               <span>다음 담당자</span>
               <select
                 required
+                disabled={Boolean(retainedNextMember)}
                 value={toMemberId}
-                onChange={(event) => setToMemberId(event.target.value)}
+                onChange={(event) => setSelectedMemberId(event.target.value)}
               >
                 {eligibleMembers.map((member) => (
                   <option key={member.id} value={member.id}>{memberDisplayName(member)}</option>
                 ))}
               </select>
             </label>
+            {retainedNextMember && (
+              <small className="form-hint">
+                역할에 정한 다음 담당자입니다. 바꾸려면 역할 수정에서 다음 담당자를 변경해 주세요.
+              </small>
+            )}
+            {eligibleMembers.length === 0 && (
+              <small className="form-hint form-hint-warning">
+                넘겨줄 활동 구성원이 없습니다. 구성원 관리에서 구성원을 추가해 주세요.
+              </small>
+            )}
             <div className="date-grid">
               <label>
                 <span>다음 담당 시작일</span>
@@ -221,6 +233,14 @@ export function RoleHandoffModal({
               <Icon name="arrow" size={18} />
               <span><small>다음 담당자</small><strong>{toMember ? memberDisplayName(toMember) : '확인 필요'}</strong></span>
             </div>
+            {handoff && mode !== 'cancel' && (
+              <small className="form-hint">
+                다음 담당 기간 {formatDateRange(
+                  handoff.incomingAssignmentStartDate,
+                  handoff.incomingAssignmentEndDate,
+                )}
+              </small>
+            )}
             {mode === 'transfer' && (
               <>
                 <dl className="handoff-snapshot-grid" aria-label="전달 전 체크리스트와 자료 현황">
@@ -250,6 +270,7 @@ export function RoleHandoffModal({
                 mode === 'accept' ? '수락' : mode === 'transfer' ? '전달' : '취소',
                 accountAccessEnabled,
               )}
+              {accountAccessEnabled && mode === 'cancel' && ' 이전 담당자가 행동할 수 없으면 관리자가 취소할 수 있습니다.'}
             </p>
           </>
         )}
@@ -265,9 +286,9 @@ export function RoleHandoffModal({
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
-          submitDisabled={mode === 'transfer'
-            && warnings.length > 0
-            && !warningAcknowledged}
+          submitDisabled={mode === 'prepare'
+            ? eligibleMembers.length === 0
+            : mode === 'transfer' && warnings.length > 0 && !warningAcknowledged}
           submitLabel={modalCopy.submit}
           pendingLabel={modalCopy.pending}
           onClose={onClose}

@@ -27,7 +27,8 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
   const accountId = session.data?.authenticated ? session.data.accountId : ''
   const membership = useCurrentAccountMembership({ ...scope, accountId })
   const client = useQueryClient()
-  const key = [...workspaceKeys.team(scope.teamId), 'seasons', scope.seasonId, 'resource-verifications', resourceId, scope.accessKey, accountId]
+  // 작업 공간 키 아래에 두어 자료 수정·보관이 확인 기록도 함께 다시 불러오게 한다.
+  const key = [...workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId), 'resource-verifications', resourceId]
   const history = useQuery({ queryKey: key, queryFn: () => getVerificationHistory(scope, resourceId) })
   const [status, setStatus] = useState<VerifyResourceRequest['status']>('CONFIRMED')
   const [note, setNote] = useState('')

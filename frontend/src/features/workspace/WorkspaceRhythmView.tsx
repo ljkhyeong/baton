@@ -144,7 +144,7 @@ export function RhythmView({
                       {formatLocalDate(round.meetingDate)}
                       {' · '}
                       {completed}/{round.routineExecutions.length} 완료
-                      {round.archivedAt ? ` · ${formatInstant(round.archivedAt)} 보관` : ''}
+                      {round.archivedAt ? ` · ${formatInstant(round.archivedAt, season.timeZone)} 보관` : ''}
                     </small>
                   </span>
                   <button
@@ -209,7 +209,7 @@ export function RhythmView({
                     <strong>{routine.title}</strong>
                     <small>
                       {owner?.name ?? '연결된 역할 없음'} · {routine.dueLabel}
-                      {routine.archivedAt ? ` · ${formatInstant(routine.archivedAt)} 보관` : ''}
+                      {routine.archivedAt ? ` · ${formatInstant(routine.archivedAt, season.timeZone)} 보관` : ''}
                     </small>
                   </span>
                   <button

@@ -231,3 +231,18 @@ test('@operations @webkit 사용할 수 없는 저장 초대를 지우고 내 �
   await expect(page).toHaveURL('/my-teams')
   expect(await page.evaluate(() => sessionStorage.getItem('baton:team-invitation:v1'))).toBeNull()
 })
+
+test('@operations 관리자가 아닌 구성원은 시즌 목록을 보고 전환하지만 시즌 관리 동작은 비활성으로 본다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.team = { ...projection.team, accountAccessEnabled: true, permission: 'MEMBER' }
+  await installApi(page, projection)
+  await accountApi(page)
+  await openSharedWorkspace(page)
+
+  await page.getByRole('button', { name: /시즌 전환/ }).first().click()
+  const dialog = page.getByRole('dialog', { name: `${projection.team.name} 시즌` })
+  await expect(dialog.getByRole('button', { name: '시즌 정보 수정' })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: '시즌 종료' })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: '다음 시즌 시작' })).toBeDisabled()
+  await expect(dialog).toContainText('관리자만 할 수 있습니다.')
+})

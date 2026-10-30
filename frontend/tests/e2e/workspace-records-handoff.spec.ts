@@ -35,6 +35,44 @@ import {
   openRecordSearch,
   openHandoffView,
 } from './support/workspaceApiHarness'
+import type { RoleHandoff } from '../../src/features/workspace/types'
+
+const fixtureId = (sequence: number) => `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`
+
+function openRoleHandoff(status: 'PREPARING' | 'TRANSFERRED'): RoleHandoff {
+  return {
+    id: ROLE_HANDOFF_ID,
+    roleId: ROLE_ID,
+    fromMemberId: MEMBER_ONE_ID,
+    toMemberId: MEMBER_TWO_ID,
+    outgoingAssignmentStartDate: '2026-07-02',
+    outgoingAssignmentEndDate: '2026-09-17',
+    incomingAssignmentStartDate: '2026-09-18',
+    incomingAssignmentEndDate: null,
+    status,
+    preparedAt: '2026-07-22T09:00:00Z',
+    transferredAt: status === 'TRANSFERRED' ? '2026-07-22T09:10:00Z' : null,
+    acceptedAt: null,
+    cancelledAt: null,
+    transferredByMemberId: status === 'TRANSFERRED' ? MEMBER_ONE_ID : null,
+    acceptedByMemberId: null,
+    cancelledByMemberId: null,
+    activeItemCount: status === 'TRANSFERRED' ? 2 : null,
+    incompleteItemCount: status === 'TRANSFERRED' ? 1 : null,
+    resourceCount: status === 'TRANSFERRED' ? 0 : null,
+    warningAcknowledged: status === 'TRANSFERRED',
+  }
+}
+
+function accountProjection(
+  handoff: RoleHandoff,
+  permission: 'ADMIN' | 'MEMBER',
+) {
+  const projection = makeProjection()
+  projection.team = { ...projection.team, accountAccessEnabled: true, permission }
+  projection.roleHandoffs = [handoff]
+  return projection
+}
 
 const PROBLEM_SELECTION_RESOURCE = {
   id: CREATED_ROLE_RESOURCE_ID,
@@ -1277,6 +1315,41 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   await expect(panel.getByText('수정 필요 · 변경 전 확인 기록')).toBeVisible()
 })
 
+test('@memory 자료를 수정하면 열어 둔 확인 기록을 다시 불러와 재확인 필요를 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '캐시 무효화는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
+    url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
+  await installApi(page, projection)
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  await page.route('**/role-resources/*/verifications/schedule', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, version: -1,
+    intervalDays: null, nextReviewOn: null, today: '2026-09-05', reviewDue: false,
+  } }))
+  let version = 0
+  await page.route('**/role-resources/*/verifications', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, resourceVersion: version,
+    verifications: [{ id: '00000000-0000-4000-8000-000000000105', resourceVersion: 0, memberId: MEMBER_ONE_ID,
+      memberName: '박민서', url: 'https://example.com/guide', status: 'CONFIRMED', note: null,
+      verifiedAt: '2026-09-05T03:00:00Z', current: version === 0 }],
+  } }))
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  const panel = page.locator('.resource-verification').first()
+  await panel.locator('summary').click()
+  await expect(panel.getByText('사용할 수 있는 자료로 확인했습니다.')).toBeVisible()
+
+  await page.getByRole('button', { name: '운영 안내 자료 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '참고 자료 수정' })
+  await dialog.getByLabel('링크').fill('https://example.com/new-guide')
+  version = 1
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await expect(panel.getByText('자료가 변경되어 재확인이 필요합니다.')).toBeVisible()
+})
+
 test('@handoff 할 일 화면의 바통 알림은 인계가 가장 가까운 역할을 보여 주고 인수인계로 이동한다', async ({ page }, testInfo) => {
   await page.clock.setFixedTime(new Date('2026-09-03T00:00:00+09:00'))
   await installApi(page)
@@ -1291,4 +1364,212 @@ test('@handoff 할 일 화면의 바통 알림은 인계가 가장 가까운 역
   await expect(navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }))
     .toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { level: 2, name: '김준호님에게 넘길 인수인계' })).toBeVisible()
+})
+
+test('@handoff 인수인계 전환이 규칙으로 거절되면 서버가 알려 준 사유를 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '거절 사유 안내는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roleHandoffs = [openRoleHandoff('PREPARING')]
+  const api = await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await openHandoffView(page, testInfo.project.name)
+  await page.getByRole('button', { name: '내용 확인 후 전달' }).click()
+  const dialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
+  await dialog.getByLabel('미완료 항목과 자료 누락을 확인했습니다').check()
+  api.rejectNextRoleHandoffChange('현재 담당자 명의로 전달을 확인해 주세요')
+  await dialog.getByRole('button', { name: '인수인계 전달하기' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('.toast[role="status"]')).toHaveText('현재 담당자 명의로 전달을 확인해 주세요')
+})
+
+test('@handoff 인수인계 준비 창은 역할에 정한 다음 담당자를 고정하고 충돌 사유를 창에 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 담당자 고정은 데스크톱에서 한 번 검증합니다.')
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await openHandoffView(page, testInfo.project.name)
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
+  const nextMember = dialog.getByLabel('다음 담당자')
+  await expect(nextMember).toHaveValue(MEMBER_TWO_ID)
+  await expect(nextMember).toBeDisabled()
+  await expect(dialog).toContainText('역할에 정한 다음 담당자입니다.')
+
+  api.rejectNextRoleHandoffChange('이 역할에는 이미 진행 중인 인수인계가 있습니다')
+  await dialog.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('이 역할에는 이미 진행 중인 인수인계가 있습니다')
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff 역할의 다음 담당자가 활동을 끝냈으면 인수인계 준비 창에서 다른 구성원을 고를 수 있다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 담당자 고정 예외는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.members[1] = { ...projection.members[1]!, deactivatedAt: '2026-07-21T12:00:00Z' }
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await openHandoffView(page, testInfo.project.name)
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
+  await expect(dialog.getByLabel('다음 담당자')).toBeEnabled()
+  await expect(dialog).not.toContainText('역할에 정한 다음 담당자입니다.')
+})
+
+test('@handoff 역할 수정이 인수인계 규칙으로 거절되면 사유를 알리고 입력을 초안으로 남긴다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '거절 사유 안내는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await page.route(`**${SCOPE_PATH}/roles/${ROLE_ID}`, (route) => route.fulfill({
+    status: 409,
+    json: {
+      code: 'ROLE_HANDOFF_STATE_CONFLICT',
+      message: '진행 중인 인수인계의 담당자와 담당 기간은 수락 또는 취소 전까지 바꿀 수 없습니다',
+    },
+  }))
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 수정' })
+  await dialog.getByLabel('역할 목적').fill('저장하지 못한 역할 목적입니다.')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('.toast[role="status"]')).toHaveText(
+    '진행 중인 인수인계의 담당자와 담당 기간은 수락 또는 취소 전까지 바꿀 수 없습니다',
+  )
+  await expect(page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)'))
+    .toHaveValue(/저장하지 못한 역할 목적입니다\./)
+})
+
+test('@handoff 계정 팀은 인수인계 당사자만 전달·수락을 활성화하고 취소는 관리자에게도 연다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '권한별 버튼 상태는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page, accountProjection(openRoleHandoff('PREPARING'), 'MEMBER'))
+  await installAccountSession(page, { claimedMemberId: MEMBER_THREE_ID })
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await expect(page.getByRole('button', { name: '내용 확인 후 전달' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '준비 취소' })).toBeDisabled()
+  await expect(page.getByText('박민서님의 계정으로 로그인해야 전달할 수 있습니다.')).toBeVisible()
+})
+
+test('@handoff 계정 팀의 이전 담당자는 준비한 인수인계를 전달하고 취소할 수 있다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '권한별 버튼 상태는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page, accountProjection(openRoleHandoff('PREPARING'), 'MEMBER'))
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await expect(page.getByRole('button', { name: '내용 확인 후 전달' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '준비 취소' })).toBeEnabled()
+  await expect(page.getByText('계정으로 로그인해야')).toHaveCount(0)
+})
+
+test('@handoff 계정 팀의 관리자는 당사자가 아니어도 전달한 인수인계를 취소할 수 있지만 수락할 수 없다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '권한별 버튼 상태는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page, accountProjection(openRoleHandoff('TRANSFERRED'), 'ADMIN'))
+  await installAccountSession(page, { claimedMemberId: MEMBER_THREE_ID })
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await expect(page.getByRole('button', { name: '인수인계 수락', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '전달 취소' })).toBeEnabled()
+  await expect(page.getByText('김준호님의 계정으로 로그인해야 수락할 수 있습니다.')).toBeVisible()
+})
+
+test('@handoff 전달·수락 창과 수락 대기 화면은 다음 담당 기간을 보여 준다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '담당 기간 안내는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roleHandoffs = [openRoleHandoff('PREPARING')]
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await page.getByRole('button', { name: '내용 확인 후 전달' }).click()
+  const transferDialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
+  await expect(transferDialog).toContainText('다음 담당 기간 2026. 9. 18. — 미정')
+  await transferDialog.getByLabel('미완료 항목과 자료 누락을 확인했습니다').check()
+  await transferDialog.getByRole('button', { name: '인수인계 전달하기' }).click()
+  await expect(transferDialog).toHaveCount(0)
+
+  await expect(page.locator('.handoff-lifecycle-card')).toContainText('새 담당자의 담당 기간은 2026. 9. 18. — 미정입니다.')
+  await page.getByRole('button', { name: '인수인계 수락', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '역할 인수인계 수락' }))
+    .toContainText('다음 담당 기간 2026. 9. 18. — 미정')
+})
+
+test('@handoff 넘겨줄 활동 구성원이 없으면 인수인계 준비 창이 구성원 추가를 안내한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '구성원 안내는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roles[0] = { ...projection.roles[0]!, nextMemberId: null }
+  projection.members = projection.members.map((member) => member.id === MEMBER_ONE_ID
+    ? member
+    : { ...member, deactivatedAt: '2026-07-21T12:00:00Z' })
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
+  await expect(dialog).toContainText('넘겨줄 활동 구성원이 없습니다. 구성원 관리에서 구성원을 추가해 주세요.')
+  await expect(dialog.getByRole('button', { name: '인수인계 준비 시작' })).toBeDisabled()
+})
+
+test('@memory 결정 작성자는 로그인한 구성원을 기본으로 선택한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await installAccountSession(page, { claimedMemberId: MEMBER_TWO_ID })
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  await page.getByRole('button', { name: '결정 남기기' }).click()
+  await expect(page.getByRole('dialog', { name: '결정과 이유 남기기' }).getByLabel('작성자'))
+    .toHaveValue(MEMBER_TWO_ID)
+})
+
+test.describe('브라우저와 시즌의 시간대가 다를 때', () => {
+  test.use({ timezoneId: 'America/New_York' })
+
+  test('@records 종료·보관·작성 시각을 시즌 시간대로 표시한다', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', '시각 표시 기준은 데스크톱에서 한 번 검증합니다.')
+    const lateNightUtc = (day: number) => `2026-07-${String(day).padStart(2, '0')}T16:30:00Z`
+    const projection = makeProjection()
+    const endedSeason = { ...projection.season, endedAt: lateNightUtc(30) }
+    projection.season = endedSeason
+    projection.seasons = [endedSeason]
+    projection.decisions[0] = { ...projection.decisions[0]!, createdAt: lateNightUtc(3) }
+    projection.decisions.push({ ...projection.decisions[0]!, id: fixtureId(201), title: '보관한 결정', archivedAt: lateNightUtc(5) })
+    projection.handoffItems[1] = { ...projection.handoffItems[1]!, archivedAt: lateNightUtc(6) }
+    projection.routines[1] = { ...projection.routines[1]!, archivedAt: lateNightUtc(7) }
+    projection.rounds[1] = { ...projection.rounds[1]!, archivedAt: lateNightUtc(8) }
+    projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '보관한 자료',
+      url: 'https://example.com/guide', description: null, createdAt: lateNightUtc(1), archivedAt: lateNightUtc(9) })
+    await installApi(page, projection)
+    await openSharedWorkspace(page)
+
+    const workspace = page.locator('.main-surface')
+    await expect(page.getByLabel('종료된 시즌 안내')).toContainText('2026. 7. 31.에 종료')
+    await page.getByRole('button', { name: /현재 시즌 .*시즌 전환/ }).first().click()
+    const seasons = page.getByRole('dialog', { name: `${projection.team.name} 시즌` })
+    await expect(seasons).toContainText('2026. 7. 31.에 종료')
+    await seasons.getByRole('button', { name: '닫기' }).click()
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+    await expect(page.locator('.decision-meta time')).toHaveText('2026. 7. 4. 오전 1:30')
+    await expect(workspace).toContainText('2026. 7. 6. 오전 1:30 보관')
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+    await expect(workspace).toContainText('2026. 7. 8. 오전 1:30 보관')
+    await expect(workspace).toContainText('2026. 7. 9. 오전 1:30 보관')
+
+    await openHandoffView(page, testInfo.project.name)
+    await expect(workspace).toContainText('2026. 7. 7. 오전 1:30 보관')
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+    await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+    const inspector = page.locator('.linked-decision').locator('..')
+    await expect(page.locator('.linked-decision small')).toHaveText('2026. 7. 4. 오전 1:30')
+    await expect(inspector).toContainText('2026. 7. 10. 오전 1:30 보관')
+  })
 })

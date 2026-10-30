@@ -180,7 +180,18 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
     teamId, seasonId, currentAccessKey, scope.accountId, workspaceAccessDenied,
   ]))
   const preserveConflictDraft = conflictDraftFlow.preserve
-  const contentCreationCleanupCommand = usePendingContentCreationCleanupCommand()
+  const loadedTeam = workspaceQuery.data?.team
+  const viewerOnly = loadedTeam?.accountAccessEnabled && loadedTeam.permission === 'VIEWER'
+  // 로그아웃 상태의 거부는 다시 로그인하면 풀리므로 로그인한 계정의 거부만 권한 상실로 본다.
+  const unconfirmableSeasonIds = workspaceAccessDenied
+    ? (sessionQuery.data?.authenticated ? [seasonId] : [])
+    : (workspaceQuery.data?.seasons ?? [])
+        .filter((season) => viewerOnly || season.endedAt)
+        .map((season) => season.id)
+  const contentCreationCleanupCommand = usePendingContentCreationCleanupCommand(
+    teamId,
+    unconfirmableSeasonIds,
+  )
   const memberCreationCommand = useCreateMemberCommand(scope)
   const updateMemberMutation = useUpdateMemberMutation(scope)
   const updateMemberDeactivationMutation = useUpdateMemberDeactivationMutation(scope)
@@ -332,9 +343,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   useWorkspaceMutationRecovery({
     teamId,
     seasonId,
-    onRoleHandoffConflict: () => beginContentConflictRecovery(
-      '다른 사람이 수정한 인수인계 내용을 불러왔습니다.',
-    ),
+    onRoleHandoffConflict: beginContentConflictRecovery,
     onWorkspaceContentConflict: () => beginContentConflictRecovery(
       '다른 사람이 수정한 내용을 불러왔습니다.',
     ),
@@ -838,6 +847,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {accountAccessEnabled && <p className="workspace-permission-note">계정 권한: {workspace.team.permission === 'ADMIN' ? '관리자' : workspace.team.permission === 'MEMBER' ? '구성원' : '열람자 · 기록 조회만 가능'}</p>}
           <SeasonEndedBanner
             season={workspace.season}
+            canAdminister={canAdminister}
             onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher}
             onCreateNext={seasonLifecycleFlow.actions.openSuccessor}
           />
@@ -942,6 +952,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'memory' && (
             <MemoryView
               scope={scope}
+              timeZone={workspace.season.timeZone}
               decisions={activeDecisions}
               archivedDecisions={archivedDecisions}
               roles={roles}
@@ -961,6 +972,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               roles={roles}
               roleHandoffs={roleHandoffs}
               members={members}
+              currentMember={me}
+              accountAccessEnabled={accountAccessEnabled}
+              canAdminister={canAdminister}
               season={workspace.season}
               calendarDate={calendarDate}
               selectedRoleId={effectiveSelectedRoleId}
@@ -1021,6 +1035,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onUpdateResourceArchive={updateRoleResourceArchive}
             onManageMembership={openMemberManagementModal}
             scope={scope}
+            timeZone={workspace.season.timeZone}
             previousSeasonId={workspace.season.previousSeasonId}
             onCopyPreviousResource={openRoleResourceCopy}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
@@ -1043,6 +1058,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           draftScope={draftScope}
           roles={roles}
           members={members}
+          currentMemberId={me?.id}
           selectedRoleId={effectiveSelectedRoleId}
           decision={editingDecision ?? undefined}
           pending={editingDecision
@@ -1251,6 +1267,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           currentSeason={workspace.season}
           seasons={workspace.seasons}
           calendarDate={calendarDate}
+          canAdminister={canAdminister}
           endingPending={seasonLifecycleFlow.switcher.endingPending}
           endingError={seasonLifecycleFlow.switcher.endingError}
           onClose={closeModal}
