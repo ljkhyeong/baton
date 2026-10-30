@@ -51,6 +51,18 @@ export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: st
   )
 }
 
+export function clearAllPendingAccessKeyRotations() {
+  try {
+    const storage = window.localStorage
+    Array.from({ length: storage.length }, (_, index) => storage.key(index))
+      .filter((key): key is string => key !== null && key.startsWith(STORAGE_KEY_PREFIX))
+      .forEach((key) => storage.removeItem(key))
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function runWithAccessKeyRotationLock<Value>(
   teamId: string,
   operation: () => Promise<Value>,

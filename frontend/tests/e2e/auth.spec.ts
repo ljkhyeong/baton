@@ -8,6 +8,8 @@ import {
   MEMBER_ONE_ID,
   navigation,
   openSharedWorkspace,
+  PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  pendingRotationIdempotencyKey,
   recordedCalls,
   SEASON_ID,
   storedAccessKey,
@@ -26,6 +28,11 @@ const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
 const ROUND_ROOM_ID = 'bcdf-ghjk-mnpq'
 const ROUND_ROOM_PATH = `/room/${ROUND_ROOM_ID}`
 const TEAM_INVITATION_TOKEN = 'a'.repeat(43)
+// 응답을 잃은 공유 링크 재발급의 임시 기록
+const PENDING_ROTATION_RECORD = JSON.stringify({
+  operation: 'rotate',
+  idempotencyKey: 'pending-rotation-'.padEnd(36, 'a'),
+})
 // 로그아웃 정리 대상인 ROUND 입장 기록의 시드 값
 const DEVICE_ROUND_SEED = {
   teamId: TEAM_ID,
@@ -334,7 +341,9 @@ async function submitPasswordChange(
 // 로그아웃이 지워야 할 팀 접속 정보와 남겨야 할 다른 설정을 함께 확인한다.
 async function expectDeviceAccessCleared(page: Page) {
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
-    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
+    key.startsWith('baton-access-key:')
+      || key.startsWith('baton-pending-access-key-change:')
+      || key === 'baton-recent-workspaces:v1'
   )))).toEqual([])
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
     key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
@@ -980,8 +989,10 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   const peer = await context.newPage()
   const workspaceApi = await installApi(peer)
   await openSharedWorkspace(peer)
-  await page.evaluate(({ teamId, seasonId, roomId, resourceId }) => {
+  await page.evaluate(({ teamId, seasonId, roomId, resourceId, rotationStorageKey, rotationRecord }) => {
     localStorage.setItem('baton-access-key:00000000-0000-4000-8000-000000000099', 'other-capability')
+    localStorage.setItem(rotationStorageKey, rotationRecord)
+    localStorage.setItem('baton-pending-access-key-change:v1:00000000-0000-4000-8000-000000000099', '손상된 기록')
     localStorage.setItem('unrelated-local-setting', 'keep')
     sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
       version: 1,
@@ -995,7 +1006,11 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
       roomId,
     )
     sessionStorage.setItem('unrelated-session-setting', 'keep')
-  }, DEVICE_ROUND_SEED)
+  }, {
+    ...DEVICE_ROUND_SEED,
+    rotationStorageKey: PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+    rotationRecord: PENDING_ROTATION_RECORD,
+  })
   await page.getByRole('button', { name: '로그아웃' }).click()
 
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
@@ -1183,6 +1198,34 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
   await expectDeviceAccessCleared(page)
+})
+
+test('접근 키 변경 임시 기록을 지우지 못하면 로그아웃 정리 실패를 안내하고 다시 지운다', async ({ page }) => {
+  const api = await installAuthApi(page, { authenticated: true })
+  await page.addInitScript(({ storageKey, record }) => {
+    const originalRemoveItem = Storage.prototype.removeItem
+    localStorage.setItem(storageKey, record)
+    let failed = false
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (this === localStorage && key === storageKey && !failed) {
+        failed = true
+        throw new DOMException('Storage disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+  }, { storageKey: PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY, record: PENDING_ROTATION_RECORD })
+
+  await page.goto('/login')
+  await expect(page.getByText('이미 로그인되어 있습니다.')).toBeVisible()
+  await page.getByRole('button', { name: '로그아웃' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('팀 접속 정보를 모두 삭제하지 못했습니다.')
+  expect(await pendingRotationIdempotencyKey(page)).not.toBeNull()
+  await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
+
+  await expect(page.getByRole('status')).toContainText('이 기기에 저장된 팀 접속 정보를 지웠습니다.')
+  expect(await pendingRotationIdempotencyKey(page)).toBeNull()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
 })
 
 test('@smoke 로그아웃하면 수락하지 않은 팀 초대를 지워 다음 계정에 보여 주지 않는다', async ({ page }) => {
