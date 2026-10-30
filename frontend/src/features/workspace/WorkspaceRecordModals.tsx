@@ -43,6 +43,7 @@ export function DecisionModal({
   draftScope,
   roles,
   members,
+  currentMemberId,
   selectedRoleId,
   decision,
   pending,
@@ -55,6 +56,7 @@ export function DecisionModal({
   draftScope: WorkspaceScope | null
   roles: Role[]
   members: Member[]
+  currentMemberId?: string
   selectedRoleId: string
   decision?: Decision
   onClose: () => void
@@ -73,7 +75,7 @@ export function DecisionModal({
       : [selectedRoleId || roles[0]?.id || ''].filter(Boolean),
   )
   const [authorMemberId, setAuthorMemberId] = useState(
-    decision?.authorMemberId ?? members.find(isActiveMember)?.id ?? '',
+    decision?.authorMemberId ?? currentMemberId ?? members.find(isActiveMember)?.id ?? '',
   )
   const [validationMessage, setValidationMessage] = useState('')
   const draft = useRecordDraft(draftScope, 'decision', decision?.id ?? 'new', { title, reason, alternative, textFormat })

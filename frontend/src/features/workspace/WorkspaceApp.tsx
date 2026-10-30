@@ -1045,6 +1045,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           draftScope={draftScope}
           roles={roles}
           members={members}
+          currentMemberId={me?.id}
           selectedRoleId={effectiveSelectedRoleId}
           decision={editingDecision ?? undefined}
           pending={editingDecision

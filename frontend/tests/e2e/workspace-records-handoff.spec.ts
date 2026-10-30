@@ -1484,6 +1484,17 @@ test('@handoff 넘겨줄 활동 구성원이 없으면 인수인계 준비 창�
   await expect(dialog.getByRole('button', { name: '인수인계 준비 시작' })).toBeDisabled()
 })
 
+test('@memory 결정 작성자는 로그인한 구성원을 기본으로 선택한다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await installAccountSession(page, { claimedMemberId: MEMBER_TWO_ID })
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  await page.getByRole('button', { name: '결정 남기기' }).click()
+  await expect(page.getByRole('dialog', { name: '결정과 이유 남기기' }).getByLabel('작성자'))
+    .toHaveValue(MEMBER_TWO_ID)
+})
+
 test.describe('브라우저와 시즌의 시간대가 다를 때', () => {
   test.use({ timezoneId: 'America/New_York' })
 
