@@ -638,6 +638,56 @@ test('@smoke @responsive 접힌 알림과 권한 오류는 자동 조회를 멈�
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', await page.locator('body').evaluate(el => el.clientWidth))
 })
 
+for (const { title, heldBeforeRead } of [
+  { title: '읽음 요청 전에 시작한', heldBeforeRead: true },
+  { title: '읽음 요청 중에 시작한', heldBeforeRead: false },
+]) {
+  test(`@smoke ${title} 늦은 알림 조회가 읽음 처리를 덮지 않는다`, async ({ page }) => {
+    await page.clock.install()
+    const projection = makeProjection()
+    await installApi(page, projection)
+    await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
+    const inboxBody = (read: boolean) => ({ accountId: ACCOUNT_ID, teamId: TEAM_ID, seasonId: SEASON_ID,
+      notifications: [overdueNotification(projection, read)] })
+    let holdRead = false
+    let heldRead: Route | undefined
+    await page.route('**/api/v1/teams/*/seasons/*/notifications', route => {
+      if (holdRead) heldRead = route
+      else return route.fulfill({ json: inboxBody(false) })
+    })
+    const readCommit = Promise.withResolvers<void>()
+    await page.route('**/api/v1/teams/*/seasons/*/notifications/*/read', async route => {
+      await readCommit.promise
+      return route.fulfill({ json: inboxBody(true) })
+    })
+    await openSharedWorkspace(page)
+    await page.getByText('내 업무와 확인할 자료', { exact: true }).click()
+    const inbox = page.locator('.notification-inbox')
+    await inbox.locator('summary').click()
+    await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 1건')
+
+    // 30초 주기 조회를 일으킨다. 진행 중인 읽음 요청은 10초 안에만 시계를 움직인다.
+    const startStaleRead = async (elapsed: number) => {
+      holdRead = true
+      await page.clock.runFor(elapsed)
+      await expect.poll(() => Boolean(heldRead)).toBe(true)
+    }
+    if (heldBeforeRead) await startStaleRead(31_000)
+    else await page.clock.runFor(25_000)
+    const markRead = inbox.getByRole('button', { name: `${overdueNotification(projection, false).title} 알림 읽음 처리` })
+    await markRead.click()
+    if (!heldBeforeRead) await startStaleRead(6_000)
+    readCommit.resolve()
+    await expect(inbox.getByRole('status')).toHaveText('알림을 읽음으로 표시했습니다.')
+    await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+
+    await heldRead!.fulfill({ json: inboxBody(false) }).catch(() => undefined)
+    await expect(inbox.locator('.notification-source')).toContainText('읽음')
+    await expect(inbox.locator('summary')).toHaveText('내 알림 · 안 읽음 0건')
+    await expect(markRead).toHaveCount(0)
+  })
+}
+
 test('@smoke 알림 조회 중 패널을 닫으면 진행 중인 요청을 취소한다', async ({ page }) => {
   await installApi(page)
   await installMembershipApi(page, { currentMembershipResponse: MEMBER_ONE_MEMBERSHIP })
