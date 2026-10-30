@@ -2382,6 +2382,125 @@ export interface components {
             /** @description 다음 과거 페이지의 배타 커서. 마지막은 null */
             nextBeforeGeneration: number | null;
         };
+        Schema_8ed83bbb191bd047: {
+            /** @description 계정 권한 전환 여부 */
+            accountAccessEnabled: boolean;
+            /**
+             * Format: uuid
+             * @description 현재 계정
+             */
+            accountId: string;
+            /** @description 최근 접근 변경 50건, 관리자에게만 제공 */
+            audit: {
+                /** @description 변경 종류 */
+                action: string;
+                /**
+                 * Format: uuid
+                 * @description 변경 계정
+                 */
+                actorAccountId: string;
+                /**
+                 * Format: date-time
+                 * @description 변경 시각
+                 */
+                changedAt: string;
+                /**
+                 * Format: uuid
+                 * @description 변경 이력 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 대상 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 변경 뒤 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+                /**
+                 * @description 이전 권한
+                 * @enum {string|null}
+                 */
+                previousPermission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            }[];
+            /** @description 최근 초대 50건, 관리자에게만 제공 */
+            invitations: {
+                /**
+                 * Format: date-time
+                 * @description 수락 시각
+                 */
+                acceptedAt: string | null;
+                /**
+                 * Format: date-time
+                 * @description 생성 시각
+                 */
+                createdAt: string;
+                /**
+                 * Format: date-time
+                 * @description 만료 시각
+                 */
+                expiresAt: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 식별자
+                 */
+                id: string;
+                /**
+                 * Format: uuid
+                 * @description 초대 구성원
+                 */
+                memberId: string;
+                /**
+                 * @description 초대 권한
+                 * @enum {string}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER";
+                /**
+                 * Format: date-time
+                 * @description 취소 시각
+                 */
+                revokedAt: string | null;
+            }[];
+            /**
+             * Format: uuid
+             * @description 내 연결 구성원
+             */
+            memberId: string | null;
+            /** @description 관리 가능한 구성원 */
+            members: {
+                /**
+                 * Format: uuid
+                 * @description 연결 계정
+                 */
+                accountId: string | null;
+                /** @description 활동 여부 */
+                active: boolean;
+                /**
+                 * Format: uuid
+                 * @description 구성원 식별자
+                 */
+                memberId: string;
+                /** @description 구성원 이름 */
+                memberName: string;
+                /**
+                 * @description 승인된 권한
+                 * @enum {string|null}
+                 */
+                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            }[];
+            /**
+             * @description 내 권한
+             * @enum {string|null}
+             */
+            permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
+            /**
+             * Format: uuid
+             * @description 팀 식별자
+             */
+            teamId: string;
+        };
         Schema_8ff7ee21dc10031e: {
             /**
              * Format: uuid
@@ -3459,125 +3578,6 @@ export interface components {
             title: string;
             /** @description http 또는 https 외부 링크 */
             url: string;
-        };
-        Schema_59121c6eafa63b3f: {
-            /** @description 계정 권한 전환 여부 */
-            accountAccessEnabled: boolean;
-            /**
-             * Format: uuid
-             * @description 현재 계정
-             */
-            accountId: string;
-            /** @description 최근 접근 변경 50건, 관리자에게만 제공 */
-            audit: {
-                /** @description 변경 종류 */
-                action: string;
-                /**
-                 * Format: uuid
-                 * @description 변경 계정
-                 */
-                actorAccountId: string;
-                /**
-                 * Format: date-time
-                 * @description 변경 시각
-                 */
-                changedAt: string;
-                /**
-                 * Format: uuid
-                 * @description 변경 이력 식별자
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 대상 구성원
-                 */
-                memberId: string;
-                /**
-                 * @description 변경 뒤 권한
-                 * @enum {string|null}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-                /**
-                 * @description 이전 권한
-                 * @enum {string|null}
-                 */
-                previousPermission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-            }[];
-            /** @description 초대 목록, 관리자에게만 제공 */
-            invitations: {
-                /**
-                 * Format: date-time
-                 * @description 수락 시각
-                 */
-                acceptedAt: string | null;
-                /**
-                 * Format: date-time
-                 * @description 생성 시각
-                 */
-                createdAt: string;
-                /**
-                 * Format: date-time
-                 * @description 만료 시각
-                 */
-                expiresAt: string;
-                /**
-                 * Format: uuid
-                 * @description 초대 식별자
-                 */
-                id: string;
-                /**
-                 * Format: uuid
-                 * @description 초대 구성원
-                 */
-                memberId: string;
-                /**
-                 * @description 초대 권한
-                 * @enum {string}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER";
-                /**
-                 * Format: date-time
-                 * @description 취소 시각
-                 */
-                revokedAt: string | null;
-            }[];
-            /**
-             * Format: uuid
-             * @description 내 연결 구성원
-             */
-            memberId: string | null;
-            /** @description 관리 가능한 구성원 */
-            members: {
-                /**
-                 * Format: uuid
-                 * @description 연결 계정
-                 */
-                accountId: string | null;
-                /** @description 활동 여부 */
-                active: boolean;
-                /**
-                 * Format: uuid
-                 * @description 구성원 식별자
-                 */
-                memberId: string;
-                /** @description 구성원 이름 */
-                memberName: string;
-                /**
-                 * @description 승인된 권한
-                 * @enum {string|null}
-                 */
-                permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-            }[];
-            /**
-             * @description 내 권한
-             * @enum {string|null}
-             */
-            permission: "ADMIN" | "MEMBER" | "VIEWER" | null;
-            /**
-             * Format: uuid
-             * @description 팀 식별자
-             */
-            teamId: string;
         };
         Schema_254976d61d5d5175: {
             /**
@@ -5386,6 +5386,21 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description 429 */
+            429: {
+                headers: {
+                    /** @description 민감 응답 캐시 금지 */
+                    "Cache-Control"?: string;
+                    /** @description 다음 요청까지 기다릴 초 */
+                    "Retry-After"?: string;
+                    /** @description 서버가 생성한 요청 추적 ID */
+                    "X-Request-ID"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     requestPasswordReset: {
@@ -6208,7 +6223,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                    "application/json": components["schemas"]["Schema_8ed83bbb191bd047"];
                 };
             };
         };
@@ -6255,7 +6270,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                    "application/json": components["schemas"]["Schema_8ed83bbb191bd047"];
                 };
             };
         };
@@ -6341,7 +6356,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                    "application/json": components["schemas"]["Schema_8ed83bbb191bd047"];
                 };
             };
         };
@@ -6385,7 +6400,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Schema_59121c6eafa63b3f"];
+                    "application/json": components["schemas"]["Schema_8ed83bbb191bd047"];
                 };
             };
             /** @description 403 */
