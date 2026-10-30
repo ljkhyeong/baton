@@ -112,7 +112,7 @@ export function CalendarContent({ scope, canIssue, ended, managementOnly = false
       }
       // 구독 주소는 mutation 반환값이나 조회 캐시에 넣지 않는다.
     },
-    gcTime: 0, networkMode: 'always',
+    gcTime: 0,
     onError: async () => { await subscription.refetch() },
     onSettled: () => {
       actionLock.current = false

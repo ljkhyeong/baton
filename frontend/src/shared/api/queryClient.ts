@@ -20,6 +20,10 @@ export const queryClient = new QueryClient({
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     },
+    mutations: {
+      // 오프라인에서도 요청을 보내 네트워크 오류로 끝낸다. 기본값은 응답 없이 제출을 잠근다.
+      networkMode: 'always',
+    },
   },
 })
 
