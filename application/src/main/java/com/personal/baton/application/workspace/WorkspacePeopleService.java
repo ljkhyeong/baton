@@ -11,6 +11,7 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateMemberCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.UpdateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -165,7 +166,10 @@ public class WorkspacePeopleService implements WorkspacePeopleUseCase {
             ConfirmRoleHandoffCommand command
     ) {
         WorkspaceScope scope = scopeAuthorizer.authorizeSeasonForUpdate(teamId, seasonId, accessKey);
-        scopeAuthorizer.requireConfirmedMember(scope.team(), command.confirmedByMemberId());
-        return roleHandoffCoordinator.cancel(teamId, seasonId, roleId, handoffId, command);
+        Optional<UUID> administratorAccountId = scopeAuthorizer.requireHandoffCancelConfirmer(
+                scope.team(),
+                command.confirmedByMemberId()
+        );
+        return roleHandoffCoordinator.cancel(teamId, seasonId, roleId, handoffId, command, administratorAccountId);
     }
 }

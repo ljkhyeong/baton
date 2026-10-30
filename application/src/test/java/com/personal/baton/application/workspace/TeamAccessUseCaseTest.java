@@ -9,11 +9,13 @@ import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedExcep
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
+import com.personal.baton.application.identity.port.in.DeactivateAccountUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleCommands.CreateWorkspaceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateRoleCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.TransferRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.ConfirmRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
 import com.personal.baton.domain.identity.Account;
 import java.time.Clock;
 import java.time.Instant;
@@ -29,6 +31,7 @@ import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
 import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
+import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.TeamPermission;
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.application.workspace.port.out.WorkspaceSeasonRepository;
@@ -37,7 +40,9 @@ import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedExc
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import static org.mockito.Mockito.*;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -69,6 +74,7 @@ class TeamAccessUseCaseTest {
     @Autowired TeamAccessUseCase access;
     @Autowired WorkspaceSeasonRepository seasons;
     @Autowired ActiveAccountTeamMembershipVerifier activeMembership;
+    @Autowired DeactivateAccountUseCase accountDeactivation;
     @MockitoBean CurrentAccountProvider current;
     @Autowired IdentityRepository identities;
     @Autowired Clock clock;
@@ -213,6 +219,136 @@ class TeamAccessUseCaseTest {
         });
 
         assertThat(lifecycle.getWorkspace(team, season, null).team().permission()).isEqualTo(TeamPermission.ADMIN);
+    }
+    @Test
+    @DisplayName("이전 담당자가 행동할 수 없으면 관리자가 열린 인수인계를 취소하고 실제 수행 계정을 이력에 남긴다")
+    void administratorCancelsHandoffWhenFromMemberCannotAct() {
+        var fixture = accountTeam("인수인계 복구 팀", "관리자", "활동 종료 담당", "권한 회수 담당", "비활성 계정 담당",
+                "열람 담당", "미연결 담당", "활동 담당", "후임");
+        UUID successor = fixture.member("후임");
+        var successorAccount = join(fixture, successor, TeamPermission.MEMBER);
+
+        // 활동 종료: 준비 중 인수인계는 다른 구성원이 대신 취소할 수 없고 관리자만 취소한다.
+        UUID deactivatedMember = fixture.member("활동 종료 담당");
+        join(fixture, deactivatedMember, TeamPermission.MEMBER);
+        var deactivatedRole = roleOf(fixture, "활동 종료 역할", deactivatedMember, successor);
+        var preparing = prepare(fixture, deactivatedRole, successor);
+        people.updateMemberDeactivation(fixture.id(), fixture.season(), deactivatedMember, null, true);
+        when(current.currentAccountId()).thenReturn(Optional.of(successorAccount));
+        assertThatThrownBy(() -> cancel(fixture, deactivatedRole, preparing, deactivatedMember))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
+        when(current.currentAccountId()).thenReturn(Optional.of(fixture.adminAccount()));
+        var cancelled = cancel(fixture, deactivatedRole, preparing, deactivatedMember);
+        assertThat(cancelled.handoff().status()).isEqualTo(RoleHandoffStatus.CANCELLED);
+        assertThat(cancelled.handoff().cancelledByMemberId()).isEqualTo(deactivatedMember);
+        assertThat(cancelled.role().nextMemberId()).isNull();
+        assertThat(cancel(fixture, deactivatedRole, preparing, deactivatedMember).handoff().cancelledAt())
+                .isEqualTo(cancelled.handoff().cancelledAt());
+        assertThat(cancellationAudit(fixture)).singleElement().satisfies(audit -> {
+            assertThat(audit.actorAccountId()).isEqualTo(fixture.adminAccount());
+            assertThat(audit.memberId()).isEqualTo(deactivatedMember);
+            assertThat(audit.previousPermission()).isNull();
+            assertThat(audit.permission()).isNull();
+        });
+
+        // 전달 뒤 이전·다음 담당자 모두 권한을 잃어도 취소할 수 있다.
+        UUID revokedMember = fixture.member("권한 회수 담당");
+        var revokedAccount = join(fixture, revokedMember, TeamPermission.MEMBER);
+        var revokedRole = roleOf(fixture, "권한 회수 역할", revokedMember, successor);
+        var transferred = prepare(fixture, revokedRole, successor);
+        when(current.currentAccountId()).thenReturn(Optional.of(revokedAccount));
+        people.transferRoleHandoff(fixture.id(), fixture.season(), revokedRole, transferred, null,
+                new TransferRoleHandoffCommand(revokedMember, true));
+        when(current.currentAccountId()).thenReturn(Optional.of(fixture.adminAccount()));
+        access.changePermission(fixture.id(), fixture.adminAccount(), revokedMember, null);
+        access.changePermission(fixture.id(), fixture.adminAccount(), successor, null);
+        assertThat(cancel(fixture, revokedRole, transferred, revokedMember).handoff().status())
+                .isEqualTo(RoleHandoffStatus.CANCELLED);
+        access.changePermission(fixture.id(), fixture.adminAccount(), successor, TeamPermission.MEMBER);
+
+        // 계정을 비활성화한 이전 담당자
+        UUID closedMember = fixture.member("비활성 계정 담당");
+        var closedAccount = join(fixture, closedMember, TeamPermission.MEMBER);
+        var closedRole = roleOf(fixture, "비활성 계정 역할", closedMember, successor);
+        var closedHandoff = prepare(fixture, closedRole, successor);
+        when(current.currentAccountId()).thenReturn(Optional.of(closedAccount));
+        accountDeactivation.deactivateAccount(closedAccount);
+        when(current.currentAccountId()).thenReturn(Optional.of(fixture.adminAccount()));
+        assertThat(cancel(fixture, closedRole, closedHandoff, closedMember).handoff().status())
+                .isEqualTo(RoleHandoffStatus.CANCELLED);
+
+        // 열람자는 전달·취소 권한이 없고, 계정을 연결하지 않은 구성원도 직접 행동할 수 없다.
+        UUID viewerMember = fixture.member("열람 담당");
+        join(fixture, viewerMember, TeamPermission.VIEWER);
+        var viewerRole = roleOf(fixture, "열람 역할", viewerMember, successor);
+        var viewerHandoff = prepare(fixture, viewerRole, successor);
+        assertThat(cancel(fixture, viewerRole, viewerHandoff, viewerMember).handoff().status())
+                .isEqualTo(RoleHandoffStatus.CANCELLED);
+        UUID unlinkedMember = fixture.member("미연결 담당");
+        var unlinkedRole = roleOf(fixture, "미연결 역할", unlinkedMember, successor);
+        var unlinkedHandoff = prepare(fixture, unlinkedRole, successor);
+        assertThat(cancel(fixture, unlinkedRole, unlinkedHandoff, unlinkedMember).handoff().status())
+                .isEqualTo(RoleHandoffStatus.CANCELLED);
+        assertThat(cancellationAudit(fixture)).hasSize(5);
+
+        // 이전 담당자가 행동할 수 있으면 관리자도 대신하지 못하고 본인 취소는 이력을 남기지 않는다.
+        UUID activeMember = fixture.member("활동 담당");
+        var activeAccount = join(fixture, activeMember, TeamPermission.MEMBER);
+        var activeRole = roleOf(fixture, "활동 역할", activeMember, successor);
+        var activeHandoff = prepare(fixture, activeRole, successor);
+        assertThatThrownBy(() -> cancel(fixture, activeRole, activeHandoff, activeMember))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
+        when(current.currentAccountId()).thenReturn(Optional.of(activeAccount));
+        assertThat(cancel(fixture, activeRole, activeHandoff, activeMember).handoff().status())
+                .isEqualTo(RoleHandoffStatus.CANCELLED);
+        when(current.currentAccountId()).thenReturn(Optional.of(fixture.adminAccount()));
+        assertThat(cancellationAudit(fixture)).hasSize(5);
+
+        // 열린 인수인계가 사라지면 시즌을 종료할 수 있다.
+        assertThat(lifecycle.updateSeasonEnding(fixture.id(), fixture.season(), null, true).endedAt()).isNotNull();
+    }
+    private AccountTeam accountTeam(String name, String... memberNames) {
+        NOW.set(Instant.parse("2026-09-05T03:00:00Z"));
+        var workspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
+                new CreateWorkspaceCommand(name, "시즌", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 31), List.of(memberNames)));
+        Map<String, UUID> members = new LinkedHashMap<>();
+        lifecycle.getWorkspace(workspace.teamId(), workspace.seasonId(), workspace.accessKey()).members()
+                .forEach(member -> members.put(member.name(), member.id()));
+        var admin = identities.saveAccount(Account.create(UUID.randomUUID(), name + " 관리자", clock.instant()));
+        UUID adminMember = members.get(memberNames[0]);
+        memberships.claimMembership(new ClaimMembershipCommand(admin.getId(), workspace.teamId(), workspace.seasonId(),
+                adminMember, workspace.accessKey()));
+        when(current.currentAccountId()).thenReturn(Optional.of(admin.getId()));
+        access.activate(workspace.teamId(), admin.getId(), adminMember, RECOVERY);
+        return new AccountTeam(workspace.teamId(), workspace.seasonId(), admin.getId(), members);
+    }
+    private UUID join(AccountTeam team, UUID memberId, TeamPermission permission) {
+        var account = identities.saveAccount(Account.create(UUID.randomUUID(), memberId + " 계정", clock.instant()));
+        when(current.currentAccountId()).thenReturn(Optional.of(team.adminAccount()));
+        var invitation = access.invite(team.id(), team.adminAccount(), memberId, permission);
+        when(current.currentAccountId()).thenReturn(Optional.of(account.getId()));
+        access.accept(account.getId(), invitation.token());
+        when(current.currentAccountId()).thenReturn(Optional.of(team.adminAccount()));
+        return account.getId();
+    }
+    private UUID roleOf(AccountTeam team, String name, UUID currentMember, UUID nextMember) {
+        return people.createRole(team.id(), team.season(), UUID.randomUUID().toString(), null,
+                new CreateRoleCommand(name, "이유를 남깁니다", currentMember, nextMember,
+                        LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), List.of(), null)).id();
+    }
+    private UUID prepare(AccountTeam team, UUID roleId, UUID nextMember) {
+        return people.prepareRoleHandoff(team.id(), team.season(), roleId, UUID.randomUUID().toString(), null,
+                new PrepareRoleHandoffCommand(nextMember, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31))).handoff().id();
+    }
+    private RoleHandoffTransitionResult cancel(AccountTeam team, UUID roleId, UUID handoffId, UUID confirmedBy) {
+        return people.cancelRoleHandoff(team.id(), team.season(), roleId, handoffId, null, new ConfirmRoleHandoffCommand(confirmedBy));
+    }
+    private List<TeamAccessUseCase.AccessAuditResult> cancellationAudit(AccountTeam team) {
+        return access.getAccess(team.id(), team.adminAccount(), null).audit().stream()
+                .filter(value -> value.action().equals("ROLE_HANDOFF_ADMIN_CANCELLED")).toList();
+    }
+    private record AccountTeam(UUID id, UUID season, UUID adminAccount, Map<String, UUID> members) {
+        UUID member(String name) { return members.get(name); }
     }
     @TestConfiguration(proxyBeanMethods = false)
     static class TimeConfig {
