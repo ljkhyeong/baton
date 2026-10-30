@@ -179,12 +179,16 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   ]))
   const preserveConflictDraft = conflictDraftFlow.preserve
   const loadedTeam = workspaceQuery.data?.team
+  const viewerOnly = loadedTeam?.accountAccessEnabled && loadedTeam.permission === 'VIEWER'
   // 로그아웃 상태의 거부는 다시 로그인하면 풀리므로 로그인한 계정의 거부만 권한 상실로 본다.
-  const contentResubmissionUnavailable = Boolean(workspaceQuery.data?.season.endedAt)
-    || Boolean(loadedTeam?.accountAccessEnabled && loadedTeam.permission === 'VIEWER')
-    || (workspaceAccessDenied && Boolean(sessionQuery.data?.authenticated))
+  const unconfirmableSeasonIds = workspaceAccessDenied
+    ? (sessionQuery.data?.authenticated ? [seasonId] : [])
+    : (workspaceQuery.data?.seasons ?? [])
+        .filter((season) => viewerOnly || season.endedAt)
+        .map((season) => season.id)
   const contentCreationCleanupCommand = usePendingContentCreationCleanupCommand(
-    contentResubmissionUnavailable ? { teamId, seasonId } : null,
+    teamId,
+    unconfirmableSeasonIds,
   )
   const memberCreationCommand = useCreateMemberCommand(scope)
   const updateMemberMutation = useUpdateMemberMutation(scope)

@@ -322,12 +322,12 @@ export function markPendingContentCreationCleanupRequired<
   return retry
 }
 
-// 다시 제출할 수 없는 범위의 기록은 지우지 않고 사용자가 직접 삭제하도록 표시한다.
-export function markUnconfirmablePendingContentCreations(scope: WorkspaceIdentity) {
+// 다시 제출할 수 없는 시즌의 기록은 지우지 않고 사용자가 직접 삭제하도록 표시한다.
+export function markUnconfirmablePendingContentCreations(teamId: string, seasonIds: string[]) {
   readPendingContentCreations()
     ?.filter(({ value }) => value.cleanupRequired !== true
-      && value.teamId === scope.teamId
-      && value.seasonId === scope.seasonId)
+      && value.teamId === teamId
+      && seasonIds.includes(value.seasonId))
     .forEach(({ value }) => {
       markCleanupRequired({ ...cleanupRetry(value), cleanupReason: 'unconfirmable' })
     })

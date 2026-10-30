@@ -202,9 +202,10 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
   }
 }
 
-// unconfirmableScope: 시즌 종료나 권한 상실로 생성 요청을 다시 보낼 수 없는 작업 공간 범위
+// unconfirmableSeasonIds: 시즌 종료나 권한 상실로 생성 요청을 다시 보낼 수 없는 팀의 시즌
 export function usePendingContentCreationCleanupCommand(
-  unconfirmableScope: Pick<WorkspaceScope, 'teamId' | 'seasonId'> | null,
+  teamId: string,
+  unconfirmableSeasonIds: string[],
 ) {
   const [cleanupRetry, setCleanupRetry] = useState<PendingContentCreationCleanupRetry | null>(
     () => pendingContentCreationCleanupRetry(),
@@ -224,9 +225,10 @@ export function usePendingContentCreationCleanupCommand(
     return unsubscribe
   }, [])
 
+  const unconfirmableSeasons = unconfirmableSeasonIds.join()
   useEffect(() => {
-    if (unconfirmableScope) markUnconfirmablePendingContentCreations(unconfirmableScope)
-  }, [unconfirmableScope?.teamId, unconfirmableScope?.seasonId])
+    markUnconfirmablePendingContentCreations(teamId, unconfirmableSeasonIds)
+  }, [teamId, unconfirmableSeasons])
 
   const retryCleanup = () => {
     if (!cleanupRetry || pending) return false

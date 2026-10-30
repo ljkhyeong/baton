@@ -1160,14 +1160,14 @@ test('@operations 열람자로 바뀌어 거절된 생성 기록은 재시도를
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-async function seedPendingMemberCreation(page: Page) {
+async function seedPendingMemberCreation(page: Page, seasonId = SEASON_ID) {
   await page.addInitScript(({ prefix, entry }) => {
     localStorage.setItem(`${prefix}${entry.idempotencyKey}`, JSON.stringify(entry))
   }, {
     prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX,
     entry: {
       teamId: TEAM_ID,
-      seasonId: SEASON_ID,
+      seasonId,
       operation: 'member',
       normalizedPayload: JSON.stringify({ name: '권한을 잃기 전 추가한 구성원' }),
       idempotencyKey: '00000000-0000-4000-8000-000000000201',
@@ -1186,6 +1186,35 @@ test('@operations 로그인한 계정이 팀 접근을 잃으면 남은 생성 �
 
   await expect.poll(async () => (await pendingContentCreationEntries(page))[0]?.cleanupReason)
     .toBe('unconfirmable')
+})
+
+test('@operations 종료된 이전 시즌에 남은 생성 기록은 새 시즌에서 삭제하고 생성을 이어 간다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'journal 삭제 경로는 데스크톱에서 한 번 검증합니다.')
+  const previousSeasonId = '00000000-0000-4000-8000-000000000003'
+  const projection = makeProjection()
+  const currentSeason = { ...projection.season, previousSeasonId }
+  projection.season = currentSeason
+  projection.seasons = [{
+    ...currentSeason,
+    id: previousSeasonId,
+    name: '2026 봄 시즌',
+    startDate: '2026-03-01',
+    endDate: '2026-06-30',
+    endedAt: '2026-06-30T03:00:00Z',
+    previousSeasonId: null,
+  }, currentSeason]
+  await installApi(page, projection)
+  await seedPendingMemberCreation(page, previousSeasonId)
+  await openSharedWorkspace(page)
+
+  const cleanupBanner = page.getByRole('alert', { name: '임시 기록 삭제 필요' })
+  await expect(cleanupBanner).toContainText('이전 요청의 저장 결과를 더 이상 확인할 수 없습니다.')
+  await cleanupBanner.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
+  await expect(cleanupBanner).toHaveCount(0)
+
+  const dialog = await submitNewRole(page, testInfo.project.name, '새 시즌의 역할')
+  await expect(dialog).toHaveCount(0)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
 test('@operations 로그인하지 않은 접근 거부는 다시 제출할 수 있도록 생성 기록을 그대로 둔다', async ({ page }, testInfo) => {
