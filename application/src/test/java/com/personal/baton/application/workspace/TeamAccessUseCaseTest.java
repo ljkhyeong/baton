@@ -17,6 +17,7 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.ConfirmRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
 import com.personal.baton.domain.identity.Account;
+import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -32,6 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.personal.baton.application.identity.port.out.CurrentAccountProvider;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.InvitationAcceptedResult;
+import com.personal.baton.application.workspace.port.out.TeamAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
@@ -85,6 +87,7 @@ class TeamAccessUseCaseTest {
     @Autowired ActiveAccountTeamMembershipVerifier activeMembership;
     @Autowired DeactivateAccountUseCase accountDeactivation;
     @Autowired PlatformTransactionManager transactionManager;
+    @Autowired TeamAccessRepository teamAccess;
     @MockitoSpyBean WorkspaceAccessRepository teams;
     @MockitoBean CurrentAccountProvider current;
     @Autowired IdentityRepository identities;
@@ -368,6 +371,15 @@ class TeamAccessUseCaseTest {
                 .hasCauseInstanceOf(AccountMembershipConflictException.class);
         assertThat(access.getMyTeams(account.getId()).teams()).singleElement()
                 .satisfies(value -> assertThat(value.memberId()).isEqualTo(fixture.member("첫째 구성원")));
+
+        // 잠금을 우회한 저장도 실제 MySQL 유일 제약이 멤버십 충돌로 변환되는지 확인한다.
+        var otherAccount = identities.saveAccount(Account.create(UUID.randomUUID(), "다른 계정", clock.instant()));
+        assertThatThrownBy(() -> teamAccess.saveMembership(AccountTeamMembership.create(UUID.randomUUID(),
+                account.getId(), fixture.id(), fixture.member("둘째 구성원"), clock.instant())))
+                .isInstanceOf(AccountMembershipConflictException.class);
+        assertThatThrownBy(() -> teamAccess.saveMembership(AccountTeamMembership.create(UUID.randomUUID(),
+                otherAccount.getId(), fixture.id(), fixture.member("첫째 구성원"), clock.instant())))
+                .isInstanceOf(AccountMembershipConflictException.class);
     }
     // 뒤따르는 수락이 첫 조회를 마치고 팀 잠금을 기다리는 동안 앞선 수락을 커밋한다.
     private Future<InvitationAcceptedResult> acceptBehindCommittedAccept(UUID teamId, UUID accountId, String committedToken,
