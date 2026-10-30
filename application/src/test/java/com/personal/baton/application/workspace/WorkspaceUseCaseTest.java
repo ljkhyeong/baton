@@ -108,6 +108,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -5782,6 +5783,33 @@ class WorkspaceUseCaseTest {
     @Nested
     @DisplayName("시즌 생명주기")
     class SeasonLifecycle {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"+10000-01-01", "9999-12-31", "0999-12-31", "-0001-01-01"})
+    @DisplayName("저장과 마감 계산이 불가능한 연도의 시즌 날짜는 DB 오류 전에 입력 오류로 거절한다")
+    void rejectsSeasonDatesOutsideSupportedYears(String date) {
+        LocalDate unsupported = LocalDate.parse(date);
+        LocalDate start = unsupported.getYear() > 2026 ? LocalDate.of(2026, 7, 1) : unsupported;
+        LocalDate end = unsupported.getYear() > 2026 ? unsupported : LocalDate.of(2026, 8, 31);
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("날짜 범위 스터디 " + date, "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31), List.of("박민서")));
+
+        assertThatThrownBy(() -> lifecycleUseCase.createWorkspace(
+                UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("범위 밖 시즌 스터디", "여름 시즌", start, end, List.of("박민서"))
+        )).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> lifecycleUseCase.updateSeason(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("여름 시즌", start, end)
+        )).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> lifecycleUseCase.createNextSeason(
+                created.teamId(), created.seasonId(), UUID.randomUUID().toString(), created.accessKey(),
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
+                        "가을 시즌", LocalDate.of(2026, 9, 1), unsupported, List.of(), List.of())
+        )).isInstanceOf(DomainValidationException.class);
+    }
 
     @DisplayName("다음 시즌 생성은 열린 원본을 종료하고 시간대와 선택한 정의만 계승한다")
     @Test

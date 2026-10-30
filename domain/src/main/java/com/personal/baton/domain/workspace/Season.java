@@ -111,19 +111,24 @@ public class Season {
 
     public void update(String name, LocalDate startDate, LocalDate endDate) {
         String normalizedName = normalizeName(name);
-        LocalDate validatedStartDate = Objects.requireNonNull(startDate, "시즌 시작일은 필수입니다");
-        LocalDate validatedEndDate = Objects.requireNonNull(endDate, "시즌 종료일은 필수입니다");
-        if (validatedStartDate.isAfter(validatedEndDate)) {
-            throw new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다");
-        }
+        validatePeriod(startDate, endDate);
         if (roundSchedule != null
-                && (roundSchedule.getFirstMeetingDate().isBefore(validatedStartDate)
-                || roundSchedule.getFirstMeetingDate().isAfter(validatedEndDate))) {
+                && (roundSchedule.getFirstMeetingDate().isBefore(startDate)
+                || roundSchedule.getFirstMeetingDate().isAfter(endDate))) {
             throw new DomainValidationException("첫 모임 날짜는 시즌 기간 안에 있어야 합니다");
         }
         this.name = normalizedName;
-        this.startDate = validatedStartDate;
-        this.endDate = validatedEndDate;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
+    // 기간을 조회 조건으로 먼저 쓰는 호출자가 DB에 넘기기 전에 같은 규칙을 적용하도록 공개한다.
+    public static void validatePeriod(LocalDate startDate, LocalDate endDate) {
+        DomainAssertions.supportedDate(Objects.requireNonNull(startDate, "시즌 시작일은 필수입니다"), "시즌 시작일");
+        DomainAssertions.supportedDate(Objects.requireNonNull(endDate, "시즌 종료일은 필수입니다"), "시즌 종료일");
+        if (startDate.isAfter(endDate)) {
+            throw new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다");
+        }
     }
 
     // 종료 상태가 바뀌었으면 true를 돌려준다. 이미 종료된 시즌은 처음 종료 시각을 유지한다.
