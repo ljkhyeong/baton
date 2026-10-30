@@ -93,6 +93,8 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
         );
     }
 
+    // 같은 시즌의 기록 경로는 모두 트랜잭션의 첫 일관 읽기 전에 시즌 행을 배타 잠금하므로 최신 커밋을 읽는다.
+    // 잠금 읽기를 쓰면 빈 범위의 gap 잠금끼리 겹쳐 다른 시즌의 첫 신호 INSERT와 교착한다.
     @Override
     public List<BriefContinuitySignalState> findBySeason(UUID teamId, UUID seasonId) {
         return jdbcTemplate.query(
@@ -108,7 +110,6 @@ public class JdbcBriefContinuitySignalAdapter implements BriefContinuitySignalSt
                 WHERE team_id = UUID_TO_BIN(?)
                 AND season_id = UUID_TO_BIN(?)
                 ORDER BY signal_type, subject_id
-                FOR UPDATE
                 """,
                 SIGNAL_MAPPER,
                 teamId.toString(),
