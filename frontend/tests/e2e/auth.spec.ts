@@ -5,6 +5,7 @@ import {
   ACCESS_KEY,
   blockAccessKeyStorage,
   installApi,
+  MEMBER_ONE_ID,
   navigation,
   openSharedWorkspace,
   recordedCalls,
@@ -24,6 +25,7 @@ const PASSWORD = 'correct horse battery staple'
 const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
 const ROUND_ROOM_ID = 'bcdf-ghjk-mnpq'
 const ROUND_ROOM_PATH = `/room/${ROUND_ROOM_ID}`
+const TEAM_INVITATION_TOKEN = 'a'.repeat(43)
 // 로그아웃 정리 대상인 ROUND 입장 기록의 시드 값
 const DEVICE_ROUND_SEED = {
   teamId: TEAM_ID,
@@ -340,6 +342,26 @@ async function expectDeviceAccessCleared(page: Page) {
   expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
   expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
     .toBe('keep')
+}
+
+// 초대 확인 화면을 수락 없이 떠나 같은 탭에 초대 토큰을 남긴다.
+async function leaveTeamInvitationPending(page: Page) {
+  await page.route('**/api/v1/team-invitations/preview', (route) => route.fulfill({ json: {
+    teamId: TEAM_ID,
+    teamName: '초대받은 팀',
+    memberId: MEMBER_ONE_ID,
+    memberName: '초대받은 구성원',
+    permission: 'VIEWER',
+    expiresAt: '2026-12-31T00:00:00Z',
+  } }))
+  await page.goto(`/join#invite=${TEAM_INVITATION_TOKEN}`)
+  await expect(page.getByRole('heading', { name: '초대받은 팀' })).toBeVisible()
+}
+
+async function expectTeamInvitationCleared(page: Page) {
+  await page.goto('/join')
+  await expect(page.getByText('초대 링크를 다시 열어 주세요.', { exact: false })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '초대받은 팀' })).toHaveCount(0)
 }
 
 async function installRoundRoomDocument(page: Page) {
@@ -1162,6 +1184,60 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
   await expectDeviceAccessCleared(page)
 })
+
+test('@smoke 로그아웃하면 수락하지 않은 팀 초대를 지워 다음 계정에 보여 주지 않는다', async ({ page }) => {
+  await installAuthApi(page, { authenticated: true })
+  await leaveTeamInvitationPending(page)
+
+  await page.goto('/login')
+  await page.getByRole('button', { name: '로그아웃' }).click()
+  await loginWithEmail(page)
+  await expect(page).toHaveURL(/\/$/)
+
+  await expectTeamInvitationCleared(page)
+})
+
+for (const { title, endSession } of [
+  {
+    title: '비밀번호 변경은',
+    endSession: (page: Page) => submitPasswordChange(page, PASSWORD, 'new correct horse battery staple'),
+  },
+  {
+    title: '모든 기기 로그아웃은',
+    endSession: async (page: Page) => {
+      page.once('dialog', (dialog) => dialog.accept())
+      await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
+    },
+  },
+  {
+    title: '계정 비활성화는',
+    endSession: async (page: Page) => {
+      await page.getByRole('checkbox', { name: '기록 보존과 로그인 중지를 확인했습니다.' }).check()
+      await page.getByRole('button', { name: '이 계정 비활성화' }).click()
+    },
+  },
+]) {
+  test(`@smoke ${title} 공유 키를 유지하고 수락하지 않은 팀 초대만 지운다`, async ({ page }) => {
+    const sessionState = { authenticated: true }
+    await installAuthApi(page, { sessionState })
+    await page.route('**/api/v1/auth/account-deactivations', (route) => {
+      sessionState.authenticated = false
+      return route.fulfill({ status: 204 })
+    })
+    await leaveTeamInvitationPending(page)
+    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
+      key: `baton-access-key:${TEAM_ID}`,
+      value: ACCESS_KEY,
+    })
+
+    await page.goto('/account')
+    await endSession(page)
+    await expect(page).toHaveURL(/\/login$/)
+
+    await expectTeamInvitationCleared(page)
+    expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
+  })
+}
 
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
   await blockAccessKeyStorage(context)
