@@ -15,4 +15,9 @@ public class CalendarSubscriptionRevocationScheduler {
             scheduler = "calendarTaskScheduler"
     )
     public void revokePending() { subscriptions.revokePending(); }
+    @Scheduled(
+            fixedDelayString = "${baton.calendar.subscription-authorization-check-interval:PT1H}",
+            scheduler = "calendarTaskScheduler"
+    )
+    public void requestUnauthorizedRevocations() { subscriptions.requestUnauthorizedRevocations(); }
 }

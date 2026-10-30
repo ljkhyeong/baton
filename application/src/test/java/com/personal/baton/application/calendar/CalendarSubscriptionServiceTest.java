@@ -3,6 +3,7 @@ package com.personal.baton.application.calendar;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.*;
 
 import com.personal.baton.BatonApplication;
@@ -13,6 +14,7 @@ import com.personal.baton.application.calendar.port.in.CalendarSubscriptionUseCa
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClient;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClient.*;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
+import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.AuthorizationCheck;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.Owner;
 import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
@@ -218,9 +220,80 @@ class CalendarSubscriptionServiceTest {
         UUID id = service.create(scope).subscriptionId();
         deactivate();
         assertReason(Reason.ACCESS_DENIED, () -> service.rotate(scope));
+        service.requestUnauthorizedRevocations();
         service.revokePending();
         verify(client).revoke(id);
         assertThat(service.find(scope).status()).isEqualTo(Status.REVOKED);
+    }
+
+    @Test
+    @DisplayName("권한 불일치만 있는 구독은 폐기 주기가 읽지 않고 권한 점검이 폐기 대기로 표시한 뒤 폐기한다")
+    void revokesUnauthorizedSubscriptionOnlyAfterAuthorizationCheck() {
+        UUID id = service.create(scope).subscriptionId();
+        deactivate();
+
+        service.revokePending();
+
+        assertThat(store.pendingRevocations(NOW)).isEmpty();
+        verify(client, never()).revoke(any());
+
+        service.requestUnauthorizedRevocations();
+
+        assertThat(store.pendingRevocations(NOW)).containsExactly(owner());
+        verify(client, never()).revoke(any());
+        service.revokePending();
+        verify(client).revoke(id);
+    }
+
+    @Test
+    @DisplayName("권한 점검 조회는 키셋 순서로 폐기되지 않은 구독의 권한을 판정한다")
+    void readsAuthorizationChecksByKeyset() {
+        service.create(scope);
+        UUID unauthorizedAccount = insertAccount("권한 없는 계정");
+        store.release(store.claim(new Owner(unauthorizedAccount, scope.teamId(), scope.seasonId()), true, false, NOW), false);
+        UUID revokedAccount = insertAccount("해제한 계정");
+        store.release(store.claim(new Owner(revokedAccount, scope.teamId(), scope.seasonId()), true, false, NOW), true);
+        UUID pendingAccount = insertAccount("폐기 대기 계정");
+        store.release(store.claim(new Owner(pendingAccount, scope.teamId(), scope.seasonId()), true, false, NOW), false);
+        store.requestRevocation(new Owner(pendingAccount, scope.teamId(), scope.seasonId()));
+        var expected = Stream.of(scope.accountId(), unauthorizedAccount).sorted(
+                java.util.Comparator.comparing(UUID::toString)).toList();
+
+        var first = store.findAuthorizationChecks(null, 1);
+        var second = store.findAuthorizationChecks(first.getLast().owner(), 1);
+
+        assertThat(first).singleElement().satisfies(check -> {
+            assertThat(check.owner().accountId()).isEqualTo(expected.getFirst());
+            assertThat(check.authorized()).isEqualTo(expected.getFirst().equals(scope.accountId()));
+        });
+        assertThat(second).singleElement().satisfies(check -> {
+            assertThat(check.owner().accountId()).isEqualTo(expected.getLast());
+            assertThat(check.authorized()).isEqualTo(expected.getLast().equals(scope.accountId()));
+        });
+        assertThat(store.findAuthorizationChecks(second.getLast().owner(), 1)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("권한 점검은 마지막 페이지까지 이어 읽고 권한 없는 구독만 폐기 대기로 표시한다")
+    void followsAuthorizationPagesUntilLastPage() {
+        CalendarSubscriptionStore pagedStore = mock(CalendarSubscriptionStore.class);
+        var firstPage = new ArrayList<AuthorizationCheck>();
+        for (int index = 0; index < CalendarSubscriptionService.AUTHORIZATION_PAGE_SIZE; index++) {
+            firstPage.add(new AuthorizationCheck(new Owner(UUID.randomUUID(), scope.teamId(), scope.seasonId()), index != 0));
+        }
+        var lastPage = List.of(new AuthorizationCheck(new Owner(UUID.randomUUID(), scope.teamId(), scope.seasonId()), false));
+        when(pagedStore.findAuthorizationChecks(null, CalendarSubscriptionService.AUTHORIZATION_PAGE_SIZE)).thenReturn(firstPage);
+        when(pagedStore.findAuthorizationChecks(firstPage.getLast().owner(), CalendarSubscriptionService.AUTHORIZATION_PAGE_SIZE))
+                .thenReturn(lastPage);
+        var paged = new CalendarSubscriptionService(access, memberships, pagedStore, client, Clock.fixed(NOW, ZoneOffset.UTC), true);
+
+        paged.requestUnauthorizedRevocations();
+
+        verify(pagedStore).requestRevocation(firstPage.getFirst().owner());
+        verify(pagedStore).requestRevocation(lastPage.getFirst().owner());
+        verify(pagedStore, times(2)).requestRevocation(any());
+        verify(pagedStore, times(2)).findAuthorizationChecks(any(), anyInt());
+        verifyNoInteractions(client);
     }
 
     @Test
@@ -334,6 +407,7 @@ class CalendarSubscriptionServiceTest {
         assertThat(feedStatus(baseUrl, lost.get().feedUrl())).isEqualTo(404);
         assertThat(feedStatus(baseUrl, issued.feedUrl())).isEqualTo(200);
         deactivate();
+        service.requestUnauthorizedRevocations();
         service.revokePending();
         assertThat(feedStatus(baseUrl, issued.feedUrl())).isEqualTo(404);
         assertThat(service.find(scope).status()).isEqualTo(Status.REVOKED);
@@ -454,6 +528,7 @@ class CalendarSubscriptionServiceTest {
         grant(TeamPermission.VIEWER);
         UUID id = service.create(scope).subscriptionId();
         jdbc.update("UPDATE account_team_memberships SET permission=NULL WHERE account_id=UUID_TO_BIN(?)", scope.accountId().toString());
+        service.requestUnauthorizedRevocations();
         service.revokePending();
         verify(client).revoke(id);
     }

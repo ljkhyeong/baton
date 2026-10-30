@@ -15,6 +15,7 @@ public interface CalendarSubscriptionStore {
     }
     record Claim(Stored subscription, UUID token) {}
     record NamedSubscription(Stored subscription, String teamName, String seasonName) {}
+    record AuthorizationCheck(Owner owner, boolean authorized) {}
     List<NamedSubscription> list(UUID accountId, UUID afterSeasonId, String query, boolean includeRevoked, Instant now, int limit);
     Optional<Stored> find(Owner owner);
     Claim claim(Owner owner, boolean create, boolean revoking, Instant now);
@@ -24,4 +25,5 @@ public interface CalendarSubscriptionStore {
     void requestMemberRevocation(UUID teamId, UUID memberId);
     void requestUnauthorizedRevocations(UUID teamId);
     List<Owner> pendingRevocations(Instant now);
+    List<AuthorizationCheck> findAuthorizationChecks(Owner after, int limit);
 }
