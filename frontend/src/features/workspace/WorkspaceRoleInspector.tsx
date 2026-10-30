@@ -41,6 +41,7 @@ export function RoleInspector({
   previousSeasonId,
   onCopyPreviousResource,
   changesDisabled,
+  seasonEnded,
 }: {
   role: Role
   members: Member[]
@@ -63,6 +64,7 @@ export function RoleInspector({
   previousSeasonId: string | null
   onCopyPreviousResource: (resource: RoleResource) => void
   changesDisabled: boolean
+  seasonEnded: boolean
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -110,6 +112,7 @@ export function RoleInspector({
                     {...scope}
                     resourceId={resource.id}
                     changesDisabled={changesDisabled}
+                    seasonEnded={seasonEnded}
                     onManageMembership={onManageMembership}
                   />
                   <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>

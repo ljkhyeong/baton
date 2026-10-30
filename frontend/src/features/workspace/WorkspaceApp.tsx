@@ -1016,6 +1016,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             previousSeasonId={workspace.season.previousSeasonId}
             onCopyPreviousResource={openRoleResourceCopy}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
+            seasonEnded={seasonEnded}
             onOpenHandoff={() => {
               openView('handoff')
               window.requestAnimationFrame(() => {

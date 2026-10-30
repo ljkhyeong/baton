@@ -21,12 +21,14 @@ import { isSameUuid } from '@/shared/api/responseValidation'
 export function RoundRoomResourceActions({
   accessKey,
   changesDisabled,
+  seasonEnded,
   resourceId,
   seasonId,
   teamId,
   onManageMembership,
 }: RoundRoomMappingScope & {
   changesDisabled: boolean
+  seasonEnded: boolean
   onManageMembership: () => void
 }) {
   const scope = { accessKey, resourceId, seasonId, teamId }
@@ -181,7 +183,7 @@ export function RoundRoomResourceActions({
       <button
         type="button"
         className="round-room-primary-action"
-        disabled={changesDisabled || busy}
+        disabled={busy || (currentMapping ? seasonEnded : changesDisabled)}
         onClick={() => currentMapping
           ? enterRoundRoom(currentMapping)
           : mappingMutation.mutate(undefined, { onSuccess: enterRoundRoom })}
@@ -205,7 +207,7 @@ export function RoundRoomResourceActions({
           {endMutation.isPending ? '종료 중' : 'ROUND 종료'}
         </button>
       )}
-      {currentMapping && changesDisabled && (
+      {currentMapping && seasonEnded && (
         <small className="round-room-status">
           종료된 시즌에서는 ROUND 방에 입장하거나 종료할 수 없습니다.
         </small>
