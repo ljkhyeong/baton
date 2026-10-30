@@ -1358,6 +1358,32 @@ test('@smoke 작업 공간은 세션 조회 실패를 미인증으로 추측하�
   await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
 })
 
+for (const { title, search, returnTo } of [
+  {
+    title: '복귀할 수 없는 쿼리가 있으면 작업 공간 경로로',
+    search: `?${new URLSearchParams({ workKind: 'handoff', workId: '8e448211-66ae-44ab-9888-c4960648c221' })}`,
+    returnTo: WORKSPACE_PATH,
+  },
+  {
+    title: '특정 주간 요약 쿼리는 그대로',
+    search: '?brief=8e448211-66ae-44ab-9888-c4960648c221',
+    returnTo: `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`,
+  },
+]) {
+  test(`@smoke 작업 공간 링크에서 로그인하면 ${title} 돌아간다`, async ({ page }) => {
+    await installAccountOnlyWorkspace(page, { authenticated: false })
+    await page.goto(`${WORKSPACE_PATH}${search}`)
+
+    const login = page.getByRole('link', { name: '로그인', exact: true })
+    await expect(login).toHaveAttribute('href', `/login?returnTo=${encodeURIComponent(returnTo)}`)
+    await login.click()
+    await loginWithEmail(page)
+
+    await expect(page).toHaveURL(returnTo)
+    await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+  })
+}
+
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
   await blockAccessKeyStorage(context)
   const sessionState = { authenticated: false }
