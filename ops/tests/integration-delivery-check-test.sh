@@ -9,6 +9,7 @@ test_base="${test_base%/}"
 test_base="$(CDPATH= cd -- "$test_base" && pwd -P)"
 test_root="$(mktemp -d "$test_base/baton-integration-delivery-test.XXXXXX")"
 fixture_ops="$test_root/ops"
+fake_bin="$test_root/fakebin"
 metrics_file="$test_root/metrics.prom"
 
 cleanup() {
@@ -32,6 +33,18 @@ printf '%s\n' \
   'cat "$BATON_TEST_INTEGRATION_METRICS_FILE"' \
   > "$fixture_ops/show-integration-metrics.sh"
 chmod 700 "$fixture_ops"/*.sh
+
+# 지표 시각과 현재 시각이 같은 초인 경계를 결정적으로 재현한다.
+mkdir -p -- "$fake_bin"
+cat > "$fake_bin/date" <<'SCRIPT'
+#!/usr/bin/env bash
+if [[ -n "${FAKE_NOW_EPOCH:-}" ]]; then
+  printf '%s\n' "$FAKE_NOW_EPOCH"
+  exit 0
+fi
+exec /bin/date "$@"
+SCRIPT
+chmod 700 "$fake_bin/date"
 
 write_metrics() {
   local refresh_success="$1"
@@ -64,6 +77,7 @@ write_metrics() {
 }
 
 run_check() {
+  PATH="$fake_bin:$PATH" \
   BATON_TEST_INTEGRATION_METRICS_FILE="$metrics_file" \
   BATON_INTEGRATION_METRICS_MAX_STALENESS_SECONDS=120 \
     "$fixture_ops/check-integration-delivery.sh"
@@ -99,5 +113,23 @@ assert_failure '최근 갱신이 실패했습니다'
 
 write_metrics 1 "$((now_epoch - 121))" 0 0 0 0 0 0 0 0
 assert_failure '마지막 정상 갱신 시각이 유효하지 않거나 오래됐습니다'
+
+# 지표 시각은 소수 초이므로 같은 초의 갱신을 미래 시각으로 거부하면 안 된다.
+write_metrics 1 "$now_epoch.875" 0 0 0 0 0 0 0 0
+FAKE_NOW_EPOCH="$now_epoch" run_check >/dev/null \
+  || fail '같은 초의 소수 갱신 시각을 거부했습니다'
+
+# Micrometer가 내보내는 지수 표기도 같은 기준으로 비교한다.
+write_metrics 1 '1.761827000875E9' 0 0 0 0 0 0 0 0
+FAKE_NOW_EPOCH=1761827000 run_check >/dev/null \
+  || fail '지수 표기 갱신 시각을 거부했습니다'
+
+write_metrics 1 "$((now_epoch - 120)).5" 0 0 0 0 0 0 0 0
+FAKE_NOW_EPOCH="$now_epoch" run_check >/dev/null \
+  || fail '허용 기간 안의 소수 갱신 시각을 거부했습니다'
+
+write_metrics 1 "$((now_epoch + 1)).25" 0 0 0 0 0 0 0 0
+FAKE_NOW_EPOCH="$now_epoch" \
+  assert_failure '마지막 정상 갱신 시각이 유효하지 않거나 오래됐습니다'
 
 printf 'PASS: BATON 연동 전달 점검은 정상 지표만 허용하고 확정 장애를 거부합니다.\n'
