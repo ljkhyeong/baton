@@ -1371,7 +1371,7 @@ cd frontend && npm ci && cd ..
 상태에서 `null`이다. 관리자만 전체 `members`, `invitations`, `audit`을 받으며 공유 키 팀의 전환 준비
 조회는 구성원 목록도 받는다. 구성원 항목은 `memberId`, `memberName`, `active`, nullable `accountId`,
 nullable `permission`을 포함한다. 초대 항목은 `id`, `memberId`, `permission`, `createdAt`, `expiresAt`,
-nullable `acceptedAt`, nullable `revokedAt`이다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
+nullable `acceptedAt`, nullable `revokedAt`이며 생성 시각·식별자 내림차순으로 최근 50건을 반환한다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
 nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 50건을 반환한다.
 `action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`, `ACCOUNT_DEACTIVATED`, `ROLE_HANDOFF_ADMIN_CANCELLED`다. `ROLE_HANDOFF_ADMIN_CANCELLED`는 권한을 바꾸지 않으므로 `memberId`에 이전 담당자를 담고 두 권한 필드는 `null`이다.
 

@@ -395,6 +395,24 @@ class TeamAccessUseCaseTest {
             executor.shutdown();
         }
     }
+    @Test
+    @DisplayName("관리자 초대 목록은 최근 50건만 최신순으로 반환한다")
+    void limitsInvitationListToLatestFifty() {
+        var fixture = accountTeam("초대 목록 팀", "관리자", "신규 구성원");
+        UUID member = fixture.member("신규 구성원");
+        var oldest = access.invite(fixture.id(), fixture.adminAccount(), member, TeamPermission.MEMBER).invitation();
+        var latest = oldest;
+        for (int count = 0; count < 50; count++) {
+            NOW.updateAndGet(value -> value.plusSeconds(1));
+            latest = access.invite(fixture.id(), fixture.adminAccount(), member, TeamPermission.MEMBER).invitation();
+        }
+
+        var invitations = access.getAccess(fixture.id(), fixture.adminAccount(), null).invitations();
+
+        assertThat(invitations).hasSize(50);
+        assertThat(invitations.getFirst().id()).isEqualTo(latest.id());
+        assertThat(invitations).noneMatch(value -> value.id().equals(oldest.id()));
+    }
     private AccountTeam accountTeam(String name, String... memberNames) {
         NOW.set(Instant.parse("2026-09-05T03:00:00Z"));
         var workspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",

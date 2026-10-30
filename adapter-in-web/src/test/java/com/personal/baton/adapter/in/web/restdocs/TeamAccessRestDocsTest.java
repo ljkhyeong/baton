@@ -238,7 +238,7 @@ class TeamAccessRestDocsTest {
                 fieldWithPath("members[].memberId").description("구성원 식별자"), fieldWithPath("members[].memberName").description("구성원 이름"),
                 fieldWithPath("members[].active").description("활동 여부"), fieldWithPath("members[].accountId").optional().description("연결 계정"),
                 new EnumFields(TeamPermission.class).withPath("members[].permission").optional().description("승인된 권한"),
-                fieldWithPath("invitations").type(JsonFieldType.ARRAY).description("초대 목록, 관리자에게만 제공"),
+                fieldWithPath("invitations").type(JsonFieldType.ARRAY).description("최근 초대 50건, 관리자에게만 제공"),
                 fieldWithPath("invitations[].id").description("초대 식별자"), fieldWithPath("invitations[].memberId").description("초대 구성원"),
                 new EnumFields(TeamPermission.class).withPath("invitations[].permission").description("초대 권한"),
                 fieldWithPath("invitations[].createdAt").description("생성 시각"), fieldWithPath("invitations[].expiresAt").description("만료 시각"),
