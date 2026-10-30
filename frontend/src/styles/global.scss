@@ -1742,7 +1742,7 @@ dialog.inspector::backdrop {
   backdrop-filter: blur(3px);
 }
 
-.inspector-close { position: absolute; top: 20px; right: 19px; display: none; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 50%; background: var(--canvas); cursor: pointer; }
+.inspector-close { position: absolute; top: 20px; right: 19px; display: none; width: 30px; height: 30px; place-items: center; border: 0; border-radius: var(--radius); background: var(--canvas); cursor: pointer; }
 .inspector.dismissible .inspector-close { display: grid; }
 .inspector.dismissible .inspector-topline { padding-right: 35px; }
 .inspector-topline { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; font-weight: 680; letter-spacing: .05em; }
@@ -1852,7 +1852,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   height: 30px;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius);
   color: var(--muted);
   background: transparent;
   cursor: pointer;
@@ -2843,7 +2843,19 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .primary-button, .secondary-button, .danger-button { min-height: 44px; }
   .round-control select { height: 44px; }
   .auth-form input, .onboarding-form input, .onboarding-form textarea, .onboarding-form select,
-  .modal-form input, .modal-form textarea, .modal-form select { font-size: 16px; }
+  .modal-form input, .modal-form textarea, .modal-form select, .season-modal .form-grid input { font-size: 16px; }
+  .modal-form input:not([type="checkbox"]), .modal-form select, .season-modal .form-grid input { height: 44px; }
+  .record-search-scope select,
+  .record-search-filters select,
+  .record-search-filters input { min-height: 44px; }
+  // 줄 높이는 그대로 두고 누를 수 있는 영역만 44px로 넓힌다.
+  .workspace-sync-status button { min-height: 44px; margin: -10px 0; }
+  .today-mode button,
+  .inspector-handoff button { min-height: 44px; }
+  .auth-form .account-deactivation-confirm,
+  .modal-form .check-field,
+  .role-handoff-form .handoff-warning-box label,
+  .modal-form .modal-choice-list label { min-height: 44px; }
   .resource-section-heading button,
   .resource-links button,
   .round-room-text-action { min-height: 44px; }
@@ -2876,7 +2888,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .today-list-toolbar .round-meta { flex: 1 1 100%; justify-content: flex-start; }
   .today-support { grid-template-columns: 1fr; gap: 24px; }
   .today-page .routine-row { grid-template-columns: 36px minmax(0, 1fr); padding: 12px 0; }
-  .today-page .routine-copy { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .today-page .routine-copy { grid-template-columns: minmax(0, 1fr); gap: 4px; min-height: 44px; }
   .today-page .routine-schedule { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
   .today-list-columns { display: none; }
   .today-page .routine-owner { display: flex; grid-column: 2; min-height: 44px; padding: 0; gap: 6px; }
@@ -2936,6 +2948,8 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   dialog.inspector { height: auto; max-height: 84vh; margin: auto 0 0; }
   .inspector.is-open { transform: translateY(0); }
   .modal { --modal-pad-y: 28px; --modal-pad-x: 22px; max-height: 92vh; }
+  .modal-close { top: 13px; right: 13px; width: 44px; height: 44px; }
+  .inspector-close { top: 13px; right: 12px; width: 44px; height: 44px; }
   .role-handoff-form .date-grid { grid-template-columns: 1fr; }
   .season-modal { align-self: end; width: calc(100% + 40px); max-height: 90vh; margin: 0 -20px -20px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
   .season-ended-banner { align-items: stretch; flex-direction: column; }

@@ -25,3 +25,4 @@
   .decision-preview-toggle { padding: 0 14px; min-height: 40px; border: 1px solid var(--rule-strong); border-radius: var(--radius); background: transparent; font-weight: 600; }
   .decision-preview { display: grid; gap: 6px; margin-top: 12px; min-height: 60px; }
 }
+@media (max-width: 720px) { .decision-text-editor .decision-preview-toggle { min-height: 44px; } }

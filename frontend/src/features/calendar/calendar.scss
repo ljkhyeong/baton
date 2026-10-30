@@ -56,3 +56,5 @@
 .holiday-list li { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .holiday-list time { color: var(--muted); }
 .holiday-notice { font-weight: 600; }
+
+@media (max-width: 720px) { .calendar-filter, .holiday-month input { min-height: 44px; } }

@@ -38,6 +38,7 @@
 .brief-evidence-list li { display: grid; gap: .4rem; font-size: 13px; overflow-wrap: anywhere; }
 .brief-filters select { width: 100%; }
 @media (max-width: 600px) { .brief-change-columns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) { .brief-attention button, .brief-attention select { min-height: 44px; } }
 
 .brief-delivery-status { display: grid; gap: .6rem; margin: 1rem 0; padding: 1rem; border: 1px solid var(--rule); border-radius: var(--radius-lg); }
 .brief-delivery-status p, .brief-delivery-status .brief-evidence { margin: 0; }

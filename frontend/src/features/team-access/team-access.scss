@@ -17,3 +17,9 @@
   li select { width: auto; }
   small { display: block; color: var(--muted); }
 }
+
+@media (max-width: 720px) {
+  .team-access-panel summary { display: flex; min-height: 44px; align-items: center; }
+  .team-access-panel .team-access-confirm,
+  .team-access-panel button { min-height: 44px; }
+}
