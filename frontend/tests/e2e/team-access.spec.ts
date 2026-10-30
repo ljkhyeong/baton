@@ -239,7 +239,7 @@ test('@operations 관리자가 아닌 구성원은 시즌 목록을 보고 전�
   await accountApi(page)
   await openSharedWorkspace(page)
 
-  await page.getByRole('button', { name: /현재 시즌 .*시즌 전환/ }).first().click()
+  await page.getByRole('button', { name: /시즌 전환/ }).first().click()
   const dialog = page.getByRole('dialog', { name: `${projection.team.name} 시즌` })
   await expect(dialog.getByRole('button', { name: '시즌 정보 수정' })).toBeDisabled()
   await expect(dialog.getByRole('button', { name: '시즌 종료' })).toBeDisabled()
