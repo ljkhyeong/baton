@@ -62,6 +62,7 @@ import {
   usePendingContentCreationCleanupCommand,
 } from './useContentCreationCommand'
 import { isWorkspaceAccessDenied } from './api'
+import { readAccessKey } from './storage'
 import { useWorkspaceAccessKeyFlow } from './useWorkspaceAccessKeyFlow'
 import { useWorkspaceConflictRecovery } from './useWorkspaceConflictRecovery'
 import { useWorkspaceMutationRecovery } from './useWorkspaceMutationRecovery'
@@ -86,6 +87,7 @@ import {
   useWorkspaceToast,
 } from './useWorkspaceUiState'
 import { AccessKeyModal, ShareLinkFallback } from './WorkspaceAccessModals'
+import WorkspaceLoginLink from './WorkspaceLoginLink'
 import {
   hasWorkspaceAccessKeyRecovery,
   WorkspaceAccessKeyRecovery,
@@ -399,9 +401,15 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
         title="작업 공간을 불러오지 못했습니다"
         description={mutationError(workspaceQuery.error)}
         action={<>
-          {accessKeyRecovery ?? (workspaceAccessDenied && accessDeniedAction
-            ? accessDeniedAction
-            : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
+          <div className="remote-state-actions">
+            {accessKeyRecovery ?? (workspaceAccessDenied && accessDeniedAction
+              ? accessDeniedAction
+              : <button type="button" className="primary-button" onClick={() => workspaceQuery.refetch()}>다시 시도하기</button>)}
+            {/* 거부된 키는 로그인 뒤 쓸 일이 없어 저장 여부와 무관하게 같은 탭에서 로그인한다. */}
+            {workspaceAccessDenied && sessionQuery.data?.authenticated === false && (
+              <WorkspaceLoginLink className="secondary-button" teamId={teamId} seasonId={seasonId} accessKey={readAccessKey(teamId)}>로그인</WorkspaceLoginLink>
+            )}
+          </div>
           {workspaceAccessDenied && <CalendarSubscriptionCleanup teamId={teamId} seasonId={seasonId} />}
         </>}
       />

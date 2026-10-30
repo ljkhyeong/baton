@@ -5,6 +5,7 @@ import {
   ACCESS_KEY,
   blockAccessKeyStorage,
   installApi,
+  makeProjection,
   MEMBER_ONE_ID,
   navigation,
   openSharedWorkspace,
@@ -1281,6 +1282,65 @@ for (const { title, endSession } of [
     expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
   })
 }
+
+// 계정 전환 팀은 로그인 전까지 저장된 공유 키도 거부한다.
+async function installAccountOnlyWorkspace(page: Page, sessionState: { authenticated: boolean }) {
+  const projection = makeProjection()
+  projection.team.accountAccessEnabled = true
+  projection.team.permission = 'MEMBER'
+  await installApi(page, projection)
+  await installAuthApi(page, { sessionState })
+  await page.route(`**${SCOPE_PATH}/workspace`, (route) => sessionState.authenticated
+    ? route.fallback()
+    : route.fulfill({ status: 403, json: {
+        code: 'WORKSPACE_ACCESS_DENIED',
+        message: '계정의 초대·권한을 확인해 주세요.',
+      } }))
+}
+
+for (const { title, open } of [
+  {
+    title: '이 기기에 저장된 공유 키로',
+    open: async (page: Page) => {
+      await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+        key: `baton-access-key:${TEAM_ID}`,
+        value: ACCESS_KEY,
+      })
+      await page.goto(WORKSPACE_PATH)
+    },
+  },
+  {
+    title: '예전 공유 링크로',
+    open: (page: Page) => page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`),
+  },
+]) {
+  test(`@smoke 계정 전환 팀을 ${title} 연 비로그인 사용자는 같은 탭에서 로그인해 돌아간다`, async ({ page }) => {
+    await installAccountOnlyWorkspace(page, { authenticated: false })
+    await open(page)
+
+    await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
+    const login = page.getByRole('link', { name: '로그인', exact: true })
+    await expect(login).toHaveAttribute('href', `/login?${new URLSearchParams({ returnTo: WORKSPACE_PATH })}`)
+    await login.click()
+    await loginWithEmail(page)
+
+    await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+    await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+  })
+}
+
+test('@smoke 로그인한 계정이 작업 공간 접근을 거부당하면 로그인 링크를 표시하지 않는다', async ({ page }) => {
+  await page.route(`**${SCOPE_PATH}/workspace`, (route) => route.fulfill({ status: 403, json: {
+    code: 'WORKSPACE_ACCESS_DENIED',
+    message: '계정의 초대·권한을 확인해 주세요.',
+  } }))
+  await installAuthApi(page, { authenticated: true })
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toHaveCount(0)
+})
 
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
   await blockAccessKeyStorage(context)
