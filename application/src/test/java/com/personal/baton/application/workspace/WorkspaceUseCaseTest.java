@@ -328,6 +328,45 @@ class WorkspaceUseCaseTest {
         assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
     }
 
+    @Test
+    @DisplayName("시즌 끝을 넘은 자동 일정은 후보에서 빠지고 기간을 늘리면 같은 커서부터 다시 회차를 만든다")
+    void resumesAutomaticRoundsWhenSeasonIsExtended() {
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                "workspace-round-season-extension-0001", CREATION_KEY,
+                new CreateWorkspaceCommand("시즌 연장 스터디", "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("박민서")));
+        RoleResult role = peopleUseCase.createRole(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("extension-role"), created.accessKey(),
+                new CreateRoleCommand("진행자", "모임 준비", null, null, null, null, List.of("질문 확인"), ""));
+        operationsUseCase.createRoutine(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("extension-routine"), created.accessKey(),
+                new CreateRoutineCommand("질문 모으기", RoutinePhase.BEFORE, "모임 전날", role.id(),
+                        "질문을 정리합니다", -1, LocalTime.of(22, 0)));
+        lifecycleUseCase.updateRoundSchedule(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 7, 27),
+                        LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, true));
+        ScheduledSeasonCandidate candidate = new ScheduledSeasonCandidate(created.teamId(), created.seasonId());
+        assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isTrue();
+
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
+        assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isFalse();
+        WorkspaceResult waiting = lifecycleUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        assertThat(waiting.season().roundSchedule().enabled()).isTrue();
+        assertThat(waiting.season().roundSchedule().nextOccurrenceDate()).isEqualTo(LocalDate.of(2026, 8, 3));
+
+        lifecycleUseCase.updateSeason(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("여름 시즌", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31)));
+
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).contains(candidate);
+        assertThat(roundGenerationWorker.generateNextOccurrence(
+                candidate, Instant.parse("2026-07-27T03:00:00Z"))).isTrue();
+        assertThat(lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey()).rounds())
+                .extracting(SeasonRoundResult::meetingDate)
+                .containsExactlyInAnyOrder(LocalDate.of(2026, 7, 27), LocalDate.of(2026, 8, 3));
+    }
+
     @Nested
     @DisplayName("접근·구성원·역할 인수인계")
     class PeopleAndHandoff {

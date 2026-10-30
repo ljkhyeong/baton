@@ -169,10 +169,6 @@ public class Season {
         );
     }
 
-    public void disableRoundSchedule() {
-        requireRoundSchedule().disable();
-    }
-
     public Optional<LocalDate> nextDueRoundOccurrence(LocalDate today) {
         if (isEnded() || roundSchedule == null) {
             return Optional.empty();

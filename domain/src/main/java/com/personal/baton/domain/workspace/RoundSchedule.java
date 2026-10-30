@@ -118,10 +118,6 @@ public class RoundSchedule {
         return nextOccurrenceDate;
     }
 
-    void disable() {
-        enabled = false;
-    }
-
     private static int validateGenerationLeadDays(int generationLeadDays) {
         if (generationLeadDays < MIN_GENERATION_LEAD_DAYS
                 || generationLeadDays > MAX_GENERATION_LEAD_DAYS) {

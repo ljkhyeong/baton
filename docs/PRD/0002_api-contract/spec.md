@@ -744,7 +744,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 - 각 실행은 원본 `routineId`, 생성 당시 업무 정보, 완료 상태와 마감 정보를 보존한다. 이후 반복 업무를 바꿔도 기존 회차에는 반영하지 않는다.
 - 같은 멱등 요청은 실행을 다시 만들지 않고 기존 회차 ID와 현재 상태를 반환한다.
 
-활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 스케줄러가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다. 처리할 발생일에 활성 반복 업무가 없으면 `roundSchedule.nextOccurrenceDate`만 다음 주기로 전진하고 실행이 없는 자동 회차는 만들지 않는다. 나중에 정의를 복원해도 이미 건너뛴 발생일을 소급 생성하지 않는다.
+활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 스케줄러가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다. 처리할 발생일에 활성 반복 업무가 없으면 `roundSchedule.nextOccurrenceDate`만 다음 주기로 전진하고 실행이 없는 자동 회차는 만들지 않는다. 나중에 정의를 복원해도 이미 건너뛴 발생일을 소급 생성하지 않는다. `nextOccurrenceDate`가 시즌 `endDate`를 넘으면 생성만 멈추고 `enabled`는 바뀌지 않는다. 시즌 기간을 늘리면 보존한 커서부터 다시 생성한다.
 
 실행 `timingStatus`는 다음 규칙으로 조회 시 계산한다.
 

@@ -77,10 +77,8 @@ class RoundAutomationPolicyTest {
                 LocalTime.of(19, 30),
                 RoundRecurrence.WEEKLY,
                 7,
-                true
+                false
         );
-
-        season.disableRoundSchedule();
 
         assertThat(season.nextDueRoundOccurrence(LocalDate.of(2026, 8, 10))).isEmpty();
 
