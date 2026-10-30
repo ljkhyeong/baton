@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -122,6 +123,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpObservationErrors.mark(request, exception);
         return jsonError(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
+    }
+
+    // 어댑터가 애그리게이트별 충돌로 바꾸지 못한 교착·잠금 실패다. 원래 메시지의 SQL을 숨기고,
+    // 정상적인 수정 충돌과 구분해 원인을 찾을 수 있도록 서버 로그를 남긴다.
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<Object> handleConcurrencyFailure(
+            ConcurrencyFailureException exception,
+            WebRequest request
+    ) {
+        LOG.warn("Unconverted lock failure: {}", request.getDescription(false), exception);
+        return handleApplicationException(new WorkspaceContentConflictException(exception), request);
     }
 
     @ExceptionHandler(ResourceCheckRequestException.class)

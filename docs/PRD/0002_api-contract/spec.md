@@ -1010,7 +1010,7 @@ GET /actuator/health
 | `409` | `ROLE_HANDOFF_STATE_CONFLICT` | 역할 인수인계의 참여자·상태·역할 스냅샷이 요청과 맞지 않거나, 열린 인수인계 중 금지된 역할·인수인계 항목·자료 변경 또는 시즌 종료·전환을 시도함 |
 | `409` | `ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED` | 인수인계 항목 없음, 미완료 항목 또는 역할 자료 없음 경고를 확인하지 않고 전달하려 함 |
 | `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
-| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 시즌, 역할, 역할 인수인계, 역할 자료, 반복 업무 정의, 회차, 반복 업무 실행, 결정 또는 인수인계 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 워크스페이스 확인이 필요함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 시즌, 역할, 역할 인수인계, 역할 자료, 반복 업무 정의, 회차, 반복 업무 실행, 결정 또는 인수인계 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 워크스페이스 확인이 필요함. DB 교착·잠금 경합으로 트랜잭션이 롤백된 요청도 포함함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 동일 재처리함 |
@@ -1036,6 +1036,8 @@ MySQL 행 잠금 시간이 제한을 넘으면 대상에 따라 다음 오류로
 - 워크스페이스·콘텐츠 생성 예약: `409 IDEMPOTENCY_KEY_CONFLICT`
 - 팀 접근 키: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
 - 공유 콘텐츠: `409 WORKSPACE_CONTENT_CONFLICT`
+
+어댑터가 대상별 오류로 바꾸지 못한 교착·잠금 실패(`ConcurrencyFailureException` 계열)도 `409 WORKSPACE_CONTENT_CONFLICT`로 처리하며 SQL 상세는 응답에 노출하지 않는다.
 
 계정 인증에서 별도로 `503`으로 분류한 경우가 아니라면 쿼리·트랜잭션 시간 초과와 DB 연결 실패는 `500 INTERNAL_ERROR`로 처리한다. 이를 사용자의 동시 수정으로 추측하지 않는다.
 

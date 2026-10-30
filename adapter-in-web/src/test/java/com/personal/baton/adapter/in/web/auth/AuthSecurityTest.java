@@ -32,6 +32,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -474,6 +475,24 @@ class AuthSecurityTest {
             logger.detachAppender(appender);
             appender.stop();
         }
+    }
+
+    @DisplayName("신원 저장소의 교착은 전역 콘텐츠 충돌이 아니라 인증 일시 장애로 응답한다")
+    @Test
+    void keepsIdentityLockFailureAsTemporaryUnavailable() throws Exception {
+        when(registerLocalAccountUseCase.registerLocalAccount(any()))
+                .thenThrow(new CannotAcquireLockException("Deadlock found"));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .with(csrf())
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.80");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration().replace(EMAIL, "identity-lock@example.com")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"));
     }
 
     @DisplayName("메일 전달 adapter가 비활성화되면 계정 존재 여부 없이 일반화된 503을 반환한다")

@@ -1,10 +1,12 @@
 package com.personal.baton.adapter.in.web;
 
+import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.personal.baton.application.workspace.error.ResourceCheckRequestException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.workspace.error.WorkspaceContentConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
@@ -19,11 +21,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -213,6 +218,40 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value("date: 날짜는 필수입니다"));
     }
 
+    @DisplayName("어댑터가 변환하지 못한 교착·잠금 실패는 SQL을 숨기고 콘텐츠 충돌로 응답한다")
+    @Test
+    void mapsUnconvertedLockFailureToContentConflict() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/test/errors/deadlock"))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("WORKSPACE_CONTENT_CONFLICT"))
+                .andExpect(jsonPath("$.message").value(new WorkspaceContentConflictException().getMessage()))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("Deadlock", "brief_attention_outbox");
+        assertThat(stoppedObservation.get().getError())
+                .isInstanceOf(WorkspaceContentConflictException.class)
+                .hasCauseInstanceOf(CannotAcquireLockException.class);
+        assertThat(logAppender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage()).contains("/api/v1/test/errors/deadlock");
+        });
+    }
+
+    @DisplayName("일반 쿼리·트랜잭션 시간 초과는 콘텐츠 충돌로 추측하지 않고 내부 오류를 유지한다")
+    @Test
+    void keepsTimeoutsAsInternalErrors() throws Exception {
+        for (String path : new String[] {
+                "/api/v1/test/errors/query-timeout",
+                "/api/v1/test/errors/transaction-timeout"
+        }) {
+            mockMvc.perform(get(path))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+        }
+    }
+
     @DisplayName("성공 응답을 비JSON Accept로 쓸 수 없으면 본문 없는 406으로 응답한다")
     @Test
     void keepsEmptyNotAcceptableForSuccessBody() throws Exception {
@@ -299,6 +338,23 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/api/v1/test/errors/binding")
         String binding(@Valid @ModelAttribute BindingPayload payload) {
             return payload.date().toString();
+        }
+
+        @GetMapping("/api/v1/test/errors/deadlock")
+        String deadlock() {
+            throw new CannotAcquireLockException(
+                    "PreparedStatementCallback; SQL [INSERT INTO brief_attention_outbox]; Deadlock found"
+            );
+        }
+
+        @GetMapping("/api/v1/test/errors/query-timeout")
+        String queryTimeout() {
+            throw new QueryTimeoutException("statement cancelled");
+        }
+
+        @GetMapping("/api/v1/test/errors/transaction-timeout")
+        String transactionTimeout() {
+            throw new TransactionTimedOutException("Transaction timed out");
         }
     }
 
