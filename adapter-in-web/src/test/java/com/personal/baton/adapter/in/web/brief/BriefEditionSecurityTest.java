@@ -120,6 +120,21 @@ class BriefEditionSecurityTest {
     }
 
     @Test
+    @DisplayName("BRIEF 점검 커서의 잘못된 종류는 내부 형식 이름 없이 고정 문구로 응답한다")
+    void hidesAttentionCursorConversionDetails() throws Exception {
+        var result = mockMvc.perform(get(BriefAttentionController.LIST_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY)
+                        .queryParam("afterEventType", "UNKNOWN_EVENT")
+                        .queryParam("afterSourceReference", "role:1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("afterEventType: 요청 값 형식이 올바르지 않습니다")))
+                .andReturn();
+        org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("Failed to convert", "com.personal");
+    }
+
+    @Test
     @DisplayName("과거 조회·비교와 업무 연결에도 계정 세션과 필요한 CSRF를 적용한다")
     void protectsNewReadBoundaries() throws Exception {
         for (String path : List.of(BriefEditionController.EDITION_PATH, BriefEditionController.COMPARISON_PATH, BriefEditionController.DELIVERY_STATUS_PATH)) {

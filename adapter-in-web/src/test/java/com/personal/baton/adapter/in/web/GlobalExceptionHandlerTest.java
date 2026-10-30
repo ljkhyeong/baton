@@ -9,6 +9,9 @@ import com.personal.baton.application.workspace.error.WorkspaceNotFoundException
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -188,6 +192,27 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
     }
 
+    @DisplayName("값 변환에 실패한 바인딩은 내부 변환 문구 대신 고정 문구로 응답한다")
+    @Test
+    void hidesBindingFailureDetails() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/test/errors/binding").queryParam("date", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.message").value("date: 요청 값 형식이 올바르지 않습니다"))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("Failed to convert", "java.time");
+    }
+
+    @DisplayName("검증 규칙 위반은 요청 DTO에 정의한 문구를 그대로 응답한다")
+    @Test
+    void keepsValidationMessages() throws Exception {
+        mockMvc.perform(get("/api/v1/test/errors/binding"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("date: 날짜는 필수입니다"));
+    }
+
     @DisplayName("성공 응답을 비JSON Accept로 쓸 수 없으면 본문 없는 406으로 응답한다")
     @Test
     void keepsEmptyNotAcceptableForSuccessBody() throws Exception {
@@ -270,8 +295,16 @@ class GlobalExceptionHandlerTest {
         String resourceCheck() {
             throw new ResourceCheckRequestException(ResourceCheckRequestException.Reason.RATE_LIMITED, 17L);
         }
+
+        @GetMapping("/api/v1/test/errors/binding")
+        String binding(@Valid @ModelAttribute BindingPayload payload) {
+            return payload.date().toString();
+        }
     }
 
     private record ErrorPayload(String value) {
+    }
+
+    record BindingPayload(@NotNull(message = "날짜는 필수입니다") LocalDate date) {
     }
 }

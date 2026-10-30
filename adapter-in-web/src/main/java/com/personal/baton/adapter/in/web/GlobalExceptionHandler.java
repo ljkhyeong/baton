@@ -56,6 +56,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "INTERNAL_ERROR",
             "서버에서 요청을 처리하지 못했습니다"
     );
+    private static final String INVALID_VALUE_MESSAGE = "요청 값 형식이 올바르지 않습니다";
 
     private record ErrorMapping(HttpStatus status, String code) {
     }
@@ -163,7 +164,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .sorted(Comparator.comparing(error -> error.getField()))
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .map(error -> error.getField() + ": "
+                        + (error.isBindingFailure() ? INVALID_VALUE_MESSAGE : error.getDefaultMessage()))
                 .collect(Collectors.joining(", "));
         return handleExceptionInternal(exception, new ErrorResponse("INVALID_INPUT", message), headers, status, request);
     }
@@ -177,7 +179,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         return handleExceptionInternal(
                 exception,
-                new ErrorResponse("INVALID_INPUT", "요청 값 형식이 올바르지 않습니다"),
+                new ErrorResponse("INVALID_INPUT", INVALID_VALUE_MESSAGE),
                 headers,
                 status,
                 request

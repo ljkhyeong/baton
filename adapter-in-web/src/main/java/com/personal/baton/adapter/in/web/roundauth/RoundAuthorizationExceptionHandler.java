@@ -7,6 +7,7 @@ import com.personal.baton.application.roundauth.error.RoundParticipationDeniedEx
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
@@ -105,6 +106,18 @@ public class RoundAuthorizationExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "INVALID_INPUT",
                 exception.getMessage(),
+                request,
+                false
+        );
+    }
+
+    // 없으면 변환 실패의 원인인 IllegalArgumentException이 위 처리기로 들어가 내부 문구가 노출된다.
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(HttpServletRequest request) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_INPUT",
+                "요청 값 형식이 올바르지 않습니다",
                 request,
                 false
         );
