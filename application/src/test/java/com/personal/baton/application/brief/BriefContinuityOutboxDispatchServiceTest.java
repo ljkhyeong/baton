@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class BriefContinuityOutboxDispatchServiceTest {
 
@@ -63,7 +65,7 @@ class BriefContinuityOutboxDispatchServiceTest {
         verify(outboxPort).markRetry(
                 retryable.outboxId(),
                 retryable.leaseToken(),
-                NOW,
+                NOW.plusSeconds(10),
                 "HTTP_503"
         );
         verify(outboxPort).markFailed(
@@ -74,7 +76,36 @@ class BriefContinuityOutboxDispatchServiceTest {
         );
     }
 
+    @DisplayName("재시도 대기 시간은 시도 횟수에 따라 10초부터 늘어나고 1시간을 넘지 않는다")
+    @ParameterizedTest
+    @CsvSource({"1, 10", "2, 20", "3, 40", "9, 2560", "10, 3600", "100, 3600"})
+    void delaysRetryByAttemptCount(int attemptCount, long delaySeconds) {
+        BriefContinuityOutboxPort outboxPort = mock(BriefContinuityOutboxPort.class);
+        BriefContinuityClient client = mock(BriefContinuityClient.class);
+        BriefContinuityDelivery delivery = delivery(1, attemptCount);
+        when(outboxPort.claimPending(anyInt(), eq(NOW), any(Duration.class)))
+                .thenReturn(List.of(delivery));
+        when(client.deliver(delivery)).thenReturn(DeliveryResult.retryable("HTTP_503"));
+
+        new BriefContinuityOutboxDispatchService(
+                outboxPort,
+                client,
+                Clock.fixed(NOW, ZoneOffset.UTC)
+        ).dispatchPending();
+
+        verify(outboxPort).markRetry(
+                delivery.outboxId(),
+                delivery.leaseToken(),
+                NOW.plusSeconds(delaySeconds),
+                "HTTP_503"
+        );
+    }
+
     private BriefContinuityDelivery delivery(long outboxId) {
+        return delivery(outboxId, 1);
+    }
+
+    private BriefContinuityDelivery delivery(long outboxId, int attemptCount) {
         UUID signalId = UUID.randomUUID();
         return new BriefContinuityDelivery(
                 outboxId,
@@ -90,6 +121,7 @@ class BriefContinuityOutboxDispatchServiceTest {
                         NOW,
                         BriefContinuityEvent.State.ACTIVE
                 ),
+                attemptCount,
                 UUID.randomUUID()
         );
     }

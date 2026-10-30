@@ -60,7 +60,8 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
                     candidate.source_reference,
                     candidate.aggregate_revision,
                     candidate.occurred_at,
-                    candidate.event_state
+                    candidate.event_state,
+                    candidate.attempt_count
                 FROM brief_continuity_outbox candidate
                 WHERE (
                     (candidate.delivery_status = 'PENDING' AND candidate.available_at <= ?)
@@ -97,7 +98,8 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
                                 BriefContinuityEvent.State.valueOf(
                                         resultSet.getString("event_state")
                                 )
-                        )
+                        ),
+                        resultSet.getInt("attempt_count")
                 ),
                 utc(claimedAt),
                 utc(claimedAt),
@@ -148,10 +150,10 @@ public class JdbcBriefContinuityOutboxAdapter implements BriefContinuityOutboxPo
         return outbox.markFailed(outboxId, leaseToken, failedAt, errorCode);
     }
 
-    private record ClaimCandidate(long outboxId, BriefContinuityEvent event) {
+    private record ClaimCandidate(long outboxId, BriefContinuityEvent event, int attemptCount) {
 
         private BriefContinuityDelivery toDelivery(UUID leaseToken) {
-            return new BriefContinuityDelivery(outboxId, event, leaseToken);
+            return new BriefContinuityDelivery(outboxId, event, attemptCount + 1, leaseToken);
         }
     }
 }
