@@ -107,6 +107,7 @@ baton_cal_backfill_enabled="false"
 baton_cal_recovery_preparation_enabled="false"
 baton_cal_recovery_run_id=""
 baton_cal_delivery_enabled="false"
+baton_cal_subscriptions_enabled="false"
 baton_cal_season_metadata_enabled="false"
 baton_cal_season_metadata_maintenance="OFF"
 baton_cal_base_url=""
@@ -190,6 +191,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       ;;
     BATON_CAL_DELIVERY_ENABLED)
       baton_cal_delivery_enabled="$value"
+      ;;
+    BATON_CAL_SUBSCRIPTIONS_ENABLED)
+      baton_cal_subscriptions_enabled="$value"
       ;;
     BATON_CAL_SEASON_METADATA_ENABLED)
       baton_cal_season_metadata_enabled="$value"
@@ -382,6 +386,8 @@ production_validation_validate_boolean \
 production_validation_validate_boolean \
   fail BATON_CAL_DELIVERY_ENABLED "$baton_cal_delivery_enabled"
 production_validation_validate_boolean \
+  fail BATON_CAL_SUBSCRIPTIONS_ENABLED "$baton_cal_subscriptions_enabled"
+production_validation_validate_boolean \
   fail BATON_CAL_SEASON_METADATA_ENABLED "$baton_cal_season_metadata_enabled"
 if [[ -n "$baton_cal_recovery_run_id" \
   && ! "$baton_cal_recovery_run_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
@@ -400,6 +406,10 @@ if [[ -n "$baton_cal_recovery_run_id" && "$baton_cal_delivery_enabled" == "true"
   [[ "$baton_cal_capture_enabled" == "true" \
     && "$baton_cal_season_metadata_enabled" == "true" ]] \
     || fail "CAL 복구 완료 확인에는 캡처와 시즌 이름 연동이 필요합니다"
+fi
+if [[ "$baton_cal_subscriptions_enabled" == "true" ]]; then
+  [[ "$baton_cal_capture_enabled" == "true" && "$baton_cal_delivery_enabled" == "true" ]] \
+    || fail "BATON_CAL_SUBSCRIPTIONS_ENABLED=true 설정에는 CAL 캡처와 전달 활성화가 필요합니다"
 fi
 if [[ "$baton_cal_delivery_enabled" == "true" ]]; then
   [[ -n "$baton_cal_base_url" ]] \

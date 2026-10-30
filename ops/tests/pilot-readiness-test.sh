@@ -248,6 +248,7 @@ for forbidden_name in \
   BATON_CAL_RECOVERY_PREPARATION_ENABLED \
   BATON_CAL_RECOVERY_RUN_ID \
   BATON_CAL_DELIVERY_ENABLED \
+  BATON_CAL_SUBSCRIPTIONS_ENABLED \
   BATON_CAL_SEASON_METADATA_ENABLED \
   BATON_CAL_SEASON_METADATA_MAINTENANCE \
   BATON_CAL_BASE_URL \
@@ -695,6 +696,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_CAL_RECOVERY_PREPARATION_ENABLED=true \
   BATON_CAL_RECOVERY_RUN_ID=90000000-0000-0000-0000-000000000001 \
   BATON_CAL_DELIVERY_ENABLED=true \
+  BATON_CAL_SUBSCRIPTIONS_ENABLED=true \
   BATON_CAL_SEASON_METADATA_ENABLED=true \
   BATON_CAL_SEASON_METADATA_MAINTENANCE=REPLAY \
   BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
@@ -983,6 +985,23 @@ assert_contains 'Production preflight passed' "$cal_preflight_output" \
 assert_not_contains "$cal_token" "$cal_preflight_output" \
   'enabled CAL preflight secret leak'
 
+cal_subscriptions_env="$test_root/cal-subscriptions.env"
+cp "$cal_enabled_env" "$cal_subscriptions_env"
+printf '%s\n' 'BATON_CAL_SUBSCRIPTIONS_ENABLED=true' >> "$cal_subscriptions_env"
+chmod 600 "$cal_subscriptions_env"
+"$production_env_validator_script" "$cal_subscriptions_env" >/dev/null \
+  || fail 'CAL 구독 활성 설정을 거부했습니다'
+for cal_subscription_dependency in BATON_CAL_CAPTURE_ENABLED BATON_CAL_DELIVERY_ENABLED; do
+  cal_subscription_dependency_env="$test_root/cal-subscriptions-without-$cal_subscription_dependency.env"
+  sed "s/^$cal_subscription_dependency=true$/$cal_subscription_dependency=false/" \
+    "$cal_subscriptions_env" > "$cal_subscription_dependency_env"
+  chmod 600 "$cal_subscription_dependency_env"
+  expect_preflight_failure \
+    "$cal_subscription_dependency 없는 CAL 구독" \
+    "$cal_subscription_dependency_env" \
+    'BATON_CAL_SUBSCRIPTIONS_ENABLED=true 설정에는 CAL 캡처와 전달 활성화가 필요합니다'
+done
+
 watch_enabled_env="$test_root/watch-enabled.env"
 write_valid_env "$watch_enabled_env"
 printf '%s\n' \
@@ -1122,6 +1141,9 @@ grep -Fq 'BATON_CAL_RECOVERY_RUN_ID: ${BATON_CAL_RECOVERY_RUN_ID:-}' \
 grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL delivery gate'
+grep -Fq 'BATON_CAL_SUBSCRIPTIONS_ENABLED: ${BATON_CAL_SUBSCRIPTIONS_ENABLED:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose가 CAL 구독 발급 설정을 전달하지 않습니다'
 grep -Fq 'BATON_CAL_SEASON_METADATA_MAINTENANCE: ${BATON_CAL_SEASON_METADATA_MAINTENANCE:-OFF}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose가 CAL 시즌 이름 보정 모드를 전달하지 않습니다'
@@ -2159,6 +2181,12 @@ write_valid_env "$invalid_cal_metadata_env"
 printf '%s\n' 'BATON_CAL_SEASON_METADATA_ENABLED=maybe' >> "$invalid_cal_metadata_env"
 expect_preflight_failure \
   'CAL 시즌 이름 설정 오류' "$invalid_cal_metadata_env" 'BATON_CAL_SEASON_METADATA_ENABLED'
+
+invalid_cal_subscriptions_env="$test_root/invalid-cal-subscriptions.env"
+write_valid_env "$invalid_cal_subscriptions_env"
+printf '%s\n' 'BATON_CAL_SUBSCRIPTIONS_ENABLED=maybe' >> "$invalid_cal_subscriptions_env"
+expect_preflight_failure \
+  'CAL 구독 설정 오류' "$invalid_cal_subscriptions_env" 'BATON_CAL_SUBSCRIPTIONS_ENABLED'
 
 invalid_cal_recovery_id_env="$test_root/invalid-cal-recovery-id.env"
 write_valid_env "$invalid_cal_recovery_id_env"
