@@ -21,6 +21,7 @@ import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionTimedOutException;
@@ -161,6 +162,7 @@ public class AuthExceptionHandler {
             AuthRateLimitExceededException exception
     ) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .contentType(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.retryAfterSeconds()))
                 .cacheControl(CacheControl.noStore())
                 .body(new ErrorResponse(
@@ -175,6 +177,7 @@ public class AuthExceptionHandler {
             String message
     ) {
         return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
                 .cacheControl(CacheControl.noStore())
                 .body(new ErrorResponse(code, message));
     }

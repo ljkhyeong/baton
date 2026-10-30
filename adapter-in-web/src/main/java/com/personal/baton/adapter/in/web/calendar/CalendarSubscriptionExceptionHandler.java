@@ -6,6 +6,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -21,7 +22,7 @@ public class CalendarSubscriptionExceptionHandler {
             case IN_PROGRESS, CREDENTIAL_REQUIRED -> HttpStatus.CONFLICT;
             default -> HttpStatus.SERVICE_UNAVAILABLE;
         };
-        return ResponseEntity.status(status).cacheControl(CacheControl.noStore())
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).cacheControl(CacheControl.noStore())
                 .body(new ErrorResponse("CAL_SUBSCRIPTION_" + exception.reason().name(), exception.getMessage()));
     }
 }

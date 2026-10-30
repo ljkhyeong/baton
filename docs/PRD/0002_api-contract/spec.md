@@ -994,7 +994,8 @@ GET /actuator/health
 | `404` | `TEAM_INVITATION_NOT_FOUND`, `MEMBERSHIP_NOT_FOUND` | 사용할 수 있는 초대가 없거나 취소·만료됨, 또는 권한을 변경할 계정 연결이 없음 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
-| `403` | `REQUEST_FORBIDDEN` | CSRF, 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
+| `403` | `ORIGIN_DENIED` | 인증 API와 계정 세션 변경 요청이 동일 출처·Fetch Metadata 검사를 통과하지 못함 |
+| `403` | `REQUEST_FORBIDDEN` | CSRF, ROUND 참여권 갱신의 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
 | `403` | `ROUND_PARTICIPATION_DENIED` | `Account`가 방의 팀 멤버십이나 활성 시즌 참여 조건을 충족하지 못함 |
 | `403` | `BRIEF_ACCESS_DENIED` | `Account`가 요청 팀의 활동 중인 멤버십을 갖지 않음 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
@@ -1010,7 +1011,7 @@ GET /actuator/health
 | `409` | `ROLE_HANDOFF_STATE_CONFLICT` | 역할 인수인계의 참여자·상태·역할 스냅샷이 요청과 맞지 않거나, 열린 인수인계 중 금지된 역할·인수인계 항목·자료 변경 또는 시즌 종료·전환을 시도함 |
 | `409` | `ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED` | 인수인계 항목 없음, 미완료 항목 또는 역할 자료 없음 경고를 확인하지 않고 전달하려 함 |
 | `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
-| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 시즌, 역할, 역할 인수인계, 역할 자료, 반복 업무 정의, 회차, 반복 업무 실행, 결정 또는 인수인계 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 워크스페이스 확인이 필요함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 시즌, 역할, 역할 인수인계, 역할 자료, 반복 업무 정의, 회차, 반복 업무 실행, 결정 또는 인수인계 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 워크스페이스 확인이 필요함. DB 교착·잠금 경합으로 트랜잭션이 롤백된 요청도 포함함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 동일 재처리함 |
@@ -1022,7 +1023,7 @@ GET /actuator/health
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
 | `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 업무 점검 아웃박스 전달이 끝나지 않아 생성할 수 없음 |
 | `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 기준의 생성 작업이 아직 진행 중임 |
-| `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 요청률 제한을 초과함 |
+| `429` | `AUTH_RATE_LIMITED` | 가입·재설정 메일·검증·로그인·현재 비밀번호 확인·ROUND 참여권 갱신 요청이 인증 요청률 제한을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 미디어 타입을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 게이트, 아웃박스 페이로드 보호 또는 메일 전달 인프라를 사용할 수 없음 |
 | `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | 신원 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지 못함 |
@@ -1037,9 +1038,13 @@ MySQL 행 잠금 시간이 제한을 넘으면 대상에 따라 다음 오류로
 - 팀 접근 키: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
 - 공유 콘텐츠: `409 WORKSPACE_CONTENT_CONFLICT`
 
+어댑터가 대상별 오류로 바꾸지 못한 교착·잠금 실패(`ConcurrencyFailureException` 계열)도 `409 WORKSPACE_CONTENT_CONFLICT`로 처리하며 SQL 상세는 응답에 노출하지 않는다.
+
 계정 인증에서 별도로 `503`으로 분류한 경우가 아니라면 쿼리·트랜잭션 시간 초과와 DB 연결 실패는 `500 INTERNAL_ERROR`로 처리한다. 이를 사용자의 동시 수정으로 추측하지 않는다.
 
-예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `406 Not Acceptable`은 오류 JSON을 협상할 수 없으므로 본문 없이 `X-Request-ID`만 반환한다.
+예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `ErrorResponse`는 요청의 `Accept`와 무관하게 `application/json`으로 내보낸다. 성공 응답 형식을 협상하지 못한 `406 Not Acceptable`만 본문 없이 `X-Request-ID`를 반환한다.
+
+바인딩 값 변환 실패와 타입 불일치는 내부 변환 문구 대신 고정 문구 `요청 값 형식이 올바르지 않습니다`를 사용한다.
 
 내부 예외와 스택 추적은 서버 로그에만 남긴다. Spring과 필터 체인의 5xx는 MDC와 응답 헤더에 같은 요청 ID를 사용한다. Caddy가 만든 413·502·503도 응답과 접근 로그에 같은 엣지 요청 ID를 남긴다. 로그에서는 운영 키, 멱등 키와 외부 요청 ID를 제거한다. 브라우저는 운영자가 로그를 찾을 수 있도록 5xx 안내에 요청 ID를 표시한다.
 
@@ -1095,7 +1100,8 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. 존재하지 않는 이메일,
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
-`Retry-After`를 반환한다.
+`Retry-After`를 반환한다. 비밀번호 변경의 현재 비밀번호 확인도 IP당 10분당 60회·계정당 10분당 10회로
+제한하며 같은 응답을 사용한다.
 
 Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최대 2,048자의 일회용
 `turnstileToken`이 필요하다. 서버는 Siteverify 응답의 성공 여부, `hostname`과 요청별 `action`을
@@ -1106,6 +1112,7 @@ Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최
 계정만 메일을 발급하며 Google·Naver 신원이나 미인증 계정에는 발급하지 않는다. 링크는 발급 후
 30분 동안 한 번만 사용할 수 있고, 아직 유효한 재설정 요청이 있으면 교체·재발송하지 않는다.
 가입과 재설정의 메일 요청은 IP당 시간당 12회·정규화 이메일당 시간당 3회의 제한을 공유한다.
+IP 제한은 Turnstile 검증 전에 소비하고, 이메일 제한은 검증을 통과한 요청만 소비한다.
 토큰 제출도 기존 검증 제한(IP당 10분당 30회·토큰당 10분당 5회)을 공유한다.
 `BATON_AUTH_PASSWORD_RESET_ENABLED=false`이면 새 요청은 `503 EMAIL_VERIFICATION_UNAVAILABLE`이며
 이미 발급한 링크의 제출은 허용한다. 토큰 오류는 `400 PASSWORD_RESET_INVALID`, 일시적인 DB 장애는
@@ -1269,7 +1276,7 @@ CSRF 없이 조회한다.
 다음 영역은 제품 명세에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 모든 제품 기록의 영구 삭제
-- 계정 비활성화·탈퇴, 관리자에 의한 세션 강제 만료, 단계 강화 신원 연결·병합, 초대와 세부 권한·감사 이력
+- 계정 탈퇴와 로그인 정보 삭제, 관리자에 의한 세션 강제 만료, 단계 강화 신원 연결·병합
 - 지연·역할 공백을 전달할 외부 알림 채널과 선호·전달 결과
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
@@ -1373,11 +1380,12 @@ cd frontend && npm ci && cd ..
 nullable `permission`을 포함한다. 초대 항목은 `id`, `memberId`, `permission`, `createdAt`, `expiresAt`,
 nullable `acceptedAt`, nullable `revokedAt`이다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
 nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 50건을 반환한다.
-`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`다.
+`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`, `ACCOUNT_DEACTIVATED`다.
 
 초대 수락의 계정 연결과 권한 변경은 원자적이다. 같은 토큰의 같은 계정 재수락은 현재 권한을 반환한다.
 권한이 취소된 계정은 재수락으로 권한을 되살릴 수 없다. 다른 계정·구성원의 기존 연결과 충돌하면
-`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다.
+`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다. 계정 권한 전환의 복구 키가
+미설정·누락·불일치이면 `403 WORKSPACE_RECOVERY_DENIED`다.
 
 워크스페이스 응답의 `team`은 기존 `id`, `name`에 `accountAccessEnabled`와 nullable `permission`을
 추가한다. 공유 키 팀에서는 각각 `false`, `null`이며 계정 팀에서는 `true`와 현재 접근 권한이다.

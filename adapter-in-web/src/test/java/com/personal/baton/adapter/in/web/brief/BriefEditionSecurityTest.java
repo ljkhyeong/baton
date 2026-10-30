@@ -12,6 +12,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -102,6 +104,34 @@ class BriefEditionSecurityTest {
         mockMvc.perform(get(BriefWorkspaceContextController.READINESS_PATH, TEAM_ID, SEASON_ID)
                         .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("BRIEF_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("비JSON Accept여도 BRIEF 업무 오류는 JSON 본문으로 응답한다")
+    void writesBriefErrorsAsJsonForNonJsonAccept() throws Exception {
+        when(contextUseCase.findGenerationReadiness(org.mockito.ArgumentMatchers.any())).thenThrow(new BriefAccessDeniedException());
+        mockMvc.perform(get(BriefWorkspaceContextController.READINESS_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY)
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("BRIEF_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("BRIEF 점검 커서의 잘못된 종류는 내부 형식 이름 없이 고정 문구로 응답한다")
+    void hidesAttentionCursorConversionDetails() throws Exception {
+        var result = mockMvc.perform(get(BriefAttentionController.LIST_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY)
+                        .queryParam("afterEventType", "UNKNOWN_EVENT")
+                        .queryParam("afterSourceReference", "role:1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("afterEventType: 요청 값 형식이 올바르지 않습니다")))
+                .andReturn();
+        org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("Failed to convert", "com.personal");
     }
 
     @Test

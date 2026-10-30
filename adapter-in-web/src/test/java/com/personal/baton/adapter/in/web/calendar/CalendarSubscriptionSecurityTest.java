@@ -11,6 +11,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -116,6 +118,18 @@ class CalendarSubscriptionSecurityTest {
                     .andExpect(jsonPath("$.code").value("CAL_SUBSCRIPTION_ACCOUNT_CHANGED"));
         }
         org.mockito.Mockito.verifyNoInteractions(subscriptions);
+    }
+
+    @Test
+    @DisplayName("비JSON Accept여도 구독 오류는 JSON 본문과 no-store를 유지한다")
+    void writesSubscriptionErrorsAsJsonForNonJsonAccept() throws Exception {
+        mockMvc.perform(get(CalendarSubscriptionController.PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Account-Id", UUID.randomUUID())
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CAL_SUBSCRIPTION_ACCOUNT_CHANGED"));
     }
 
     @Test

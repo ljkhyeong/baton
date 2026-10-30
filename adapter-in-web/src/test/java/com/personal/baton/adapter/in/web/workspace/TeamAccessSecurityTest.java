@@ -4,6 +4,7 @@ import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
+import com.personal.baton.application.workspace.error.WorkspaceRecoveryDeniedException;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordsUseCase;
 import com.personal.baton.application.workspace.port.in.InspectResourceHealthUseCase;
@@ -79,6 +80,21 @@ class TeamAccessSecurityTest {
                         + "\",\"memberId\":\"" + ID + "\",\"permission\":\"MEMBER\"}"))
                 .andExpect(status().isConflict());
         verifyNoInteractions(access);
+    }
+
+    @Test
+    @DisplayName("복구 키 없는 계정 권한 전환은 입력 오류가 아니라 서비스의 복구 거부로 응답한다")
+    void delegatesMissingRecoveryKeyToService() throws Exception {
+        when(access.activate(ID, ID, ID, null)).thenThrow(new WorkspaceRecoveryDeniedException());
+
+        mvc.perform(post(TeamAccessController.PATH + "/activate", ID).with(authentication(auth)).with(csrf())
+                        .header("Origin", "http://localhost").header("Sec-Fetch-Site", "same-origin")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedAccountId\":\"" + ID + "\",\"memberId\":\"" + ID + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("WORKSPACE_RECOVERY_DENIED"));
+
+        verify(access).activate(ID, ID, ID, null);
     }
 
     @Test

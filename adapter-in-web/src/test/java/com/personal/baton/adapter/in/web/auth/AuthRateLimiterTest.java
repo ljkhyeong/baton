@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,14 +15,26 @@ class AuthRateLimiterTest {
     void limitsRegistrationByNormalizedEmail() {
         AuthRateLimiter limiter = new AuthRateLimiter();
 
-        limiter.checkRegistration("192.0.2.1", " Study.User@Example.COM ");
-        limiter.checkRegistration("192.0.2.2", "study.user@example.com");
-        limiter.checkRegistration("192.0.2.3", "STUDY.USER@example.com");
+        limiter.checkRegistrationEmail(" Study.User@Example.COM ");
+        limiter.checkRegistrationEmail("study.user@example.com");
+        limiter.checkRegistrationEmail("STUDY.USER@example.com");
 
-        assertThatThrownBy(() -> limiter.checkRegistration(
-                "192.0.2.4",
-                "study.user@example.com"
-        )).isInstanceOf(AuthRateLimitExceededException.class);
+        assertThatThrownBy(() -> limiter.checkRegistrationEmail("study.user@example.com"))
+                .isInstanceOf(AuthRateLimitExceededException.class);
+    }
+
+    @DisplayName("같은 네트워크의 가입 요청은 시간 창 안에서 열두 번까지만 허용한다")
+    @Test
+    void limitsRegistrationByNetwork() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            limiter.checkRegistrationNetwork("192.0.2.1");
+        }
+
+        assertThatThrownBy(() -> limiter.checkRegistrationNetwork("192.0.2.1"))
+                .isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkRegistrationNetwork("192.0.2.2");
     }
 
     @DisplayName("같은 IP와 이메일 조합의 로그인 무차별 대입은 열 번 뒤 제한한다")
@@ -62,6 +75,29 @@ class AuthRateLimiterTest {
                 ).isBetween(1L, 60L));
     }
 
+    @DisplayName("인증 필터가 잘라 내는 앞뒤 제어 문자는 같은 계정 축으로 묶는다")
+    @Test
+    void limitsLoginByEmailTrimmedLikeAuthenticationFilter() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+        List<String> variants = List.of(
+                "\u0001member@example.com",
+                "member@example.com\u001f",
+                "\u0001\u2003Member@Example.COM\u2003\u0001"
+        );
+
+        for (int attempt = 0; attempt < 20; attempt += 1) {
+            limiter.checkLogin(
+                    "198.51.100." + (attempt + 1),
+                    variants.get(attempt % variants.size())
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkLogin(
+                "203.0.113.1",
+                "member@example.com"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+    }
+
     @DisplayName("성공한 로그인은 유한한 계정 실패 예산을 즉시 복구한다")
     @Test
     void resetsAccountFailureBudgetAfterSuccess() {
@@ -96,6 +132,31 @@ class AuthRateLimiterTest {
         )).isInstanceOf(AuthRateLimitExceededException.class);
         limiter.checkLogin(
                 "2001:db8:abcd:43::1",
+                "another@example.com"
+        );
+    }
+
+    @DisplayName("ForwardedHeaderFilter가 대괄호로 넘긴 IPv6도 /64로 묶는다")
+    @Test
+    void limitsLoginByBracketedIpv6NetworkPrefix() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 60; attempt += 1) {
+            String host = Integer.toHexString(attempt + 1);
+            limiter.checkLogin(
+                    attempt % 2 == 0
+                            ? "[2001:db8:abcd:42::" + host + "]"
+                            : "2001:db8:abcd:42::" + host,
+                    "member-" + attempt + "@example.com"
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkLogin(
+                "[2001:db8:abcd:42::ffff]",
+                "another@example.com"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkLogin(
+                "[2001:db8:abcd:43::1]",
                 "another@example.com"
         );
     }
