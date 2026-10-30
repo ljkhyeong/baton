@@ -1217,6 +1217,7 @@ a {
 
 .role-row:hover,
 .role-row.selected { background: var(--canvas); }
+.role-row.selected { box-shadow: inset 3px 0 0 var(--ink); }
 
 .role-main,
 .person-cell,
@@ -1265,14 +1266,17 @@ a {
 .progress-cell strong { font-size: 12px; }
 .progress-cell svg { color: var(--faint); }
 
-.inline-edit-button {
+// 행 단위 수정·보관·복원은 화면마다 같은 작은 테두리 버튼으로 표시한다.
+.inline-edit-button,
+.record-actions button,
+.archive-row button {
   flex: 0 0 auto;
   align-self: center;
   min-width: 42px;
   min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
+  padding: 0 9px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
   color: var(--muted);
   background: transparent;
   font-size: 12px;
@@ -1280,10 +1284,11 @@ a {
   cursor: pointer;
 }
 
-.inline-edit-button:hover {
-  border-color: var(--rule-strong);
+.inline-edit-button:hover,
+.record-actions button:hover,
+.archive-row button:hover {
+  border-color: var(--ink);
   color: var(--ink);
-  background: var(--paper);
 }
 
 .role-row > .inline-edit-button { margin: 0 10px 0 2px; }
@@ -1504,23 +1509,6 @@ a {
   display: flex;
   flex: 0 0 auto;
   gap: 5px;
-}
-
-.record-actions button,
-.archive-row button {
-  padding: 6px 9px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-sm);
-  color: var(--muted);
-  background: transparent;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.record-actions button:hover,
-.archive-row button:hover {
-  border-color: var(--ink);
-  color: var(--ink);
 }
 
 .record-actions button:disabled,
@@ -2713,6 +2701,9 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   }
   .inspector.is-open { transform: translateX(0); }
   dialog.inspector { height: 100%; max-height: none; }
+  // 상세가 서랍으로 바뀌면 닫힌 동안 선택 표시를 남기지 않는다.
+  .role-row.selected { box-shadow: none; }
+  .role-row.selected:not(:hover) { background: transparent; }
   .inspector-close { display: grid; }
   .inspector-topline { padding-right: 35px; }
   .toast { right: 24px; }
@@ -2844,6 +2835,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .record-search-actions button { display: grid; min-height: 44px; place-items: center; text-align: center; }
   .action-cluster { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .action-cluster .secondary-button { width: 100%; }
+  .action-cluster .primary-button { grid-column: 1 / -1; }
   .round-control { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
   .round-schedule-card { align-items: flex-start; }
   .round-control label { width: 100%; }
@@ -2859,7 +2851,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .today-page .routine-owner .avatar { flex-basis: 22px; width: 22px; height: 22px; }
   .directory-head { display: none; }
   .role-row { align-items: flex-start; }
-  .role-row > .inline-edit-button { align-self: flex-start; min-height: 44px; margin: 10px 0 0; }
+  .role-row > .inline-edit-button { align-self: flex-start; margin: 10px 0 0; }
   .role-row-open { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px 8px; }
   .role-main { align-items: flex-start; }
   .role-main small { white-space: normal; overflow-wrap: anywhere; }
@@ -2888,8 +2880,9 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .routine-row.overdue .check-button::before { border-color: var(--warning); }
   .check-button-unavailable::before { border-style: dashed; background: var(--nav); }
   .routine-actions { gap: 2px; }
-  .routine-actions .inline-edit-button,
-  .routine-archive-shelf .archive-row button { min-height: 44px; }
+  .inline-edit-button,
+  .record-actions button,
+  .archive-row button { min-height: 44px; }
   .routine-definition-note { max-width: 64px; }
   .decision-body { padding: 20px 0; }
   .decision-heading { flex-direction: column; gap: 0; }
@@ -2904,7 +2897,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .handoff-lifecycle-card > .primary-button { min-height: 44px; }
   .handoff-item-row { gap: 8px; }
   .handoff-item-row .record-actions { gap: 3px; }
-  .handoff-item-row .record-actions button { padding: 6px 7px; }
+  .handoff-item-row .record-actions button { padding: 0 7px; }
   .inspector { top: auto; left: 0; width: 100%; border-top: 1px solid var(--rule); border-left: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: 0 -18px 60px rgba(17, 23, 20, .18); transform: translateY(105%); }
   dialog.inspector { height: auto; max-height: 84vh; margin: auto 0 0; }
   .inspector.is-open { transform: translateY(0); }
@@ -2958,7 +2951,6 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .round-schedule-card .secondary-button { flex: 0 0 auto; }
   .round-archive-shelf .archive-row,
   .routine-archive-shelf .archive-row { align-items: flex-start; gap: 12px; }
-  .round-archive-shelf .archive-row button { min-height: 44px; }
   .signal-heading { align-items: flex-start; }
   .onboarding-date-row { grid-template-columns: 1fr; }
   .auth-heading h1 { font-size: 24px; }
