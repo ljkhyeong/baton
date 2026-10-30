@@ -1261,3 +1261,34 @@ test('@operations 오프라인에서 제출해도 멈추지 않고 네트워크 
   await dialog.getByRole('button', { name: '취소' }).click()
   await expect(dialog).toHaveCount(0)
 })
+
+test('@operations 역할 수정은 쉼표가 든 담당 업무를 나누지 않고 새 역할만 쉼표로 나눈다', async ({ page }, testInfo) => {
+  const responsibility = '장소와 준비물, 참가 인원을 확인하고 부족한 준비를 알립니다.'
+  const projection = makeProjection()
+  projection.roles[0] = { ...projection.roles[0]!, responsibilities: [responsibility] }
+  const api = await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '역할 수정' })
+  await expect(editDialog).toContainText('한 줄에 하나씩 적어 주세요.')
+  await editDialog.getByLabel('담당 업무').fill(`${responsibility}\n남은 준비물, 영수증 정리`)
+  await editDialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(editDialog).toHaveCount(0)
+  const update = await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)
+  expect((update.body as { responsibilities: string[] }).responsibilities)
+    .toEqual([responsibility, '남은 준비물, 영수증 정리'])
+
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const createDialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await expect(createDialog).toContainText('줄바꿈 또는 쉼표로 구분해 주세요.')
+  await createDialog.getByLabel('역할 이름').fill('쉼표로 입력한 역할')
+  await createDialog.getByLabel('역할 목적').fill('새 역할의 입력 안내를 따릅니다.')
+  await createDialog.getByLabel('담당 업무').fill('질문 수집, 공통 막힘 정리')
+  await createDialog.getByRole('button', { name: '역할 만들기' }).click()
+  await expect(createDialog).toHaveCount(0)
+  const creation = await recordedCall(api, 'POST', `${SCOPE_PATH}/roles`)
+  expect((creation.body as { responsibilities: string[] }).responsibilities)
+    .toEqual(['질문 수집', '공통 막힘 정리'])
+})

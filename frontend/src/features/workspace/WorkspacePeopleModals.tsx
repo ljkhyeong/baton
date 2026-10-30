@@ -297,7 +297,8 @@ export function RoleModal({
       nextMemberId: effectiveNextMemberId || null,
       assignmentStartDate: effectiveAssignmentStartDate || null,
       assignmentEndDate: effectiveAssignmentEndDate || null,
-      responsibilities: splitList(responsibilities),
+      // 저장된 담당 업무에는 쉼표가 들어 있을 수 있어 수정할 때는 줄바꿈으로만 나눈다.
+      responsibilities: splitList(responsibilities, editing ? /\n/ : /[\n,]/),
       risk: risk.trim() || null,
     }))
   }
@@ -395,7 +396,7 @@ export function RoleModal({
             placeholder={'질문 수집\n자주 막히는 문제 정리'}
             rows={3}
           />
-          <small>줄바꿈 또는 쉼표로 구분해 주세요.</small>
+          <small>{editing ? '한 줄에 하나씩 적어 주세요.' : '줄바꿈 또는 쉼표로 구분해 주세요.'}</small>
         </label>
         <label>
           <span>주의사항</span>
@@ -427,6 +428,6 @@ export function RoleModal({
   )
 }
 
-function splitList(value: string) {
-  return [...new Set(value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean))]
+function splitList(value: string, separator: RegExp) {
+  return [...new Set(value.split(separator).map((item) => item.trim()).filter(Boolean))]
 }
