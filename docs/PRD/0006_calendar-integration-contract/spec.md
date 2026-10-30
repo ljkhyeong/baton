@@ -115,7 +115,7 @@ BATON은 CAL 과거 백업 복원 때 새 `BATON_CAL_RECOVERY_RUN_ID`를 사용�
 켠다. 각 시즌의 최신 일정과 최신 이름 아웃박스가 모두 `DELIVERED`일 때만 현재 원본 상태로 시즌
 매니페스트를 만든다. 시즌별 검증 뒤 전체 시즌 수·다이제스트를 CAL에 보내며, 완료 또는 영구 실패
 뒤에는 같은 프로세스에서 더 요청하지 않는다. 일시적 불일치·네트워크·인증·`429`·`5xx`는 다음
-스케줄 주기에 다시 시도한다.
+스케줄 주기에 다시 시도하고, 대기 사유 코드는 바뀔 때마다 경고 로그로 남긴다.
 
 다이제스트는 JDK `MessageDigest`, `DigestOutputStream`, `DataOutputStream`과 `HexFormat`을 사용한다.
 CAL과 동일하게 UUID 문자열 순서, UTF-8 길이 접두 문자열, big-endian 정수와 다음 버전 표식을
