@@ -6,6 +6,8 @@
 - [소스맵 연결](docs/runbooks/free-integrations.md#원본-코드-위치-연결): React 프로젝트 slug·빌드 전용 토큰을 준비하고 업로드를 켠 웹 이미지를 만든다. 같은 이미지를 배포해 실제 오류의 원본 파일·줄과 개인정보 비노출을 확인한다. 로컬 대역 업로드와 파일 제거만 검증했으며 실제 공급자 업로드는 하지 않았다.
 - [Brevo 결과 웹훅](docs/runbooks/free-integrations.md#메일-전달-결과-brevo-webhook): 전용 토큰·공급자 웹훅을 준비한다. Prometheus 수집 필터를 갱신하고 `baton_email_delivery_receipts` 조회, 새 테스트 메일의 전달·중복 수신·반송 경보를 확인한 뒤 운영 수신을 활성화한다. 기본 비활성이다.
 
+- 비루트 `web`의 공인 DNS·ACME 발급·갱신과 외부 80/443·HTTP/3 접근을 실제 공개 호스트에서 확인한다. 기존 Caddy 볼륨을 쓰던 배포면 첫 배포 뒤 인증서 유지도 본다. 로컬 스모크는 내부 CA로만 확인했다.
+
 - 실제 배포할 BATON·웹·MySQL 이미지에 [Trivy 검사](docs/runbooks/free-integrations.md#배포-이미지-취약점-검사-trivy)를 실행하고 HIGH·CRITICAL 발견 항목을 조치한다. 로컬 테스트 이미지 검사 결과를 운영 이미지 검사 결과로 대신하지 않는다.
 
 - [무료 외부 연동](docs/runbooks/free-integrations.md)에 따라 Brevo 무료 SMTP·Better Stack 공개 상태/백업 하트비트·Google Drive crypt 원격 저장소의 계정과 비밀값을 준비한다. `b4ton.com`의 실제 HTTPS·메일 수신·첫 하트비트·원격 업로드/복원을 확인한다.
