@@ -82,7 +82,7 @@ public class WorkspaceAccessPersistenceAdapter implements WorkspaceAccessReposit
         try {
             return teamRepository.findWithSharedLockById(teamId);
         } catch (PessimisticLockingFailureException exception) {
-            throw new WorkspaceAccessKeyConflictException(exception);
+            throw new WorkspaceContentConflictException(exception);
         }
     }
 

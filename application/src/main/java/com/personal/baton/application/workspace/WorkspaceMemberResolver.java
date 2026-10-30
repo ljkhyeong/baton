@@ -1,6 +1,7 @@
 package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
+import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Component
@@ -32,6 +34,26 @@ final class WorkspaceMemberResolver {
             UUID teamId,
             UUID... candidateMemberIds
     ) {
+        return requireActiveMembers(
+                teamId,
+                candidateMemberIds,
+                () -> new DomainValidationException("비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다")
+        );
+    }
+
+    void requireActiveHandoffParticipants(UUID teamId, UUID... candidateMemberIds) {
+        requireActiveMembers(
+                teamId,
+                candidateMemberIds,
+                () -> new RoleHandoffStateConflictException("활동을 종료한 구성원은 역할 인수인계에 참여할 수 없습니다")
+        );
+    }
+
+    private Map<UUID, Member> requireActiveMembers(
+            UUID teamId,
+            UUID[] candidateMemberIds,
+            Supplier<? extends RuntimeException> inactiveMember
+    ) {
         List<UUID> memberIds = normalizedMemberIds(candidateMemberIds);
         if (memberIds.isEmpty()) {
             return Map.of();
@@ -47,9 +69,7 @@ final class WorkspaceMemberResolver {
                 throw memberNotFound();
             }
             if (!member.isActive()) {
-                throw new DomainValidationException(
-                        "비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다"
-                );
+                throw inactiveMember.get();
             }
         }
         return membersById;

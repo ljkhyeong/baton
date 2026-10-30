@@ -58,6 +58,7 @@ final class WorkspaceSeasonSettingsCoordinator {
                     command.startDate(),
                     command.endDate()
             );
+            requireStartAfterPreviousSeason(season, command.startDate());
         }
         season.update(command.name(), command.startDate(), command.endDate());
         Season savedSeason = seasonRepository.saveSeason(season);
@@ -98,24 +99,31 @@ final class WorkspaceSeasonSettingsCoordinator {
         return resultMapper.toSeasonResult(savedSeason);
     }
 
+    private void requireStartAfterPreviousSeason(Season season, LocalDate startDate) {
+        if (season.getPreviousSeasonId() == null) {
+            return;
+        }
+        seasonRepository.findSeasonById(season.getPreviousSeasonId())
+                .filter(previous -> !startDate.isAfter(previous.getEndDate()))
+                .ifPresent(previous -> {
+                    throw new DomainValidationException("다음 시즌 시작일은 이전 시즌 종료일보다 늦어야 합니다");
+                });
+    }
+
     private void validateSeasonRangeAgainstExistingContent(
             UUID teamId,
             UUID seasonId,
             LocalDate startDate,
             LocalDate endDate
     ) {
-        LocalDate validatedStartDate = Objects.requireNonNull(startDate, "시즌 시작일은 필수입니다");
-        LocalDate validatedEndDate = Objects.requireNonNull(endDate, "시즌 종료일은 필수입니다");
-        if (validatedStartDate.isAfter(validatedEndDate)) {
-            throw new DomainValidationException("시즌 시작일은 종료일보다 늦을 수 없습니다");
-        }
-        if (operationsRepository.existsSeasonRoundOutsideRange(seasonId, validatedStartDate, validatedEndDate)) {
+        Season.validatePeriod(startDate, endDate);
+        if (operationsRepository.existsSeasonRoundOutsideRange(seasonId, startDate, endDate)) {
             throw new DomainValidationException("기존 회차 날짜를 제외하도록 시즌 기간을 줄일 수 없습니다");
         }
-        if (peopleRepository.existsRoleAssignmentOutsideRange(teamId, seasonId, validatedStartDate, validatedEndDate)) {
+        if (peopleRepository.existsRoleAssignmentOutsideRange(teamId, seasonId, startDate, endDate)) {
             throw new DomainValidationException("기존 역할 배정 기간을 제외하도록 시즌 기간을 줄일 수 없습니다");
         }
-        if (peopleRepository.existsOpenRoleHandoffOutsideRange(teamId, seasonId, validatedStartDate, validatedEndDate)) {
+        if (peopleRepository.existsOpenRoleHandoffOutsideRange(teamId, seasonId, startDate, endDate)) {
             throw new DomainValidationException(
                     "준비 중인 인수인계의 다음 담당 기간을 제외하도록 시즌 기간을 줄일 수 없습니다"
             );

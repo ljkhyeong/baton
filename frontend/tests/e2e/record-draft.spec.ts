@@ -73,3 +73,31 @@ test('@memory 계정이 바뀌면 다른 계정의 초안을 불러오지 않는
   await expect(dialog.getByRole('button', { name: '초안 불러오기' })).toHaveCount(0)
   await expect(dialog.getByLabel('무엇을 결정했나요?')).toHaveValue('')
 })
+
+test('@memory 저장된 초안을 불러오거나 삭제하기 전에는 새 입력이 초안을 덮어쓰지 않는다', async ({ page }, testInfo) => {
+  await installApi(page)
+  await page.route('**/api/v1/auth/session', route => route.fulfill({ json: { authenticated: false } }))
+  await openSharedWorkspace(page)
+  const dialog = await openDecisionDialog(page, testInfo.project.name)
+  await dialog.getByLabel('무엇을 결정했나요?').fill('지키고 싶은 첫 초안')
+  await expect(dialog.getByText('현재 탭에 초안을 저장했습니다.')).toBeVisible()
+
+  await page.reload()
+  await openDecisionDialog(page, testInfo.project.name)
+  await expect(dialog.getByRole('button', { name: '초안 불러오기' })).toBeVisible()
+  await dialog.getByLabel('무엇을 결정했나요?').fill('실수로 입력한 다른 내용')
+  await dialog.getByLabel('무엇을 결정했나요?').fill('')
+  await expect(dialog.getByRole('button', { name: '초안 불러오기' })).toBeVisible()
+
+  await page.reload()
+  await openDecisionDialog(page, testInfo.project.name)
+  await dialog.getByRole('button', { name: '초안 불러오기' }).click()
+  await expect(dialog.getByLabel('무엇을 결정했나요?')).toHaveValue('지키고 싶은 첫 초안')
+
+  await dialog.getByLabel('무엇을 결정했나요?').fill('불러온 뒤 고친 초안')
+  await expect(dialog.getByText('현재 탭에 초안을 저장했습니다.')).toBeVisible()
+  await page.reload()
+  await openDecisionDialog(page, testInfo.project.name)
+  await dialog.getByRole('button', { name: '초안 불러오기' }).click()
+  await expect(dialog.getByLabel('무엇을 결정했나요?')).toHaveValue('불러온 뒤 고친 초안')
+})

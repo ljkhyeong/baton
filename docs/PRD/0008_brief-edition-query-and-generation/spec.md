@@ -65,8 +65,8 @@ BRIEF 응답의 `workspaceId`와 `seasonId`가 요청 범위와 다르면 노출
 - 이벤트 송신 토큰과 다른 서비스 전용 Bearer를 사용한다.
 - `baton.brief.service-api.enabled`는 기본 `false`다.
 - 활성화할 때 기본 URL은 경로 없는 HTTPS 출처만 허용하며 리디렉션을 따르지 않는다.
-- BATON 프로덕션 override는 Bearer를 Spring config tree로, 인증서 truststore를 고정 경로의
-  PKCS12 파일로 마운트한다.
+- BATON 프로덕션 override는 Bearer와 BRIEF 서비스 인증서 PEM을 Spring config tree로 주입한다.
+  인증서는 `brief-service` SSL 번들로 이 클라이언트에만 적용하고 JVM 기본 신뢰 저장소는 바꾸지 않는다.
 - BATON `app`과 BRIEF 서비스 전용 Caddy만 운영자가 만든 `Internal=true` Docker 네트워크를
   공유한다. BATON은 인증서 검증을 끄지 않는다.
 - BRIEF 서비스 Caddy는 호스트 포트를 게시하지 않고 조회·생성 허용 목록 밖을 `404`로
@@ -145,7 +145,9 @@ React Query와 공용 HTTP 클라이언트를 사용한다. 생성 요청의 동
 - 외부 어댑터 테스트는 별도 Bearer 토큰, 생성 JSON, `ETag`, 인증·재시도 결과 분류를 확인한다.
 - 보안 통합 테스트는 미인증 `401`, 조건부 조회 `304`, 생성 CSRF·동일 출처 경계를 확인한다.
 - `BriefEditionRestDocsTest`가 두 사용자 API의 OpenAPI 계약을 생성한다.
-- 운영 셸 테스트는 별도 토큰과 truststore, 서비스 Compose override와
+- 외부 어댑터 테스트는 실제 TLS로 SSL 번들 신뢰, 번들 없는 클라이언트의 사설 인증서 거부와
+  호스트 이름 검증 유지를 확인한다.
+- 운영 셸 테스트는 별도 토큰과 PEM 인증서, 서비스 Compose override와
   `Internal=true` 네트워크를 확인한다.
 - `brief-edition.spec.ts`는 API 대역으로 미생성·전달 대기, 동적 CSRF·본문 없는 생성, 새 생성과
   재사용, 저장 시간대·이전 근거 `null`, 종료 시즌 생성 차단과 권한 거부를 확인한다.

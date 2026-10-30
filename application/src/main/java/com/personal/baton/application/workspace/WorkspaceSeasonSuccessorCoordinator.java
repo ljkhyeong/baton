@@ -3,6 +3,7 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
 import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
+import com.personal.baton.application.workspace.error.SeasonSuccessorExistsException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoleResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.CopiedRoutineResult;
@@ -116,6 +117,9 @@ final class WorkspaceSeasonSuccessorCoordinator {
                 .filter(found -> sourceSeasonId.equals(found.getPreviousSeasonId())));
         if (replayed.isPresent()) {
             return toNextSeasonResult(sourceSeason, replayed.get());
+        }
+        if (seasonRepository.existsSeasonByPreviousSeasonId(sourceSeasonId)) {
+            throw new SeasonSuccessorExistsException();
         }
 
         seasonRepository.findActiveSeasonByTeamId(teamId)

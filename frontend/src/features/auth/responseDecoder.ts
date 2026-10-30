@@ -8,7 +8,7 @@ import type {
   AccountSecurity,
   AccountIdentityProvider,
 } from '@/features/auth/types'
-import { isJsonObject, isNonEmptyString, isUuid } from '@/shared/api/responseValidation'
+import { isJsonObject, isNonEmptyString, isSameUuid, isUuid } from '@/shared/api/responseValidation'
 
 const AUTH_PROVIDERS = new Set<AuthProvider>(['google', 'naver'])
 const ACCOUNT_IDENTITY_PROVIDERS = new Set<AccountIdentityProvider>([
@@ -100,9 +100,9 @@ export function decodePasswordResetRequest(value: unknown): PasswordResetRequest
   return { accepted: true }
 }
 
-export function decodeAccountSecurity(value: unknown): AccountSecurity {
+export function decodeAccountSecurity(value: unknown, accountId: string): AccountSecurity {
   if (!isJsonObject(value)
-    || !isUuid(value.accountId)
+    || !isSameUuid(value.accountId, accountId)
     || !isNonEmptyString(value.displayName)
     || value.displayName.length > 100
     || !Array.isArray(value.identities)) {
@@ -128,7 +128,7 @@ export function decodeAccountSecurity(value: unknown): AccountSecurity {
     })
   }
   return {
-    accountId: value.accountId,
+    accountId,
     displayName: value.displayName,
     identities,
   }

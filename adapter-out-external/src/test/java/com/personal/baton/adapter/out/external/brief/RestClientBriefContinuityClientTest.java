@@ -132,6 +132,7 @@ class RestClientBriefContinuityClientTest {
                         Instant.parse("2026-08-27T03:00:00Z"),
                         BriefContinuityEvent.State.ACTIVE
                 ),
+                1,
                 UUID.fromString("00000000-0000-0000-0000-000000002325")
         );
     }

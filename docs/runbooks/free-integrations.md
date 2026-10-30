@@ -231,7 +231,7 @@ curl -q --config /srv/baton/secrets/better-stack-api.curl \
 BATON_BACKUP_HEARTBEAT_URL_FILE=/srv/baton/secrets/backup-heartbeat-url
 ```
 
-`backup-cycle.sh`는 새 덤프 생성·업로드·원격 검증이 모두 성공한 뒤에만 [완료 신호](https://betterstack.com/docs/uptime/cron-and-heartbeat-monitor/)를 보낸다. 기존 대기 백업만 재전송했거나 잠금 획득·백업·원격 검증이 실패하면 보내지 않는다. URL은 프로세스 인자나 로그에 기록하지 않는다. DB 내용과 작업 로그도 외부에 보내지 않는다.
+`backup-cycle.sh`는 새 덤프 생성·업로드·원격 검증·로컬 보존 정리가 모두 성공한 뒤에만 [완료 신호](https://betterstack.com/docs/uptime/cron-and-heartbeat-monitor/)를 보낸다. 기존 대기 백업만 재전송했거나 잠금 획득·백업·원격 검증·보존 정리가 실패하면 보내지 않는다. URL은 프로세스 인자나 로그에 기록하지 않는다. DB 내용과 작업 로그도 외부에 보내지 않는다.
 
 감시 API 장애는 백업 성공 상태를 취소하지 않는다. 로컬에 통보 실패를 남기며, 외부에서는 기한 안에 신호가 없으면 알림을 보낸다. **첫 신호를 받은 뒤부터 감시가 시작**되므로 실제 첫 수신을 확인해야 한다. Kubernetes 작업에서 재사용할 때도 완료 신호는 실제 백업·원격 검증의 마지막 단계에 연결한다. 기존 Compose용 백업 스크립트를 k3s 전용 스크립트로 간주하지 않는다.
 

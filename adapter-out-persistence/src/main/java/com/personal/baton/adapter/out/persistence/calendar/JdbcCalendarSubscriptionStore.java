@@ -155,11 +155,36 @@ public class JdbcCalendarSubscriptionStore implements CalendarSubscriptionStore 
 
     @Override
     public List<Owner> pendingRevocations(Instant now) {
-        return jdbc.query(SELECT + " WHERE (revocation_pending=TRUE OR (revoked=FALSE AND NOT EXISTS ("
-                + AUTHORIZED_MEMBERSHIP + """
-                ))) AND (lease_until IS NULL OR lease_until<=?)
+        return jdbc.query(SELECT + """
+                 WHERE revocation_pending=TRUE AND (lease_until IS NULL OR lease_until<=?)
                 ORDER BY account_id,season_id LIMIT 50
                 """, this::read, utc(now)).stream().map(Stored::owner).toList();
+    }
+
+    // 조건에 맞는 행이 적어도 한 번에 전체를 읽지 않도록 권한 판정 결과와 함께 페이지 단위로 돌려준다.
+    @Override
+    public List<AuthorizationCheck> findAuthorizationChecks(Owner after, int limit) {
+        var parameters = new ArrayList<Object>();
+        var sql = new StringBuilder("""
+                SELECT BIN_TO_UUID(account_id) account_id, BIN_TO_UUID(team_id) team_id,
+                       BIN_TO_UUID(season_id) season_id, EXISTS (
+                """ + AUTHORIZED_MEMBERSHIP + """
+                ) authorized
+                FROM calendar_subscriptions
+                WHERE revoked=FALSE AND revocation_pending=FALSE
+                """);
+        if (after != null) {
+            sql.append(" AND (account_id>UUID_TO_BIN(?) OR (account_id=UUID_TO_BIN(?) AND season_id>UUID_TO_BIN(?)))");
+            parameters.add(after.accountId().toString());
+            parameters.add(after.accountId().toString());
+            parameters.add(after.seasonId().toString());
+        }
+        sql.append(" ORDER BY account_id,season_id LIMIT ?");
+        parameters.add(limit);
+        return jdbc.query(sql.toString(), (rs, index) -> new AuthorizationCheck(
+                new Owner(UUID.fromString(rs.getString("account_id")), UUID.fromString(rs.getString("team_id")),
+                        UUID.fromString(rs.getString("season_id"))),
+                rs.getBoolean("authorized")), parameters.toArray());
     }
 
     private Stored read(ResultSet rs, int ignored) throws SQLException {

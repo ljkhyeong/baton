@@ -3,18 +3,15 @@ services:
     environment:
       BATON_BRIEF_SERVICE_API_ENABLED: "true"
       BATON_BRIEF_SERVICE_API_BASE_URL: "https://${BATON_BRIEF_SERVICE_HOST:?BATON_BRIEF_SERVICE_HOST is required}:8443"
-      JAVA_TOOL_OPTIONS: >-
-        -Djavax.net.ssl.trustStore=/run/baton-keys/brief-service-truststore.p12
-        -Djavax.net.ssl.trustStoreType=PKCS12
-        -Djavax.net.ssl.trustStorePassword=changeit
+      BATON_BRIEF_SERVICE_API_SSL_BUNDLE: brief-service
     secrets:
       - source: baton_brief_service_api_bearer_token
         target: /run/baton-config/baton.brief.service-api.bearer-token
         uid: "10001"
         gid: "10001"
         mode: 0400
-      - source: baton_brief_service_truststore
-        target: /run/baton-keys/brief-service-truststore.p12
+      - source: baton_brief_service_trusted_certificate
+        target: /run/baton-config/spring.ssl.bundle.pem.brief-service.truststore.certificate
         uid: "10001"
         gid: "10001"
         mode: 0400
@@ -26,8 +23,9 @@ networks:
     external: true
     name: "${BATON_BRIEF_PRIVATE_NETWORK:?BATON_BRIEF_PRIVATE_NETWORK is required}"
 
+# file 비밀은 호스트 소유권 그대로 바인드돼 UID 10001 앱이 읽지 못하므로 환경 전달을 쓴다.
 secrets:
   baton_brief_service_api_bearer_token:
-    file: "${BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE:?BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE is required}"
-  baton_brief_service_truststore:
-    file: "${BATON_BRIEF_SERVICE_TRUSTSTORE_FILE:?BATON_BRIEF_SERVICE_TRUSTSTORE_FILE is required}"
+    environment: BATON_SECRET_BRIEF_SERVICE_API_BEARER_TOKEN
+  baton_brief_service_trusted_certificate:
+    environment: BATON_SECRET_BRIEF_SERVICE_TRUSTED_CERTIFICATE

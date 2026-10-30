@@ -211,10 +211,13 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 모든 구성원이 키를 잃었다면 운영자가 아래 API로 기존 키를 폐기하고 새 키를 발급한다. 응답을 받지 못했을 때도 같은 `Idempotency-Key`로 재시도한다. 상세 조건은 [API 계약](docs/PRD/0002_api-contract/spec.md)을 따른다.
 
 ```bash
-curl -X POST \
-  "https://baton.example.com/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover" \
-  -H "Idempotency-Key: <32~200자의 고엔트로피 값>" \
-  -H "X-Baton-Recovery-Key: <프로덕션 복구 키>"
+# 복구 키가 프로세스 인자와 셸 기록에 남지 않도록 입력받아 curl 설정(표준 입력)으로 넘긴다.
+IFS= read -r -s -p '프로덕션 복구 키: ' recovery_key; printf '\n'
+printf 'header = "X-Baton-Recovery-Key: %s"\n' "$recovery_key" | curl -q --config - \
+  --request POST \
+  --header "Idempotency-Key: <32~200자의 고엔트로피 값>" \
+  "https://baton.example.com/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover"
+unset recovery_key
 ```
 
 ## 첫 파일럿 운영 배포
@@ -275,6 +278,10 @@ openssl rand -hex 32
 | 설정 출력 | 비밀값을 출력하지 않는 `config --quiet`만 허용한다. |
 | 재조립 없는 실행 | `start`, `restart`, `pause`, `unpause`, `watch`, `up --watch`, 대화형 메뉴를 거부한다. `COMPOSE_MENU=false`로 고정한다. |
 | 그 밖의 명령·옵션 | 운영에 필요한 명령만 허용한다. `run`, `attach`, 모델 변환, 이미지 게시, 확장, 데이터 볼륨 삭제, 파일·프로필·프로젝트 변경, 고아 컨테이너 제거·재생성 우회 옵션은 거부한다. |
+
+`web`은 UID `10002`의 비루트 Caddy로 실행하고 Linux capability를 모두 제거하며 `no-new-privileges`를 적용한다. 80·443 바인드는 이 컨테이너 네트워크 네임스페이스의 `net.ipv4.ip_unprivileged_port_start=0`으로 허용한다. root로 쓰던 기존 `baton_caddy_data`·`baton_caddy_config` 볼륨은 `web`을 시작하기 전에 일회성 `web-volume-owner`가 소유권을 맞추므로 기존 인증서를 그대로 쓴다. 헬스체크는 게시하지 않는 루프백 전용 `127.0.0.1:8081/healthz`를 호출한다.
+
+자원 제한은 [홈서버 k3s 런북](docs/runbooks/homeserver-k3s.md)과 같은 값을 쓴다. CPU는 각 1개, 메모리는 MySQL `1536m`, `app` `1g`, `web` `128m`이다. `app`의 최대 힙은 메모리 제한의 50%이며 `OutOfMemoryError`가 나면 프로세스를 끝내 `restart` 정책으로 다시 시작한다. 1초를 넘는 쿼리는 MySQL 볼륨의 `/var/lib/mysql/slow-query.log`에 남는다. 쿼리 원문이 포함되고 자동 회전하지 않으므로 `./ops/production-compose.sh exec mysql tail -n 100 /var/lib/mysql/slow-query.log`로 확인하되 외부로 복사하지 않고 크기를 함께 본다.
 
 사전점검 뒤 환경 파일의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 실패한다. 다른 환경 파일은 `./ops/preflight-production.sh /absolute/path/to/env`로 검사한 뒤 모든 Compose 호출에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다.
 
@@ -383,10 +390,13 @@ cat /absolute/path/to/baton-backup-state/last-restore-recovery-targets.tsv
 # 각 줄의 팀 ID와 시즌 ID에 새 멱등 키를 사용해 운영자 복구 API를 호출한다.
 # 응답을 확인할 때까지 같은 restore_idempotency_key를 보관하고, 다음 팀에는 새 값을 만든다.
 restore_idempotency_key="$(openssl rand -hex 32)"
-curl -X POST \
-  "https://<BATON_HOST>/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover" \
-  -H "Idempotency-Key: $restore_idempotency_key" \
-  -H "X-Baton-Recovery-Key: <프로덕션 복구 키>"
+# 복구 키가 프로세스 인자와 셸 기록에 남지 않도록 입력받아 curl 설정(표준 입력)으로 넘긴다.
+IFS= read -r -s -p '프로덕션 복구 키: ' recovery_key; printf '\n'
+printf 'header = "X-Baton-Recovery-Key: %s"\n' "$recovery_key" | curl -q --config - \
+  --request POST \
+  --header "Idempotency-Key: $restore_idempotency_key" \
+  "https://<BATON_HOST>/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover"
+unset recovery_key
 # 응답의 accessKey로 다음 형식의 새 링크를 만들고 구성원에게 다시 전달한다.
 # https://<BATON_HOST>/teams/<team-id>/seasons/<season-id>#accessKey=<new-access-key>
 # 기존 링크의 403과 새 링크의 조회·변경을 확인한 뒤 새 보안 상태를 백업한다.
@@ -395,7 +405,7 @@ systemctl --user start baton-backup.service
 systemctl --user start baton-backup.timer
 ```
 
-백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 보조 파일로 생성된다. `backup.sh`는 gzip과 BATON 핵심 스키마 표식을 확인하고 보조 파일을 먼저 원자적으로 게시한 뒤 덤프 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. `restore.sh`는 보조 파일 검증을 자체적으로 강제하고 예약 백업 잠금과 프로덕션 Compose 생명주기 잠금을 모두 잡는다. 또한 애플리케이션·웹과 잔존 ROUND 웹·시그널링 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다.
+백업은 기본적으로 `ops/backups/`에 권한이 제한된 고유 이름의 압축 SQL과 필수 SHA-256 보조 파일로 생성된다. `backup.sh`는 gzip과 BATON 핵심 스키마 표식을 확인하고 보조 파일을 먼저 원자적으로 게시한 뒤 덤프 본문을 마지막에 공개하므로, 강제 종료가 다음 예약 주기를 막는 불완전 본문을 남기지 않는다. 강제 종료로 남은 `.baton-*` 임시 평문 덤프는 다음 예약 주기가 잠금을 잡은 뒤 수정 후 3시간이 지난 것만 지운다. `restore.sh`는 보조 파일 검증을 자체적으로 강제하고 예약 백업 잠금과 프로덕션 Compose 생명주기 잠금을 모두 잡는다. 또한 애플리케이션·웹과 잔존 ROUND 웹·시그널링 컨테이너가 모두 `exited` 상태가 아니면 요청을 거부하고 대상 DB를 비운 뒤 백업 스냅샷만 복원한다.
 
 계정 권한 모델 도입 전 백업은 현재 접근 키 폐기 상태를 증명할 수 없다. 따라서 기존 공유 링크를 모두 무효화하고 다음 순서로 복구한다.
 
@@ -433,11 +443,11 @@ journalctl --user -u baton-backup.service -n 100 --no-pager
 BATON_BACKUP_STATE_DIR=/absolute/path/to/baton-backup-state ./ops/check-backup-freshness.sh
 ```
 
-타이머는 매일 `03:15 Asia/Seoul`부터 최대 15분 안에 실행하고, 호스트가 꺼져 놓친 실행은 다음 기동 뒤 보충한다. 실패한 서비스는 15분 간격으로 다시 시작하되 시작률을 1시간에 네 번으로 제한한다. 주기는 커널 `flock`으로 겹침을 막아 프로세스 종료 뒤 오래된 잠금이 남지 않는다.
+타이머는 매일 `03:15 Asia/Seoul`부터 최대 15분 안에 실행하고, 호스트가 꺼져 놓친 실행은 다음 기동 뒤 보충한다. 실패한 서비스는 15분 간격으로 다시 시작하되 시작률을 1시간에 네 번으로 제한한다. 보존 정리만 실패한 종료 코드 `79`는 다시 시작하지 않는다. 주기는 커널 `flock`으로 겹침을 막아 프로세스 종료 뒤 오래된 잠금이 남지 않는다.
 
-각 주기는 이전에 업로드하지 못한 로컬 백업을 먼저 재시도하되 이 단계만으로 최신성이나 로컬 보존 상태를 바꾸지 않고, 이어서 새 덤프를 만든다. 모든 덤프와 필수 SHA-256 보조 파일을 `--immutable`로 암호화 원격 저장소에 게시한 뒤, `rclone check --download`로 해당 두 파일의 실제 내용을 비교한다. 완전히 검증한 파일에는 로컬 완료 표식을 남겨 이후 주기에는 다시 전송하지 않는다. 새 스냅샷까지 외부 검증된 뒤 상태 파일에 체크섬이 이름과 결합한 UTC 스냅샷 시각·이름·해시와 검증 시각을 기록한다. 14일이 지난 로컬 파일은 삭제 직전에 원격 본문과 보조 파일을 다시 검증하고, 최신 세 개는 항상 남긴다. BATON 스크립트는 원격 백업을 삭제하지 않으므로 원격 버전 관리·객체 잠금·생명주기는 공급자에서 별도로 설정한다.
+각 주기는 이전에 업로드하지 못한 로컬 백업을 먼저 재시도하되 이 단계만으로 최신성이나 로컬 보존 상태를 바꾸지 않고, 이어서 새 덤프를 만든다. 재시도가 실패해도 기록하고 진행하되 최근 20시간 안에 검증되는 덤프가 없을 때만 새 덤프를 만들고 주기는 실패로 끝내므로, 원격 장애 중에도 로컬 스냅샷은 하루 한 번 남고 재시작이 덤프를 늘리지 않는다. 이미 원격 검증한 로컬 사본이 손상되면 경고만 남기고 새 덤프 동기화를 계속한다. 손상 파일은 원격 사본을 확인한 뒤 운영자가 지운다. 모든 덤프와 필수 SHA-256 보조 파일을 `--immutable`로 암호화 원격 저장소에 게시한 뒤, `rclone check --download`로 해당 두 파일의 실제 내용을 비교한다. 완전히 검증한 파일에는 로컬 완료 표식을 남겨 이후 주기에는 다시 전송하지 않는다. 새 스냅샷까지 외부 검증된 뒤 상태 파일에 체크섬이 이름과 결합한 UTC 스냅샷 시각·이름·해시와 검증 시각을 기록한다. 14일이 지난 로컬 파일은 삭제 직전에 원격 본문과 보조 파일을 다시 검증하고, 최신 세 개는 항상 남긴다. 재검증에 실패한 파일은 지우지 않고 나머지를 계속 정리한 뒤 주기를 실패로 끝내며, 이미 기록한 최신성 상태는 유지한다. BATON 스크립트는 원격 백업을 삭제하지 않으므로 원격 버전 관리·객체 잠금·생명주기는 공급자에서 별도로 설정한다.
 
-선택 설정 `BATON_BACKUP_HEARTBEAT_URL_FILE`은 [외부 백업 감시](docs/runbooks/free-integrations.md#백업-하트비트)에 사용한다. 새 백업의 원격 검증이 끝난 뒤에만 완료 신호를 보내므로 홈서버 정전과 작업 중단도 외부에서 감지한다. 감시 API 장애로 이미 성공한 백업을 다시 만들지는 않는다.
+선택 설정 `BATON_BACKUP_HEARTBEAT_URL_FILE`은 [외부 백업 감시](docs/runbooks/free-integrations.md#백업-하트비트)에 사용한다. 새 백업의 원격 검증과 로컬 보존 정리가 끝난 뒤에만 완료 신호를 보내므로 홈서버 정전과 작업 중단도 외부에서 감지한다. 감시 API 장애로 이미 성공한 백업을 다시 만들지는 않는다.
 
 외부 백업을 복구할 때는 덤프와 같은 이름의 `.sha256`을 함께 암호화 원격 저장소에서 내려받고 먼저 검증한다.
 
@@ -519,7 +529,7 @@ CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애�
 - 전달·접수 시각이 `0`이면 아직 성공 기록이 없다. 정상 갱신 시각이 `0`이면 앱 시작 뒤 갱신에 성공한 적이 없다.
 - 갱신 성공 값이 `0`이면 다른 지표는 마지막 정상 갱신 때의 값이다.
 - 대기 시간이 `0`이면 대기 행이 없거나 가장 오래된 행도 생성 후 1초가 지나지 않았다. `status=pending` 개수와 함께 확인한다.
-- 이메일의 `VERIFICATION_TOKEN_EXPIRED`는 원시 `failed` 수에 남지만 조치 대상에서 제외한다. 대체된 `SUPERSEDED` 전달은 실패가 아니다.
+- 이메일의 `VERIFICATION_TOKEN_EXPIRED`와 `INACTIVE` 보상까지 기록한 WATCH의 `INVALID_TARGET_URL`은 원시 `failed` 수에 남지만 조치 대상에서 제외한다. 대체된 `SUPERSEDED` 전달은 실패가 아니다.
 - WATCH 인박스는 아직 처리 완료 상태를 관리하지 않으므로 접수 수와 마지막 접수 시각만 제공한다.
 
 시즌 이름은 별도 `integration=calendar_metadata`로 집계한다. 같은 시즌의 더 높은 개정이
@@ -529,7 +539,7 @@ CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애�
 운영자가 지표를 확인할 때는 다음 순서를 따른다.
 
 1. `baton_integration_metrics_refresh_success`가 `0`이면 30초 뒤 다시 확인한다. 계속 `0`이면 마지막 정상 갱신 시각과 애플리케이션의 DB 연결 로그를 확인한다.
-2. `actionable_failed_items`가 한 건이라도 있으면 해당 아웃박스의 `last_error_code`를 확인한다. 결정적 계약 오류와 유효하지 않은 대상은 자동 재처리하지 않으므로 행을 직접 수정하거나 삭제하지 않는다. 이메일 원시 `status=failed`에만 있는 `VERIFICATION_TOKEN_EXPIRED`는 만료된 비밀 제거 기록으로 판단한다.
+2. `actionable_failed_items`가 한 건이라도 있으면 해당 아웃박스의 `last_error_code`를 확인한다. 결정적 계약 오류와 유효하지 않은 대상은 자동 재처리하지 않으므로 행을 직접 수정하거나 삭제하지 않는다. 원시 `status=failed`에만 있는 이메일의 `VERIFICATION_TOKEN_EXPIRED`는 만료된 비밀 제거 기록으로, WATCH의 `INVALID_TARGET_URL`은 보상까지 끝난 대상 거절 기록으로 판단한다.
 3. `status=processing`이 1분 임대와 다음 30초 지표 갱신 뒤에도 남아 있으면 `lease_expires_at`을 확인한다. 만료 임대는 작업자가 다시 선점하므로 지표만 보고 행을 강제로 되돌리지 않는다.
 4. 가장 오래된 대기 시간은 네트워크 재시도의 최대 1시간 대기를 포함할 수 있다. 대기 시간만으로 장애를 확정하지 않고 `attempt_count`, `available_at`, 최근 성공 시각을 함께 확인한다.
 
@@ -689,6 +699,8 @@ systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup
 
 실제 ROUND 릴리스 이미지가 운영자가 고정한 다이제스트·리비전·레이블과 일치하는지는 사전점검과 래퍼의 잠금 내부 배포 경계가, 진입점 호환성은 공개 스테이징 기동이 별도로 확인한다.
 
+root로 쓰던 Caddy 볼륨을 재현해 비루트 `web` 이전, capability 제거, 로컬 헬스체크, 세 서비스의 자원 제한, `app` 최대 힙과 MySQL 슬로우 쿼리 설정도 확인한다.
+
 먼저 DB 설정이 없는 `app` 이미지가 컨텍스트와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA 대체 경로, 상태 검사·제품 API 역방향 프록시와 보안 헤더, 유효한 CI 전용 키를 사용한 프로덕션 프로필 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다.
 
 ROUND 런타임을 닫은 기본 상태에서는 공개 방 UI·`signal`·TURN과 내부 ROUND 경로가 `404`·`no-store`를 반환하고, 활성 상태에서는 정확한 재작성·자격 증명 허용 목록·쿠키 중복/대소문자 변형 `401`·미디어/WSS 헤더를 확인한다. 맞춤 Caddy의 방 범위 사전 요청률 제한이 `429`를 반환하는지도 검증한다.
@@ -787,7 +799,7 @@ GitHub Actions의 `품질 게이트`는 모든 풀 리퀘스트, `main` 푸시�
 - WATCH 모니터 동기화: 기본 비활성화. 활성화하려면 `BATON_WATCH_ENABLED=true`, 경로가 없는 HTTPS 출처인 `BATON_WATCH_BASE_URL`, 32~200자의 URL 안전 ASCII인 `BATON_WATCH_BEARER_TOKEN`과 환경마다 고정된 `BATON_WATCH_SOURCE_NAMESPACE`를 설정한다. HTTP 기본 URL은 Bearer 토큰 보호를 위해 기동 단계에서 거부한다. 기본 시간 제한은 연결 `PT2S`, 읽기 `PT5S`이고 합은 45초를 넘을 수 없다. 디스패처는 전용 스케줄러에서 한 번에 한 건을 1분 임대로 처리하며 10초 간격, 최초 상태 동기화는 10초 뒤, 이후에는 6시간 간격이다. 소스 이름공간은 기존 아웃박스와 다르면 시작을 거부한다. 점검을 완전히 중단하려면 연결을 유지한 채 `BATON_WATCH_MONITORING_ENABLED=false`로 배포해 `INACTIVE` 전달을 끝낸 다음 `BATON_WATCH_ENABLED=false`로 전환한다.
 - WATCH 상태 이벤트 수신: 기본 비활성화. 활성화하려면 `BATON_WATCH_EVENT_RECEIVER_ENABLED=true`, 위와 같은 환경의 `BATON_WATCH_SOURCE_NAMESPACE`와 32~200자의 URL 안전 ASCII `BATON_WATCH_EVENT_RECEIVER_BEARER_TOKEN`을 설정한다. 수신 토큰은 외부 전송 WATCH 토큰과 그 밖의 운영 비밀값과 달라야 한다. 저장소 구현과 로컬 런타임 스모크는 실제 공개 HTTPS 콜백, 응답 유실 뒤 동일 재전송과 운영 활성화를 대신하지 않는다.
 - BRIEF 이벤트 전달은 기본으로 꺼져 있다. 로컬은 `BATON_BRIEF_DELIVERY_ENABLED=true`와 경로 없는 루프백 HTTP 주소를, 그 밖의 환경은 경로 없는 HTTPS 주소를 `BATON_BRIEF_BASE_URL`에 설정한다. 직접 실행은 `BATON_BRIEF_BEARER_TOKEN`, 프로덕션은 소유자 전용 `BATON_BRIEF_BEARER_TOKEN_FILE`을 사용한다. 토큰은 BRIEF가 새 값과 직전 값을 함께 허용한 뒤 BATON을 새 값으로 전환하고, 전달 성공을 확인한 다음 직전 값을 제거한다. 작업자는 기본 10초 간격으로 한 건씩 처리한다. `200`·`202`는 완료, `429`·`5xx`·네트워크 오류는 재시도, 그 밖의 상태는 영구 실패로 기록한다. 시간 경계 재계산은 `BATON_BRIEF_RECONCILIATION_INTERVAL`을 설정할 때만 실행한다. 공개 HTTPS 스테이징 전달은 아직 검증하지 않았다.
-- BRIEF 주간 요약 조회·생성은 기본으로 꺼져 있다. BATON은 계정 세션, 활동 중인 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF에 저장된 최신 요약을 전달한다. 프로덕션에서는 `BATON_BRIEF_SERVICE_API_ENABLED=true`, `BATON_BRIEF_SERVICE_HOST`, `BATON_BRIEF_PRIVATE_NETWORK`, 전용 Bearer 토큰 파일과 PKCS12 truststore 파일을 설정한다. 이벤트 전송 토큰을 재사용하거나 인증서 검증을 끄지 않는다. 로컬에서는 실제 두 JAR과 Caddy로 HTTPS 조회·생성·토큰 교체를 확인했다. 공인 DNS·ACME와 분리된 스테이징 호스트 검증은 남아 있다.
+- BRIEF 주간 요약 조회·생성은 기본으로 꺼져 있다. BATON은 계정 세션, 활동 중인 팀 구성원과 작업 공간 접근 권한을 확인한 뒤 BRIEF에 저장된 최신 요약을 전달한다. 프로덕션에서는 `BATON_BRIEF_SERVICE_API_ENABLED=true`, `BATON_BRIEF_SERVICE_HOST`, `BATON_BRIEF_PRIVATE_NETWORK`, 전용 Bearer 토큰 파일과 BRIEF 서비스 인증서 PEM 파일(`BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE`)을 설정한다. 이 인증서는 BRIEF 서비스 클라이언트의 Spring SSL 번들에만 적용하므로 공개 CA를 쓰는 OAuth·Turnstile·CAL·WATCH·공휴일·Sentry·SMTP 연동의 JVM 신뢰 저장소는 그대로다. 이벤트 전송 토큰을 재사용하거나 인증서 검증을 끄지 않는다. 로컬에서는 실제 두 JAR과 Caddy로 HTTPS 조회·생성·토큰 교체를 확인했다. 공인 DNS·ACME와 분리된 스테이징 호스트 검증은 남아 있다.
 - 비밀값과 환경별 접속 정보는 환경 변수로 주입한다.
 - 프로덕션에서는 MySQL을 Docker 내부 네트워크에만 둔다. 외부 호스트나 관리형 DB로 옮기기 전에는 CA 배포·회전과 인증서 SAN 검증을 준비하고 JDBC·상태 검사를 `VERIFY_IDENTITY`로 전환해야 한다.
 

@@ -43,6 +43,7 @@ export function RhythmView({
   onConfigureRoundSchedule,
   busyRoundIds,
   busyRoutineIds,
+  canAdminister,
   changesDisabled,
 }: {
   season: Season
@@ -67,12 +68,16 @@ export function RhythmView({
   onConfigureRoundSchedule: () => void
   busyRoundIds: ReadonlySet<string>
   busyRoutineIds: ReadonlySet<string>
+  canAdminister: boolean
   changesDisabled: boolean
 }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
   const timelineItems = routineTimelineItems(routines, selectedRound)
   const roundScheduleWaitingForRoutine = Boolean(season.roundSchedule?.enabled)
     && routines.length === 0
+  // 서버는 일정을 켜 둔 채 생성만 멈추고, 시즌 기간을 늘리면 이 날짜부터 이어서 만든다.
+  const roundSchedulePastSeason = Boolean(season.roundSchedule?.enabled)
+    && season.roundSchedule!.nextOccurrenceDate > season.endDate
   const progress = seasonProgress(season, calendarDate)
   const selectedRoundOperationPending = Boolean(selectedRound && busyRoundIds.has(selectedRound.id))
   const selectedRoundBusy = changesDisabled || selectedRoundOperationPending
@@ -93,19 +98,24 @@ export function RhythmView({
           </h2>
           <p>
             {season.roundSchedule
-              ? `${season.timeZone} · ${roundScheduleWaitingForRoutine
-                ? '회차에 추가할 업무 없음'
-                : season.roundSchedule.enabled ? '자동 생성 켜짐' : '일시중지'}`
+              ? `${season.timeZone} · ${roundSchedulePastSeason
+                ? '시즌 안의 회차 생성 완료'
+                : roundScheduleWaitingForRoutine
+                  ? '회차에 추가할 업무 없음'
+                  : season.roundSchedule.enabled ? '자동 생성 켜짐' : '일시중지'}`
               : `${season.timeZone} 기준 반복 일정을 설정해 보세요.`}
             {season.roundSchedule?.nextOccurrenceDate
-              ? ` · 다음 예정일 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}`
+              ? roundSchedulePastSeason
+                ? ` · 시즌 기간을 늘리면 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}부터 이어서 생성합니다`
+                : ` · 다음 예정일 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}`
               : ''}
           </p>
+          {!canAdminister && <p>설정은 관리자만 바꿀 수 있습니다.</p>}
         </div>
         <button
           type="button"
           className="secondary-button"
-          disabled={changesDisabled}
+          disabled={changesDisabled || !canAdminister}
           onClick={onConfigureRoundSchedule}
         >
           {season.roundSchedule ? '회차 자동 생성 설정' : '설정하기'}
@@ -144,7 +154,7 @@ export function RhythmView({
                       {formatLocalDate(round.meetingDate)}
                       {' · '}
                       {completed}/{round.routineExecutions.length} 완료
-                      {round.archivedAt ? ` · ${formatInstant(round.archivedAt)} 보관` : ''}
+                      {round.archivedAt ? ` · ${formatInstant(round.archivedAt, season.timeZone)} 보관` : ''}
                     </small>
                   </span>
                   <button
@@ -209,7 +219,7 @@ export function RhythmView({
                     <strong>{routine.title}</strong>
                     <small>
                       {owner?.name ?? '연결된 역할 없음'} · {routine.dueLabel}
-                      {routine.archivedAt ? ` · ${formatInstant(routine.archivedAt)} 보관` : ''}
+                      {routine.archivedAt ? ` · ${formatInstant(routine.archivedAt, season.timeZone)} 보관` : ''}
                     </small>
                   </span>
                   <button

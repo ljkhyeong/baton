@@ -74,7 +74,7 @@ export default function CalendarBulkRevocation({ accountId, enabled, selected, d
       setResults(completed)
       // 결과를 알 수 없는 해제 요청은 반복하지 않고 사용자가 상태를 확인하도록 남긴다.
     },
-    gcTime: 0, networkMode: 'always',
+    gcTime: 0,
     onSettled: () => {
       locked.current = false
       onLockChange(false)

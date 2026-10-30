@@ -1,13 +1,19 @@
 package com.personal.baton.application.brief;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import com.personal.baton.BatonApplication;
+import com.personal.baton.application.brief.port.out.BriefContinuityClient;
 import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
+import com.personal.baton.application.delivery.DeliveryResult;
+import com.personal.baton.application.delivery.DispatchResult;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,6 +131,44 @@ class BriefContinuityOutboxPersistenceTest {
                     .isEqualTo(firstSignal.event().sourceReference());
             assertThat(delivery.event().aggregateRevision()).isEqualTo(2);
         });
+    }
+
+    @DisplayName("재시도를 기다리는 신호는 다른 신호의 전달을 막지 않고 같은 신호의 다음 리비전만 붙잡는다")
+    @Test
+    void keepsDeliveringOtherSignalsWhileOneSignalWaitsForRetry() {
+        insertOutbox(FIRST_SIGNAL_ID, 1, "ROLE_UNASSIGNED");
+        insertOutbox(FIRST_SIGNAL_ID, 2, "ROLE_UNASSIGNED");
+        insertOutbox(SECOND_SIGNAL_ID, 1, "HANDOFF_INCOMPLETE");
+        List<BriefContinuityDelivery> attempts = new ArrayList<>();
+        BriefContinuityClient failingFirstSignal = delivery -> {
+            attempts.add(delivery);
+            return delivery.event().sourceReference().endsWith(FIRST_SIGNAL_ID.toString())
+                    ? DeliveryResult.retryable("HTTP_503")
+                    : DeliveryResult.delivered("HTTP_202");
+        };
+
+        assertThat(dispatchAt(NOW, failingFirstSignal).failedCount()).isOne();
+        assertThat(dispatchAt(NOW.plusSeconds(1), failingFirstSignal).deliveredCount()).isOne();
+        assertThat(dispatchAt(NOW.plusSeconds(2), failingFirstSignal).claimedCount()).isZero();
+        assertThat(dispatchAt(NOW.plusSeconds(10), failingFirstSignal).failedCount()).isOne();
+
+        assertThat(attempts).extracting(
+                delivery -> delivery.event().sourceReference(),
+                delivery -> delivery.event().aggregateRevision(),
+                BriefContinuityDelivery::attemptCount
+        ).containsExactly(
+                tuple("baton-continuity:" + FIRST_SIGNAL_ID, 1L, 1),
+                tuple("baton-continuity:" + SECOND_SIGNAL_ID, 1L, 1),
+                tuple("baton-continuity:" + FIRST_SIGNAL_ID, 1L, 2)
+        );
+    }
+
+    private DispatchResult dispatchAt(Instant now, BriefContinuityClient client) {
+        return new BriefContinuityOutboxDispatchService(
+                outboxPort,
+                client,
+                Clock.fixed(now, ZoneOffset.UTC)
+        ).dispatchPending();
     }
 
     private int attemptCount(BriefContinuityDelivery delivery) {

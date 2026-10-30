@@ -4,6 +4,8 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$REPOSITORY_ROOT/ops/production-validation-common.sh"
 COMPOSE_FILE="$REPOSITORY_ROOT/compose.production.yml"
 ROUND_COMPOSE_FILE="$REPOSITORY_ROOT/compose.round.production.yml"
 RECOVERY_COMPOSE_FILE="$SCRIPT_DIR/compose.recovery-rehearsal.yml"
@@ -523,6 +525,123 @@ assert_round_container_hardening() {
   fi
 }
 
+assert_web_container_hardening() {
+  local added_capabilities
+  local container_id
+  local dropped_capabilities
+  local health_status
+  local security_options
+
+  container_id="$("${COMPOSE[@]}" ps -q web)"
+  if [[ "$("${COMPOSE[@]}" exec -T web id -u | tr -d '\r\n')" != "10002" ]]; then
+    log "공개 Caddy 컨테이너가 비루트 UID로 실행되지 않습니다."
+    return 1
+  fi
+  dropped_capabilities="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{range .HostConfig.CapDrop}}{{.}} {{end}}' \
+      "$container_id"
+  )"
+  dropped_capabilities="${dropped_capabilities% }"
+  if [[ "${dropped_capabilities#CAP_}" != "ALL" ]]; then
+    log "공개 Caddy 컨테이너의 Linux capability 제거 집합이 정확히 ALL이 아닙니다."
+    return 1
+  fi
+  added_capabilities="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{range .HostConfig.CapAdd}}{{.}} {{end}}' \
+      "$container_id"
+  )"
+  if [[ -n "$added_capabilities" ]]; then
+    log "공개 Caddy 컨테이너에 추가 Linux capability가 있습니다: $added_capabilities"
+    return 1
+  fi
+  security_options="$(
+    "$REAL_DOCKER" inspect --format '{{json .HostConfig.SecurityOpt}}' "$container_id"
+  )"
+  if [[ "$security_options" != *no-new-privileges* ]]; then
+    log "공개 Caddy 컨테이너에 no-new-privileges가 없습니다."
+    return 1
+  fi
+  health_status="$(
+    "$REAL_DOCKER" inspect --format '{{.State.Health.Status}}' "$container_id"
+  )"
+  if [[ "$health_status" != "healthy" ]]; then
+    log "공개 Caddy 컨테이너의 로컬 HTTP 헬스체크가 정상이 아닙니다: $health_status"
+    return 1
+  fi
+  if ! "${COMPOSE[@]}" exec -T web sh -ec \
+    'test -r /data/caddy/legacy/certificate && test -w /data/caddy && test -w /config/caddy'; then
+    log "root로 쓰던 기존 Caddy 볼륨을 비루트 web이 사용하지 못합니다."
+    return 1
+  fi
+}
+
+assert_container_limits() {
+  local service="$1"
+  local expected_limits="$2"
+  local actual_limits
+  local container_id
+
+  container_id="$("${COMPOSE[@]}" ps -q "$service")"
+  actual_limits="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' \
+      "$container_id"
+  )"
+  if [[ "$actual_limits" != "$expected_limits" ]]; then
+    log "$service 자원 제한이 예상과 다릅니다: expected=$expected_limits actual=$actual_limits"
+    return 1
+  fi
+}
+
+# 이미지 진입점의 JVM 옵션으로 최대 힙을 구해 비힙 영역이 들어갈 여유가 있는지 확인한다.
+assert_app_heap_within_limit() {
+  local container_id
+  local entrypoint
+  local max_heap_bytes
+  local memory_limit_bytes
+
+  container_id="$("${COMPOSE[@]}" ps -q app)"
+  entrypoint="$(
+    "$REAL_DOCKER" inspect --format '{{range .Config.Entrypoint}}{{.}} {{end}}' "$container_id"
+  )"
+  if [[ "$entrypoint" != *"-XX:+ExitOnOutOfMemoryError"* ]]; then
+    log "app 진입점에 -XX:+ExitOnOutOfMemoryError가 없습니다."
+    return 1
+  fi
+  if [[ ! "$entrypoint" =~ (-XX:MaxRAMPercentage=[0-9.]+) ]]; then
+    log "app 진입점에서 최대 힙 비율을 찾지 못했습니다."
+    return 1
+  fi
+  max_heap_bytes="$(
+    "${COMPOSE[@]}" exec -T app java "${BASH_REMATCH[1]}" -XX:+PrintFlagsFinal -version \
+      | awk '$2 == "MaxHeapSize" { print $4 }'
+  )"
+  memory_limit_bytes="$(
+    "$REAL_DOCKER" inspect --format '{{.HostConfig.Memory}}' "$container_id"
+  )"
+  if [[ ! "$max_heap_bytes" =~ ^[0-9]+$ ]] \
+    || ((max_heap_bytes * 10 > memory_limit_bytes * 6)); then
+    log "app 최대 힙이 메모리 제한의 60%를 넘습니다: heap=$max_heap_bytes limit=$memory_limit_bytes"
+    return 1
+  fi
+}
+
+assert_mysql_slow_query_log() {
+  local settings
+
+  settings="$("${COMPOSE[@]}" exec -T \
+    -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+    mysql mysql --protocol=socket --user=root --batch --skip-column-names \
+    --execute="SELECT @@slow_query_log, @@long_query_time, @@slow_query_log_file;" \
+    | tr '\t' ' ' | tr -d '\r')"
+  if [[ "$settings" != "1 1.000000 /var/lib/mysql/slow-query.log" ]]; then
+    log "MySQL 슬로우 쿼리 로그 설정이 예상과 다릅니다: $settings"
+    return 1
+  fi
+}
+
 assert_round_turn_secret_mount() {
   local container_id
   local mount_contract
@@ -777,6 +896,13 @@ if [[ "$MISSING_DATASOURCE_OUTPUT" != *"DB_URL 설정이 필요합니다"* ]]; t
   exit 1
 fi
 
+log "root로 쓰던 이전 배포의 Caddy volume을 재현합니다."
+"${COMPOSE[@]}" run --rm --no-deps --entrypoint sh web-volume-owner -ec \
+  'mkdir -p /data/caddy/legacy /config/caddy
+  printf legacy > /data/caddy/legacy/certificate
+  chmod 700 /data/caddy/legacy
+  chown -R 0:0 /data /config'
+
 log "빌드한 이미지와 격리된 MySQL·Caddy volume을 기동합니다."
 "${COMPOSE[@]}" up --detach --no-build --wait --wait-timeout 300
 
@@ -800,7 +926,19 @@ assert_no_published_ports round-signaling
 assert_round_container_hardening round-web NET_BIND_SERVICE
 assert_round_container_hardening round-signaling ""
 assert_round_turn_secret_mount
+assert_web_container_hardening
+assert_container_limits mysql "1610612736 1000000000 256"
+assert_container_limits app "1073741824 1000000000 512"
+assert_container_limits web "134217728 1000000000 128"
+assert_app_heap_within_limit
+assert_mysql_slow_query_log
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
+
+# 공개 상태 검사기와 같은 판정으로 실제 Actuator 응답을 확인한다.
+if ! production_validation_is_aggregate_up_document "$(<"$RUN_DIR/health.body")"; then
+  log "실제 /actuator/health 응답을 ops/check-service-health.sh 판정이 거부합니다."
+  exit 1
+fi
 
 log "프로덕션 컨테이너 내부 연동 지표와 읽기 전용 장애 점검을 검증합니다."
 run_isolated_recovery_operation \

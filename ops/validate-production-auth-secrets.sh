@@ -68,7 +68,7 @@ brief_delivery_enabled="false"
 brief_bearer_token_file=""
 brief_service_api_enabled="false"
 brief_service_bearer_token_file=""
-brief_service_truststore_file=""
+brief_service_trusted_certificate_file=""
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -159,7 +159,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE)
       brief_service_bearer_token_file="$value"
       ;;
-    BATON_BRIEF_SERVICE_TRUSTSTORE_FILE) brief_service_truststore_file="$value" ;;
+    BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE)
+      brief_service_trusted_certificate_file="$value"
+      ;;
   esac
 done
 
@@ -200,16 +202,26 @@ validate_bearer_token_file() {
     || fail "$name must contain 32-200 URL-safe ASCII characters"
 }
 
-validate_truststore_file() {
+validate_trusted_certificate_file() {
   local name="$1"
   local target="$2"
+  local size
 
   production_validation_secret_file fail "$name" "$target" > /dev/null
-  command -v keytool >/dev/null 2>&1 \
-    || fail "keytool is required to validate the BRIEF service truststore"
-  if ! keytool -list -rfc -storetype PKCS12 -storepass changeit \
-    -keystore "$target" 2>/dev/null | grep -q '^-----BEGIN CERTIFICATE-----$'; then
-    fail "$name must be a PKCS12 truststore with password changeit and at least one certificate"
+  size="$(wc -c < "$target" | tr -d '[:space:]')"
+  if [[ ! "$size" =~ ^[0-9]+$ ]] || (( size < 256 || size > 65536 )); then
+    fail "$name PEM size is invalid"
+  fi
+  if grep -q 'PRIVATE KEY' "$target"; then
+    fail "$name must not contain a private key"
+  fi
+  command -v openssl >/dev/null 2>&1 \
+    || fail "openssl is required to validate the BRIEF service certificate"
+  if ! openssl x509 -in "$target" -noout >/dev/null 2>&1; then
+    fail "$name must contain a PEM certificate"
+  fi
+  if ! openssl x509 -in "$target" -noout -checkend 0 >/dev/null 2>&1; then
+    fail "$name contains an expired certificate"
   fi
 }
 
@@ -329,14 +341,15 @@ if [[ "$brief_delivery_enabled" == "true" || -n "$brief_bearer_token_file" ]]; t
 fi
 if [[ "$brief_service_api_enabled" == "true" \
   || -n "$brief_service_bearer_token_file" \
-  || -n "$brief_service_truststore_file" ]]; then
+  || -n "$brief_service_trusted_certificate_file" ]]; then
   require_value \
     BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE "$brief_service_bearer_token_file"
-  require_value BATON_BRIEF_SERVICE_TRUSTSTORE_FILE "$brief_service_truststore_file"
+  require_value \
+    BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE "$brief_service_trusted_certificate_file"
   validate_bearer_token_file \
     BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE "$brief_service_bearer_token_file"
-  validate_truststore_file \
-    BATON_BRIEF_SERVICE_TRUSTSTORE_FILE "$brief_service_truststore_file"
+  validate_trusted_certificate_file \
+    BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE "$brief_service_trusted_certificate_file"
 fi
 if [[ -n "$brief_bearer_token_file" && -n "$brief_service_bearer_token_file" \
   && "$(< "$brief_bearer_token_file")" == "$(< "$brief_service_bearer_token_file")" ]]; then

@@ -8,6 +8,7 @@ import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
@@ -31,6 +32,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -230,6 +232,95 @@ class AuthSecurityTest {
         verifyNoInteractions(accountSecurityUseCase);
     }
 
+    @DisplayName("같은 계정의 현재 비밀번호 확인은 IP를 바꿔도 열 번 뒤 429로 제한한다")
+    @Test
+    void limitsPasswordChangeAttemptsByAccount() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+        MockHttpSession session = accountSession(UUID.randomUUID(), 0);
+
+        for (int attempt = 1; attempt <= 10; attempt += 1) {
+            mockMvc.perform(passwordChange(session, "198.51.100." + attempt))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INVALID"));
+        }
+
+        mockMvc.perform(passwordChange(session, "198.51.100.200"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "code": "AUTH_RATE_LIMITED",
+                          "message": "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요"
+                        }
+                        """, true));
+
+        verify(accountSecurityUseCase, times(10)).changeLocalPassword(any());
+        assertThat(session.isInvalid()).isFalse();
+    }
+
+    @DisplayName("같은 네트워크의 현재 비밀번호 확인은 계정을 바꿔도 예순 번 뒤 429로 제한한다")
+    @Test
+    void limitsPasswordChangeAttemptsByNetwork() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+
+        for (int attempt = 0; attempt < 60; attempt += 1) {
+            mockMvc.perform(passwordChange(accountSession(UUID.randomUUID(), 0), "203.0.113.77"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(passwordChange(accountSession(UUID.randomUUID(), 0), "203.0.113.77"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("AUTH_RATE_LIMITED"));
+    }
+
+    @DisplayName("비JSON Accept여도 인증 오류는 JSON 본문으로 응답한다")
+    @Test
+    void writesAuthErrorsAsJsonForNonJsonAccept() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+
+        mockMvc.perform(passwordChange(accountSession(UUID.randomUUID(), 0), "203.0.113.78")
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INVALID"));
+    }
+
+    @DisplayName("비JSON Accept여도 인증 요청률 제한은 JSON 본문과 재시도 시간으로 응답한다")
+    @Test
+    void writesRateLimitAsJsonForNonJsonAccept() throws Exception {
+        doThrow(new com.personal.baton.application.identity.error.HumanVerificationRejectedException())
+                .when(humanVerificationUseCase).verify(any());
+        org.springframework.test.web.servlet.request.RequestPostProcessor rateLimitedNetwork = request -> {
+            request.setRemoteAddr("203.0.113.79");
+            return request;
+        };
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            mockMvc.perform(sameOrigin(post(AuthController.PASSWORD_RESET_REQUESTS_PATH)).with(csrf())
+                            .with(rateLimitedNetwork)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"limited@example.com\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(sameOrigin(post(AuthController.PASSWORD_RESET_REQUESTS_PATH)).with(csrf())
+                        .with(rateLimitedNetwork)
+                        .accept(MediaType.TEXT_PLAIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"limited@example.com\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("AUTH_RATE_LIMITED"));
+    }
+
     @DisplayName("설정하지 않은 소셜 공급자 목록은 가입 가능 여부와 인증 정보가 없는 빈 배열만 반환한다")
     @Test
     void exposesEmptyProviderListWhenSocialLoginIsUnavailable() throws Exception {
@@ -384,6 +475,24 @@ class AuthSecurityTest {
             logger.detachAppender(appender);
             appender.stop();
         }
+    }
+
+    @DisplayName("신원 저장소의 교착은 전역 콘텐츠 충돌이 아니라 인증 일시 장애로 응답한다")
+    @Test
+    void keepsIdentityLockFailureAsTemporaryUnavailable() throws Exception {
+        when(registerLocalAccountUseCase.registerLocalAccount(any()))
+                .thenThrow(new CannotAcquireLockException("Deadlock found"));
+
+        mockMvc.perform(sameOrigin(post(AuthController.LOCAL_REGISTRATIONS_PATH))
+                        .with(csrf())
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.80");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validRegistration().replace(EMAIL, "identity-lock@example.com")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("IDENTITY_TEMPORARILY_UNAVAILABLE"));
     }
 
     @DisplayName("메일 전달 adapter가 비활성화되면 계정 존재 여부 없이 일반화된 503을 반환한다")
@@ -623,12 +732,36 @@ class AuthSecurityTest {
     }
 
     private MockHttpSession accountSession(long version) {
+        return accountSession(ACCOUNT_ID, version);
+    }
+
+    private MockHttpSession accountSession(UUID accountId, long version) {
         MockHttpSession session = new MockHttpSession();
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                new AccountSessionPrincipal(ACCOUNT_ID, version), null, List.of()));
+                new AccountSessionPrincipal(accountId, version), null, List.of()));
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
         return session;
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder passwordChange(
+            MockHttpSession session,
+            String remoteAddress
+    ) {
+        return sameOrigin(post(AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH))
+                .session(session)
+                .with(csrf())
+                .with(request -> {
+                    request.setRemoteAddr(remoteAddress);
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "currentPassword": "wrong current password",
+                          "newPassword": "new correct horse battery staple"
+                        }
+                        """);
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder sameOrigin(

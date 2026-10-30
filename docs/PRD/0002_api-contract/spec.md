@@ -146,7 +146,7 @@ POST /api/v1/workspaces
 }
 ```
 
-`teamName`과 `seasonName`은 공백만으로 구성될 수 없고 각각 100자 이하다. `startDate`와 `endDate`는 시간대 없는 ISO 8601 달력 날짜이며 시작일은 종료일보다 늦을 수 없다. `memberNames`는 1명 이상 100명 이하이고 각 이름은 공백만으로 구성될 수 없으며 100자 이하다. 앞뒤 공백을 제거한 구성원 이름은 중복될 수 없으며, 이름이 같은 사람은 역할 선택에서 구분할 수 있는 별칭을 붙인다.
+`teamName`과 `seasonName`은 공백만으로 구성될 수 없고 각각 100자 이하다. `startDate`와 `endDate`는 시간대 없는 ISO 8601 달력 날짜이며 시작일은 종료일보다 늦을 수 없다. 시즌 날짜의 연도는 `1001..9998`이고 벗어나면 `400 INVALID_INPUT`이다. 역할 담당 기간과 회차 날짜는 시즌 기간 안으로 제한되므로 같은 범위를 따른다. `memberNames`는 1명 이상 100명 이하이고 각 이름은 공백만으로 구성될 수 없으며 100자 이하다. 앞뒤 공백을 제거한 구성원 이름은 중복될 수 없으며, 이름이 같은 사람은 역할 선택에서 구분할 수 있는 별칭을 붙인다.
 
 선택 필드 `template`은 `STUDY_V1`, `TEAM_V1`, `TASK_FORCE_V1`, `CLUB_V1`, `COMMITTEE_V1` 중 하나이며 생략·`null`이면 기존 빈 구성으로 생성한다. 다른 값은 `400 INVALID_INPUT`이다. 각 템플릿은 역할 3개와 반복 업무 3개를 팀·시즌·구성원과 같은 트랜잭션으로 저장하고 담당자·담당 기간·실제 마감·반복 일정·회차는 만들지 않는다. 역할 공백의 연속성 신호도 같은 트랜잭션에 반영한다. 배포된 템플릿 식별자의 구성은 유지하고 변경은 새 버전으로 추가한다.
 
@@ -292,7 +292,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-성공 상태는 `200 OK`이고 갱신된 시즌 전체 표현을 반환한다. 이름은 앞뒤 공백을 정리한 뒤 팀 안에서 유일하고 최대 100자다. 시작일은 종료일보다 늦을 수 없다. 종료되지 않은 시즌만 수정할 수 있으며 기존 회차 날짜, 역할 담당 기간이나 열린 역할 인수인계의 다음 담당 기간을 제외하도록 기간을 줄일 수 없다.
+성공 상태는 `200 OK`이고 갱신된 시즌 전체 표현을 반환한다. 이름은 앞뒤 공백을 정리한 뒤 팀 안에서 유일하고 최대 100자다. 시작일은 종료일보다 늦을 수 없다. 종료되지 않은 시즌만 수정할 수 있으며 기존 회차 날짜, 역할 담당 기간이나 열린 역할 인수인계의 다음 담당 기간을 제외하도록 기간을 줄일 수 없다. `previousSeasonId`가 있는 시즌의 시작일은 이전 시즌 종료일보다 늦어야 하며 위반은 `400 INVALID_INPUT`이다.
 
 운영자 시즌 이름 정정:
 
@@ -444,7 +444,7 @@ X-Baton-Recovery-Key: <파일럿 운영자 복구 키>
 
 요청 지문은 도메인 입력과 같이 문자열 앞뒤 공백과 도메인이 같은 값으로 취급하는 선택적 빈 문자열을 정규화한다. 책임과 관련 역할처럼 순서가 응답에 보존되는 목록은 순서까지 요청 의미에 포함한다. 서버는 원문 멱등 키 대신 작업·팀·시즌으로 범위를 분리한 SHA-256 기반 해시만 저장하며, 멱등 예약과 리소스 생성은 한 트랜잭션에서 커밋하거나 함께 롤백한다.
 
-브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 Web Lock으로 보호한 브라우저 영구 저장소에 저장해야 한다. `setItem`이 예외를 던지면 새 생성을 전송하지 않는다. 브라우저 전체에 결과를 확인하지 못한 콘텐츠 생성 기록이 있으면 가장 오래된 기록과 같은 팀·시즌·종류·입력의 재확인만 전송하고 다른 새 생성은 막는다. 성공 또는 같은 결과의 동일 재처리를 확인한 뒤에만 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
+브라우저 클라이언트는 요청 전에 정규화 요청과 멱등 키를 Web Lock으로 보호한 브라우저 영구 저장소에 저장해야 한다. `setItem`이 예외를 던지면 새 생성을 전송하지 않는다. 브라우저 전체에 결과를 확인하지 못한 콘텐츠 생성 기록이 있으면 가장 오래된 기록과 같은 팀·시즌·종류·입력의 재확인만 전송하고 다른 새 생성은 막는다. 성공 또는 같은 결과의 동일 재처리를 확인하거나 시즌 종료(`SEASON_ENDED`)로 같은 요청을 더 진행할 수 없을 때 기록을 지우며, 네트워크 오류·서버 오류·동시 충돌·접근 키 오류에는 보존한다. 시즌 종료나 권한 상실로 다시 제출할 수 없게 된 기록은 사용자가 직접 삭제한다. 같은 키의 다른 요청으로 판정되면 해당 기록을 지우고 사용자의 명시적인 새 제출을 요구한다.
 
 ### 구성원
 
@@ -590,7 +590,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-같은 멱등 키와 같은 정규화 요청은 같은 인수인계의 현재 표현을 `201 Created`로 반환한다. 다른 열린 인수인계가 있거나 역할의 현재·다음 담당자 상태가 준비 조건과 맞지 않으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
+같은 멱등 키와 같은 정규화 요청은 같은 인수인계의 현재 표현을 `201 Created`로 반환한다. 다른 열린 인수인계가 있거나 역할의 현재·다음 담당자 상태가 준비 조건과 맞지 않으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 현재·다음 담당자가 활동을 종료한 경우도 같다.
 
 전달:
 
@@ -634,7 +634,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 현재 파일럿은 `PREPARING` 또는 `TRANSFERRED` 상태에서 준비 당시 이전 담당자 ID를 선언한 취소만 허용한다. 성공하면 인수인계를 `CANCELLED`로 만들고 역할의 `nextMemberId` 예약을 비우며 `200 OK`로 현재 역할과 인수인계를 반환한다. `ACCEPTED` 상태는 취소할 수 없다.
 
-세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환은 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 인수인계가나 경로의 팀·시즌·역할과 소속이 다른 인수인계는 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 공유 키 팀에서는 실제 사람을 인증한 감사 기록으로 해석하지 않는다. 계정 전환 팀은 `confirmedByMemberId`가 로그인 계정과 연결된 활성 구성원인지도 확인하며 불일치는 `403 WORKSPACE_ACCESS_DENIED`다.
+세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환, 전달할 때 이전·다음 담당자나 수락할 때 다음 담당자가 활동을 종료한 경우는 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 인수인계가나 경로의 팀·시즌·역할과 소속이 다른 인수인계는 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 공유 키 팀에서는 실제 사람을 인증한 감사 기록으로 해석하지 않는다. 계정 전환 팀은 `confirmedByMemberId`가 로그인 계정과 연결된 활성 구성원인지도 확인하며 불일치는 `403 WORKSPACE_ACCESS_DENIED`다. 취소에 한해 이전 담당자가 활동 종료, 계정 비활성, 연결된 계정 없음, 권한 없음 또는 `VIEWER`로 행동할 수 없으면 `ADMIN`이 이전 담당자 ID를 `confirmedByMemberId`로 선언해 취소할 수 있다. 이때 `cancelledByMemberId`는 이전 담당자이고 실제 수행 계정은 팀 권한 이력의 `ROLE_HANDOFF_ADMIN_CANCELLED`에 남는다. 이전 담당자가 행동할 수 있으면 `ADMIN`도 `403 WORKSPACE_ACCESS_DENIED`다.
 
 `PREPARING` 동안에는 담당자와 담당 기간만 고정되고 역할 내용, 인수인계 항목과 역할 자료는 계속 보완할 수 있다. `TRANSFERRED` 뒤에는 역할, 그 역할의 인수인계 항목과 자료를 수락 또는 취소 전까지 수정·완료·보관·복원하거나 다른 역할로 옮길 수 없다. 자료나 인수인계 항목을 다른 역할 사이에 옮길 때도 출발·도착 역할 중 하나가 `TRANSFERRED`이면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
 
@@ -668,7 +668,7 @@ PUT /api/v1/teams/{teamId}/seasons/{seasonId}/role-resources/{resourceId}
 X-Baton-Access-Key: <워크스페이스 접근 키>
 ```
 
-요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 인수인계가 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있다.
+요청은 생성과 같은 `roleId`, `title`, `url`, `description` 전체 표현을 사용하고 성공 상태는 `200 OK`다. 응답은 최초 `createdAt`과 현재 `archivedAt`을 그대로 유지한다. 대상 자료는 요청한 시즌의 역할에 연결되어 있어야 하며 `roleId`를 같은 시즌의 다른 역할로 바꿀 수 있다. 자료가 없거나 다른 시즌 소유이면 `404 ROLE_RESOURCE_NOT_FOUND`, 새 소유 역할이 해당 시즌에 없으면 `404 ROLE_NOT_FOUND`다. 같은 자료 수정 트랜잭션이 겹치면 늦은 요청은 `409 WORKSPACE_CONTENT_CONFLICT`를 받고 최신 워크스페이스를 다시 확인해야 한다. 생성 대상이나 수정 전·후 소유 역할에 `TRANSFERRED` 인수인계가 있으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 보관한 자료는 먼저 복원해야 수정할 수 있으며 보관 상태의 수정 요청은 `404 ROLE_RESOURCE_NOT_FOUND`다. `TRANSFERRED` 충돌을 이보다 먼저 확인한다.
 
 보관·복원:
 
@@ -744,7 +744,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 - 각 실행은 원본 `routineId`, 생성 당시 업무 정보, 완료 상태와 마감 정보를 보존한다. 이후 반복 업무를 바꿔도 기존 회차에는 반영하지 않는다.
 - 같은 멱등 요청은 실행을 다시 만들지 않고 기존 회차 ID와 현재 상태를 반환한다.
 
-활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 스케줄러가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다. 처리할 발생일에 활성 반복 업무가 없으면 `roundSchedule.nextOccurrenceDate`만 다음 주기로 전진하고 실행이 없는 자동 회차는 만들지 않는다. 나중에 정의를 복원해도 이미 건너뛴 발생일을 소급 생성하지 않는다.
+활성화한 주간·격주 일정은 별도 사용자 요청 없이 선행 생성일에 자동 회차를 만든다. 자동 회차는 `origin: AUTOMATIC`, 반복 일정의 원래 발생일 `scheduledOccurrenceDate`와 모임 시각의 UTC `scheduledAt`을 보존한다. `(seasonId, scheduledOccurrenceDate)`는 유일하므로 스케줄러가 같은 발생을 다시 처리해도 회차를 중복 생성하지 않는다. 처리할 발생일에 활성 반복 업무가 없으면 `roundSchedule.nextOccurrenceDate`만 다음 주기로 전진하고 실행이 없는 자동 회차는 만들지 않는다. 나중에 정의를 복원해도 이미 건너뛴 발생일을 소급 생성하지 않는다. `nextOccurrenceDate`가 시즌 `endDate`를 넘으면 생성만 멈추고 `enabled`는 바뀌지 않는다. 시즌 기간을 늘리면 보존한 커서부터 다시 생성한다.
 
 실행 `timingStatus`는 다음 규칙으로 조회 시 계산한다.
 
@@ -994,7 +994,8 @@ GET /actuator/health
 | `404` | `TEAM_INVITATION_NOT_FOUND`, `MEMBERSHIP_NOT_FOUND` | 사용할 수 있는 초대가 없거나 취소·만료됨, 또는 권한을 변경할 계정 연결이 없음 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
-| `403` | `REQUEST_FORBIDDEN` | CSRF, 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
+| `403` | `ORIGIN_DENIED` | 인증 API와 계정 세션 변경 요청이 동일 출처·Fetch Metadata 검사를 통과하지 못함 |
+| `403` | `REQUEST_FORBIDDEN` | CSRF, ROUND 참여권 갱신의 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
 | `403` | `ROUND_PARTICIPATION_DENIED` | `Account`가 방의 팀 멤버십이나 활성 시즌 참여 조건을 충족하지 못함 |
 | `403` | `BRIEF_ACCESS_DENIED` | `Account`가 요청 팀의 활동 중인 멤버십을 갖지 않음 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
@@ -1010,7 +1011,7 @@ GET /actuator/health
 | `409` | `ROLE_HANDOFF_STATE_CONFLICT` | 역할 인수인계의 참여자·상태·역할 스냅샷이 요청과 맞지 않거나, 열린 인수인계 중 금지된 역할·인수인계 항목·자료 변경 또는 시즌 종료·전환을 시도함 |
 | `409` | `ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED` | 인수인계 항목 없음, 미완료 항목 또는 역할 자료 없음 경고를 확인하지 않고 전달하려 함 |
 | `409` | `ROUND_NAME_CONFLICT` | 같은 시즌에 동일한 회차 이름이 존재함 |
-| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 시즌, 역할, 역할 인수인계, 역할 자료, 반복 업무 정의, 회차, 반복 업무 실행, 결정 또는 인수인계 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 워크스페이스 확인이 필요함 |
+| `409` | `WORKSPACE_CONTENT_CONFLICT` | 같은 구성원, 시즌, 역할, 역할 인수인계, 역할 자료, 반복 업무 정의, 회차, 반복 업무 실행, 결정 또는 인수인계 항목을 다른 요청이 동시에 변경하거나 상태 검사용 행 잠금에 실패해 최신 워크스페이스 확인이 필요함. DB 교착·잠금 경합으로 트랜잭션이 롤백된 요청도 포함함 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 범위와 작업의 멱등 키를 의미가 다른 생성 요청에 재사용함 |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | 같은 범위와 작업의 생성 요청이 동시에 처리 중임. 같은 키와 요청으로 재시도해야 함 |
 | `409` | `IDEMPOTENCY_REPLAY_EXPIRED` | 더 최신 접근 키 변경 뒤 과거 워크스페이스 생성·키 변경 응답을 동일 재처리함 |
@@ -1022,7 +1023,7 @@ GET /actuator/health
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
 | `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 업무 점검 아웃박스 전달이 끝나지 않아 생성할 수 없음 |
 | `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 기준의 생성 작업이 아직 진행 중임 |
-| `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 요청률 제한을 초과함 |
+| `429` | `AUTH_RATE_LIMITED` | 가입·재설정 메일·검증·로그인·현재 비밀번호 확인·ROUND 참여권 갱신 요청이 인증 요청률 제한을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 미디어 타입을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 게이트, 아웃박스 페이로드 보호 또는 메일 전달 인프라를 사용할 수 없음 |
 | `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | 신원 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지 못함 |
@@ -1034,12 +1035,16 @@ GET /actuator/health
 MySQL 행 잠금 시간이 제한을 넘으면 대상에 따라 다음 오류로 처리한다.
 
 - 워크스페이스·콘텐츠 생성 예약: `409 IDEMPOTENCY_KEY_CONFLICT`
-- 팀 접근 키: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
-- 공유 콘텐츠: `409 WORKSPACE_CONTENT_CONFLICT`
+- 팀 접근 키 변경 저장: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
+- 공유 콘텐츠와 일반 변경·시즌 관리의 팀 잠금: `409 WORKSPACE_CONTENT_CONFLICT`
+
+어댑터가 대상별 오류로 바꾸지 못한 교착·잠금 실패(`ConcurrencyFailureException` 계열)도 `409 WORKSPACE_CONTENT_CONFLICT`로 처리하며 SQL 상세는 응답에 노출하지 않는다.
 
 계정 인증에서 별도로 `503`으로 분류한 경우가 아니라면 쿼리·트랜잭션 시간 초과와 DB 연결 실패는 `500 INTERNAL_ERROR`로 처리한다. 이를 사용자의 동시 수정으로 추측하지 않는다.
 
-예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `406 Not Acceptable`은 오류 JSON을 협상할 수 없으므로 본문 없이 `X-Request-ID`만 반환한다.
+예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `ErrorResponse`는 요청의 `Accept`와 무관하게 `application/json`으로 내보낸다. 성공 응답 형식을 협상하지 못한 `406 Not Acceptable`만 본문 없이 `X-Request-ID`를 반환한다.
+
+바인딩 값 변환 실패와 타입 불일치는 내부 변환 문구 대신 고정 문구 `요청 값 형식이 올바르지 않습니다`를 사용한다.
 
 내부 예외와 스택 추적은 서버 로그에만 남긴다. Spring과 필터 체인의 5xx는 MDC와 응답 헤더에 같은 요청 ID를 사용한다. Caddy가 만든 413·502·503도 응답과 접근 로그에 같은 엣지 요청 ID를 남긴다. 로그에서는 운영 키, 멱등 키와 외부 요청 ID를 제거한다. 브라우저는 운영자가 로그를 찾을 수 있도록 5xx 안내에 요청 ID를 표시한다.
 
@@ -1095,7 +1100,8 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. 존재하지 않는 이메일,
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
-`Retry-After`를 반환한다.
+`Retry-After`를 반환한다. 비밀번호 변경의 현재 비밀번호 확인도 IP당 10분당 60회·계정당 10분당 10회로
+제한하며 같은 응답을 사용한다.
 
 Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최대 2,048자의 일회용
 `turnstileToken`이 필요하다. 서버는 Siteverify 응답의 성공 여부, `hostname`과 요청별 `action`을
@@ -1106,6 +1112,7 @@ Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최
 계정만 메일을 발급하며 Google·Naver 신원이나 미인증 계정에는 발급하지 않는다. 링크는 발급 후
 30분 동안 한 번만 사용할 수 있고, 아직 유효한 재설정 요청이 있으면 교체·재발송하지 않는다.
 가입과 재설정의 메일 요청은 IP당 시간당 12회·정규화 이메일당 시간당 3회의 제한을 공유한다.
+IP 제한은 Turnstile 검증 전에 소비하고, 이메일 제한은 검증을 통과한 요청만 소비한다.
 토큰 제출도 기존 검증 제한(IP당 10분당 30회·토큰당 10분당 5회)을 공유한다.
 `BATON_AUTH_PASSWORD_RESET_ENABLED=false`이면 새 요청은 `503 EMAIL_VERIFICATION_UNAVAILABLE`이며
 이미 발급한 링크의 제출은 허용한다. 토큰 오류는 `400 PASSWORD_RESET_INVALID`, 일시적인 DB 장애는
@@ -1269,7 +1276,7 @@ CSRF 없이 조회한다.
 다음 영역은 제품 명세에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 모든 제품 기록의 영구 삭제
-- 계정 비활성화·탈퇴, 관리자에 의한 세션 강제 만료, 단계 강화 신원 연결·병합, 초대와 세부 권한·감사 이력
+- 계정 탈퇴와 로그인 정보 삭제, 관리자에 의한 세션 강제 만료, 단계 강화 신원 연결·병합
 - 지연·역할 공백을 전달할 외부 알림 채널과 선호·전달 결과
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
@@ -1365,19 +1372,20 @@ cd frontend && npm ci && cd ..
 | `POST /api/v1/team-access/{teamId}/invitations/{invitationId}/revoke` | `expectedAccountId` | 취소 후 팀 권한 |
 | `PUT /api/v1/team-access/{teamId}/members/{memberId}/permission` | `expectedAccountId`, `permission` | 변경 후 팀 권한. `permission=null` 또는 생략은 접근 취소 |
 | `POST /api/v1/team-invitations/preview` | `expectedAccountId`, 43자 URL 안전 `token` | `teamId`, `teamName`, `memberId`, `memberName`, `permission`, `expiresAt` |
-| `POST /api/v1/team-invitations/accept` | 미리보기와 같은 요청 | `accountId`, `teamId`, 이동할 최신 `seasonId`, `memberId`, 현재 `permission` |
+| `POST /api/v1/team-invitations/accept` | 미리보기와 같은 요청 | `accountId`, `teamId`, 이동할 `seasonId`(종료되지 않은 시즌 우선, 모두 종료됐으면 시작일·식별자 내림차순 첫 시즌), `memberId`, 현재 `permission` |
 
 `permission`은 `ADMIN`, `MEMBER`, `VIEWER`다. 팀 권한 응답의 `memberId`·`permission`은 연결 전·승인 전
 상태에서 `null`이다. 관리자만 전체 `members`, `invitations`, `audit`을 받으며 공유 키 팀의 전환 준비
 조회는 구성원 목록도 받는다. 구성원 항목은 `memberId`, `memberName`, `active`, nullable `accountId`,
 nullable `permission`을 포함한다. 초대 항목은 `id`, `memberId`, `permission`, `createdAt`, `expiresAt`,
-nullable `acceptedAt`, nullable `revokedAt`이다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
+nullable `acceptedAt`, nullable `revokedAt`이며 생성 시각·식별자 내림차순으로 최근 50건을 반환한다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
 nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 50건을 반환한다.
-`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`다.
+`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`, `ACCOUNT_DEACTIVATED`, `ROLE_HANDOFF_ADMIN_CANCELLED`다. `ROLE_HANDOFF_ADMIN_CANCELLED`는 권한을 바꾸지 않으므로 `memberId`에 이전 담당자를 담고 두 권한 필드는 `null`이다.
 
 초대 수락의 계정 연결과 권한 변경은 원자적이다. 같은 토큰의 같은 계정 재수락은 현재 권한을 반환한다.
 권한이 취소된 계정은 재수락으로 권한을 되살릴 수 없다. 다른 계정·구성원의 기존 연결과 충돌하면
-`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다.
+`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다. 계정 권한 전환의 복구 키가
+미설정·누락·불일치이면 `403 WORKSPACE_RECOVERY_DENIED`다.
 
 워크스페이스 응답의 `team`은 기존 `id`, `name`에 `accountAccessEnabled`와 nullable `permission`을
 추가한다. 공유 키 팀에서는 각각 `false`, `null`이며 계정 팀에서는 `true`와 현재 접근 권한이다.
@@ -1470,7 +1478,7 @@ CSRF 검증도 적용한다. 성공·구독 전용 오류 응답은 `Cache-Contr
 `today`와 `nextReviewOn`은 시즌 시간대의 `YYYY-MM-DD` 날짜다. 확인일 당일부터 `reviewDue=true`다.
 
 같은 경로의 `POST`는 계정 세션·동일 출처·CSRF, `expectedAccountId`, `expectedVersion`(-1 이상),
-`intervalDays`(1~365), `nextReviewOn`을 받는다. 주기와 확인일을 함께 null 또는 생략하면 해제한다.
+`intervalDays`(1~365), `nextReviewOn`(연도 `1001..9998`)을 받는다. 주기와 확인일을 함께 null 또는 생략하면 해제한다.
 연결된 활성 구성원과 자료 수정 권한이 필요하며, 응답은 갱신한 일정의 `200 OK`다.
 버전 불일치·보관 자료는 `409 WORKSPACE_CONTENT_CONFLICT`, 종료 시즌은 기존 종료 오류,
 주기·날짜의 일부 누락과 범위 오류는 `400 INVALID_INPUT`다.

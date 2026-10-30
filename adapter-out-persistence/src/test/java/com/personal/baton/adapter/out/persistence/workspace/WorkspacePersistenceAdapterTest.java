@@ -140,9 +140,9 @@ final class WorkspacePersistenceAdapterTest {
                 );
     }
 
-    @DisplayName("팀의 공유 잠금 실패 원인을 접근 키 충돌 예외에 보존한다")
+    @DisplayName("일반 변경의 팀 공유 잠금 실패는 접근 키 충돌이 아닌 콘텐츠 충돌로 원인을 보존한다")
     @Test
-    void preservesPessimisticLockCauseForAccessKeyConflict() {
+    void preservesTeamSharedLockCauseForContentConflict() {
         UUID teamId = UUID.randomUUID();
         PessimisticLockingFailureException cause =
                 new PessimisticLockingFailureException("팀 공유 잠금 실패");
@@ -150,7 +150,7 @@ final class WorkspacePersistenceAdapterTest {
 
         assertThatThrownBy(() -> accessAdapter.findTeamByIdWithSharedLock(teamId))
                 .isInstanceOfSatisfying(
-                        WorkspaceAccessKeyConflictException.class,
+                        WorkspaceContentConflictException.class,
                         exception -> assertThat(exception.getCause()).isSameAs(cause)
                 );
     }

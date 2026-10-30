@@ -3,6 +3,8 @@ import type { Page, Route } from '@playwright/test'
 import {
   ACCESS_KEY,
   MEMBER_ONE_ID,
+  MEMBER_TWO_ID,
+  ROLE_HANDOFF_ID,
   ROLE_ID,
   SECOND_ROLE_RESOURCE_ID,
   SEASON_ID,
@@ -230,6 +232,14 @@ function projectionWithMultipleRoundResources() {
     createdAt: '2026-08-09T11:01:00Z',
     archivedAt: null,
   })
+  return projection
+}
+
+// 공유 키 없이 초대받은 계정으로 여는 계정 전환 팀
+function accountTeamProjection(permission: 'MEMBER' | 'VIEWER') {
+  const projection = projectionWithRoundResource()
+  projection.team.accountAccessEnabled = true
+  projection.team.permission = permission
   return projection
 }
 
@@ -523,6 +533,67 @@ test('종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출�
     '종료된 시즌에서는 ROUND 방에 입장하거나 종료할 수 없습니다.',
   )
   expect(roundApi.calls.some((call) => call.method === 'DELETE')).toBe(false)
+})
+
+test('@webkit 공유 키 없는 계정 팀 구성원도 ROUND 방 목록을 확인하고 방을 시작한다', async ({ page }, testInfo) => {
+  await installApi(page, accountTeamProjection('MEMBER'))
+  const roundApi = await installRoundProductApi(page)
+  await page.goto(WORKSPACE_PATH)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+  const mappingRead = roundApi.calls.find((call) => (
+    call.method === 'GET' && call.path === '/api/v1/round-room-mappings'
+  ))
+  expect(mappingRead?.query).toEqual({ seasonId: SEASON_ID, teamId: TEAM_ID })
+  expect(mappingRead?.headers['x-baton-access-key'] ?? '').toBe('')
+})
+
+test('열람자는 열린 ROUND 방에 입장하지만 방을 시작하거나 종료하지 못한다', async ({ page }, testInfo) => {
+  await installApi(page, accountTeamProjection('VIEWER'))
+  const roundApi = await installRoundProductApi(page, { activeMapping: true })
+  await page.goto(WORKSPACE_PATH)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await expect(inspector.getByRole('button', { name: 'ROUND 종료' })).toBeDisabled()
+  await expect(inspector.getByText('종료된 시즌에서는', { exact: false })).toHaveCount(0)
+  await inspector.getByRole('button', { name: 'ROUND 입장' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+  expect(roundApi.calls.some((call) => call.method !== 'GET')).toBe(false)
+})
+
+test('열람자에게 열린 방이 없으면 ROUND 시작을 막는다', async ({ page }, testInfo) => {
+  await installApi(page, accountTeamProjection('VIEWER'))
+  await installRoundProductApi(page)
+  await page.goto(WORKSPACE_PATH)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await expect(inspector.getByRole('button', { name: 'ROUND 시작' })).toBeDisabled()
+})
+
+test('인수인계 전달로 잠긴 역할에서도 열린 ROUND 방에는 입장한다', async ({ page }, testInfo) => {
+  const projection = projectionWithRoundResource()
+  projection.roleHandoffs.push({
+    id: ROLE_HANDOFF_ID, roleId: ROLE_ID,
+    fromMemberId: MEMBER_ONE_ID, toMemberId: MEMBER_TWO_ID,
+    outgoingAssignmentStartDate: '2026-07-02', outgoingAssignmentEndDate: '2026-09-17',
+    incomingAssignmentStartDate: '2026-08-01', incomingAssignmentEndDate: '2026-09-17',
+    status: 'TRANSFERRED', preparedAt: '2026-07-22T09:00:00Z', transferredAt: '2026-07-22T09:10:00Z',
+    acceptedAt: null, cancelledAt: null, transferredByMemberId: MEMBER_ONE_ID,
+    acceptedByMemberId: null, cancelledByMemberId: null,
+    activeItemCount: 0, incompleteItemCount: 0, resourceCount: 0, warningAcknowledged: true,
+  })
+  await installApi(page, projection)
+  await installRoundProductApi(page, { activeMapping: true })
+  await openSharedWorkspace(page)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await expect(inspector.getByRole('button', { name: 'ROUND 입장' })).toBeEnabled()
+  await expect(inspector.getByRole('button', { name: 'ROUND 종료' })).toBeDisabled()
+  await expect(inspector.getByText('종료된 시즌에서는', { exact: false })).toHaveCount(0)
 })
 
 test('익명 사용자는 접근 키 없는 로그인 복귀 링크를 받는다', async ({ page }, testInfo) => {

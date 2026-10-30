@@ -10,6 +10,7 @@ import type { Decision, Member, Role } from './types'
 
 export function MemoryView({
   scope,
+  timeZone,
   decisions,
   archivedDecisions,
   roles,
@@ -24,6 +25,7 @@ export function MemoryView({
   changesDisabled,
 }: {
   scope: WorkspaceScope
+  timeZone: string
   decisions: Decision[]
   archivedDecisions: Decision[]
   roles: Role[]
@@ -52,7 +54,7 @@ export function MemoryView({
               <div className="decision-body">
                 <div className="decision-heading">
                   <div>
-                    <div className="decision-meta"><time>{formatInstant(decision.createdAt)}</time><span>{decision.authorName}</span></div>
+                    <div className="decision-meta"><time>{formatInstant(decision.createdAt, timeZone)}</time><span>{decision.authorName}</span></div>
                     <h2>{decision.title}</h2>
                   </div>
                   <div className="record-actions">
@@ -75,7 +77,7 @@ export function MemoryView({
                   </div>
                 </div>
                 <div className="decision-reason"><span>이유</span><DecisionText text={decision.reason} format={decision.textFormat} /></div><div className="decision-alternative"><span>검토한 대안</span><DecisionText text={decision.alternative} format={decision.textFormat} /></div>
-                <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} />
+                <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} timeZone={timeZone} />
                 <div className="decision-tags">{decision.roleIds.map((roleId) => { const role = roles.find((item) => item.id === roleId); return role ? <button type="button" key={roleId} onClick={() => onSelectRole(roleId)}>{role.name}</button> : null })}</div>
               </div>
             </article>
@@ -106,10 +108,10 @@ export function MemoryView({
                   <strong>{decision.title}</strong>
                   <small>
                     {decision.archivedAt
-                      ? `${formatInstant(decision.archivedAt)} 보관`
+                      ? `${formatInstant(decision.archivedAt, timeZone)} 보관`
                       : '보관됨'}
                   </small>
-                  <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} />
+                  <ContentChangePanel scope={scope} kind="DECISION" recordId={decision.id} timeZone={timeZone} />
                 </div>
                 <button
                   type="button"

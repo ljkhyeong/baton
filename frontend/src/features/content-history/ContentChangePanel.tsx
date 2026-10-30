@@ -28,7 +28,7 @@ function getHistory(scope: WorkspaceScope, kind: Kind, recordId: string) {
     },
   })
 }
-export function ContentChangePanel({ scope, kind, recordId }: { scope: WorkspaceScope; kind: Kind; recordId: string }) {
+export function ContentChangePanel({ scope, kind, recordId, timeZone }: { scope: WorkspaceScope; kind: Kind; recordId: string; timeZone: string }) {
   const [open, setOpen] = useState(false)
   const history = useQuery({ queryKey: [...workspaceKeys.detail(scope.teamId, scope.seasonId, scope.accessKey, scope.accountId),
     'content-changes', kind, recordId], queryFn: () => getHistory(scope, kind, recordId), enabled: open })
@@ -40,7 +40,7 @@ export function ContentChangePanel({ scope, kind, recordId }: { scope: Workspace
         : history.isError ? <p role="alert">{history.error.message} <button className="secondary-button" type="button" onClick={() => void history.refetch()}>다시 불러오기</button></p>
           : history.data.changes.length === 0 ? <p>아직 남겨진 수정 이력이 없습니다.</p>
             : <ol>{history.data.changes.map(change => <li key={change.id}>
-              <strong>{change.actorName} · {formatInstant(change.changedAt)}</strong>
+              <strong>{change.actorName} · {formatInstant(change.changedAt, timeZone)}</strong>
               <dl>{change.fields.map((field, index) => <div key={index}>
                 <dt>{field.fieldName}</dt><dd><span>변경 전</span><pre>{field.beforeValue || '값 없음'}</pre></dd>
                 <dd><span>변경 후</span><pre>{field.afterValue || '값 없음'}</pre></dd>

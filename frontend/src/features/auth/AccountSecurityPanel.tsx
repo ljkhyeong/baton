@@ -7,6 +7,7 @@ import {
   revokeAccountSessions,
 } from '@/features/auth/api'
 import { useAccountSecurity } from '@/features/auth/useAccountSecurity'
+import { clearTeamInvitationToken } from '@/features/team-access/pendingTeamInvitation'
 
 const identityLabels = {
   google: 'Google',
@@ -24,6 +25,7 @@ export default function AccountSecurityPanel({ accountId, children }: { accountI
   const [validationError, setValidationError] = useState('')
 
   const finishAccountSession = (notice: 'password_changed' | 'sessions_revoked' | 'account_deactivated') => {
+    clearTeamInvitationToken()
     window.location.replace(`/login?${new URLSearchParams({ accountNotice: notice })}`)
   }
 

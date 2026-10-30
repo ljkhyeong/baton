@@ -47,7 +47,7 @@ public class TeamAccessController {
     }
     @PostMapping(PATH + "/activate")
     public ResponseEntity<TeamAccessResponse> activate(@PathVariable UUID teamId,
-            @RequestHeader(WorkspaceLifecycleController.RECOVERY_KEY_HEADER) String recoveryKey,
+            @RequestHeader(name = WorkspaceLifecycleController.RECOVERY_KEY_HEADER, required = false) String recoveryKey,
             @AuthenticationPrincipal(errorOnInvalidType = true) AuthenticatedAccountPrincipal principal,
             @Valid @RequestBody ActivateTeamAccessRequest request) {
         expected(principal, request.expectedAccountId());

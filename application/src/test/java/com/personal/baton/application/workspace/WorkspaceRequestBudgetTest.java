@@ -182,6 +182,32 @@ class WorkspaceRequestBudgetTest {
         ).members()).noneMatch(member -> member.name().equals("박민서"));
     }
 
+    @DisplayName("팀 행의 배타 잠금이 유지되면 일반 변경은 접근 키 충돌이 아닌 내용 충돌로 실패한다")
+    @Test
+    void failsTeamSharedLockWithinBudgetAsContentConflict() throws Exception {
+        CreatedWorkspaceResult created = createWorkspace(
+                "workspace-request-budget-shared-0001",
+                "요청 예산 공유 잠금 스터디"
+        );
+
+        try (HeldDatabaseLock ignored = holdExclusiveRowLock(
+                "SELECT HEX(id) FROM teams WHERE id = UUID_TO_BIN(?) FOR UPDATE",
+                created.teamId()
+        )) {
+            assertThatThrownBy(() -> peopleUseCase.createRole(
+                    created.teamId(),
+                    created.seasonId(),
+                    "content-request-budget-shared-role-00001",
+                    created.accessKey(),
+                    new CreateRoleCommand("진행자", "모임을 진행합니다", null, null, null, null, List.of(), null)
+            )).isInstanceOfSatisfying(
+                    WorkspaceContentConflictException.class,
+                    exception -> assertThat(exception.getCause())
+                            .isInstanceOf(PessimisticLockingFailureException.class)
+            );
+        }
+    }
+
     private CreatedWorkspaceResult createWorkspace(String idempotencyKey, String teamName) {
         return lifecycleUseCase.createWorkspace(
                 idempotencyKey,

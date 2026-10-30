@@ -85,10 +85,11 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean appendSeasonMetadataIfChanged(UUID seasonId, String displayName, Instant occurredAt) {
+        // 호출 경로가 첫 일관 읽기 전에 시즌 행을 배타 잠금하거나 커밋 전의 새 시즌이므로 잠금 읽기가 필요 없다.
         List<String> latest = jdbcTemplate.queryForList(
                 """
                 SELECT display_name FROM calendar_season_metadata_outbox
-                WHERE season_id = UUID_TO_BIN(?) ORDER BY id DESC LIMIT 1 FOR UPDATE
+                WHERE season_id = UUID_TO_BIN(?) ORDER BY id DESC LIMIT 1
                 """,
                 String.class,
                 seasonId.toString()
@@ -347,6 +348,14 @@ public class JdbcCalendarOutboxAdapter implements CalendarOutboxPort, CalendarRe
     }
 
     private Optional<StoredSnapshot> findLatestSnapshot(UUID sourceItemId) {
+        // 첫 스냅샷까지 잠금 읽기를 하면 빈 범위의 gap 잠금이 인덱스 틈을 공유하는 다른 원본의 첫 INSERT를 막는다.
+        if (!Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM calendar_snapshot_outbox WHERE source_item_id = ?)",
+                Boolean.class,
+                uuidBytes(sourceItemId)
+        ))) {
+            return Optional.empty();
+        }
         return jdbcTemplate.query(
                         """
                         SELECT

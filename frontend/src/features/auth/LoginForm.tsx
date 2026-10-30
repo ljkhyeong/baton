@@ -19,6 +19,7 @@ import {
   useAuthSession,
 } from '@/features/auth/useAuthSession'
 import { accountMembershipKeys } from '@/features/membership/queries'
+import { clearTeamInvitationToken } from '@/features/team-access/pendingTeamInvitation'
 import { clearAllWorkspaceDeviceState } from '@/features/workspace/deviceState'
 import { workspaceKeys } from '@/features/workspace/queries'
 
@@ -146,6 +147,7 @@ export default function LoginForm() {
       queryClient.removeQueries({ queryKey: accountMembershipKeys.all })
       queryClient.removeQueries({ queryKey: workspaceKeys.all })
       clearRememberedAuthReturnTo()
+      clearTeamInvitationToken()
       deviceStateCleanupMutation.reset()
       setLogoutCleanupFailed(!deviceStateCleared)
     },

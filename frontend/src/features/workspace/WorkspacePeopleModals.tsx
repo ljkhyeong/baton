@@ -273,11 +273,26 @@ export function RoleModal({
   )
   const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
   const [risk, setRisk] = useState(role?.risk ?? '')
+  const [assignmentFilledFromSeason, setAssignmentFilledFromSeason] = useState(false)
+  const [validationMessage, setValidationMessage] = useState('')
   const currentMemberOptions = memberSelectionOptions(members, role?.currentMemberId)
   const nextMemberOptions = memberSelectionOptions(members, role?.nextMemberId)
+  const selectCurrentMember = (memberId: string) => {
+    setCurrentMemberId(memberId)
+    if (!memberId || (assignmentStartDate && assignmentEndDate)) return
+    // 담당 기간이 비어 있으면 서버가 종료일 기준 공백 점검을 할 수 없다.
+    setAssignmentStartDate(assignmentStartDate || season.startDate)
+    setAssignmentEndDate(assignmentEndDate || season.endDate)
+    setAssignmentFilledFromSeason(true)
+  }
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current) return
+    // 저장된 담당 업무에는 쉼표가 들어 있을 수 있어 수정할 때는 줄바꿈으로만 나눈다.
+    const responsibilityItems = splitList(responsibilities, editing ? /\n/ : /[\n,]/)
+    const invalidMessage = roleInputError(name, purpose, responsibilityItems)
+    setValidationMessage(invalidMessage)
+    if (invalidMessage) return
     const effectiveCurrentMemberId = assignmentLocked && role
       ? role.currentMemberId ?? ''
       : currentMemberId
@@ -297,7 +312,7 @@ export function RoleModal({
       nextMemberId: effectiveNextMemberId || null,
       assignmentStartDate: effectiveAssignmentStartDate || null,
       assignmentEndDate: effectiveAssignmentEndDate || null,
-      responsibilities: splitList(responsibilities),
+      responsibilities: responsibilityItems,
       risk: risk.trim() || null,
     }))
   }
@@ -316,6 +331,7 @@ export function RoleModal({
           <span>역할 이름</span>
           <input
             required
+            maxLength={100}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="예: 질문 담당"
@@ -325,6 +341,7 @@ export function RoleModal({
           <span>역할 목적</span>
           <textarea
             required
+            maxLength={1000}
             value={purpose}
             onChange={(event) => setPurpose(event.target.value)}
             placeholder="예: 모임에서 나온 질문이 빠짐없이 해결되도록 합니다"
@@ -337,7 +354,7 @@ export function RoleModal({
             <select
               value={currentMemberId}
               disabled={assignmentLocked}
-              onChange={(event) => setCurrentMemberId(event.target.value)}
+              onChange={(event) => selectCurrentMember(event.target.value)}
             >
               <option value="">담당자 미정</option>
               {currentMemberOptions.map(memberOption)}
@@ -382,6 +399,11 @@ export function RoleModal({
             />
           </label>
         </div>
+        {assignmentFilledFromSeason && (
+          <small className="form-hint">
+            담당 기간이 비어 있어 시즌 기간으로 채웠습니다. 필요하면 바꿔 주세요.
+          </small>
+        )}
         {assignmentLocked && (
           <small className="form-hint">
             인수인계를 준비하는 동안 담당자와 담당 기간은 바꿀 수 없습니다. 역할 설명과 담당 업무는 수정할 수 있습니다.
@@ -395,17 +417,19 @@ export function RoleModal({
             placeholder={'질문 수집\n자주 막히는 문제 정리'}
             rows={3}
           />
-          <small>줄바꿈 또는 쉼표로 구분해 주세요.</small>
+          <small>{editing ? '한 줄에 하나씩 적어 주세요.' : '줄바꿈 또는 쉼표로 구분해 주세요.'}</small>
         </label>
         <label>
           <span>주의사항</span>
           <textarea
+            maxLength={1000}
             value={risk}
             onChange={(event) => setRisk(event.target.value)}
             placeholder="예: 자료가 개인 계정에만 저장되어 있습니다"
             rows={2}
           />
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (
@@ -427,6 +451,16 @@ export function RoleModal({
   )
 }
 
-function splitList(value: string) {
-  return [...new Set(value.split(/[\n,]/).map((item) => item.trim()).filter(Boolean))]
+function roleInputError(name: string, purpose: string, responsibilities: string[]) {
+  if (!name.trim()) return '역할 이름을 입력해 주세요.'
+  if (!purpose.trim()) return '역할 목적을 입력해 주세요.'
+  if (responsibilities.length > 100) return '담당 업무는 100개까지 입력할 수 있습니다.'
+  if (responsibilities.some((item) => item.length > 500)) {
+    return '담당 업무는 항목마다 500자까지 입력할 수 있습니다.'
+  }
+  return ''
+}
+
+function splitList(value: string, separator: RegExp) {
+  return [...new Set(value.split(separator).map((item) => item.trim()).filter(Boolean))]
 }

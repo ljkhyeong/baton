@@ -924,6 +924,40 @@ class AuthSessionRestDocsTest {
         assertThat(session.isInvalid()).isFalse();
     }
 
+    @DisplayName("현재 비밀번호 확인을 반복하면 재시도 시간과 함께 요청률 제한으로 응답한다")
+    @Test
+    void documentsPasswordChangeRateLimit() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+        MockHttpSession session = authenticatedSession(UUID.randomUUID());
+        for (int attempt = 0; attempt < 10; attempt += 1) {
+            mockMvc.perform(passwordChange(session)).andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(passwordChange(session))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(jsonPath("$.code").value("AUTH_RATE_LIMITED"))
+                .andDo(MockMvcRestDocumentationWrapper.document(
+                        "changeLocalPasswordRateLimited",
+                        CHANGE_LOCAL_PASSWORD_DESCRIPTION,
+                        CHANGE_LOCAL_PASSWORD_SUMMARY,
+                        responseHeaders(
+                                headerWithName(RequestIdFilter.HEADER_NAME)
+                                        .description("서버가 생성한 요청 추적 ID"),
+                                headerWithName(HttpHeaders.CACHE_CONTROL)
+                                        .description("민감 응답 캐시 금지"),
+                                headerWithName(HttpHeaders.RETRY_AFTER)
+                                        .description("다음 요청까지 기다릴 초")
+                        ),
+                        errorResponseFields()
+                ));
+
+        assertThat(session.isInvalid()).isFalse();
+    }
+
     @DisplayName("소셜 로그인 전용 계정의 비밀번호 변경 요청은 충돌로 응답한다")
     @Test
     void documentsUnavailableLocalPassword() throws Exception {
@@ -990,10 +1024,27 @@ class AuthSessionRestDocsTest {
                 .header("Sec-Fetch-Site", "same-origin");
     }
 
+    private MockHttpServletRequestBuilder passwordChange(MockHttpSession session) {
+        return sameOriginMutation(post(AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH))
+                .session(session)
+                .with(csrf().asHeader())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "currentPassword": "wrong current password",
+                          "newPassword": "new correct horse battery staple"
+                        }
+                        """);
+    }
+
     private MockHttpSession authenticatedSession() {
+        return authenticatedSession(ACCOUNT_ID);
+    }
+
+    private MockHttpSession authenticatedSession(UUID accountId) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                new AccountSessionPrincipal(ACCOUNT_ID, 0),
+                new AccountSessionPrincipal(accountId, 0),
                 null,
                 List.of()
         ));

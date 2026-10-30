@@ -254,6 +254,7 @@ test('빈 DB에서 파일럿 기록과 완료 상태를 만들고 다른 브라�
     name: /^회고 질문 준비/,
   })).toBeChecked()
   await nextSeasonDialog.getByLabel('다음 시즌 이름').fill('2027 파일럿 시즌')
+  page.once('dialog', (confirmation) => confirmation.accept())
   await nextSeasonDialog.getByRole('button', {
     name: '현재 시즌 종료하고 만들기',
   }).click()

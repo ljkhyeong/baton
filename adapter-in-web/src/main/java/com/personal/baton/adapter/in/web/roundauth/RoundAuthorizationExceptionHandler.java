@@ -7,11 +7,13 @@ import com.personal.baton.application.roundauth.error.RoundParticipationDeniedEx
 import com.personal.baton.application.roundauth.error.RoundRoomConflictException;
 import com.personal.baton.application.roundauth.error.RoundRoomNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -109,6 +111,18 @@ public class RoundAuthorizationExceptionHandler {
         );
     }
 
+    // 없으면 변환 실패의 원인인 IllegalArgumentException이 위 처리기로 들어가 내부 문구가 노출된다.
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(HttpServletRequest request) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_INPUT",
+                "요청 값 형식이 올바르지 않습니다",
+                request,
+                false
+        );
+    }
+
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
     public ResponseEntity<ErrorResponse> handleInvalidRequestBody(HttpServletRequest request) {
         return error(
@@ -128,6 +142,7 @@ public class RoundAuthorizationExceptionHandler {
             boolean expireGrant
     ) {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
                 .cacheControl(CacheControl.noStore());
         if (expireGrant) {
             String roomId = RoundGrantAdmissionFilter.refreshRoomId(request);

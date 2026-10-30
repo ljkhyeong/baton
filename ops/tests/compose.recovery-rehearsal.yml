@@ -8,6 +8,9 @@ services:
   web:
     labels:
       com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
+  web-volume-owner:
+    labels:
+      com.personal.baton.recovery-rehearsal: ${BATON_RECOVERY_REHEARSAL_RUN_ID:?BATON_RECOVERY_REHEARSAL_RUN_ID is required}
   round-web:
     image: ${BATON_RECOVERY_REHEARSAL_WEB_IMAGE:?BATON_RECOVERY_REHEARSAL_WEB_IMAGE is required}
     volumes:

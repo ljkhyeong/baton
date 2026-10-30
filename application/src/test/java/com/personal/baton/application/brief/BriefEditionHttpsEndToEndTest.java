@@ -58,7 +58,9 @@ class BriefEditionHttpsEndToEndTest {
             "brief-service-previous-token-000000001";
     private static final String ACCOUNT_EMAIL = "brief-e2e@example.com";
     private static final String ACCOUNT_PASSWORD = "brief-e2e-password-2026";
-    private static final String TRUSTSTORE_PASSWORD = "changeit";
+    private static final String SSL_BUNDLE = "brief-service";
+    private static final String TRUSTED_CERTIFICATE_PROPERTY =
+            "spring.ssl.bundle.pem." + SSL_BUNDLE + ".truststore.certificate";
     private static final DockerImageName JAVA_RUNTIME_IMAGE = DockerImageName.parse(
             "eclipse-temurin:21.0.11_10-jre-alpine-3.23"
                     + "@sha256:3f08b13888f595cc49edabea7250ba69499ba25602b267da591720769400e08c"
@@ -102,17 +104,20 @@ class BriefEditionHttpsEndToEndTest {
                 "brief-current-config",
                 Map.of("brief.service-api.bearer-token", CURRENT_SERVICE_TOKEN)
         );
+        String trustedCertificate = Files.readString(tlsFiles.certificate());
         Path previousBatonConfig = secretDirectory(
                 "baton-previous-config",
-                Map.of("baton.brief.service-api.bearer-token", PREVIOUS_SERVICE_TOKEN)
+                Map.of(
+                        "baton.brief.service-api.bearer-token", PREVIOUS_SERVICE_TOKEN,
+                        TRUSTED_CERTIFICATE_PROPERTY, trustedCertificate
+                )
         );
         Path currentBatonConfig = secretDirectory(
                 "baton-current-config",
-                Map.of("baton.brief.service-api.bearer-token", CURRENT_SERVICE_TOKEN)
-        );
-        Path batonKeys = mountedFilesDirectory(
-                "baton-keys",
-                Map.of("brief-service-truststore.p12", tlsFiles.truststore())
+                Map.of(
+                        "baton.brief.service-api.bearer-token", CURRENT_SERVICE_TOKEN,
+                        TRUSTED_CERTIFICATE_PROPERTY, trustedCertificate
+                )
         );
         Path caddySecrets = mountedFilesDirectory(
                 "caddy-secrets",
@@ -162,7 +167,6 @@ class BriefEditionHttpsEndToEndTest {
                     try (GenericContainer<?> baton = batonContainer(
                             batonJar,
                             batonData,
-                            batonKeys,
                             previousBatonConfig
                     )) {
                         startBaton(baton, serviceNetwork);
@@ -327,7 +331,6 @@ class BriefEditionHttpsEndToEndTest {
                     try (GenericContainer<?> batonWithPreviousToken = batonContainer(
                             batonJar,
                             batonData,
-                            batonKeys,
                             previousBatonConfig
                     )) {
                         startBaton(batonWithPreviousToken, serviceNetwork);
@@ -352,7 +355,6 @@ class BriefEditionHttpsEndToEndTest {
                     try (GenericContainer<?> batonWithCurrentToken = batonContainer(
                             batonJar,
                             batonData,
-                            batonKeys,
                             currentBatonConfig
                     )) {
                         startBaton(batonWithCurrentToken, serviceNetwork);
@@ -548,7 +550,6 @@ class BriefEditionHttpsEndToEndTest {
     private GenericContainer<?> batonContainer(
             Path jar,
             Network dataNetwork,
-            Path keyDirectory,
             Path configDirectory
     ) {
         return securedJavaContainer(jar)
@@ -570,23 +571,13 @@ class BriefEditionHttpsEndToEndTest {
                         "BATON_BRIEF_SERVICE_API_BASE_URL",
                         "https://brief-service:8443"
                 )
+                .withEnv("BATON_BRIEF_SERVICE_API_SSL_BUNDLE", SSL_BUNDLE)
                 .withEnv("BATON_BRIEF_SERVICE_API_CONNECT_TIMEOUT", "PT1S")
                 .withEnv("BATON_BRIEF_SERVICE_API_READ_TIMEOUT", "PT3S")
-                .withEnv(
-                        "JAVA_TOOL_OPTIONS",
-                        "-Djavax.net.ssl.trustStore=/run/baton-keys/brief-service-truststore.p12 "
-                                + "-Djavax.net.ssl.trustStoreType=PKCS12 "
-                                + "-Djavax.net.ssl.trustStorePassword=" + TRUSTSTORE_PASSWORD
-                                + " -Djava.io.tmpdir=/tmp"
-                )
+                .withEnv("JAVA_TOOL_OPTIONS", "-Djava.io.tmpdir=/tmp")
                 .withFileSystemBind(
                         configDirectory.toAbsolutePath().toString(),
                         "/run/baton-config",
-                        BindMode.READ_ONLY
-                )
-                .withFileSystemBind(
-                        keyDirectory.toAbsolutePath().toString(),
-                        "/run/baton-keys",
                         BindMode.READ_ONLY
                 )
                 .waitingFor(Wait.forHttp("/actuator/health")
@@ -780,7 +771,6 @@ class BriefEditionHttpsEndToEndTest {
     private TlsFiles createTlsFiles() throws IOException, InterruptedException {
         Path certificate = tempDirectory.resolve("brief-service.crt");
         Path privateKey = tempDirectory.resolve("brief-service.key");
-        Path truststore = tempDirectory.resolve("brief-service-truststore.p12");
         run(
                 "openssl",
                 "req",
@@ -799,22 +789,7 @@ class BriefEditionHttpsEndToEndTest {
                 "-addext",
                 "subjectAltName=DNS:brief-service"
         );
-        run(
-                Path.of(System.getProperty("java.home"), "bin", "keytool").toString(),
-                "-importcert",
-                "-noprompt",
-                "-storetype",
-                "PKCS12",
-                "-keystore",
-                truststore.toString(),
-                "-storepass",
-                TRUSTSTORE_PASSWORD,
-                "-alias",
-                "brief-service",
-                "-file",
-                certificate.toString()
-        );
-        return new TlsFiles(certificate, privateKey, truststore);
+        return new TlsFiles(certificate, privateKey);
     }
 
     private Path secretDirectory(String name, Map<String, String> values) throws IOException {
@@ -924,7 +899,7 @@ class BriefEditionHttpsEndToEndTest {
         }
     }
 
-    private record TlsFiles(Path certificate, Path privateKey, Path truststore) {
+    private record TlsFiles(Path certificate, Path privateKey) {
     }
 
     private record Workspace(UUID teamId, UUID seasonId, UUID memberId, String accessKey) {

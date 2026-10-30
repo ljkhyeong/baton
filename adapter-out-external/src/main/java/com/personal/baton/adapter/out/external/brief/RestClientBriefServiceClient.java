@@ -52,13 +52,13 @@ public final class RestClientBriefServiceClient
                                                               BriefAttentionPage.Cursor after, int limit) {
         var summary = readQuery(() -> restClient.get().uri(builder -> {
                     builder.path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/attention-items/resolutions")
-                            .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).queryParam("limit", limit);
+                            .queryParam("weekStart", weekStart).queryParam("zoneId", "{zoneId}").queryParam("limit", limit);
                     if (after != null) {
                         return builder.queryParam("afterEventType", after.eventType())
                                 .queryParam("afterSourceReference", "{sourceReference}")
-                                .build(workspaceId, seasonId, after.sourceReference());
+                                .build(workspaceId, seasonId, zoneId.getId(), after.sourceReference());
                     }
-                    return builder.build(workspaceId, seasonId);
+                    return builder.build(workspaceId, seasonId, zoneId.getId());
                 }).accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefWeeklyResolutions.class), ExpectedRejection.QUERY);
         if (!weekStart.equals(summary.weekStart()) || !zoneId.equals(summary.zoneId())
                 || !weekStart.atStartOfDay(zoneId).toInstant().equals(summary.windowStart())
@@ -88,7 +88,7 @@ public final class RestClientBriefServiceClient
     public Result findLatestEditionForWeek(UUID workspaceId, UUID seasonId, LocalDate weekStart, ZoneId zoneId) {
         return requestEdition(() -> restClient.get().uri(builder -> builder
                 .path("/api/v1/workspaces/{workspaceId}/seasons/{seasonId}/editions/weekly/latest")
-                .queryParam("weekStart", weekStart).queryParam("zoneId", zoneId.getId()).build(workspaceId, seasonId))
+                .queryParam("weekStart", weekStart).queryParam("zoneId", "{zoneId}").build(workspaceId, seasonId, zoneId.getId()))
                 .accept(MediaType.APPLICATION_JSON).retrieve().toEntity(BriefEditionSnapshot.class), true);
     }
 

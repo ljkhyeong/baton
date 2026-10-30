@@ -64,21 +64,11 @@ public class ScheduledRoundGenerationWorker {
         if (schedule == null || !schedule.isEnabled()) {
             return false;
         }
-        if (schedule.getNextOccurrenceDate().isAfter(season.getEndDate())) {
-            season.disableRoundSchedule();
-            seasonRepository.saveSeason(season);
-            return false;
-        }
 
         ZoneId zoneId = season.getZoneId();
         LocalDate today = LocalDate.ofInstant(triggeredAt, zoneId);
         LocalDate occurrenceDate = season.nextDueRoundOccurrence(today).orElse(null);
         if (occurrenceDate == null) {
-            return false;
-        }
-        if (!season.contains(occurrenceDate)) {
-            season.disableRoundSchedule();
-            seasonRepository.saveSeason(season);
             return false;
         }
 

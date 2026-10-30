@@ -11,6 +11,8 @@ import com.personal.baton.BatonApplication;
 import com.personal.baton.application.brief.port.in.ReconcileBriefContinuitySignalsUseCase;
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import com.personal.baton.application.workspace.BriefContinuitySignalRecorder;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalSeverity;
+import com.personal.baton.application.workspace.port.in.ContinuitySignalType;
 import com.personal.baton.application.workspace.port.in.WorkspaceLifecycleUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspaceOperationsUseCase;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleUseCase;
@@ -46,7 +48,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -209,6 +213,72 @@ class BriefContinuitySignalPersistenceTest {
                     workspace.teamId(), workspace.seasonId(), workspace.accessKey(), true
             );
         }
+    }
+
+    @DisplayName("서로 다른 시즌의 첫 신호 기록은 같은 인덱스 틈을 공유해도 교착하지 않는다")
+    @Test
+    void recordsFirstSignalsOfDifferentSeasonsWithoutDeadlock() throws Exception {
+        String adjacentSeasonPrefix = UUID.randomUUID().toString().substring(0, 34);
+        UUID firstSeasonId = UUID.fromString(adjacentSeasonPrefix + "01");
+        UUID secondSeasonId = UUID.fromString(adjacentSeasonPrefix + "02");
+        CyclicBarrier bothSeasonsRead = new CyclicBarrier(2);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> recordFirstSignal(firstSeasonId, bothSeasonsRead));
+            var second = executor.submit(() -> recordFirstSignal(secondSeasonId, bothSeasonsRead));
+
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+
+            assertThat(jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*)
+                    FROM brief_continuity_signal
+                    WHERE season_id IN (UUID_TO_BIN(?), UUID_TO_BIN(?))
+                    """,
+                    Long.class,
+                    firstSeasonId.toString(),
+                    secondSeasonId.toString()
+            )).isEqualTo(2);
+        } finally {
+            executor.shutdownNow();
+            for (String table : List.of(
+                    "brief_continuity_outbox",
+                    "brief_continuity_signal",
+                    "brief_continuity_scope"
+            )) {
+                jdbcTemplate.update(
+                        "DELETE FROM " + table + " WHERE season_id IN (UUID_TO_BIN(?), UUID_TO_BIN(?))",
+                        firstSeasonId.toString(),
+                        secondSeasonId.toString()
+                );
+            }
+        }
+    }
+
+    private void recordFirstSignal(UUID seasonId, CyclicBarrier bothSeasonsRead) {
+        UUID teamId = UUID.randomUUID();
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            signalStore.lockSeason(teamId, seasonId);
+            assertThat(signalStore.findBySeason(teamId, seasonId)).isEmpty();
+            try {
+                bothSeasonsRead.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException | BrokenBarrierException | TimeoutException exception) {
+                throw new IllegalStateException("두 시즌의 조회를 맞추지 못했습니다", exception);
+            }
+            signalStore.append(UUID.randomUUID(), new BriefContinuityEvent(
+                    UUID.randomUUID(),
+                    ContinuitySignalType.ROLE_UNASSIGNED,
+                    2,
+                    ContinuitySignalSeverity.CRITICAL,
+                    teamId,
+                    seasonId,
+                    BriefContinuityEvent.sourceReference(UUID.randomUUID()),
+                    1,
+                    NOW,
+                    BriefContinuityEvent.State.ACTIVE
+            ));
+        });
     }
 
     private RoleResult assignedRole(

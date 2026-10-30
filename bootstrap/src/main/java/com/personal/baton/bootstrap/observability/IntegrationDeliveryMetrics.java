@@ -163,15 +163,22 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
                         WHEN delivery_status = 'PENDING' THEN %s
                         ELSE NULL
                     END) AS oldest_pending_at,
-                    MAX(CASE
-                        WHEN delivery_status = 'DELIVERED' THEN completed_at
-                        ELSE NULL
-                    END) AS last_success_at,
+                    (
+                        SELECT MAX(completed_at)
+                        FROM %s
+                        WHERE delivery_status = 'DELIVERED'
+                    ) AS last_success_at,
                     COALESCE(SUM(
                         delivery_status = 'PROCESSING' AND lease_expires_at <= ?
                     ), 0) AS expired_processing_count
                 FROM %s delivery
-                """.formatted(unresolvedFailure, integration.pendingSinceColumn, integration.tableName);
+                WHERE delivery_status IN ('PENDING', 'PROCESSING', 'FAILED')
+                """.formatted(
+                        unresolvedFailure,
+                        integration.pendingSinceColumn,
+                        integration.tableName,
+                        integration.tableName
+                );
         return jdbcTemplate.queryForObject(
                 sql,
                 this::deliverySnapshot,
@@ -194,12 +201,13 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
         );
     }
 
+    // 인박스는 삭제가 없어 COUNT(*)가 행 수에 비례한다. 마지막 접수 시각만 인덱스에서 바로 찾는다.
     private WatchInboxSnapshot readWatchInboxSnapshot() {
         return jdbcTemplate.queryForObject(
                 """
                 SELECT
                     COUNT(*) AS stored_items,
-                    MAX(accepted_at) AS last_accepted_at
+                    (SELECT MAX(accepted_at) FROM watch_health_event_inbox) AS last_accepted_at
                 FROM watch_health_event_inbox
                 """,
                 (resultSet, rowNumber) -> new WatchInboxSnapshot(
@@ -232,7 +240,7 @@ public class IntegrationDeliveryMetrics implements MeterBinder {
     private enum Integration {
         CALENDAR("calendar", "calendar_snapshot_outbox", "occurred_at", ""),
         CALENDAR_METADATA("calendar_metadata", "calendar_season_metadata_outbox", "occurred_at", ""),
-        WATCH("watch", "watch_monitor_outbox", "occurred_at", ""),
+        WATCH("watch", "watch_monitor_outbox", "occurred_at", "INVALID_TARGET_URL"),
         BRIEF("brief", "brief_continuity_outbox", "occurred_at", ""),
         EMAIL(
                 "email",

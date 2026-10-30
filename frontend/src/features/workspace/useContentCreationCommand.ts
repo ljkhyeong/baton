@@ -9,6 +9,7 @@ import {
   clearPendingContentCreationCleanup,
   hasPendingContentCreation,
   markPendingContentCreationCleanupRequired,
+  markUnconfirmablePendingContentCreations,
   pendingContentCreationCleanupRetry,
   prepareContentCreation,
   runWithContentCreationLock,
@@ -66,6 +67,7 @@ const terminalContentCreationCodes = new Set([
   'ROLE_NAME_CONFLICT',
   'ROUND_NAME_CONFLICT',
   'ROLE_HANDOFF_STATE_CONFLICT',
+  'SEASON_ENDED',
   'TEAM_NOT_FOUND',
   'SEASON_NOT_FOUND',
   'MEMBER_NOT_FOUND',
@@ -84,11 +86,19 @@ const contentCreationLockMessages = {
   failed: '새 항목을 만들 수 없습니다. 새로고침한 뒤 다시 시도해 주세요.',
 }
 const contentCreationCleanupRequiredMessage = '임시 기록을 삭제하지 못해 요청을 보내지 않았습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.'
+const contentCreationUnconfirmableMessage = '이전 요청의 저장 결과를 더 이상 확인할 수 없습니다. 임시 기록을 삭제한 뒤 목록에서 저장 여부를 확인해 주세요.'
 const contentCreationCleanupCompletedMessage = '임시 기록을 삭제했습니다. 목록과 입력을 확인한 뒤 다시 제출해 주세요.'
 const guardedContentCreationMessage = '이전 항목이 저장됐는지 확인하지 못해 새 항목을 추가하지 않았습니다. 이전과 같은 내용을 다시 제출해 저장 여부를 확인하세요.'
 
 export function isTerminalContentCreationError(error: unknown) {
   return resolveIdempotencyJournalFailure(error, contentCreationJournalPolicy) !== 'retrySameRequest'
+}
+
+function cleanupRequiredMessage(retry: PendingContentCreationCleanupRetry | null) {
+  if (!retry) return ''
+  return retry.cleanupReason === 'unconfirmable'
+    ? contentCreationUnconfirmableMessage
+    : contentCreationCleanupRequiredMessage
 }
 
 function preparationError(
@@ -112,9 +122,7 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
 
   const reset = () => {
     mutation.reset()
-    setStorageError(pendingContentCreationCleanupRetry()
-      ? contentCreationCleanupRequiredMessage
-      : '')
+    setStorageError(cleanupRequiredMessage(pendingContentCreationCleanupRetry()))
   }
 
   const submit = (
@@ -194,26 +202,33 @@ function useContentCreationCommand<Operation extends ContentCreationOperation>(
   }
 }
 
-export function usePendingContentCreationCleanupCommand() {
+// unconfirmableSeasonIds: 시즌 종료나 권한 상실로 생성 요청을 다시 보낼 수 없는 팀의 시즌
+export function usePendingContentCreationCleanupCommand(
+  teamId: string,
+  unconfirmableSeasonIds: string[],
+) {
   const [cleanupRetry, setCleanupRetry] = useState<PendingContentCreationCleanupRetry | null>(
     () => pendingContentCreationCleanupRetry(),
   )
   const [pending, setPending] = useState(false)
-  const [message, setMessage] = useState(
-    cleanupRetry ? contentCreationCleanupRequiredMessage : '',
-  )
+  const [message, setMessage] = useState(cleanupRequiredMessage(cleanupRetry))
 
   useEffect(() => {
     const syncCleanupRetry = () => {
       const nextRetry = pendingContentCreationCleanupRetry()
       setCleanupRetry(nextRetry)
-      if (nextRetry) setMessage(contentCreationCleanupRequiredMessage)
+      if (nextRetry) setMessage(cleanupRequiredMessage(nextRetry))
     }
 
     const unsubscribe = subscribePendingContentCreationCleanup(syncCleanupRetry)
     syncCleanupRetry()
     return unsubscribe
   }, [])
+
+  const unconfirmableSeasons = unconfirmableSeasonIds.join()
+  useEffect(() => {
+    markUnconfirmablePendingContentCreations(teamId, unconfirmableSeasonIds)
+  }, [teamId, unconfirmableSeasons])
 
   const retryCleanup = () => {
     if (!cleanupRetry || pending) return false

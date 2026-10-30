@@ -60,7 +60,8 @@ export function useRecordDraft(scope: WorkspaceScope | null, kind: RecordDraftKi
   }, [scopeValue])
 
   useEffect(() => {
-    if (!key || serialized === ignored.current) return
+    // 저장된 초안을 불러오거나 삭제하기 전에는 새 입력으로 덮어쓰지 않는다.
+    if (!key || available || serialized === ignored.current) return
     try {
       if (serialized === initial.current) {
         sessionStorage.removeItem(key)
@@ -78,7 +79,7 @@ export function useRecordDraft(scope: WorkspaceScope | null, kind: RecordDraftKi
     } catch {
       setMessage('초안을 저장하지 못했습니다. 페이지를 나가기 전에 입력 내용을 복사해 주세요.')
     }
-  }, [key, serialized])
+  }, [key, available, serialized])
 
   const discard = () => {
     if (!key) return
@@ -99,7 +100,7 @@ export function RecordDraftNotice({ draft, pending, onRestore }: {
   return <aside className={actionable ? 'record-draft has-draft' : 'record-draft'} aria-label="작성 중 초안">
     <small>초안은 이 탭에 최대 24시간 보관합니다. 새로고침해도 같은 탭에서 불러올 수 있습니다. 불러온 뒤 작성자와 역할을 확인하세요.</small>
     {actionable && <>
-      <p>이전에 작성하던 초안이 있습니다.{draft.changedOriginal && ' 원본이 변경되었습니다. 최신 내용과 비교해 주세요.'}</p>
+      <p>이전에 작성하던 초안이 있습니다. 불러오거나 삭제하기 전에는 새 입력을 초안으로 저장하지 않습니다.{draft.changedOriginal && ' 원본이 변경되었습니다. 최신 내용과 비교해 주세요.'}</p>
       <button type="button" className="secondary-button" disabled={pending} onClick={() => {
         onRestore(draft.saved!.fields); draft.restored()
       }}>초안 불러오기</button>

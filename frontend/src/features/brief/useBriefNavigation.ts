@@ -31,7 +31,8 @@ export function useBriefNavigation(scopeKey: string) {
   const clearLink = () => {
     const query = new URLSearchParams(location.search)
     query.delete('brief')
-    void navigate({ pathname: location.pathname, search: query.toString(), hash: location.hash }, { replace: true })
+    // 작업 공간은 접근 키를 저장한 뒤 라우터를 거치지 않고 주소의 프래그먼트를 지우므로 실제 주소를 따른다.
+    void navigate({ pathname: location.pathname, search: query.toString(), hash: window.location.hash }, { replace: true })
   }
   return { selection, update, invalidLink, clearLink }
 }

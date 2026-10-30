@@ -43,4 +43,9 @@ RUN command -v setcap >/dev/null \
     && BATON_HOST=baton.invalid \
     BATON_ROUND_RUNTIME_ENABLED=false \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile \
-    && caddy list-modules | grep -Fxq 'http.handlers.rate_limit'
+    && caddy list-modules | grep -Fxq 'http.handlers.rate_limit' \
+    && addgroup -S -g 10002 caddy \
+    && adduser -S -D -H -u 10002 -G caddy caddy \
+    && chown -R caddy:caddy /data /config
+
+USER caddy

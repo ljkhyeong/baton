@@ -5,8 +5,12 @@ import {
   ACCESS_KEY,
   blockAccessKeyStorage,
   installApi,
+  makeProjection,
+  MEMBER_ONE_ID,
   navigation,
   openSharedWorkspace,
+  PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+  pendingRotationIdempotencyKey,
   recordedCalls,
   SEASON_ID,
   storedAccessKey,
@@ -24,6 +28,12 @@ const PASSWORD = 'correct horse battery staple'
 const VERIFICATION_TOKEN = 'verification-token-'.padEnd(48, 'a')
 const ROUND_ROOM_ID = 'bcdf-ghjk-mnpq'
 const ROUND_ROOM_PATH = `/room/${ROUND_ROOM_ID}`
+const TEAM_INVITATION_TOKEN = 'a'.repeat(43)
+// 응답을 잃은 공유 링크 재발급의 임시 기록
+const PENDING_ROTATION_RECORD = JSON.stringify({
+  operation: 'rotate',
+  idempotencyKey: 'pending-rotation-'.padEnd(36, 'a'),
+})
 // 로그아웃 정리 대상인 ROUND 입장 기록의 시드 값
 const DEVICE_ROUND_SEED = {
   teamId: TEAM_ID,
@@ -332,7 +342,9 @@ async function submitPasswordChange(
 // 로그아웃이 지워야 할 팀 접속 정보와 남겨야 할 다른 설정을 함께 확인한다.
 async function expectDeviceAccessCleared(page: Page) {
   expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
-    key.startsWith('baton-access-key:') || key === 'baton-recent-workspaces:v1'
+    key.startsWith('baton-access-key:')
+      || key.startsWith('baton-pending-access-key-change:')
+      || key === 'baton-recent-workspaces:v1'
   )))).toEqual([])
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
     key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
@@ -340,6 +352,26 @@ async function expectDeviceAccessCleared(page: Page) {
   expect(await page.evaluate(() => localStorage.getItem('unrelated-local-setting'))).toBe('keep')
   expect(await page.evaluate(() => sessionStorage.getItem('unrelated-session-setting')))
     .toBe('keep')
+}
+
+// 초대 확인 화면을 수락 없이 떠나 같은 탭에 초대 토큰을 남긴다.
+async function leaveTeamInvitationPending(page: Page) {
+  await page.route('**/api/v1/team-invitations/preview', (route) => route.fulfill({ json: {
+    teamId: TEAM_ID,
+    teamName: '초대받은 팀',
+    memberId: MEMBER_ONE_ID,
+    memberName: '초대받은 구성원',
+    permission: 'VIEWER',
+    expiresAt: '2026-12-31T00:00:00Z',
+  } }))
+  await page.goto(`/join#invite=${TEAM_INVITATION_TOKEN}`)
+  await expect(page.getByRole('heading', { name: '초대받은 팀' })).toBeVisible()
+}
+
+async function expectTeamInvitationCleared(page: Page) {
+  await page.goto('/join')
+  await expect(page.getByText('초대 링크를 다시 열어 주세요.', { exact: false })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '초대받은 팀' })).toHaveCount(0)
 }
 
 async function installRoundRoomDocument(page: Page) {
@@ -957,9 +989,12 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await expect(page.getByText(`계정 ID ${ACCOUNT_ID}`)).toBeVisible()
   const peer = await context.newPage()
   const workspaceApi = await installApi(peer)
+  await installAuthApi(peer)
   await openSharedWorkspace(peer)
-  await page.evaluate(({ teamId, seasonId, roomId, resourceId }) => {
+  await page.evaluate(({ teamId, seasonId, roomId, resourceId, rotationStorageKey, rotationRecord }) => {
     localStorage.setItem('baton-access-key:00000000-0000-4000-8000-000000000099', 'other-capability')
+    localStorage.setItem(rotationStorageKey, rotationRecord)
+    localStorage.setItem('baton-pending-access-key-change:v1:00000000-0000-4000-8000-000000000099', '손상된 기록')
     localStorage.setItem('unrelated-local-setting', 'keep')
     sessionStorage.setItem(`baton-round-entry:v1:${roomId}`, JSON.stringify({
       version: 1,
@@ -973,7 +1008,11 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
       roomId,
     )
     sessionStorage.setItem('unrelated-session-setting', 'keep')
-  }, DEVICE_ROUND_SEED)
+  }, {
+    ...DEVICE_ROUND_SEED,
+    rotationStorageKey: PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
+    rotationRecord: PENDING_ROTATION_RECORD,
+  })
   await page.getByRole('button', { name: '로그아웃' }).click()
 
   await expect(page.getByRole('button', { name: '이메일로 로그인' })).toBeVisible()
@@ -1162,6 +1201,214 @@ test('로그아웃 후 기기 정리 재시도는 서버 로그아웃을 반복�
   expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
   await expectDeviceAccessCleared(page)
 })
+
+test('접근 키 변경 임시 기록을 지우지 못하면 로그아웃 정리 실패를 안내하고 다시 지운다', async ({ page }) => {
+  const api = await installAuthApi(page, { authenticated: true })
+  await page.addInitScript(({ storageKey, record }) => {
+    const originalRemoveItem = Storage.prototype.removeItem
+    localStorage.setItem(storageKey, record)
+    let failed = false
+    Storage.prototype.removeItem = function removeItem(key) {
+      if (this === localStorage && key === storageKey && !failed) {
+        failed = true
+        throw new DOMException('Storage disabled', 'SecurityError')
+      }
+      originalRemoveItem.call(this, key)
+    }
+  }, { storageKey: PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY, record: PENDING_ROTATION_RECORD })
+
+  await page.goto('/login')
+  await expect(page.getByText('이미 로그인되어 있습니다.')).toBeVisible()
+  await page.getByRole('button', { name: '로그아웃' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('팀 접속 정보를 모두 삭제하지 못했습니다.')
+  expect(await pendingRotationIdempotencyKey(page)).not.toBeNull()
+  await page.getByRole('button', { name: '이 기기 접근 정보 다시 지우기' }).click()
+
+  await expect(page.getByRole('status')).toContainText('이 기기에 저장된 팀 접속 정보를 지웠습니다.')
+  expect(await pendingRotationIdempotencyKey(page)).toBeNull()
+  expect(callsFor(api.calls, 'POST', '/api/v1/auth/logout')).toHaveLength(1)
+})
+
+test('@smoke 로그아웃하면 수락하지 않은 팀 초대를 지워 다음 계정에 보여 주지 않는다', async ({ page }) => {
+  await installAuthApi(page, { authenticated: true })
+  await leaveTeamInvitationPending(page)
+
+  await page.goto('/login')
+  await page.getByRole('button', { name: '로그아웃' }).click()
+  await loginWithEmail(page)
+  await expect(page).toHaveURL(/\/$/)
+
+  await expectTeamInvitationCleared(page)
+})
+
+for (const { title, endSession } of [
+  {
+    title: '비밀번호 변경은',
+    endSession: (page: Page) => submitPasswordChange(page, PASSWORD, 'new correct horse battery staple'),
+  },
+  {
+    title: '모든 기기 로그아웃은',
+    endSession: async (page: Page) => {
+      page.once('dialog', (dialog) => dialog.accept())
+      await page.getByRole('button', { name: '모든 기기에서 로그아웃' }).click()
+    },
+  },
+  {
+    title: '계정 비활성화는',
+    endSession: async (page: Page) => {
+      await page.getByRole('checkbox', { name: '기록 보존과 로그인 중지를 확인했습니다.' }).check()
+      await page.getByRole('button', { name: '이 계정 비활성화' }).click()
+    },
+  },
+]) {
+  test(`@smoke ${title} 공유 키를 유지하고 수락하지 않은 팀 초대만 지운다`, async ({ page }) => {
+    const sessionState = { authenticated: true }
+    await installAuthApi(page, { sessionState })
+    await page.route('**/api/v1/auth/account-deactivations', (route) => {
+      sessionState.authenticated = false
+      return route.fulfill({ status: 204 })
+    })
+    await leaveTeamInvitationPending(page)
+    await page.evaluate(({ key, value }) => localStorage.setItem(key, value), {
+      key: `baton-access-key:${TEAM_ID}`,
+      value: ACCESS_KEY,
+    })
+
+    await page.goto('/account')
+    await endSession(page)
+    await expect(page).toHaveURL(/\/login$/)
+
+    await expectTeamInvitationCleared(page)
+    expect(await storedAccessKey(page)).toBe(ACCESS_KEY)
+  })
+}
+
+test('@smoke 계정 보안 응답의 계정이 세션과 다르면 표시하지 않고 다시 확인을 안내한다', async ({ page }) => {
+  await installAuthApi(page, { authenticated: true })
+  await page.route('**/api/v1/auth/account', (route) => route.fulfill({ json: {
+    accountId: '8e448211-66ae-44ab-9888-c4960648c22c',
+    displayName: '다른 계정',
+    identities: [],
+  } }))
+  await page.goto('/account')
+
+  await expect(page.getByRole('alert')).toContainText('계정 보안 정보를 불러오지 못했습니다.')
+  await expect(page.getByRole('heading', { name: '다른 계정' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '다시 확인', exact: true })).toBeVisible()
+})
+
+test('@smoke URL.parse가 없는 브라우저에서도 로그인 복귀 경로를 검증한다', async ({ page }) => {
+  await page.addInitScript(() => Reflect.deleteProperty(URL, 'parse'))
+  await installAuthApi(page)
+  await page.goto(`/login?returnTo=${encodeURIComponent(`${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`)}`)
+  await loginWithEmail(page)
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`)
+
+  await page.goto(`/login?returnTo=${encodeURIComponent('//evil.example/steal')}`)
+  await expect(page.getByRole('link', { name: '스터디로 이동' })).toHaveAttribute('href', '/')
+})
+
+// 계정 전환 팀은 로그인 전까지 저장된 공유 키도 거부한다.
+async function installAccountOnlyWorkspace(page: Page, sessionState: { authenticated: boolean }) {
+  const projection = makeProjection()
+  projection.team.accountAccessEnabled = true
+  projection.team.permission = 'MEMBER'
+  await installApi(page, projection)
+  await installAuthApi(page, { sessionState })
+  await page.route(`**${SCOPE_PATH}/workspace`, (route) => sessionState.authenticated
+    ? route.fallback()
+    : route.fulfill({ status: 403, json: {
+        code: 'WORKSPACE_ACCESS_DENIED',
+        message: '계정의 초대·권한을 확인해 주세요.',
+      } }))
+}
+
+for (const { title, open } of [
+  {
+    title: '이 기기에 저장된 공유 키로',
+    open: async (page: Page) => {
+      await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), {
+        key: `baton-access-key:${TEAM_ID}`,
+        value: ACCESS_KEY,
+      })
+      await page.goto(WORKSPACE_PATH)
+    },
+  },
+  {
+    title: '예전 공유 링크로',
+    open: (page: Page) => page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`),
+  },
+]) {
+  test(`@smoke 계정 전환 팀을 ${title} 연 비로그인 사용자는 같은 탭에서 로그인해 돌아간다`, async ({ page }) => {
+    await installAccountOnlyWorkspace(page, { authenticated: false })
+    await open(page)
+
+    await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
+    const login = page.getByRole('link', { name: '로그인', exact: true })
+    await expect(login).toHaveAttribute('href', `/login?${new URLSearchParams({ returnTo: WORKSPACE_PATH })}`)
+    await login.click()
+    await loginWithEmail(page)
+
+    await expect(page).toHaveURL(new RegExp(`${WORKSPACE_PATH}$`))
+    await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+  })
+}
+
+test('@smoke 로그인한 계정이 작업 공간 접근을 거부당하면 로그인 링크를 표시하지 않는다', async ({ page }) => {
+  await page.route(`**${SCOPE_PATH}/workspace`, (route) => route.fulfill({ status: 403, json: {
+    code: 'WORKSPACE_ACCESS_DENIED',
+    message: '계정의 초대·권한을 확인해 주세요.',
+  } }))
+  await installAuthApi(page, { authenticated: true })
+  await page.goto(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '다시 시도하기' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toHaveCount(0)
+})
+
+test('@smoke 작업 공간은 세션 조회 실패를 미인증으로 추측하지 않고 다시 확인한다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.team.accountAccessEnabled = true
+  projection.team.permission = 'MEMBER'
+  await installApi(page, projection)
+  await installAuthApi(page, { authenticated: true, sessionFailuresBeforeSuccess: 1 })
+  await page.goto(WORKSPACE_PATH)
+
+  await expect(page.getByRole('alert')).toContainText('로그인 상태를 확인하지 못했습니다.')
+  await expect(page.getByText('로그인 또는 공유 링크 필요')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '다시 확인', exact: true }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+})
+
+for (const { title, search, returnTo } of [
+  {
+    title: '복귀할 수 없는 쿼리가 있으면 작업 공간 경로로',
+    search: `?${new URLSearchParams({ workKind: 'handoff', workId: '8e448211-66ae-44ab-9888-c4960648c221' })}`,
+    returnTo: WORKSPACE_PATH,
+  },
+  {
+    title: '특정 주간 요약 쿼리는 그대로',
+    search: '?brief=8e448211-66ae-44ab-9888-c4960648c221',
+    returnTo: `${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`,
+  },
+]) {
+  test(`@smoke 작업 공간 링크에서 로그인하면 ${title} 돌아간다`, async ({ page }) => {
+    await installAccountOnlyWorkspace(page, { authenticated: false })
+    await page.goto(`${WORKSPACE_PATH}${search}`)
+
+    const login = page.getByRole('link', { name: '로그인', exact: true })
+    await expect(login).toHaveAttribute('href', `/login?returnTo=${encodeURIComponent(returnTo)}`)
+    await login.click()
+    await loginWithEmail(page)
+
+    await expect(page).toHaveURL(returnTo)
+    await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+  })
+}
 
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
   await blockAccessKeyStorage(context)
