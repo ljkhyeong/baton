@@ -890,6 +890,26 @@ test('@operations 반복 업무와 회차를 안전하게 생성하고 선택한
   await expect(page.getByRole('button', { name: '회고 질문 준비 완료 취소' })).toBeVisible()
 })
 
+test('@operations 다음 예정일이 시즌 종료일을 넘은 일정은 기간을 늘리면 이어서 생성한다고 안내한다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.season.roundSchedule = {
+    firstMeetingDate: '2026-07-23',
+    meetingTime: '20:00:00',
+    recurrence: 'WEEKLY',
+    generationLeadDays: 7,
+    enabled: true,
+    nextOccurrenceDate: '2026-09-24',
+  }
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+
+  const card = page.locator('.round-schedule-card')
+  await expect(card).toContainText('시즌 안의 회차 생성 완료 · 시즌 기간을 늘리면 2026. 9. 24.부터 이어서 생성합니다')
+  await expect(card).not.toContainText('자동 생성 켜짐')
+  await expect(card).not.toContainText('다음 예정일')
+})
+
 test('@operations @responsive 반복 업무 정의를 보관해도 과거 실행을 완료하고 복원한 정의는 다음 회차부터 사용한다', async ({ page }, testInfo) => {
   test.slow(testInfo.project.name === 'webkit', '여러 화면에서 보관·완료·복원과 새 회차 생성을 확인한다')
   const initialProjection = makeProjection()
