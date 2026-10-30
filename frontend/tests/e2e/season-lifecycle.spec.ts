@@ -433,6 +433,8 @@ async function submitNextSeason(dialog: Locator) {
 
 test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 최신 데이터를 불러온다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '중앙 충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const pageErrors: Error[] = []
+  page.on('pageerror', (error) => pageErrors.push(error))
   const api = await attachSeasonApi(page)
   await openWorkspace(page)
 
@@ -450,6 +452,7 @@ test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 �
   await seasonSwitcher(page).click()
   await expect(page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' }))
     .toContainText('다른 구성원이 고친 시즌')
+  expect(pageErrors).toEqual([])
 })
 
 test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 초점을 복원한다', async ({ page }) => {

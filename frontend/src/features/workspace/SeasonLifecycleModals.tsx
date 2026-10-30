@@ -4,7 +4,8 @@ import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { formatInstantDate } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import { daysUntil } from './seasonCalendar'
-import { FormActions, FormError, ModalShell } from './WorkspaceModalPrimitives'
+import { FormActions, FormError, ModalShell, useSubmissionLock } from './WorkspaceModalPrimitives'
+import type { SaveResult } from './WorkspaceModalPrimitives'
 import { formatLocalDate } from './workspacePresentation'
 import type {
   CreateNextSeasonRequest,
@@ -159,8 +160,9 @@ export function SeasonEditModal({
   pending: boolean
   error: unknown
   onClose: () => void
-  onSave: (request: UpdateSeasonRequest) => void
+  onSave: (request: UpdateSeasonRequest) => SaveResult
 }) {
+  const submission = useSubmissionLock(pending)
   const [name, setName] = useState(season.name)
   const [startDate, setStartDate] = useState(season.startDate)
   const [endDate, setEndDate] = useState(season.endDate)
@@ -168,13 +170,14 @@ export function SeasonEditModal({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (submission.closeGuardRef.current) return
     const normalizedName = name.trim()
     if (!normalizedName) {
       setValidationError('시즌 이름을 입력해 주세요.')
       return
     }
     setValidationError('')
-    onSave({ name: normalizedName, startDate, endDate })
+    submission.start(onSave({ name: normalizedName, startDate, endDate }))
   }
 
   return (
@@ -183,7 +186,8 @@ export function SeasonEditModal({
       kicker="시즌"
       title="시즌 정보 수정"
       description="시즌 이름과 기간을 바꿉니다. 기존 모임 날짜와 담당 기간은 새 기간 안에 있어야 합니다."
-      closeDisabled={pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -222,7 +226,7 @@ export function SeasonEditModal({
         </div>
         {validationError && <p className="form-error" role="alert">{validationError}</p>}
         <FormError error={error} />
-        <FormActions pending={pending} submitLabel="시즌 정보 저장" pendingLabel="저장하는 중…" onClose={onClose} />
+        <FormActions pending={submission.pending} closeGuardRef={submission.closeGuardRef} submitLabel="시즌 정보 저장" pendingLabel="저장하는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
