@@ -1244,6 +1244,41 @@ test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 �
   await expect(panel.getByText('수정 필요 · 변경 전 확인 기록')).toBeVisible()
 })
 
+test('@memory 자료를 수정하면 열어 둔 확인 기록을 다시 불러와 재확인 필요를 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '캐시 무효화는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
+    url: 'https://example.com/guide', description: null, archivedAt: null, createdAt: '2026-09-05T00:00:00Z' })
+  await installApi(page, projection)
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  await page.route('**/role-resources/*/verifications/schedule', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, version: -1,
+    intervalDays: null, nextReviewOn: null, today: '2026-09-05', reviewDue: false,
+  } }))
+  let version = 0
+  await page.route('**/role-resources/*/verifications', route => route.fulfill({ json: {
+    teamId: TEAM_ID, seasonId: SEASON_ID, resourceId: CREATED_ROLE_RESOURCE_ID, resourceVersion: version,
+    verifications: [{ id: '00000000-0000-4000-8000-000000000105', resourceVersion: 0, memberId: MEMBER_ONE_ID,
+      memberName: '박민서', url: 'https://example.com/guide', status: 'CONFIRMED', note: null,
+      verifiedAt: '2026-09-05T03:00:00Z', current: version === 0 }],
+  } }))
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  const panel = page.locator('.resource-verification').first()
+  await panel.locator('summary').click()
+  await expect(panel.getByText('사용할 수 있는 자료로 확인했습니다.')).toBeVisible()
+
+  await page.getByRole('button', { name: '운영 안내 자료 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '참고 자료 수정' })
+  await dialog.getByLabel('링크').fill('https://example.com/new-guide')
+  version = 1
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await expect(panel.getByText('자료가 변경되어 재확인이 필요합니다.')).toBeVisible()
+})
+
 test('@handoff 할 일 화면의 바통 알림은 인계가 가장 가까운 역할을 보여 주고 인수인계로 이동한다', async ({ page }, testInfo) => {
   await page.clock.setFixedTime(new Date('2026-09-03T00:00:00+09:00'))
   await installApi(page)
