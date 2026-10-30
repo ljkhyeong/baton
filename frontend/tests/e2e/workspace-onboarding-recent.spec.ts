@@ -8,6 +8,7 @@ import {
   ACCESS_KEY,
   WORKSPACE_PATH,
   SCOPE_PATH,
+  PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   PENDING_CREATION_STORAGE_PREFIX,
   RECENT_WORKSPACE,
   makeProjection,
@@ -1115,6 +1116,11 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
       roomId,
     )
   }, { roomId: 'bcdf-ghjk-mnpq', teamId: TEAM_ID, seasonId: SEASON_ID })
+  const otherTeamRotationKey = 'baton-pending-access-key-change:v1:00000000-0000-4000-8000-000000000099'
+  await page.evaluate((storageKeys) => {
+    const rotation = JSON.stringify({ operation: 'rotate', idempotencyKey: crypto.randomUUID() })
+    storageKeys.forEach((storageKey) => localStorage.setItem(storageKey, rotation))
+  }, [PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY, otherTeamRotationKey])
   const peer = await context.newPage()
   await api.attachPage(peer)
   await peer.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: false } }))
@@ -1144,6 +1150,9 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
     key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
   )))).toEqual([])
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
+    key.startsWith('baton-pending-access-key-change:')
+  )))).toEqual([otherTeamRotationKey])
   await peer.close()
 })
 

@@ -51,6 +51,14 @@ export function clearPendingAccessKeyRotation(teamId: string, idempotencyKey: st
   )
 }
 
+export function forgetPendingAccessKeyRotation(teamId: string) {
+  try {
+    window.localStorage.removeItem(storageKey(teamId))
+  } catch {
+    // 저장소를 쓸 수 없으면 같은 저장소의 접근 키 삭제 실패로 먼저 안내한다.
+  }
+}
+
 export function clearAllPendingAccessKeyRotations() {
   try {
     const storage = window.localStorage
