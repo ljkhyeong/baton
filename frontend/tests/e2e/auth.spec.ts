@@ -989,6 +989,7 @@ test('@smoke local 로그인과 로그아웃은 매번 CSRF를 받고 session �
   await expect(page.getByText(`계정 ID ${ACCOUNT_ID}`)).toBeVisible()
   const peer = await context.newPage()
   const workspaceApi = await installApi(peer)
+  await installAuthApi(peer)
   await openSharedWorkspace(peer)
   await page.evaluate(({ teamId, seasonId, roomId, resourceId, rotationStorageKey, rotationRecord }) => {
     localStorage.setItem('baton-access-key:00000000-0000-4000-8000-000000000099', 'other-capability')

@@ -1095,6 +1095,7 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
   }, { roomId: 'bcdf-ghjk-mnpq', teamId: TEAM_ID, seasonId: SEASON_ID })
   const peer = await context.newPage()
   await api.attachPage(peer)
+  await peer.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: false } }))
   await peer.goto(WORKSPACE_PATH)
   await expect(peer.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   const workspaceGetCount = () => recordedCalls(api, 'GET', `${SCOPE_PATH}/workspace`).length
