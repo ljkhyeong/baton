@@ -46,7 +46,7 @@ backup_path="$("$script_dir/backup.sh" --print-path)"
 printf 'Backup created for synchronization: %s\n' "$backup_path"
 "$script_dir/sync-backups.sh"
 
-# 새 덤프의 원격 검증이 끝난 뒤에만 완료 신호를 보낸다.
+# 새 덤프의 원격 검증과 로컬 보존 정리가 끝난 뒤에만 완료 신호를 보낸다.
 heartbeat_url_file="${BATON_BACKUP_HEARTBEAT_URL_FILE:-}"
 if [[ -n "$heartbeat_url_file" ]]; then
   heartbeat_url=""

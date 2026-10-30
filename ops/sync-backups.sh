@@ -16,6 +16,9 @@ if [[ $# -eq 1 ]]; then
   defer_cycle_finalization=true
 fi
 
+# 스냅샷 성공을 기록한 뒤의 보존 정리 실패다. systemd 유닛이 이 코드로는 재시작하지 않아 덤프가 쌓이지 않는다.
+prune_failure_exit_status=79
+
 temporary_path=""
 cleanup() {
   if [[ -n "$temporary_path" ]]; then
@@ -41,7 +44,7 @@ verify_remote_objects() {
   local backup_path="$1"
   local backup_name="$2"
 
-  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
+  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null || return 1
   printf '%s\n' "$backup_name" "$backup_name.sha256" | \
     rclone check "$backup_dir" "$remote" --download --one-way --files-from-raw - \
       --retries 5 --retries-sleep 30s
@@ -202,8 +205,22 @@ for backup_path in "${backups[@]}"; do
   fi
 done
 
+if [[ $uploaded -gt 0 && "$defer_cycle_finalization" == false ]]; then
+  mkdir -p -- "$state_dir"
+  temporary_path="$(mktemp "$state_dir/.last-success.XXXXXX")"
+  printf '%s\n%s\n%s\n%s\n%s\n' \
+    "$latest_backup_epoch" \
+    "$latest_backup_name" \
+    "$latest_backup_hash" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    "$remote" > "$temporary_path"
+  mv -- "$temporary_path" "$state_dir/last-success"
+  temporary_path=""
+fi
+
 minimum_local_backups=3
 pruned=0
+prune_failed=0
 if [[ "$defer_cycle_finalization" == false ]]; then
   recent_start=0
   if [[ ${#backups[@]} -gt $minimum_local_backups ]]; then
@@ -223,26 +240,20 @@ if [[ "$defer_cycle_finalization" == false ]]; then
       continue
     fi
     expired_name="$(basename -- "$expired_backup")"
-    verify_remote_objects "$expired_backup" "$expired_name"
+    if ! verify_remote_objects "$expired_backup" "$expired_name"; then
+      printf 'Retention audit failed; keeping the local snapshot: %s\n' "$expired_name" >&2
+      prune_failed=$((prune_failed + 1))
+      continue
+    fi
     rm -f -- "$expired_backup" "$expired_backup.sha256" "$expired_backup.uploaded"
     pruned=$((pruned + 1))
   done < <(find "$backup_dir" -maxdepth 1 -type f -name 'baton-*.sql.gz' -mtime "+$retention_days" -print0)
 fi
 
-if [[ $uploaded -gt 0 && "$defer_cycle_finalization" == false ]]; then
-  mkdir -p -- "$state_dir"
-  temporary_path="$(mktemp "$state_dir/.last-success.XXXXXX")"
-  printf '%s\n%s\n%s\n%s\n%s\n' \
-    "$latest_backup_epoch" \
-    "$latest_backup_name" \
-    "$latest_backup_hash" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-    "$remote" > "$temporary_path"
-  mv -- "$temporary_path" "$state_dir/last-success"
-  temporary_path=""
-fi
-
-printf 'Off-site backup synchronization completed: uploaded=%d, already_verified=%d, local_pruned=%d, remote=%s\n' \
-  "$uploaded" "$already_verified" "$pruned" "$remote"
+printf 'Off-site backup synchronization completed: uploaded=%d, already_verified=%d, local_pruned=%d, prune_failed=%d, remote=%s\n' \
+  "$uploaded" "$already_verified" "$pruned" "$prune_failed" "$remote"
 
 trap - EXIT INT TERM
+if [[ $prune_failed -gt 0 ]]; then
+  exit "$prune_failure_exit_status"
+fi

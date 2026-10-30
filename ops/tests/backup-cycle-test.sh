@@ -609,12 +609,34 @@ for day in 01 02 03 04; do
   write_valid_backup "$prune_audit_backup"
   touch -t "202001${day}0000" "$prune_audit_backup"
 done
-if FAKE_RCLONE_CORRUPT_CHECK_AT=11 run_cycle "$prune_audit_root" >/dev/null 2>&1; then
-  fail 'remote prune audit mismatch unexpectedly succeeded'
-fi
+# 보존 정리 실패는 끝난 백업을 취소하지 않는다. 실패한 파일만 남기고 나머지를 정리한 뒤
+# 재시작하지 않는 종료 코드로 알려 systemd 재시작마다 덤프가 늘지 않게 한다.
+set +e
+FAKE_RCLONE_CORRUPT_CHECK_AT=11 run_cycle "$prune_audit_root" >/dev/null 2>&1
+prune_audit_status=$?
+set -e
+assert_count 79 "$prune_audit_status" 'failed remote prune audit exit status'
+grep -Fxq "RestartPreventExitStatus=$prune_audit_status" \
+  "$repo_root/ops/systemd/baton-backup.service" \
+  || fail 'backup unit restarts after a retention-only failure'
 prune_audit_backup_count="$(find "$prune_audit_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
-assert_count 5 "$prune_audit_backup_count" 'failed remote prune audit local snapshots'
-assert_no_file "$prune_audit_root/state/last-success"
+assert_count 4 "$prune_audit_backup_count" 'failed remote prune audit local snapshots'
+prune_audit_expired_count="$(
+  find "$prune_audit_root/backups" -maxdepth 1 -type f \
+    \( -name '*-pending01.sql.gz' -o -name '*-pending02.sql.gz' \) | wc -l | tr -d ' '
+)"
+assert_count 1 "$prune_audit_expired_count" 'expired snapshot kept by the failed audit'
+assert_file "$prune_audit_root/state/last-success"
+prune_audit_newest="$(
+  find "$prune_audit_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' ! -name '*-pending*' -print
+)"
+[[ "$(sed -n '2p' "$prune_audit_root/state/last-success")" == "$(basename -- "$prune_audit_newest")" ]] \
+  || fail 'retention failure did not record the newest verified snapshot'
+PATH="$fake_bin:$PATH" \
+BATON_BACKUP_STATE_DIR="$prune_audit_root/state" \
+BATON_BACKUP_MAX_AGE_HOURS=36 \
+"$repo_root/ops/check-backup-freshness.sh" >/dev/null \
+  || fail 'retention failure hid the verified snapshot from the freshness check'
 
 failure_root="$test_root/upload-failure"
 mkdir -p -- "$failure_root/backups" "$failure_root/remote"
@@ -768,6 +790,22 @@ if BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
   run_cycle "$new_upload_failure_root" >/dev/null 2>&1; then
   fail 'backup failure with heartbeat unexpectedly succeeded'
 fi
+assert_no_file "$heartbeat_root/request"
+# 보존 정리 실패도 주기 실패이므로 완료 신호를 보내지 않는다.
+heartbeat_prune_root="$test_root/heartbeat-prune-failure"
+mkdir -p -- "$heartbeat_prune_root/backups" "$heartbeat_prune_root/remote"
+write_valid_production_env "$heartbeat_prune_root/production.env"
+for day in 01 02 03 04; do
+  heartbeat_prune_backup="$heartbeat_prune_root/backups/baton-202001${day}T000000Z-pending${day}.sql.gz"
+  write_valid_backup "$heartbeat_prune_backup"
+  touch -t "202001${day}0000" "$heartbeat_prune_backup"
+done
+if BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
+  FAKE_HEARTBEAT_ROOT="$heartbeat_root" FAKE_RCLONE_CORRUPT_CHECK_AT=11 \
+  run_cycle "$heartbeat_prune_root" >/dev/null 2>&1; then
+  fail 'retention failure with heartbeat unexpectedly succeeded'
+fi
+assert_file "$heartbeat_prune_root/state/last-success"
 assert_no_file "$heartbeat_root/request"
 printf '%s' 'http://uptime.betterstack.com/api/v1/heartbeat/test-secret-token' > "$heartbeat_root/url"
 BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
