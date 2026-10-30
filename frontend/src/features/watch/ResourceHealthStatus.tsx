@@ -23,8 +23,8 @@ function subscribeOnline(onChange: () => void) {
 type CheckRequest = { previousConclusiveAt: string | null; submittedAt: number }
 type CheckReceipt = CheckRequest & { status: ResourceCheck['status']; resultConfirmed: boolean }
 
-export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, title, ...scope }:
-  ResourceHealthScope & { enabled: boolean; changesDisabled: boolean; targetUrl: string; title: string }) {
+export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, title, timeZone, ...scope }:
+  ResourceHealthScope & { enabled: boolean; changesDisabled: boolean; targetUrl: string; title: string; timeZone: string }) {
   const queryClient = useQueryClient()
   const online = useSyncExternalStore(subscribeOnline, () => onlineManager.isOnline())
   const key = useMemo(() => ['teams', scope.teamId, 'seasons', scope.seasonId, 'resource-health', scope.resourceId,
@@ -128,10 +128,10 @@ export function ResourceHealthStatus({ enabled, changesDisabled, targetUrl, titl
       </small>
       {reason && <small>{reason}</small>}
       {result?.lastConclusiveAt && (
-        <small>최근 상태 확인 {formatInstant(result.lastConclusiveAt)}</small>
+        <small>최근 상태 확인 {formatInstant(result.lastConclusiveAt, timeZone)}</small>
       )}
       {result?.lastCheckedAt && (
-        <small>최근 점검 시도 {formatInstant(result.lastCheckedAt)}</small>
+        <small>최근 점검 시도 {formatInstant(result.lastCheckedAt, timeZone)}</small>
       )}
       {currentResult?.availability === 'AVAILABLE' && currentResult.lastOutcome && currentResult.lastOutcome !== 'SUCCESS' && (
         <small>최근 점검: {outcomeLabels[currentResult.lastOutcome]}</small>

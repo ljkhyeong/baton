@@ -9,19 +9,19 @@ import { ResourceReviewSchedulePanel } from './ResourceReviewSchedulePanel'
 import { getVerificationHistory, verifyResource, reviewScheduleKey, dueReviewsKey, type VerifyResourceRequest } from './api'
 import './resource-verification.scss'
 
-export function ResourceVerificationPanel({ scope, resourceId, disabled, onManageMembership }: {
-  scope: WorkspaceScope; resourceId: string; disabled: boolean; onManageMembership: () => void
+export function ResourceVerificationPanel({ scope, resourceId, disabled, onManageMembership, timeZone }: {
+  scope: WorkspaceScope; resourceId: string; disabled: boolean; onManageMembership: () => void; timeZone: string
 }) {
   const [open, setOpen] = useState(false)
   return <details className="resource-verification" onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>자료 확인 기록</summary>
     {open && <VerificationContent key={`${scope.teamId}:${scope.seasonId}:${resourceId}:${scope.accessKey}`}
-      scope={scope} resourceId={resourceId} disabled={disabled} onManageMembership={onManageMembership} />}
+      scope={scope} resourceId={resourceId} disabled={disabled} onManageMembership={onManageMembership} timeZone={timeZone} />}
   </details>
 }
 
-function VerificationContent({ scope, resourceId, disabled, onManageMembership }: {
-  scope: WorkspaceScope; resourceId: string; disabled: boolean; onManageMembership: () => void
+function VerificationContent({ scope, resourceId, disabled, onManageMembership, timeZone }: {
+  scope: WorkspaceScope; resourceId: string; disabled: boolean; onManageMembership: () => void; timeZone: string
 }) {
   const session = useAuthSession()
   const accountId = session.data?.authenticated ? session.data.accountId : ''
@@ -48,7 +48,7 @@ function VerificationContent({ scope, resourceId, disabled, onManageMembership }
           <strong>{!latest ? '아직 확인한 기록이 없습니다.' : !latest.current ? '자료가 변경되어 재확인이 필요합니다.'
             : latest.status === 'CONFIRMED' ? '사용할 수 있는 자료로 확인했습니다.' : '자료 수정이 필요합니다.'}</strong>
           <ol>{history.data.verifications.map(row => <li key={row.id}>
-            <span>{row.memberName} · {formatInstant(row.verifiedAt)}</span>
+            <span>{row.memberName} · {formatInstant(row.verifiedAt, timeZone)}</span>
             <span>{row.status === 'CONFIRMED' ? '사용 가능' : '수정 필요'}{!row.current && ' · 변경 전 확인 기록'}</span>
             {row.note && <p>{row.note}</p>}
           </li>)}</ol>

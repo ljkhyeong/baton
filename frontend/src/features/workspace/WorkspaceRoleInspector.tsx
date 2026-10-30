@@ -107,7 +107,7 @@ export function RoleInspector({
                   {resource.description && <small>{resource.description}</small>}
                   <ResourceHealthStatus key={`${resource.id}:${resource.url}:${scope.accessKey}:${scope.accountId ?? ''}`} {...scope} resourceId={resource.id}
                     title={resource.title} targetUrl={resource.url} enabled={open && !blocked}
-                    changesDisabled={changesDisabled} />
+                    changesDisabled={changesDisabled} timeZone={timeZone} />
                 </span>
                 <div className="resource-row-actions">
                   <RoundRoomResourceActions
@@ -120,9 +120,9 @@ export function RoleInspector({
                   <button type="button" aria-label={`${resource.title} 자료 수정`} disabled={changesDisabled} onClick={() => onEditResource(resource)}>수정</button>
                   <button type="button" aria-label={`${resource.title} 자료 보관`} disabled={changesDisabled} onClick={() => onUpdateResourceArchive(resource, true)}>보관</button>
                 </div>
-                <ContentChangePanel scope={scope} kind="ROLE_RESOURCE" recordId={resource.id} />
+                <ContentChangePanel scope={scope} kind="ROLE_RESOURCE" recordId={resource.id} timeZone={timeZone} />
                 <ResourceVerificationPanel scope={scope} resourceId={resource.id}
-                  disabled={changesDisabled} onManageMembership={onManageMembership} />
+                  disabled={changesDisabled} onManageMembership={onManageMembership} timeZone={timeZone} />
               </li>
             ))}
           </ul>
@@ -145,7 +145,7 @@ export function RoleInspector({
                   >
                     복원
                   </button>
-                  <ContentChangePanel scope={scope} kind="ROLE_RESOURCE" recordId={resource.id} />
+                  <ContentChangePanel scope={scope} kind="ROLE_RESOURCE" recordId={resource.id} timeZone={timeZone} />
                 </li>
               ))}
             </ul>

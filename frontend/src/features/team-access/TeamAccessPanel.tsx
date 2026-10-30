@@ -9,17 +9,17 @@ import './team-access.scss'
 
 type InvitationLink = { invitationId: string; url: string }
 
-export function TeamAccessPanel({ scope }: { scope: WorkspaceScope }) {
+export function TeamAccessPanel({ scope, timeZone }: { scope: WorkspaceScope; timeZone: string }) {
   const session = useAuthSession()
   const [open, setOpen] = useState(false)
   return <details className="team-access-panel" onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>팀 초대·권한 관리</summary>
     {open && (session.data?.authenticated
-      ? <AccessContent key={`${scope.teamId}:${session.data.accountId}`} scope={{ ...scope, accountId: session.data.accountId }} />
+      ? <AccessContent key={`${scope.teamId}:${session.data.accountId}`} scope={{ ...scope, accountId: session.data.accountId }} timeZone={timeZone} />
       : <p>로그인한 뒤 팀의 초대·권한 설정을 확인할 수 있습니다.</p>)}
   </details>
 }
-function AccessContent({ scope }: { scope: AccessScope }) {
+function AccessContent({ scope, timeZone }: { scope: AccessScope; timeZone: string }) {
   const client = useQueryClient()
   const queryKey = ['teams', scope.teamId, 'access', scope.accountId, scope.accessKey]
   const query = useQuery({ queryKey, queryFn: () => getTeamAccess(scope) })
@@ -152,7 +152,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
           const pending = !invite.acceptedAt && !invite.revokedAt && !expired
           const memberName = access.members.find(member => member.memberId === invite.memberId)?.memberName ?? '알 수 없는 구성원'
           return <li key={invite.id}><span>{memberName} · {permissionNames[invite.permission]}
-            <small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : expired ? '기간 만료' : `${formatInstant(invite.expiresAt)}까지 유효`}</small></span>
+            <small>{invite.acceptedAt ? '수락 완료' : invite.revokedAt ? '초대 취소' : expired ? '기간 만료' : `${formatInstant(invite.expiresAt, timeZone)}까지 유효`}</small></span>
             {pending && <button className="secondary-button" type="button" disabled={mutation.isPending} onClick={() => {
               if (window.confirm(`${memberName}님의 초대를 취소할까요? 이 초대 링크는 즉시 사용할 수 없게 됩니다.`))
                 mutation.mutate({ kind: 'revoke', id: invite.id })
@@ -162,7 +162,7 @@ function AccessContent({ scope }: { scope: AccessScope }) {
       <details><summary>최근 권한 변경 이력</summary><ul>{access.audit.map(item => <li key={item.id}><span>
         {access.members.find(member => member.memberId === item.memberId)?.memberName} · {({ ADMIN_RECOVERY: '관리자 지정·복구', INVITED: '초대 생성', INVITATION_REVOKED: '초대 취소', INVITATION_ACCEPTED: '초대 수락', PERMISSION_CHANGED: '권한 변경', ACCOUNT_DEACTIVATED: '계정 비활성화', ROLE_HANDOFF_ADMIN_CANCELLED: '관리자가 인수인계 취소' } as Record<string, string>)[item.action] ?? '접근 설정 변경'}
         <small>변경한 사람: {access.members.find(member => member.accountId === item.actorAccountId)?.memberName ?? '연결된 구성원 없음'}</small>
-        <small>{item.action !== 'ROLE_HANDOFF_ADMIN_CANCELLED' && `${item.previousPermission ? permissionNames[item.previousPermission] : '접근 없음'} → ${item.permission ? permissionNames[item.permission] : '접근 없음'} · `}{formatInstant(item.changedAt)}</small>
+        <small>{item.action !== 'ROLE_HANDOFF_ADMIN_CANCELLED' && `${item.previousPermission ? permissionNames[item.previousPermission] : '접근 없음'} → ${item.permission ? permissionNames[item.permission] : '접근 없음'} · `}{formatInstant(item.changedAt, timeZone)}</small>
       </span></li>)}</ul></details>
     </>}
     {mutation.isError && <p role="alert">{mutation.error.message}</p>}

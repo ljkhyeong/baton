@@ -1084,7 +1084,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               changesDisabled={contentChangesDisabled}
               seasonEnded={seasonEnded}
             />
-            <TeamAccessPanel scope={scope} />
+            <TeamAccessPanel scope={scope} timeZone={workspace.season.timeZone} />
             </>
           )}
           pendingMemberId={pendingMemberDeactivationId}
