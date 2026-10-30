@@ -519,7 +519,7 @@ CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애�
 - 전달·접수 시각이 `0`이면 아직 성공 기록이 없다. 정상 갱신 시각이 `0`이면 앱 시작 뒤 갱신에 성공한 적이 없다.
 - 갱신 성공 값이 `0`이면 다른 지표는 마지막 정상 갱신 때의 값이다.
 - 대기 시간이 `0`이면 대기 행이 없거나 가장 오래된 행도 생성 후 1초가 지나지 않았다. `status=pending` 개수와 함께 확인한다.
-- 이메일의 `VERIFICATION_TOKEN_EXPIRED`는 원시 `failed` 수에 남지만 조치 대상에서 제외한다. 대체된 `SUPERSEDED` 전달은 실패가 아니다.
+- 이메일의 `VERIFICATION_TOKEN_EXPIRED`와 `INACTIVE` 보상까지 기록한 WATCH의 `INVALID_TARGET_URL`은 원시 `failed` 수에 남지만 조치 대상에서 제외한다. 대체된 `SUPERSEDED` 전달은 실패가 아니다.
 - WATCH 인박스는 아직 처리 완료 상태를 관리하지 않으므로 접수 수와 마지막 접수 시각만 제공한다.
 
 시즌 이름은 별도 `integration=calendar_metadata`로 집계한다. 같은 시즌의 더 높은 개정이
@@ -529,7 +529,7 @@ CAL·WATCH·BRIEF·이메일 전달 상태는 외부에 공개하지 않는 애�
 운영자가 지표를 확인할 때는 다음 순서를 따른다.
 
 1. `baton_integration_metrics_refresh_success`가 `0`이면 30초 뒤 다시 확인한다. 계속 `0`이면 마지막 정상 갱신 시각과 애플리케이션의 DB 연결 로그를 확인한다.
-2. `actionable_failed_items`가 한 건이라도 있으면 해당 아웃박스의 `last_error_code`를 확인한다. 결정적 계약 오류와 유효하지 않은 대상은 자동 재처리하지 않으므로 행을 직접 수정하거나 삭제하지 않는다. 이메일 원시 `status=failed`에만 있는 `VERIFICATION_TOKEN_EXPIRED`는 만료된 비밀 제거 기록으로 판단한다.
+2. `actionable_failed_items`가 한 건이라도 있으면 해당 아웃박스의 `last_error_code`를 확인한다. 결정적 계약 오류와 유효하지 않은 대상은 자동 재처리하지 않으므로 행을 직접 수정하거나 삭제하지 않는다. 원시 `status=failed`에만 있는 이메일의 `VERIFICATION_TOKEN_EXPIRED`는 만료된 비밀 제거 기록으로, WATCH의 `INVALID_TARGET_URL`은 보상까지 끝난 대상 거절 기록으로 판단한다.
 3. `status=processing`이 1분 임대와 다음 30초 지표 갱신 뒤에도 남아 있으면 `lease_expires_at`을 확인한다. 만료 임대는 작업자가 다시 선점하므로 지표만 보고 행을 강제로 되돌리지 않는다.
 4. 가장 오래된 대기 시간은 네트워크 재시도의 최대 1시간 대기를 포함할 수 있다. 대기 시간만으로 장애를 확정하지 않고 `attempt_count`, `available_at`, 최근 성공 시각을 함께 확인한다.
 

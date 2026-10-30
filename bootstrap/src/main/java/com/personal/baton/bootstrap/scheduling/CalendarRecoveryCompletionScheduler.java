@@ -2,8 +2,10 @@ package com.personal.baton.bootstrap.scheduling;
 
 import com.personal.baton.application.calendar.port.in.CompleteCalendarRecoveryUseCase;
 import com.personal.baton.bootstrap.config.CalendarIntegrationProperties;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -19,6 +21,7 @@ class CalendarRecoveryCompletionScheduler {
     private final CompleteCalendarRecoveryUseCase recovery;
     private final UUID recoveryId;
     private final AtomicBoolean stopped = new AtomicBoolean();
+    private final AtomicReference<String> lastWaitingCode = new AtomicReference<>();
 
     CalendarRecoveryCompletionScheduler(
             CompleteCalendarRecoveryUseCase recovery,
@@ -40,6 +43,10 @@ class CalendarRecoveryCompletionScheduler {
         var result = recovery.complete(recoveryId);
         switch (result.status()) {
             case WAITING -> {
+                // 주기마다 반복하지 않고 대기 사유가 달라질 때만 남겨 불일치 종류를 잃지 않는다.
+                if (!Objects.equals(result.code(), lastWaitingCode.getAndSet(result.code()))) {
+                    log.warn("CAL 전체 복구 완료를 기다립니다. code=" + result.code());
+                }
                 return;
             }
             case COMPLETED -> log.info(

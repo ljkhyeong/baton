@@ -6,6 +6,7 @@ import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClie
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClient.Outcome;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClient.Result;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
+import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.AuthorizationCheck;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.Claim;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.Owner;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore.Stored;
@@ -13,9 +14,12 @@ import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerif
 import com.personal.baton.application.workspace.port.in.VerifyWorkspaceAccessUseCase;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import java.time.Clock;
+import java.util.List;
 import java.util.UUID;
 
 public final class CalendarSubscriptionService implements CalendarSubscriptionUseCase {
+    static final int AUTHORIZATION_PAGE_SIZE = 100;
+
     private final VerifyWorkspaceAccessUseCase access;
     private final ActiveAccountTeamMembershipVerifier memberships;
     private final CalendarSubscriptionStore store;
@@ -106,13 +110,26 @@ public final class CalendarSubscriptionService implements CalendarSubscriptionUs
     @Override
     public void revokePending() {
         for (Owner owner : store.pendingRevocations(clock.instant())) {
-            store.requestRevocation(owner);
             try {
                 revokeOwner(owner);
             } catch (CalendarSubscriptionException exception) {
                 // 외부 실패와 진행 중 요청은 다음 주기에 같은 구독 ID로 다시 폐기한다.
             }
         }
+    }
+
+    // 원본 변경이 폐기 의도를 남기지 못한 이전 데이터를 보완한다. 외부 호출은 폐기 주기가 맡는다.
+    @Override
+    public void requestUnauthorizedRevocations() {
+        Owner after = null;
+        List<AuthorizationCheck> page;
+        do {
+            page = store.findAuthorizationChecks(after, AUTHORIZATION_PAGE_SIZE);
+            for (AuthorizationCheck check : page) {
+                if (!check.authorized()) store.requestRevocation(check.owner());
+            }
+            if (!page.isEmpty()) after = page.getLast().owner();
+        } while (page.size() == AUTHORIZATION_PAGE_SIZE);
     }
 
     private void revokeOwner(Owner owner) {

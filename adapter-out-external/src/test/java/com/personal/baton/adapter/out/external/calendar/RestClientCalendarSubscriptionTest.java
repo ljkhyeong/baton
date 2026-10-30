@@ -8,6 +8,10 @@ import com.networknt.schema.InputFormat;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionClient.Outcome;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -22,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -66,6 +71,27 @@ class RestClientCalendarSubscriptionTest {
                 .body("{\"code\":\"SUBSCRIPTION_ALREADY_EXISTS\"}"));
         server.expect(requestTo(PATH)).andRespond(withException(new SocketTimeoutException()));
         assertThat(client.create(ID, SEASON).outcome()).isEqualTo(Outcome.ALREADY_EXISTS);
+        assertThat(client.create(ID, SEASON).outcome()).isEqualTo(Outcome.UNAVAILABLE);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("충돌 오류 본문을 받다가 끊기면 잘못된 응답이 아니라 연결 실패로 구분한다")
+    void classifiesInterruptedConflictBodyAsUnavailable() {
+        server.expect(requestTo(PATH)).andRespond(request -> {
+            InputStream body = new SequenceInputStream(
+                    new ByteArrayInputStream("{\"code\":".getBytes(StandardCharsets.UTF_8)),
+                    new InputStream() {
+                        @Override
+                        public int read() throws IOException {
+                            throw new SocketTimeoutException("응답 본문 수신 시간 초과");
+                        }
+                    }
+            );
+            var response = new MockClientHttpResponse(body, HttpStatus.CONFLICT);
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            return response;
+        });
         assertThat(client.create(ID, SEASON).outcome()).isEqualTo(Outcome.UNAVAILABLE);
         server.verify();
     }

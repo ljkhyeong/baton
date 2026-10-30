@@ -23,4 +23,5 @@ public interface CalendarSubscriptionUseCase {
     Credential rotate(Scope scope);
     void revoke(Scope scope);
     void revokePending();
+    void requestUnauthorizedRevocations();
 }

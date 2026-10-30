@@ -1,6 +1,7 @@
 package com.personal.baton.bootstrap.scheduling;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,8 @@ import com.personal.baton.application.watch.port.in.ReconcileWatchMonitorsUseCas
 import com.personal.baton.bootstrap.config.WatchEventReceiverProperties;
 import com.personal.baton.bootstrap.config.WatchIntegrationProperties;
 import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -46,13 +49,34 @@ class WatchMonitorSchedulerTest {
                     ReconcileWatchMonitorsUseCase reconcile =
                             context.getBean(ReconcileWatchMonitorsUseCase.class);
                     when(dispatch.dispatchPending()).thenReturn(new DispatchResult(1, 1, 0));
-                    when(reconcile.reconcile()).thenReturn(new ReconciliationResult(1, 1));
+                    when(reconcile.reconcile()).thenReturn(new ReconciliationResult(1, 1, List.of()));
 
                     scheduler.dispatchPending();
                     scheduler.reconcile();
 
                     verify(dispatch).dispatchPending();
                     verify(reconcile).reconcile();
+                });
+    }
+
+    @Test
+    @DisplayName("WATCH 스케줄러는 상태 조정에 실패한 자료가 있으면 실행 끝에 실패로 보고한다")
+    void reportFailuresAfterReconciliation() {
+        contextRunner
+                .withPropertyValues("baton.watch.enabled=true")
+                .run(context -> {
+                    WatchMonitorScheduler scheduler = context.getBean(WatchMonitorScheduler.class);
+                    ReconcileWatchMonitorsUseCase reconcile =
+                            context.getBean(ReconcileWatchMonitorsUseCase.class);
+                    when(reconcile.reconcile()).thenReturn(
+                            new ReconciliationResult(3, 2, List.of(UUID.randomUUID()))
+                    );
+
+                    assertThatThrownBy(scheduler::reconcile)
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessageContaining("failed=1")
+                            .hasMessageContaining("candidates=3")
+                            .hasMessageContaining("appended=2");
                 });
     }
 

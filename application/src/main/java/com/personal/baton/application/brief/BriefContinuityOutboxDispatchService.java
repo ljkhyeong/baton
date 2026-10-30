@@ -6,6 +6,7 @@ import com.personal.baton.application.brief.port.out.BriefContinuityOutboxPort;
 import com.personal.baton.application.delivery.DeliveryErrorCode;
 import com.personal.baton.application.delivery.DeliveryResult;
 import com.personal.baton.application.delivery.DispatchResult;
+import com.personal.baton.application.delivery.RetryBackoff;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,6 +22,7 @@ public class BriefContinuityOutboxDispatchService
     );
     private static final int BATCH_SIZE = 1;
     private static final Duration LEASE_DURATION = Duration.ofMinutes(1);
+    private static final RetryBackoff RETRY_BACKOFF = new RetryBackoff(Duration.ofSeconds(10), Duration.ofHours(1));
 
     private final BriefContinuityOutboxPort outboxPort;
     private final BriefContinuityClient client;
@@ -67,10 +69,11 @@ public class BriefContinuityOutboxDispatchService
                     DeliveryErrorCode.normalized(result.code(), "BRIEF_DELIVERED")
             );
             case RETRYABLE_FAILURE -> {
+                // 대기 시간이 없으면 ID가 가장 낮은 실패 행만 계속 선점해 다른 신호가 전달되지 못한다.
                 outboxPort.markRetry(
                         delivery.outboxId(),
                         delivery.leaseToken(),
-                        completedAt,
+                        completedAt.plus(RETRY_BACKOFF.delayAfterAttempt(delivery.attemptCount())),
                         DeliveryErrorCode.normalized(result.code(), "BRIEF_RETRYABLE_FAILURE")
                 );
                 yield false;

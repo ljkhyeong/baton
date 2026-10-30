@@ -137,6 +137,41 @@ class WatchMonitorOutboxPersistenceTest {
         assertThat(payloads.get(1).eventId()).isEqualTo(changed.eventId());
     }
 
+    @DisplayName("자료의 첫 스냅샷 기록은 인덱스 틈을 공유하는 다른 자료의 트랜잭션을 기다리지 않는다")
+    @Test
+    void appendsFirstSnapshotWithoutWaitingForOtherResource() throws Exception {
+        CountDownLatch firstAppended = new CountDownLatch(1);
+        CountDownLatch allowFirstCommit = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> firstTransaction = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> {
+                        outboxPort.appendIfChanged(activeChange(
+                                UUID.randomUUID(),
+                                FIRST_RESOURCE_ID,
+                                "https://example.com/first"
+                        ));
+                        firstAppended.countDown();
+                        await(allowFirstCommit);
+                    }));
+            assertThat(firstAppended.await(5, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(executor.submit(() -> outboxPort.appendIfChanged(activeChange(
+                    UUID.randomUUID(),
+                    SECOND_RESOURCE_ID,
+                    "https://example.org/second"
+            ))).get(3, TimeUnit.SECONDS)).isTrue();
+
+            allowFirstCommit.countDown();
+            firstTransaction.get(5, TimeUnit.SECONDS);
+            assertThat(outboxCount()).isEqualTo(2L);
+        } finally {
+            allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     @DisplayName("원본 네임스페이스는 대소문자만 달라도 다른 환경으로 판정한다")
     @Test
     void comparesSourceNamespaceCaseSensitively() {
@@ -379,6 +414,65 @@ class WatchMonitorOutboxPersistenceTest {
                     compensation.sourceRevision()
             )).isEqualTo(delivery.sourceRevision());
         });
+    }
+
+    @DisplayName("자료 잠금을 기다리는 동안 커밋된 새 URL은 유효하지 않은 대상 보상으로 덮지 않는다")
+    @Test
+    void keepsNewerSnapshotCommittedWhileWaitingForResourceLock() throws Exception {
+        String rejectedUrl = "https://example.com/first";
+        String changedUrl = "https://example.com/concurrent-change";
+        outboxPort.appendIfChanged(activeChange(UUID.randomUUID(), FIRST_RESOURCE_ID, rejectedUrl));
+        WatchMonitorDelivery rejected = outboxPort.claimPending(
+                1,
+                OCCURRED_AT,
+                Duration.ofSeconds(30)
+        ).getFirst();
+        CountDownLatch mutationReady = new CountDownLatch(1);
+        CountDownLatch allowCommit = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> mutation = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> {
+                        jdbcTemplate.update(
+                                "UPDATE role_resources SET url = ? WHERE id = UUID_TO_BIN(?)",
+                                changedUrl,
+                                FIRST_RESOURCE_ID.toString()
+                        );
+                        outboxPort.appendIfChanged(activeChange(
+                                UUID.randomUUID(),
+                                FIRST_RESOURCE_ID,
+                                changedUrl
+                        ));
+                        mutationReady.countDown();
+                        await(allowCommit);
+                    }));
+            assertThat(mutationReady.await(5, TimeUnit.SECONDS)).isTrue();
+
+            Future<Boolean> compensation = executor.submit(() ->
+                    outboxPort.markInvalidTargetAndAppendInactive(
+                            rejected.sourceRevision(),
+                            rejected.leaseToken(),
+                            UUID.randomUUID(),
+                            OCCURRED_AT.plusSeconds(1)
+                    ));
+            assertThatThrownBy(() -> compensation.get(200, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+
+            allowCommit.countDown();
+            mutation.get(5, TimeUnit.SECONDS);
+            assertThat(compensation.get(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(storedStatus(rejected.sourceRevision())).isEqualTo("FAILED");
+            assertThat(jdbcTemplate.queryForList(
+                    "SELECT target_url FROM watch_monitor_outbox "
+                            + "WHERE resource_id = UUID_TO_BIN(?) ORDER BY id",
+                    String.class,
+                    FIRST_RESOURCE_ID.toString()
+            )).containsExactly(rejectedUrl, changedUrl);
+        } finally {
+            allowCommit.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @DisplayName("유효하지 않은 대상의 보상은 같은 URL 재활성화를 막고 URL 변경은 새 ACTIVE를 허용한다")

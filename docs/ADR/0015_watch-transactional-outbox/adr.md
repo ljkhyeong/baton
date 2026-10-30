@@ -32,6 +32,8 @@ RoleResource/Season 트랜잭션
 
 아웃박스의 `BIGINT AUTO_INCREMENT` 기본 키를 WATCH `sourceRevision`으로 사용한다. 같은 자료의 BATON 변경은 기존 잠금 순서로 직렬화되므로 해당 참조 안에서 리비전이 단조 증가한다. 롤백으로 생긴 번호 공백과 다른 자료 사이의 번호 공백은 의미가 없다.
 
+자료의 첫 스냅샷은 비교할 행이 없으므로 잠금 읽기 없이 기록한다. 빈 범위의 gap 잠금은 인덱스 틈을 공유하는 다른 자료의 첫 기록을 막고 교착을 만든다.
+
 JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재개는 자료 행을 수정하지 않으므로 `RoleResource.version`을 외부 리비전으로 사용하지 않는다.
 
 ### 임대와 트랜잭션
@@ -48,7 +50,7 @@ JPA `@Version`은 내부 동시성 제어에만 사용한다. 시즌 종료·재
 - `SOURCE_REVISION_CONFLICT`와 그 밖의 결정적 `4xx`: 영구 실패로 기록
 - `ACTIVE`의 `INVALID_TARGET_URL`: 실패 행과 더 높은 리비전의 `INACTIVE` 보상 행을 한 트랜잭션에서 기록
 
-`INACTIVE` 보상 행은 `compensation_for_id`로 거절된 `ACTIVE` 리비전을 가리킨다. 이 자기 참조는 WATCH에 보내는 불변 `INACTIVE` 페이로드를 바꾸지 않으면서 어떤 원본 대상 URL의 결정적 거절을 보상했는지 아웃박스 안에서 추적한다.
+`INACTIVE` 보상 행은 `compensation_for_id`로 거절된 `ACTIVE` 리비전을 가리킨다. 이 자기 참조는 WATCH에 보내는 불변 `INACTIVE` 페이로드를 바꾸지 않으면서 어떤 원본 대상 URL의 결정적 거절을 보상했는지 아웃박스 안에서 추적한다. 같은 자료에 더 높은 리비전이 있으면 보상 행을 만들지 않으며, 이 판단은 자료 잠금 뒤의 최신 커밋을 읽도록 `READ COMMITTED` 트랜잭션에서 수행한다.
 
 오류 본문과 URL을 저장하지 않고 안정적인 오류 코드만 남긴다.
 

@@ -10,6 +10,14 @@ import org.springframework.stereotype.Component;
 public class CalendarSubscriptionRevocationScheduler {
     private final CalendarSubscriptionUseCase subscriptions;
     public CalendarSubscriptionRevocationScheduler(CalendarSubscriptionUseCase subscriptions) { this.subscriptions = subscriptions; }
-    @Scheduled(fixedDelayString = "${baton.calendar.subscription-revocation-interval:PT5S}")
+    @Scheduled(
+            fixedDelayString = "${baton.calendar.subscription-revocation-interval:PT5S}",
+            scheduler = "calendarTaskScheduler"
+    )
     public void revokePending() { subscriptions.revokePending(); }
+    @Scheduled(
+            fixedDelayString = "${baton.calendar.subscription-authorization-check-interval:PT1H}",
+            scheduler = "calendarTaskScheduler"
+    )
+    public void requestUnauthorizedRevocations() { subscriptions.requestUnauthorizedRevocations(); }
 }
