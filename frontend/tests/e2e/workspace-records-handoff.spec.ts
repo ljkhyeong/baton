@@ -37,6 +37,8 @@ import {
 } from './support/workspaceApiHarness'
 import type { RoleHandoff } from '../../src/features/workspace/types'
 
+const fixtureId = (sequence: number) => `00000000-0000-4000-8000-${String(sequence).padStart(12, '0')}`
+
 function openRoleHandoff(status: 'PREPARING' | 'TRANSFERRED'): RoleHandoff {
   return {
     id: ROLE_HANDOFF_ID,
@@ -1442,4 +1444,50 @@ test('@handoff 계정 팀의 관리자는 당사자가 아니어도 전달한 �
   await expect(page.getByRole('button', { name: '인수인계 수락', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '전달 취소' })).toBeEnabled()
   await expect(page.getByText('김준호님의 계정으로 로그인해야 수락할 수 있습니다.')).toBeVisible()
+})
+
+test.describe('브라우저와 시즌의 시간대가 다를 때', () => {
+  test.use({ timezoneId: 'America/New_York' })
+
+  test('@records 종료·보관·작성 시각을 시즌 시간대로 표시한다', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', '시각 표시 기준은 데스크톱에서 한 번 검증합니다.')
+    const lateNightUtc = (day: number) => `2026-07-${String(day).padStart(2, '0')}T16:30:00Z`
+    const projection = makeProjection()
+    const endedSeason = { ...projection.season, endedAt: lateNightUtc(30) }
+    projection.season = endedSeason
+    projection.seasons = [endedSeason]
+    projection.decisions[0] = { ...projection.decisions[0]!, createdAt: lateNightUtc(3) }
+    projection.decisions.push({ ...projection.decisions[0]!, id: fixtureId(201), title: '보관한 결정', archivedAt: lateNightUtc(5) })
+    projection.handoffItems[1] = { ...projection.handoffItems[1]!, archivedAt: lateNightUtc(6) }
+    projection.routines[1] = { ...projection.routines[1]!, archivedAt: lateNightUtc(7) }
+    projection.rounds[1] = { ...projection.rounds[1]!, archivedAt: lateNightUtc(8) }
+    projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '보관한 자료',
+      url: 'https://example.com/guide', description: null, createdAt: lateNightUtc(1), archivedAt: lateNightUtc(9) })
+    await installApi(page, projection)
+    await openSharedWorkspace(page)
+
+    const workspace = page.locator('.main-surface')
+    await expect(page.getByLabel('종료된 시즌 안내')).toContainText('2026. 7. 31.에 종료')
+    await page.getByRole('button', { name: /현재 시즌 .*시즌 전환/ }).first().click()
+    const seasons = page.getByRole('dialog', { name: `${projection.team.name} 시즌` })
+    await expect(seasons).toContainText('2026. 7. 31.에 종료')
+    await seasons.getByRole('button', { name: '닫기' }).click()
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+    await expect(page.locator('.decision-meta time')).toHaveText('2026. 7. 4. 오전 1:30')
+    await expect(workspace).toContainText('2026. 7. 6. 오전 1:30 보관')
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+    await expect(workspace).toContainText('2026. 7. 8. 오전 1:30 보관')
+    await expect(workspace).toContainText('2026. 7. 9. 오전 1:30 보관')
+
+    await openHandoffView(page, testInfo.project.name)
+    await expect(workspace).toContainText('2026. 7. 7. 오전 1:30 보관')
+
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+    await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+    const inspector = page.locator('.linked-decision').locator('..')
+    await expect(page.locator('.linked-decision small')).toHaveText('2026. 7. 4. 오전 1:30')
+    await expect(inspector).toContainText('2026. 7. 10. 오전 1:30 보관')
+  })
 })

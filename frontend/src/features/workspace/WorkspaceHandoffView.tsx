@@ -366,7 +366,7 @@ export function HandoffView({
                 <span>
                   <strong>{item.label}</strong>
                   <small>
-                    {item.archivedAt ? `${formatInstant(item.archivedAt)} 보관` : '보관됨'}
+                    {item.archivedAt ? `${formatInstant(item.archivedAt, season.timeZone)} 보관` : '보관됨'}
                     {item.completed ? ' · 완료' : ''}
                   </small>
                 </span>

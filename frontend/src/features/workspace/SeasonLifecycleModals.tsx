@@ -105,7 +105,7 @@ export function SeasonSwitcherModal({
           <strong>{currentSeason.name}</strong>
           <small>
             {currentSeason.endedAt
-              ? `${formatInstantDate(currentSeason.endedAt)}에 종료`
+              ? `${formatInstantDate(currentSeason.endedAt, currentSeason.timeZone)}에 종료`
               : '시즌을 종료하면 기록을 수정할 수 없습니다.'}
           </small>
         </div>
@@ -437,7 +437,7 @@ export function SeasonEndedBanner({
         <Icon name="check" size={18} />
         <span>
           <strong>이 시즌은 읽기 전용입니다.</strong>
-          <small>{formatInstantDate(season.endedAt)}에 종료되어 기록을 바꿀 수 없습니다.</small>
+          <small>{formatInstantDate(season.endedAt, season.timeZone)}에 종료되어 기록을 바꿀 수 없습니다.</small>
         </span>
       </div>
       <div>

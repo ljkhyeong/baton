@@ -38,6 +38,7 @@ export function RoleInspector({
   onUpdateResourceArchive,
   onManageMembership,
   scope,
+  timeZone,
   previousSeasonId,
   onCopyPreviousResource,
   changesDisabled,
@@ -60,6 +61,7 @@ export function RoleInspector({
   onUpdateResourceArchive: (resource: RoleResource, archived: boolean) => void
   onManageMembership: () => void
   scope: WorkspaceScope
+  timeZone: string
   previousSeasonId: string | null
   onCopyPreviousResource: (resource: RoleResource) => void
   changesDisabled: boolean
@@ -130,7 +132,7 @@ export function RoleInspector({
                 <li key={resource.id}>
                   <span>
                     <strong>{resource.title}</strong>
-                    <small>{formatInstant(resource.archivedAt!)} 보관</small>
+                    <small>{formatInstant(resource.archivedAt!, timeZone)} 보관</small>
                   </span>
                   <button
                     type="button"
@@ -148,7 +150,7 @@ export function RoleInspector({
         )}
       </div>
       {relatedRoutine && <div className="inspector-section next-event"><span className="block-label">담당 반복 업무</span><strong>{relatedRoutine.title}</strong><small>{relatedRoutine.dueLabel} · {relatedRoutine.detail}</small></div>}
-      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">관련 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt)}</small></div>}
+      {relatedDecision && <div className="inspector-section linked-decision"><span className="block-label">관련 결정</span><p>“{relatedDecision.title}”</p><small>{formatInstant(relatedDecision.createdAt, timeZone)}</small></div>}
       {previousSeasonId && role.previousRoleId && (
         <PreviousRoleRecords
           key={`${scope.teamId}:${scope.seasonId}:${role.id}`}

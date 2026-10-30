@@ -940,6 +940,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {view === 'memory' && (
             <MemoryView
               scope={scope}
+              timeZone={workspace.season.timeZone}
               decisions={activeDecisions}
               archivedDecisions={archivedDecisions}
               roles={roles}
@@ -1022,6 +1023,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
             onUpdateResourceArchive={updateRoleResourceArchive}
             onManageMembership={openMemberManagementModal}
             scope={scope}
+            timeZone={workspace.season.timeZone}
             previousSeasonId={workspace.season.previousSeasonId}
             onCopyPreviousResource={openRoleResourceCopy}
             changesDisabled={contentChangesDisabled || selectedRoleLocked}
