@@ -36,9 +36,14 @@ public class AccountSecurityController {
     );
 
     private final AccountSecurityUseCase accountSecurityUseCase;
+    private final AuthRateLimiter authRateLimiter;
 
-    public AccountSecurityController(AccountSecurityUseCase accountSecurityUseCase) {
+    public AccountSecurityController(
+            AccountSecurityUseCase accountSecurityUseCase,
+            AuthRateLimiter authRateLimiter
+    ) {
         this.accountSecurityUseCase = accountSecurityUseCase;
+        this.authRateLimiter = authRateLimiter;
     }
 
     @GetMapping(ACCOUNT_PATH)
@@ -60,6 +65,7 @@ public class AccountSecurityController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
+        authRateLimiter.checkPasswordChange(servletRequest.getRemoteAddr(), principal.accountId());
         accountSecurityUseCase.changeLocalPassword(new ChangeLocalPasswordCommand(
                 principal.accountId(),
                 request.currentPassword(),

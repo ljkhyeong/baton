@@ -1022,7 +1022,7 @@ GET /actuator/health
 | `409` | `ROUND_ROOM_CONFLICT` | 방 ID 또는 역할 자료의 활성 매핑이 기존 기록과 충돌함 |
 | `409` | `BRIEF_DELIVERY_INCOMPLETE` | 대상 팀·시즌의 BRIEF 업무 점검 아웃박스 전달이 끝나지 않아 생성할 수 없음 |
 | `409` | `BRIEF_GENERATION_IN_PROGRESS` | 같은 주차·시간대·전달 기준의 생성 작업이 아직 진행 중임 |
-| `429` | `AUTH_RATE_LIMITED` | 가입·검증·로그인 요청이 인증 요청률 제한을 초과함 |
+| `429` | `AUTH_RATE_LIMITED` | 가입·재설정 메일·검증·로그인·현재 비밀번호 확인·ROUND 참여권 갱신 요청이 인증 요청률 제한을 초과함 |
 | `415` | `UNSUPPORTED_MEDIA_TYPE` | 요청 본문의 미디어 타입을 지원하지 않음 |
 | `503` | `EMAIL_VERIFICATION_UNAVAILABLE` | 가입 게이트, 아웃박스 페이로드 보호 또는 메일 전달 인프라를 사용할 수 없음 |
 | `503` | `IDENTITY_TEMPORARILY_UNAVAILABLE` | 신원 저장소 잠금 경합이나 일시적 인프라 장애로 가입·검증·자체 이메일 로그인을 처리하지 못함 |
@@ -1095,7 +1095,8 @@ WATCH 내부 이벤트 경로는 전용 `Authorization: Bearer` 필터가 보호
 Spring Security `DelegatingPasswordEncoder`의 PBKDF2 형식을 사용한다. 존재하지 않는 이메일,
 미검증 신원과 잘못된 비밀번호는 모두 `401 INVALID_CREDENTIALS`로 일반화한다. 가입·검증·
 로그인은 IP와 정규화한 식별자 단위 요청률 제한을 적용하고 초과 시 `429 AUTH_RATE_LIMITED`와
-`Retry-After`를 반환한다.
+`Retry-After`를 반환한다. 비밀번호 변경의 현재 비밀번호 확인도 IP당 10분당 60회·계정당 10분당 10회로
+제한하며 같은 응답을 사용한다.
 
 Turnstile을 활성화하면 가입·비밀번호 재설정 메일 요청에 최대 2,048자의 일회용
 `turnstileToken`이 필요하다. 서버는 Siteverify 응답의 성공 여부, `hostname`과 요청별 `action`을

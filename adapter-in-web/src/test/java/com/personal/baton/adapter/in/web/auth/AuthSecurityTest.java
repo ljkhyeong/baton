@@ -8,6 +8,7 @@ import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.application.identity.port.in.AccountSecurityUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
+import com.personal.baton.application.identity.error.CurrentPasswordMismatchException;
 import com.personal.baton.application.identity.error.EmailVerificationException;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
 import com.personal.baton.application.identity.error.EmailVerificationPayloadProtectionException;
@@ -228,6 +229,52 @@ class AuthSecurityTest {
                 .andExpect(jsonPath("$.code").value("ORIGIN_DENIED"));
 
         verifyNoInteractions(accountSecurityUseCase);
+    }
+
+    @DisplayName("같은 계정의 현재 비밀번호 확인은 IP를 바꿔도 열 번 뒤 429로 제한한다")
+    @Test
+    void limitsPasswordChangeAttemptsByAccount() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+        MockHttpSession session = accountSession(UUID.randomUUID(), 0);
+
+        for (int attempt = 1; attempt <= 10; attempt += 1) {
+            mockMvc.perform(passwordChange(session, "198.51.100." + attempt))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INVALID"));
+        }
+
+        mockMvc.perform(passwordChange(session, "198.51.100.200"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().json("""
+                        {
+                          "code": "AUTH_RATE_LIMITED",
+                          "message": "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요"
+                        }
+                        """, true));
+
+        verify(accountSecurityUseCase, times(10)).changeLocalPassword(any());
+        assertThat(session.isInvalid()).isFalse();
+    }
+
+    @DisplayName("같은 네트워크의 현재 비밀번호 확인은 계정을 바꿔도 예순 번 뒤 429로 제한한다")
+    @Test
+    void limitsPasswordChangeAttemptsByNetwork() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+
+        for (int attempt = 0; attempt < 60; attempt += 1) {
+            mockMvc.perform(passwordChange(accountSession(UUID.randomUUID(), 0), "203.0.113.77"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(passwordChange(accountSession(UUID.randomUUID(), 0), "203.0.113.77"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("AUTH_RATE_LIMITED"));
     }
 
     @DisplayName("설정하지 않은 소셜 공급자 목록은 가입 가능 여부와 인증 정보가 없는 빈 배열만 반환한다")
@@ -623,12 +670,36 @@ class AuthSecurityTest {
     }
 
     private MockHttpSession accountSession(long version) {
+        return accountSession(ACCOUNT_ID, version);
+    }
+
+    private MockHttpSession accountSession(UUID accountId, long version) {
         MockHttpSession session = new MockHttpSession();
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                new AccountSessionPrincipal(ACCOUNT_ID, version), null, List.of()));
+                new AccountSessionPrincipal(accountId, version), null, List.of()));
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
         return session;
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder passwordChange(
+            MockHttpSession session,
+            String remoteAddress
+    ) {
+        return sameOrigin(post(AccountSecurityController.LOCAL_PASSWORD_CHANGES_PATH))
+                .session(session)
+                .with(csrf())
+                .with(request -> {
+                    request.setRemoteAddr(remoteAddress);
+                    return request;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "currentPassword": "wrong current password",
+                          "newPassword": "new correct horse battery staple"
+                        }
+                        """);
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder sameOrigin(

@@ -23,6 +23,8 @@ public final class AuthRateLimiter {
     private static final Limit LOGIN_IP = new Limit(60, Duration.ofMinutes(10));
     private static final Limit LOGIN_IP_EMAIL = new Limit(10, Duration.ofMinutes(10));
     private static final Limit LOGIN_ACCOUNT_FAILURE = new Limit(20, Duration.ofMinutes(10));
+    private static final Limit PASSWORD_CHANGE_IP = new Limit(60, Duration.ofMinutes(10));
+    private static final Limit PASSWORD_CHANGE_ACCOUNT = new Limit(10, Duration.ofMinutes(10));
     private static final Limit VERIFICATION_IP = new Limit(30, Duration.ofMinutes(10));
     private static final Limit VERIFICATION_TOKEN = new Limit(5, Duration.ofMinutes(10));
     private static final Limit ROUND_ACCOUNT_ROOM = new Limit(12, Duration.ofMinutes(1));
@@ -65,6 +67,17 @@ public final class AuthRateLimiter {
         if (accountBucket != null) {
             accountBucket.addTokens(1);
         }
+    }
+
+    public void checkPasswordChange(String remoteAddress, UUID accountId) {
+        consume(
+                "password-change:ip:" + digest(normalizeClientNetwork(remoteAddress)),
+                PASSWORD_CHANGE_IP
+        );
+        consume(
+                "password-change:account:" + digest(Objects.requireNonNull(accountId).toString()),
+                PASSWORD_CHANGE_ACCOUNT
+        );
     }
 
     public void checkVerification(String remoteAddress, String verificationToken) {
