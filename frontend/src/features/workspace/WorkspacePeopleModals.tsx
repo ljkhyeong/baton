@@ -273,11 +273,17 @@ export function RoleModal({
   )
   const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
   const [risk, setRisk] = useState(role?.risk ?? '')
+  const [validationMessage, setValidationMessage] = useState('')
   const currentMemberOptions = memberSelectionOptions(members, role?.currentMemberId)
   const nextMemberOptions = memberSelectionOptions(members, role?.nextMemberId)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current) return
+    // 저장된 담당 업무에는 쉼표가 들어 있을 수 있어 수정할 때는 줄바꿈으로만 나눈다.
+    const responsibilityItems = splitList(responsibilities, editing ? /\n/ : /[\n,]/)
+    const invalidMessage = roleInputError(name, purpose, responsibilityItems)
+    setValidationMessage(invalidMessage)
+    if (invalidMessage) return
     const effectiveCurrentMemberId = assignmentLocked && role
       ? role.currentMemberId ?? ''
       : currentMemberId
@@ -297,8 +303,7 @@ export function RoleModal({
       nextMemberId: effectiveNextMemberId || null,
       assignmentStartDate: effectiveAssignmentStartDate || null,
       assignmentEndDate: effectiveAssignmentEndDate || null,
-      // 저장된 담당 업무에는 쉼표가 들어 있을 수 있어 수정할 때는 줄바꿈으로만 나눈다.
-      responsibilities: splitList(responsibilities, editing ? /\n/ : /[\n,]/),
+      responsibilities: responsibilityItems,
       risk: risk.trim() || null,
     }))
   }
@@ -317,6 +322,7 @@ export function RoleModal({
           <span>역할 이름</span>
           <input
             required
+            maxLength={100}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="예: 질문 담당"
@@ -326,6 +332,7 @@ export function RoleModal({
           <span>역할 목적</span>
           <textarea
             required
+            maxLength={1000}
             value={purpose}
             onChange={(event) => setPurpose(event.target.value)}
             placeholder="예: 모임에서 나온 질문이 빠짐없이 해결되도록 합니다"
@@ -401,12 +408,14 @@ export function RoleModal({
         <label>
           <span>주의사항</span>
           <textarea
+            maxLength={1000}
             value={risk}
             onChange={(event) => setRisk(event.target.value)}
             placeholder="예: 자료가 개인 계정에만 저장되어 있습니다"
             rows={2}
           />
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (
@@ -426,6 +435,16 @@ export function RoleModal({
       </form>
     </ModalShell>
   )
+}
+
+function roleInputError(name: string, purpose: string, responsibilities: string[]) {
+  if (!name.trim()) return '역할 이름을 입력해 주세요.'
+  if (!purpose.trim()) return '역할 목적을 입력해 주세요.'
+  if (responsibilities.length > 100) return '담당 업무는 100개까지 입력할 수 있습니다.'
+  if (responsibilities.some((item) => item.length > 500)) {
+    return '담당 업무는 항목마다 500자까지 입력할 수 있습니다.'
+  }
+  return ''
 }
 
 function splitList(value: string, separator: RegExp) {

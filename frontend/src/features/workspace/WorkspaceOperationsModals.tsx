@@ -64,9 +64,16 @@ export function RoutineModal({
     (routine?.ownerRoleId ?? selectedRoleId) || roles[0]?.id || '',
   )
   const [detail, setDetail] = useState(routine?.detail ?? '')
+  const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current || !ownerRoleId) return
+    const invalidMessage = !title.trim() ? '반복 업무 이름을 입력해 주세요.'
+      : !dueLabel.trim() ? '기한 설명을 입력해 주세요.'
+        : !detail.trim() ? '세부 설명을 입력해 주세요.'
+          : ''
+    setValidationMessage(invalidMessage)
+    if (invalidMessage) return
     submission.start(onSave({
       title: title.trim(),
       phase,
@@ -96,6 +103,7 @@ export function RoutineModal({
           <span>반복 업무 이름</span>
           <input
             required
+            maxLength={200}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="예: 문제 5개 선정"
@@ -128,6 +136,7 @@ export function RoutineModal({
           <span>기한 설명</span>
           <input
             required
+            maxLength={100}
             value={dueLabel}
             onChange={(event) => setDueLabel(event.target.value)}
             placeholder="예: 수요일 18:00"
@@ -170,12 +179,14 @@ export function RoutineModal({
           <span>세부 설명</span>
           <textarea
             required
+            maxLength={1000}
             value={detail}
             onChange={(event) => setDetail(event.target.value)}
             placeholder="완료 기준이나 다음 담당자가 알아야 할 내용을 적어주세요"
             rows={3}
           />
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (
