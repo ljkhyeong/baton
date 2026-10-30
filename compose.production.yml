@@ -20,6 +20,12 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+00:00
+      - --slow-query-log=ON
+      - --long-query-time=1
+      - --slow-query-log-file=/var/lib/mysql/slow-query.log
+    cpus: "1.00"
+    mem_limit: 1536m
+    pids_limit: 256
     volumes:
       - baton_mysql_data:/var/lib/mysql
     healthcheck:
@@ -42,6 +48,9 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    cpus: "1.00"
+    mem_limit: 1g
+    pids_limit: 512
     environment:
       SPRING_PROFILES_ACTIVE: ${BATON_EFFECTIVE_SPRING_PROFILES_ACTIVE:-production}
       SPRING_CONFIG_IMPORT: configtree:/run/baton-config/
@@ -197,6 +206,9 @@ services:
       secrets:
         - sentry_auth_token
     restart: unless-stopped
+    cpus: "1.00"
+    mem_limit: 128m
+    pids_limit: 128
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
       BATON_ROUND_RUNTIME_ENABLED: ${BATON_ROUND_RUNTIME_ENABLED:-false}

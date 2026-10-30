@@ -577,6 +577,71 @@ assert_web_container_hardening() {
   fi
 }
 
+assert_container_limits() {
+  local service="$1"
+  local expected_limits="$2"
+  local actual_limits
+  local container_id
+
+  container_id="$("${COMPOSE[@]}" ps -q "$service")"
+  actual_limits="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' \
+      "$container_id"
+  )"
+  if [[ "$actual_limits" != "$expected_limits" ]]; then
+    log "$service 자원 제한이 예상과 다릅니다: expected=$expected_limits actual=$actual_limits"
+    return 1
+  fi
+}
+
+# 이미지 진입점의 JVM 옵션으로 최대 힙을 구해 비힙 영역이 들어갈 여유가 있는지 확인한다.
+assert_app_heap_within_limit() {
+  local container_id
+  local entrypoint
+  local max_heap_bytes
+  local memory_limit_bytes
+
+  container_id="$("${COMPOSE[@]}" ps -q app)"
+  entrypoint="$(
+    "$REAL_DOCKER" inspect --format '{{range .Config.Entrypoint}}{{.}} {{end}}' "$container_id"
+  )"
+  if [[ "$entrypoint" != *"-XX:+ExitOnOutOfMemoryError"* ]]; then
+    log "app 진입점에 -XX:+ExitOnOutOfMemoryError가 없습니다."
+    return 1
+  fi
+  if [[ ! "$entrypoint" =~ (-XX:MaxRAMPercentage=[0-9.]+) ]]; then
+    log "app 진입점에서 최대 힙 비율을 찾지 못했습니다."
+    return 1
+  fi
+  max_heap_bytes="$(
+    "${COMPOSE[@]}" exec -T app java "${BASH_REMATCH[1]}" -XX:+PrintFlagsFinal -version \
+      | awk '$2 == "MaxHeapSize" { print $4 }'
+  )"
+  memory_limit_bytes="$(
+    "$REAL_DOCKER" inspect --format '{{.HostConfig.Memory}}' "$container_id"
+  )"
+  if [[ ! "$max_heap_bytes" =~ ^[0-9]+$ ]] \
+    || ((max_heap_bytes * 10 > memory_limit_bytes * 6)); then
+    log "app 최대 힙이 메모리 제한의 60%를 넘습니다: heap=$max_heap_bytes limit=$memory_limit_bytes"
+    return 1
+  fi
+}
+
+assert_mysql_slow_query_log() {
+  local settings
+
+  settings="$("${COMPOSE[@]}" exec -T \
+    -e MYSQL_PWD="$BATON_DB_ROOT_PASSWORD" \
+    mysql mysql --protocol=socket --user=root --batch --skip-column-names \
+    --execute="SELECT @@slow_query_log, @@long_query_time, @@slow_query_log_file;" \
+    | tr '\t' ' ' | tr -d '\r')"
+  if [[ "$settings" != "1 1.000000 /var/lib/mysql/slow-query.log" ]]; then
+    log "MySQL 슬로우 쿼리 로그 설정이 예상과 다릅니다: $settings"
+    return 1
+  fi
+}
+
 assert_round_turn_secret_mount() {
   local container_id
   local mount_contract
@@ -862,6 +927,11 @@ assert_round_container_hardening round-web NET_BIND_SERVICE
 assert_round_container_hardening round-signaling ""
 assert_round_turn_secret_mount
 assert_web_container_hardening
+assert_container_limits mysql "1610612736 1000000000 256"
+assert_container_limits app "1073741824 1000000000 512"
+assert_container_limits web "134217728 1000000000 128"
+assert_app_heap_within_limit
+assert_mysql_slow_query_log
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
 
 # 공개 상태 검사기와 같은 판정으로 실제 Actuator 응답을 확인한다.

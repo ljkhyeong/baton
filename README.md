@@ -281,6 +281,8 @@ openssl rand -hex 32
 
 `web`은 UID `10002`의 비루트 Caddy로 실행하고 Linux capability를 모두 제거하며 `no-new-privileges`를 적용한다. 80·443 바인드는 이 컨테이너 네트워크 네임스페이스의 `net.ipv4.ip_unprivileged_port_start=0`으로 허용한다. root로 쓰던 기존 `baton_caddy_data`·`baton_caddy_config` 볼륨은 `web`을 시작하기 전에 일회성 `web-volume-owner`가 소유권을 맞추므로 기존 인증서를 그대로 쓴다. 헬스체크는 게시하지 않는 루프백 전용 `127.0.0.1:8081/healthz`를 호출한다.
 
+자원 제한은 [홈서버 k3s 런북](docs/runbooks/homeserver-k3s.md)과 같은 값을 쓴다. CPU는 각 1개, 메모리는 MySQL `1536m`, `app` `1g`, `web` `128m`이다. `app`의 최대 힙은 메모리 제한의 50%이며 `OutOfMemoryError`가 나면 프로세스를 끝내 `restart` 정책으로 다시 시작한다. 1초를 넘는 쿼리는 MySQL 볼륨의 `/var/lib/mysql/slow-query.log`에 남는다. 쿼리 원문이 포함되고 자동 회전하지 않으므로 `./ops/production-compose.sh exec mysql tail -n 100 /var/lib/mysql/slow-query.log`로 확인하되 외부로 복사하지 않고 크기를 함께 본다.
+
 사전점검 뒤 환경 파일의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 실패한다. 다른 환경 파일은 `./ops/preflight-production.sh /absolute/path/to/env`로 검사한 뒤 모든 Compose 호출에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다.
 
 `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`는 필수다. 빠지면 Compose 설정 단계에서 실패한다. 두 운영 키는 직접 실행에서도 32~200자의 URL 안전 ASCII여야 한다. `production`에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다.
@@ -697,7 +699,7 @@ systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup
 
 실제 ROUND 릴리스 이미지가 운영자가 고정한 다이제스트·리비전·레이블과 일치하는지는 사전점검과 래퍼의 잠금 내부 배포 경계가, 진입점 호환성은 공개 스테이징 기동이 별도로 확인한다.
 
-root로 쓰던 Caddy 볼륨을 재현해 비루트 `web` 이전, capability 제거와 로컬 헬스체크도 확인한다.
+root로 쓰던 Caddy 볼륨을 재현해 비루트 `web` 이전, capability 제거, 로컬 헬스체크, 세 서비스의 자원 제한, `app` 최대 힙과 MySQL 슬로우 쿼리 설정도 확인한다.
 
 먼저 DB 설정이 없는 `app` 이미지가 컨텍스트와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA 대체 경로, 상태 검사·제품 API 역방향 프록시와 보안 헤더, 유효한 CI 전용 키를 사용한 프로덕션 프로필 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다.
 

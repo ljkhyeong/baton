@@ -1172,6 +1172,21 @@ grep -Fq 'header Cache-Control "public, max-age=31536000, immutable"' "$repo_roo
 grep -Fq 'header Cache-Control "no-cache"' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not revalidate the SPA entry document'
 
+# 값은 홈서버 k3s 런북의 자원 제한과 맞춘다.
+for production_limit in \
+  'mem_limit: 1536m' \
+  'mem_limit: 1g' \
+  'mem_limit: 128m' \
+  'pids_limit: 256' \
+  'pids_limit: 512' \
+  'pids_limit: 128' \
+  '- --slow-query-log=ON' \
+  '- --long-query-time=1'; do
+  grep -Fq -- "$production_limit" "$repo_root/compose.production.yml" \
+    || fail "production Compose is missing: $production_limit"
+done
+grep -Fq -- '-XX:+ExitOnOutOfMemoryError' "$repo_root/Dockerfile" \
+  || fail 'production app does not exit on OutOfMemoryError'
 grep -Fxq 'USER caddy' "$repo_root/frontend/Dockerfile" \
   || fail 'production web image does not run as a non-root user'
 grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \

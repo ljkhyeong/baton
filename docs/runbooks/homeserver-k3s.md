@@ -506,7 +506,7 @@ save('00-network',policies)
 
 mysql=workload('baton','mysql','mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb',3306,'512Mi','1536Mi',
  {'MYSQL_DATABASE':'baton','MYSQL_USER':'baton','TZ':'UTC'},['mysql-secret'],storage=('20Gi','/var/lib/mysql'))
-mysql[1]['spec']['template']['spec']['containers'][0]['args']=['--character-set-server=utf8mb4','--collation-server=utf8mb4_unicode_ci','--default-time-zone=+00:00','--innodb-buffer-pool-size=512M','--max-connections=50']
+mysql[1]['spec']['template']['spec']['containers'][0]['args']=['--character-set-server=utf8mb4','--collation-server=utf8mb4_unicode_ci','--default-time-zone=+00:00','--innodb-buffer-pool-size=512M','--max-connections=50','--slow-query-log=ON','--long-query-time=1','--slow-query-log-file=/var/lib/mysql/slow-query.log']
 postgres=workload('baton','postgres','postgres:18.6-alpine',5432,'256Mi','512Mi',{'POSTGRES_DB':'baton_cal','POSTGRES_USER':'baton_cal'},['postgres-secret'],storage=('10Gi','/var/lib/postgresql'))
 postgres[1]['spec']['template']['spec']['containers'][0]['args']=['-c','shared_buffers=128MB','-c','max_connections=30']
 save('10-databases',mysql+postgres)
