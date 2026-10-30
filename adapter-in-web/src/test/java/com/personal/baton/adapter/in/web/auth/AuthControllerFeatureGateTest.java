@@ -72,15 +72,7 @@ class AuthControllerFeatureGateTest {
     @DisplayName("가입과 재설정 메일 요청은 용도를 구분해 자동 요청 방지를 검증한다")
     @Test
     void verifiesHumanChallengeBeforeEmailRequests() {
-        var enabledController = new AuthController(
-                registerUseCase,
-                verifyUseCase,
-                resetUseCase,
-                registrations(),
-                new AuthRateLimiter(),
-                new AuthFeatureProperties(true, true),
-                humanVerificationUseCase
-        );
+        var enabledController = enabledController();
         var servletRequest = new MockHttpServletRequest();
         servletRequest.setRemoteAddr("192.0.2.10");
 
@@ -103,6 +95,46 @@ class AuthControllerFeatureGateTest {
                 "192.0.2.10",
                 Action.PASSWORD_RESET_REQUEST
         ));
+    }
+
+    @DisplayName("대괄호로 전달된 IPv6 주소는 대괄호 없이 자동 요청 방지 검증에 넘긴다")
+    @Test
+    void passesUnbracketedIpv6ToHumanVerification() {
+        var enabledController = enabledController();
+        var servletRequest = new MockHttpServletRequest();
+        servletRequest.setRemoteAddr("[2001:db8::1]");
+
+        enabledController.registerLocalAccount(
+                new LocalRegistrationRequest("member@example.com", "박민서", "registration-token"),
+                servletRequest
+        );
+        enabledController.requestPasswordReset(
+                new AuthRequests.PasswordResetRequest("member@example.com", "reset-token"),
+                servletRequest
+        );
+
+        verify(humanVerificationUseCase).verify(new HumanVerificationCommand(
+                "registration-token",
+                "2001:db8::1",
+                Action.LOCAL_REGISTRATION
+        ));
+        verify(humanVerificationUseCase).verify(new HumanVerificationCommand(
+                "reset-token",
+                "2001:db8::1",
+                Action.PASSWORD_RESET_REQUEST
+        ));
+    }
+
+    private AuthController enabledController() {
+        return new AuthController(
+                registerUseCase,
+                verifyUseCase,
+                resetUseCase,
+                registrations(),
+                new AuthRateLimiter(),
+                new AuthFeatureProperties(true, true),
+                humanVerificationUseCase
+        );
     }
 
     @SuppressWarnings("unchecked")

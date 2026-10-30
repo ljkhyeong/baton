@@ -124,6 +124,31 @@ class AuthRateLimiterTest {
         );
     }
 
+    @DisplayName("ForwardedHeaderFilter가 대괄호로 넘긴 IPv6도 /64로 묶는다")
+    @Test
+    void limitsLoginByBracketedIpv6NetworkPrefix() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 60; attempt += 1) {
+            String host = Integer.toHexString(attempt + 1);
+            limiter.checkLogin(
+                    attempt % 2 == 0
+                            ? "[2001:db8:abcd:42::" + host + "]"
+                            : "2001:db8:abcd:42::" + host,
+                    "member-" + attempt + "@example.com"
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkLogin(
+                "[2001:db8:abcd:42::ffff]",
+                "another@example.com"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkLogin(
+                "[2001:db8:abcd:43::1]",
+                "another@example.com"
+        );
+    }
+
     @DisplayName("인증 토큰은 다섯 번 뒤 제한한다")
     @Test
     void limitsVerificationByToken() {

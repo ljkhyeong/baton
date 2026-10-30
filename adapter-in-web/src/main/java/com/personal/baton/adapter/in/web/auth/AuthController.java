@@ -140,7 +140,7 @@ public class AuthController {
         );
         humanVerificationUseCase.verify(new HumanVerificationCommand(
                 request.turnstileToken(),
-                servletRequest.getRemoteAddr(),
+                AuthRateLimiter.withoutIpv6Brackets(servletRequest.getRemoteAddr()),
                 Action.LOCAL_REGISTRATION
         ));
         try {
@@ -185,7 +185,7 @@ public class AuthController {
         authRateLimiter.checkRegistration(servletRequest.getRemoteAddr(), request.email());
         humanVerificationUseCase.verify(new HumanVerificationCommand(
                 request.turnstileToken(),
-                servletRequest.getRemoteAddr(),
+                AuthRateLimiter.withoutIpv6Brackets(servletRequest.getRemoteAddr()),
                 Action.PASSWORD_RESET_REQUEST
         ));
         passwordResetUseCase.requestPasswordReset(request.email());

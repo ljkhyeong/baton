@@ -87,6 +87,14 @@ public final class AuthRateLimiter {
         );
     }
 
+    // ForwardedHeaderFilter는 전달받은 IPv6 주소를 대괄호로 감싸 getRemoteAddr()에 돌려준다.
+    static String withoutIpv6Brackets(String remoteAddress) {
+        if (remoteAddress != null && remoteAddress.startsWith("[") && remoteAddress.endsWith("]")) {
+            return remoteAddress.substring(1, remoteAddress.length() - 1);
+        }
+        return remoteAddress;
+    }
+
     private void consume(String key, Limit limit) {
         Bucket bucket = buckets.get(key, ignored -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
@@ -117,7 +125,7 @@ public final class AuthRateLimiter {
     }
 
     private String normalizeClientNetwork(String remoteAddress) {
-        String candidate = Objects.requireNonNullElse(remoteAddress, "").strip();
+        String candidate = withoutIpv6Brackets(Objects.requireNonNullElse(remoteAddress, "").strip());
         int zoneDelimiter = candidate.indexOf('%');
         if (zoneDelimiter >= 0) {
             candidate = candidate.substring(0, zoneDelimiter);
