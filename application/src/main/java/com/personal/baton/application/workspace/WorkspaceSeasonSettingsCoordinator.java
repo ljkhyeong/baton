@@ -58,6 +58,7 @@ final class WorkspaceSeasonSettingsCoordinator {
                     command.startDate(),
                     command.endDate()
             );
+            requireStartAfterPreviousSeason(season, command.startDate());
         }
         season.update(command.name(), command.startDate(), command.endDate());
         Season savedSeason = seasonRepository.saveSeason(season);
@@ -96,6 +97,17 @@ final class WorkspaceSeasonSettingsCoordinator {
             briefContinuitySignalRecorder.reconcileSeason(savedSeason.getTeamId(), seasonId);
         }
         return resultMapper.toSeasonResult(savedSeason);
+    }
+
+    private void requireStartAfterPreviousSeason(Season season, LocalDate startDate) {
+        if (season.getPreviousSeasonId() == null) {
+            return;
+        }
+        seasonRepository.findSeasonById(season.getPreviousSeasonId())
+                .filter(previous -> !startDate.isAfter(previous.getEndDate()))
+                .ifPresent(previous -> {
+                    throw new DomainValidationException("다음 시즌 시작일은 이전 시즌 종료일보다 늦어야 합니다");
+                });
     }
 
     private void validateSeasonRangeAgainstExistingContent(

@@ -200,7 +200,9 @@ public class TeamAccessService implements TeamAccessUseCase {
                 .orElseThrow(WorkspaceAccessDeniedException::new);
     }
     private InvitationAcceptedResult accepted(Team team, AccountTeamMembership membership) {
-        var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(WorkspaceNotFoundException::team);
+        var season = seasons.findActiveSeasonByTeamId(team.getId())
+                .or(() -> seasons.findLatestSeasonByTeamId(team.getId()))
+                .orElseThrow(WorkspaceNotFoundException::team);
         return new InvitationAcceptedResult(membership.getAccountId(), team.getId(), season.getId(),
                 membership.getMemberId(), membership.getPermission());
     }

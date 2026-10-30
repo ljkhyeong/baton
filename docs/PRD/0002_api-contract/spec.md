@@ -292,7 +292,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-성공 상태는 `200 OK`이고 갱신된 시즌 전체 표현을 반환한다. 이름은 앞뒤 공백을 정리한 뒤 팀 안에서 유일하고 최대 100자다. 시작일은 종료일보다 늦을 수 없다. 종료되지 않은 시즌만 수정할 수 있으며 기존 회차 날짜, 역할 담당 기간이나 열린 역할 인수인계의 다음 담당 기간을 제외하도록 기간을 줄일 수 없다.
+성공 상태는 `200 OK`이고 갱신된 시즌 전체 표현을 반환한다. 이름은 앞뒤 공백을 정리한 뒤 팀 안에서 유일하고 최대 100자다. 시작일은 종료일보다 늦을 수 없다. 종료되지 않은 시즌만 수정할 수 있으며 기존 회차 날짜, 역할 담당 기간이나 열린 역할 인수인계의 다음 담당 기간을 제외하도록 기간을 줄일 수 없다. `previousSeasonId`가 있는 시즌의 시작일은 이전 시즌 종료일보다 늦어야 하며 위반은 `400 INVALID_INPUT`이다.
 
 운영자 시즌 이름 정정:
 
@@ -1365,7 +1365,7 @@ cd frontend && npm ci && cd ..
 | `POST /api/v1/team-access/{teamId}/invitations/{invitationId}/revoke` | `expectedAccountId` | 취소 후 팀 권한 |
 | `PUT /api/v1/team-access/{teamId}/members/{memberId}/permission` | `expectedAccountId`, `permission` | 변경 후 팀 권한. `permission=null` 또는 생략은 접근 취소 |
 | `POST /api/v1/team-invitations/preview` | `expectedAccountId`, 43자 URL 안전 `token` | `teamId`, `teamName`, `memberId`, `memberName`, `permission`, `expiresAt` |
-| `POST /api/v1/team-invitations/accept` | 미리보기와 같은 요청 | `accountId`, `teamId`, 이동할 최신 `seasonId`, `memberId`, 현재 `permission` |
+| `POST /api/v1/team-invitations/accept` | 미리보기와 같은 요청 | `accountId`, `teamId`, 이동할 `seasonId`(종료되지 않은 시즌 우선, 모두 종료됐으면 시작일·식별자 내림차순 첫 시즌), `memberId`, 현재 `permission` |
 
 `permission`은 `ADMIN`, `MEMBER`, `VIEWER`다. 팀 권한 응답의 `memberId`·`permission`은 연결 전·승인 전
 상태에서 `null`이다. 관리자만 전체 `members`, `invitations`, `audit`을 받으며 공유 키 팀의 전환 준비

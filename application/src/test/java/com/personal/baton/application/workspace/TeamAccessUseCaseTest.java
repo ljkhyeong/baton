@@ -307,6 +307,25 @@ class TeamAccessUseCaseTest {
         // 열린 인수인계가 사라지면 시즌을 종료할 수 있다.
         assertThat(lifecycle.updateSeasonEnding(fixture.id(), fixture.season(), null, true).endedAt()).isNotNull();
     }
+    @Test
+    @DisplayName("초대 수락 뒤 이동 시즌은 시작일이 더 늦은 종료 시즌보다 종료되지 않은 시즌을 우선한다")
+    void movesToOpenSeasonAfterAcceptingInvitation() {
+        var fixture = accountTeam("시즌 이동 팀", "관리자", "신규 구성원");
+        var ended = Season.create(UUID.randomUUID(), fixture.id(), "종료한 시즌",
+                LocalDate.of(2027, 1, 1), LocalDate.of(2027, 6, 30));
+        ended.updateEnding(true, clock.instant());
+        seasons.saveSeason(ended);
+        var invitation = access.invite(fixture.id(), fixture.adminAccount(), fixture.member("신규 구성원"), TeamPermission.MEMBER);
+        var account = identities.saveAccount(Account.create(UUID.randomUUID(), "신규 계정", clock.instant()));
+        when(current.currentAccountId()).thenReturn(Optional.of(account.getId()));
+
+        assertThat(access.accept(account.getId(), invitation.token()).seasonId()).isEqualTo(fixture.season());
+
+        when(current.currentAccountId()).thenReturn(Optional.of(fixture.adminAccount()));
+        lifecycle.updateSeasonEnding(fixture.id(), fixture.season(), null, true);
+        when(current.currentAccountId()).thenReturn(Optional.of(account.getId()));
+        assertThat(access.accept(account.getId(), invitation.token()).seasonId()).isEqualTo(ended.getId());
+    }
     private AccountTeam accountTeam(String name, String... memberNames) {
         NOW.set(Instant.parse("2026-09-05T03:00:00Z"));
         var workspace = lifecycle.createWorkspace(UUID.randomUUID().toString(), "pilot-operator-key-0000000000000001",
