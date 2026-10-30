@@ -994,7 +994,8 @@ GET /actuator/health
 | `404` | `TEAM_INVITATION_NOT_FOUND`, `MEMBERSHIP_NOT_FOUND` | 사용할 수 있는 초대가 없거나 취소·만료됨, 또는 권한을 변경할 계정 연결이 없음 |
 | `403` | `WORKSPACE_CREATION_DENIED` | 설정된 파일럿 생성 키 누락 또는 불일치 |
 | `403` | `WORKSPACE_RECOVERY_DENIED` | 운영자 복구 키 미설정·누락 또는 불일치 |
-| `403` | `REQUEST_FORBIDDEN` | CSRF, 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
+| `403` | `ORIGIN_DENIED` | 인증 API와 계정 세션 변경 요청이 동일 출처·Fetch Metadata 검사를 통과하지 못함 |
+| `403` | `REQUEST_FORBIDDEN` | CSRF, ROUND 참여권 갱신의 동일 출처, 권한 또는 필터 체인의 전체 거부 경계를 통과하지 못함 |
 | `403` | `ROUND_PARTICIPATION_DENIED` | `Account`가 방의 팀 멤버십이나 활성 시즌 참여 조건을 충족하지 못함 |
 | `403` | `BRIEF_ACCESS_DENIED` | `Account`가 요청 팀의 활동 중인 멤버십을 갖지 않음 |
 | `404` | `TEAM_NOT_FOUND`, `SEASON_NOT_FOUND`, `MEMBER_NOT_FOUND`, `ROLE_NOT_FOUND`, `ROLE_HANDOFF_NOT_FOUND`, `ROLE_RESOURCE_NOT_FOUND`, `ROUTINE_NOT_FOUND`, `SEASON_ROUND_NOT_FOUND`, `ROUTINE_EXECUTION_NOT_FOUND`, `DECISION_NOT_FOUND`, `HANDOFF_ITEM_NOT_FOUND` | 요청 범위에서 리소스를 찾지 못했거나 보관된 기록을 활성 변경 API로 요청함 |
@@ -1275,7 +1276,7 @@ CSRF 없이 조회한다.
 다음 영역은 제품 명세에는 포함되지만 HTTP 경로, 요청·응답 DTO와 상태값이 아직 확정되지 않았다.
 
 - 모든 제품 기록의 영구 삭제
-- 계정 비활성화·탈퇴, 관리자에 의한 세션 강제 만료, 단계 강화 신원 연결·병합, 초대와 세부 권한·감사 이력
+- 계정 탈퇴와 로그인 정보 삭제, 관리자에 의한 세션 강제 만료, 단계 강화 신원 연결·병합
 - 지연·역할 공백을 전달할 외부 알림 채널과 선호·전달 결과
 
 이 영역의 API를 추가할 때는 구현, 이 문서와 REST Docs 계약 테스트를 같은 변경에서 갱신한다.
@@ -1379,7 +1380,7 @@ cd frontend && npm ci && cd ..
 nullable `permission`을 포함한다. 초대 항목은 `id`, `memberId`, `permission`, `createdAt`, `expiresAt`,
 nullable `acceptedAt`, nullable `revokedAt`이다. 권한 이력은 `id`, `actorAccountId`, `memberId`, `action`,
 nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 50건을 반환한다.
-`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`다.
+`action`은 `ADMIN_RECOVERY`, `INVITED`, `INVITATION_REVOKED`, `INVITATION_ACCEPTED`, `PERMISSION_CHANGED`, `ACCOUNT_DEACTIVATED`다.
 
 초대 수락의 계정 연결과 권한 변경은 원자적이다. 같은 토큰의 같은 계정 재수락은 현재 권한을 반환한다.
 권한이 취소된 계정은 재수락으로 권한을 되살릴 수 없다. 다른 계정·구성원의 기존 연결과 충돌하면
