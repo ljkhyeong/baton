@@ -4,6 +4,8 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOSITORY_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=ops/production-validation-common.sh
+source "$REPOSITORY_ROOT/ops/production-validation-common.sh"
 COMPOSE_FILE="$REPOSITORY_ROOT/compose.production.yml"
 ROUND_COMPOSE_FILE="$REPOSITORY_ROOT/compose.round.production.yml"
 RECOVERY_COMPOSE_FILE="$SCRIPT_DIR/compose.recovery-rehearsal.yml"
@@ -801,6 +803,12 @@ assert_round_container_hardening round-web NET_BIND_SERVICE
 assert_round_container_hardening round-signaling ""
 assert_round_turn_secret_mount
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
+
+# 공개 상태 검사기와 같은 판정으로 실제 Actuator 응답을 확인한다.
+if ! production_validation_is_aggregate_up_document "$(<"$RUN_DIR/health.body")"; then
+  log "실제 /actuator/health 응답을 ops/check-service-health.sh 판정이 거부합니다."
+  exit 1
+fi
 
 log "프로덕션 컨테이너 내부 연동 지표와 읽기 전용 장애 점검을 검증합니다."
 run_isolated_recovery_operation \

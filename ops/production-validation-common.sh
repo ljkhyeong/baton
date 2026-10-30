@@ -132,6 +132,17 @@ production_validation_is_url_safe_secret() {
   [[ ${#value} -ge 32 && ${#value} -le 200 && "$value" =~ ^[A-Za-z0-9._~-]+$ ]]
 }
 
+# /actuator/health의 집계 UP 문서인지 판정한다. Spring Boot가 필드 순서를 보장하지 않으므로
+# 순서만 허용 범위로 두고, 상세 항목이나 내부 키의 UP이 집계 판정을 대신하지 못하게 전체를 맞춘다.
+production_validation_is_aggregate_up_document() {
+  local document="$1"
+  local groups='"groups":\[("[A-Za-z0-9._-]+"(,"[A-Za-z0-9._-]+")*)?\]'
+  local status='"status":"UP"'
+  local pattern="^[[:space:]]*\\{($status(,$groups)?|$groups,$status)\\}[[:space:]]*\$"
+
+  [[ "$document" =~ $pattern ]]
+}
+
 # 백업 파일 이름의 UTC 스냅샷 시각을 epoch 초로 출력한다. 실패 문구는 호출자가 출력한다.
 production_validation_backup_epoch_from_name() {
   local backup_name="$1"

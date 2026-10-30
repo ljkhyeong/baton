@@ -438,11 +438,29 @@ done
 [[ -n "$body_file" && -n "$url" ]] || exit 81
 case "${FAKE_CURL_MODE:-healthy}" in
   healthy)
+    # Spring Boot 4의 Jackson 3가 정렬한 실제 응답 순서다.
+    printf '{"groups":["liveness","readiness"],"status":"UP"}\n' > "$body_file"
+    printf '200'
+    ;;
+  status-first)
     printf '{"status":"UP","groups":["liveness","readiness"]}\n' > "$body_file"
+    printf '200'
+    ;;
+  status-only)
+    printf '{"status":"UP"}\n' > "$body_file"
     printf '200'
     ;;
   down)
     printf '{"status":"DOWN"}\n' > "$body_file"
+    printf '200'
+    ;;
+  groups-down)
+    printf '{"groups":["liveness","readiness"],"status":"DOWN"}\n' > "$body_file"
+    printf '200'
+    ;;
+  nested-up)
+    printf '{"components":{"db":{"status":"UP"}},"groups":["liveness"],"status":"DOWN"}\n' \
+      > "$body_file"
     printf '200'
     ;;
   redirect)
@@ -2401,8 +2419,18 @@ assert_not_contains '--insecure' "$curl_arguments" 'certificate verification'
 assert_not_contains ' -k ' " $curl_arguments " 'certificate verification'
 assert_not_contains '--location' "$curl_arguments" 'redirect behavior'
 
+FAKE_CURL_MODE=status-first run_health >/dev/null \
+  || fail 'status-first health response order failed'
+FAKE_CURL_MODE=status-only run_health >/dev/null \
+  || fail 'health response without probe groups failed'
 if FAKE_CURL_MODE=down run_health >/dev/null 2>&1; then
   fail 'DOWN service health unexpectedly passed'
+fi
+if FAKE_CURL_MODE=groups-down run_health >/dev/null 2>&1; then
+  fail 'DOWN service health with probe groups unexpectedly passed'
+fi
+if FAKE_CURL_MODE=nested-up run_health >/dev/null 2>&1; then
+  fail 'nested component UP unexpectedly replaced the aggregate status'
 fi
 if FAKE_CURL_MODE=redirect run_health >/dev/null 2>&1; then
   fail 'redirected service health unexpectedly passed'
