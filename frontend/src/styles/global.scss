@@ -597,6 +597,7 @@ a {
 }
 .onboarding-date-row,
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-grid .full { grid-column: 1 / -1; }
 .onboarding-submit { width: 100%; margin-top: 4px; }
 .workspace-template-preview { border: 1px solid var(--rule); padding: 16px; overflow-wrap: anywhere; }
 .workspace-template-preview h3 { margin-top: 0; }
@@ -1273,7 +1274,9 @@ a {
 // 행 단위 수정·보관·복원은 화면마다 같은 작은 테두리 버튼으로 표시한다.
 .inline-edit-button,
 .record-actions button,
-.archive-row button {
+.archive-row button,
+.resource-links .resource-row-actions > button,
+.resource-links > li > button {
   flex: 0 0 auto;
   align-self: center;
   min-width: 42px;
@@ -1285,12 +1288,15 @@ a {
   background: transparent;
   font-size: 12px;
   font-weight: 500;
+  text-decoration: none;
   cursor: pointer;
 }
 
 .inline-edit-button:hover,
 .record-actions button:hover,
-.archive-row button:hover {
+.archive-row button:hover,
+.resource-links .resource-row-actions > button:hover,
+.resource-links > li > button:hover {
   border-color: var(--ink);
   color: var(--ink);
 }
@@ -1752,13 +1758,14 @@ dialog.inspector::backdrop {
 .inspector-section li.muted { color: var(--faint); }
 .resource-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .resource-section-heading button { display: inline-flex; min-height: 32px; align-items: center; gap: 4px; padding: 6px 0; border: 0; color: var(--ink); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
-.resource-links > li { align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.resource-links > li { flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .resource-links > li:last-child { border-bottom: 0; }
 .resource-links > li > span { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
 .resource-links a { overflow-wrap: anywhere; color: var(--ink); font-size: 12px; font-weight: 700; line-height: 1.45; text-decoration-color: var(--baton); text-underline-offset: 3px; }
 .resource-links small { color: var(--muted); font-size: 12px; line-height: 1.5; }
 .resource-links button { min-width: 32px; min-height: 32px; flex: 0 0 auto; padding: 6px 0; border: 0; color: var(--muted); background: transparent; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.resource-row-actions { display: flex; max-width: 118px; flex: 0 0 auto; flex-direction: column; align-items: flex-end; gap: 4px; }
+// 좁은 상세 패널에서 설명을 가리지 않도록 동작은 내용 아래 한 줄에 둔다.
+.resource-row-actions { display: flex; flex: 1 0 100%; flex-wrap: wrap; align-items: center; gap: 6px; }
 .round-room-resource-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; }
 .round-room-primary-action,
 .round-room-text-action { min-height: 32px; padding: 6px 0; font-weight: 700; }
@@ -1936,6 +1943,13 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   grid-column: 1 / -1;
 }
 
+// 시즌 양식은 체크박스 목록이 있어 modal-form 대신 입력 묶음에만 같은 배치를 적용한다.
+.season-modal form > .form-grid { margin: 27px 0 17px; }
+.season-modal .form-grid label { display: flex; flex-direction: column; gap: 7px; }
+.season-modal .form-grid label > span { font-size: 12px; font-weight: 680; }
+.season-modal .form-grid input { width: 100%; height: 41px; padding: 0 12px; font-size: 13px; }
+.season-modal form > .form-error { margin: 17px 0; }
+
 .season-copy-boundary {
   display: flex;
   gap: 10px;
@@ -2074,6 +2088,8 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 }
 .handoff-warning-box > strong { font-size: 12px; }
 .handoff-warning-box ul { margin: 8px 0 12px; padding-left: 18px; font-size: 12px; line-height: 1.65; }
+// 대화상자의 체크박스 한 줄은 입력칸 크기 규칙을 받지 않고 글자 옆에 둔다.
+.modal-form .check-field,
 .role-handoff-form .handoff-warning-box label {
   flex-direction: row;
   gap: 8px;
@@ -2081,6 +2097,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   color: var(--ink);
   cursor: pointer;
 }
+.modal-form .check-field input,
 .role-handoff-form .handoff-warning-box input {
   width: 17px;
   height: 17px;
@@ -2886,7 +2903,9 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .routine-actions { gap: 2px; }
   .inline-edit-button,
   .record-actions button,
-  .archive-row button { min-height: 44px; }
+  .archive-row button,
+  .resource-links .resource-row-actions > button,
+  .resource-links > li > button { min-height: 44px; }
   .routine-definition-note { max-width: 64px; }
   .decision-body { padding: 20px 0; }
   .decision-heading { flex-direction: column; gap: 0; }
