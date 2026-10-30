@@ -232,6 +232,32 @@ test('@operations @webkit 사용할 수 없는 저장 초대를 지우고 내 �
   expect(await page.evaluate(() => sessionStorage.getItem('baton:team-invitation:v1'))).toBeNull()
 })
 
+test('@operations 관리자의 인수인계 취소는 권한 변경 없이 이력에 남는다', async ({ page }, testInfo) => {
+  const projection = makeProjection()
+  projection.team = { ...projection.team, accountAccessEnabled: true, permission: 'ADMIN' }
+  await installApi(page, projection)
+  await accountApi(page)
+  await page.route('**/api/v1/team-access/**', route => route.fulfill({ json: {
+    teamId: TEAM_ID, accountId: ACCOUNT_ID, accountAccessEnabled: true, memberId: MEMBER_ONE_ID, permission: 'ADMIN',
+    members: projection.members.map(member => ({ memberId: member.id, memberName: member.name, active: true,
+      accountId: member.id === MEMBER_ONE_ID ? ACCOUNT_ID : null,
+      permission: member.id === MEMBER_ONE_ID ? 'ADMIN' : null })),
+    invitations: [],
+    audit: [{ id: INVITATION, actorAccountId: ACCOUNT_ID, memberId: MEMBER_TWO_ID,
+      action: 'ROLE_HANDOFF_ADMIN_CANCELLED', previousPermission: null, permission: null, changedAt: instant }],
+  } }))
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할', exact: true }).click()
+  await page.getByRole('button', { name: '구성원 관리', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '구성원 관리' })
+  await dialog.getByText('팀 초대·권한 관리', { exact: true }).click()
+  await dialog.getByText('최근 권한 변경 이력', { exact: true }).click()
+
+  await expect(dialog.getByText('김준호 · 관리자가 인수인계 취소')).toBeVisible()
+  await expect(dialog.getByText('변경한 사람: 박민서')).toBeVisible()
+  await expect(dialog).not.toContainText('접근 없음 →')
+})
+
 test('@operations 관리자가 아닌 구성원은 시즌 목록을 보고 전환하지만 시즌 관리 동작은 비활성으로 본다', async ({ page }) => {
   const projection = makeProjection()
   projection.team = { ...projection.team, accountAccessEnabled: true, permission: 'MEMBER' }
