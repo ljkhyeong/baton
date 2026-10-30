@@ -32,6 +32,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.security.crypto.keygen.StringKeyGenerator;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -164,8 +165,9 @@ public class TeamAccessService implements TeamAccessUseCase {
         return new InvitationPreviewResult(team.getId(), team.getName(), member.getId(), member.getName(),
                 permission, invitation.getExpiresAt());
     }
+    // 팀 잠금 전 조회가 스냅샷을 고정하면 앞선 수락의 커밋을 보지 못하므로 READ_COMMITTED에서 잠금 뒤 다시 읽는다.
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public InvitationAcceptedResult accept(UUID accountId, String token) {
         requireActor(accountId);
         String hash = tokenHash(token);
@@ -200,7 +202,9 @@ public class TeamAccessService implements TeamAccessUseCase {
                 .orElseThrow(WorkspaceAccessDeniedException::new);
     }
     private InvitationAcceptedResult accepted(Team team, AccountTeamMembership membership) {
-        var season = seasons.findLatestSeasonByTeamId(team.getId()).orElseThrow(WorkspaceNotFoundException::team);
+        var season = seasons.findActiveSeasonByTeamId(team.getId())
+                .or(() -> seasons.findLatestSeasonByTeamId(team.getId()))
+                .orElseThrow(WorkspaceNotFoundException::team);
         return new InvitationAcceptedResult(membership.getAccountId(), team.getId(), season.getId(),
                 membership.getMemberId(), membership.getPermission());
     }

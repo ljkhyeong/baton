@@ -108,6 +108,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -326,6 +327,45 @@ class WorkspaceUseCaseTest {
                         LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, true));
         lifecycleUseCase.updateSeasonEnding(created.teamId(), created.seasonId(), created.accessKey(), true);
         assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
+    }
+
+    @Test
+    @DisplayName("시즌 끝을 넘은 자동 일정은 후보에서 빠지고 기간을 늘리면 같은 커서부터 다시 회차를 만든다")
+    void resumesAutomaticRoundsWhenSeasonIsExtended() {
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                "workspace-round-season-extension-0001", CREATION_KEY,
+                new CreateWorkspaceCommand("시즌 연장 스터디", "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of("박민서")));
+        RoleResult role = peopleUseCase.createRole(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("extension-role"), created.accessKey(),
+                new CreateRoleCommand("진행자", "모임 준비", null, null, null, null, List.of("질문 확인"), ""));
+        operationsUseCase.createRoutine(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("extension-routine"), created.accessKey(),
+                new CreateRoutineCommand("질문 모으기", RoutinePhase.BEFORE, "모임 전날", role.id(),
+                        "질문을 정리합니다", -1, LocalTime.of(22, 0)));
+        lifecycleUseCase.updateRoundSchedule(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateRoundScheduleCommand("Asia/Seoul", LocalDate.of(2026, 7, 27),
+                        LocalTime.of(19, 0), RoundRecurrence.WEEKLY, 7, true));
+        ScheduledSeasonCandidate candidate = new ScheduledSeasonCandidate(created.teamId(), created.seasonId());
+        assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isTrue();
+
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).doesNotContain(candidate);
+        assertThat(roundGenerationWorker.generateNextOccurrence(candidate, FIXED_INSTANT)).isFalse();
+        WorkspaceResult waiting = lifecycleUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        assertThat(waiting.season().roundSchedule().enabled()).isTrue();
+        assertThat(waiting.season().roundSchedule().nextOccurrenceDate()).isEqualTo(LocalDate.of(2026, 8, 3));
+
+        lifecycleUseCase.updateSeason(created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("여름 시즌", LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31)));
+
+        assertThat(seasonRepository.findScheduledSeasonCandidates()).contains(candidate);
+        assertThat(roundGenerationWorker.generateNextOccurrence(
+                candidate, Instant.parse("2026-07-27T03:00:00Z"))).isTrue();
+        assertThat(lifecycleUseCase.getWorkspace(created.teamId(), created.seasonId(), created.accessKey()).rounds())
+                .extracting(SeasonRoundResult::meetingDate)
+                .containsExactlyInAnyOrder(LocalDate.of(2026, 7, 27), LocalDate.of(2026, 8, 3));
     }
 
     @Nested
@@ -741,6 +781,54 @@ class WorkspaceUseCaseTest {
                 )
         )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
+    }
+
+    @DisplayName("활동 종료한 참여자가 있는 인수인계의 준비·전달·수락은 상태 충돌로 거절한다")
+    @Test
+    void rejectsHandoffTransitionsWithDeactivatedParticipant() {
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                "workspace-handoff-inactive-member-01", CREATION_KEY,
+                new CreateWorkspaceCommand("인수인계 참여자 스터디", "파일럿 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30), List.of("박민서", "김준호")));
+        WorkspaceResult workspace = lifecycleUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        UUID minseo = memberNamed(workspace, "박민서").id();
+        UUID junho = memberNamed(workspace, "김준호").id();
+        RoleResult role = peopleUseCase.createRole(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("inactive-handoff-role"), created.accessKey(),
+                new CreateRoleCommand("진행자", "모임을 진행합니다", minseo, null,
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of(), null));
+        Runnable deactivateJunho = () -> peopleUseCase.updateMemberDeactivation(
+                created.teamId(), created.seasonId(), junho, created.accessKey(), true);
+        Runnable reactivateJunho = () -> peopleUseCase.updateMemberDeactivation(
+                created.teamId(), created.seasonId(), junho, created.accessKey(), false);
+        WorkspacePeopleCommands.PrepareRoleHandoffCommand prepare = new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
+                junho, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30));
+
+        deactivateJunho.run();
+        assertThatThrownBy(() -> peopleUseCase.prepareRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), contentIdempotencyKey("inactive-handoff-prepare-a"),
+                created.accessKey(), prepare)).isInstanceOf(RoleHandoffStateConflictException.class);
+        reactivateJunho.run();
+        UUID handoffId = peopleUseCase.prepareRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), contentIdempotencyKey("inactive-handoff-prepare-b"),
+                created.accessKey(), prepare).handoff().id();
+
+        deactivateJunho.run();
+        assertThatThrownBy(() -> peopleUseCase.transferRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), handoffId, created.accessKey(),
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo, true)))
+                .isInstanceOf(RoleHandoffStateConflictException.class);
+        reactivateJunho.run();
+        peopleUseCase.transferRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), handoffId, created.accessKey(),
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo, true));
+
+        deactivateJunho.run();
+        assertThatThrownBy(() -> peopleUseCase.acceptRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), handoffId, created.accessKey(),
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(junho)))
+                .isInstanceOf(RoleHandoffStateConflictException.class);
     }
 
     @DisplayName("역할 인수인계는 전달과 수락으로 담당 기간을 바꾸고 취소된 전달 재시도를 현재 상태로 재생한다")
@@ -1164,6 +1252,19 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(minseo.id())
         );
+        assertThatThrownBy(() -> recordsUseCase.updateRoleResource(
+                created.teamId(),
+                created.seasonId(),
+                resource.id(),
+                created.accessKey(),
+                new UpdateRoleResourceCommand(
+                        role.id(),
+                        "보관 중에는 바꿀 수 없는 진행 문서",
+                        "https://docs.example.com/facilitation-archived",
+                        null
+                )
+        )).isInstanceOfSatisfying(WorkspaceNotFoundException.class,
+                exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
         assertThat(recordsUseCase.updateRoleResourceArchive(
                 created.teamId(),
                 created.seasonId(),
@@ -5696,6 +5797,33 @@ class WorkspaceUseCaseTest {
     @DisplayName("시즌 생명주기")
     class SeasonLifecycle {
 
+    @ParameterizedTest
+    @ValueSource(strings = {"+10000-01-01", "9999-12-31", "0999-12-31", "-0001-01-01"})
+    @DisplayName("저장과 마감 계산이 불가능한 연도의 시즌 날짜는 DB 오류 전에 입력 오류로 거절한다")
+    void rejectsSeasonDatesOutsideSupportedYears(String date) {
+        LocalDate unsupported = LocalDate.parse(date);
+        LocalDate start = unsupported.getYear() > 2026 ? LocalDate.of(2026, 7, 1) : unsupported;
+        LocalDate end = unsupported.getYear() > 2026 ? unsupported : LocalDate.of(2026, 8, 31);
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("날짜 범위 스터디 " + date, "여름 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 8, 31), List.of("박민서")));
+
+        assertThatThrownBy(() -> lifecycleUseCase.createWorkspace(
+                UUID.randomUUID().toString(), CREATION_KEY,
+                new CreateWorkspaceCommand("범위 밖 시즌 스터디", "여름 시즌", start, end, List.of("박민서"))
+        )).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> lifecycleUseCase.updateSeason(
+                created.teamId(), created.seasonId(), created.accessKey(),
+                new UpdateSeasonCommand("여름 시즌", start, end)
+        )).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> lifecycleUseCase.createNextSeason(
+                created.teamId(), created.seasonId(), UUID.randomUUID().toString(), created.accessKey(),
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
+                        "가을 시즌", LocalDate.of(2026, 9, 1), unsupported, List.of(), List.of())
+        )).isInstanceOf(DomainValidationException.class);
+    }
+
     @DisplayName("다음 시즌 생성은 열린 원본을 종료하고 시간대와 선택한 정의만 계승한다")
     @Test
     void createsNextSeasonWithSelectedDefinitionsAndPreservesHistory() {
@@ -5914,6 +6042,19 @@ class WorkspaceUseCaseTest {
                 created.seasonId(),
                 created.accessKey(),
                 false
+        )).isInstanceOf(SeasonSuccessorExistsException.class);
+        assertThatThrownBy(() -> lifecycleUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-second-attempt"),
+                created.accessKey(),
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
+                        "겨울 시즌",
+                        LocalDate.of(2026, 11, 1),
+                        LocalDate.of(2026, 12, 31),
+                        List.of(),
+                        List.of()
+                )
         )).isInstanceOf(SeasonSuccessorExistsException.class);
         assertThatThrownBy(() -> operationsUseCase.createRoutine(
                 created.teamId(),

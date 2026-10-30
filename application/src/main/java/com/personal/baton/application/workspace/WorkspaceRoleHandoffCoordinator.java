@@ -9,6 +9,7 @@ import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.PrepareRoleHandoffCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleHandoffTransitionResult;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.TransferRoleHandoffCommand;
+import com.personal.baton.application.workspace.port.out.TeamAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceRecordsRepository;
 import com.personal.baton.domain.workspace.ContentCreationOperation;
@@ -16,6 +17,7 @@ import com.personal.baton.domain.workspace.Role;
 import com.personal.baton.domain.workspace.RoleHandoff;
 import com.personal.baton.domain.workspace.RoleHandoffStatus;
 import com.personal.baton.domain.workspace.Season;
+import com.personal.baton.domain.workspace.TeamAccessAudit;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
@@ -25,8 +27,11 @@ import java.util.UUID;
 @Component
 final class WorkspaceRoleHandoffCoordinator {
 
+    private static final String ADMIN_CANCELLATION_AUDIT_ACTION = "ROLE_HANDOFF_ADMIN_CANCELLED";
+
     private final WorkspacePeopleRepository peopleRepository;
     private final WorkspaceRecordsRepository recordsRepository;
+    private final TeamAccessRepository teamAccessRepository;
     private final Clock clock;
     private final WorkspaceContentIdempotency contentIdempotency;
     private final WorkspaceMemberResolver memberResolver;
@@ -38,6 +43,7 @@ final class WorkspaceRoleHandoffCoordinator {
     WorkspaceRoleHandoffCoordinator(
             WorkspacePeopleRepository peopleRepository,
             WorkspaceRecordsRepository recordsRepository,
+            TeamAccessRepository teamAccessRepository,
             Clock clock,
             WorkspaceContentIdempotency contentIdempotency,
             WorkspaceMemberResolver memberResolver,
@@ -48,6 +54,7 @@ final class WorkspaceRoleHandoffCoordinator {
     ) {
         this.peopleRepository = peopleRepository;
         this.recordsRepository = recordsRepository;
+        this.teamAccessRepository = teamAccessRepository;
         this.clock = clock;
         this.contentIdempotency = contentIdempotency;
         this.memberResolver = memberResolver;
@@ -102,7 +109,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 && !Objects.equals(role.getNextMemberId(), command.toMemberId())) {
             throw conflict("역할에 지정된 다음 담당자와 인수인계 대상이 다릅니다");
         }
-        memberResolver.requireActiveMembersForNewReferences(
+        memberResolver.requireActiveHandoffParticipants(
                 teamId,
                 fromMemberId,
                 command.toMemberId()
@@ -169,7 +176,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 "현재 담당자 명의로 전달을 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
-        memberResolver.requireActiveMembersForNewReferences(
+        memberResolver.requireActiveHandoffParticipants(
                 teamId,
                 handoff.getFromMemberId(),
                 handoff.getToMemberId()
@@ -233,7 +240,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 "다음 담당자 명의로 수락을 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
-        memberResolver.requireActiveMembersForNewReferences(teamId, handoff.getToMemberId());
+        memberResolver.requireActiveHandoffParticipants(teamId, handoff.getToMemberId());
         rolePolicy.validateAssignmentDates(
                 season,
                 handoff.getIncomingAssignmentStartDate(),
@@ -259,7 +266,8 @@ final class WorkspaceRoleHandoffCoordinator {
             UUID seasonId,
             UUID roleId,
             UUID handoffId,
-            ConfirmRoleHandoffCommand command
+            ConfirmRoleHandoffCommand command,
+            Optional<UUID> administratorAccountId
     ) {
         Role role = roleResolver.requireRoleForUpdate(teamId, seasonId, roleId);
         RoleHandoff handoff = requireRoleHandoffForUpdate(
@@ -285,10 +293,21 @@ final class WorkspaceRoleHandoffCoordinator {
         );
         requireRoleMatchesHandoff(role, handoff);
 
-        handoff.cancel(command.confirmedByMemberId(), Instant.now(clock));
+        Instant cancelledAt = Instant.now(clock);
+        handoff.cancel(command.confirmedByMemberId(), cancelledAt);
         role.cancelHandoff(handoff.getToMemberId());
         Role savedRole = peopleRepository.saveRole(role);
         RoleHandoff savedHandoff = peopleRepository.saveRoleHandoff(handoff);
+        // 인수인계 행의 취소 확인자는 이전 담당자로 고정되어 실제 수행 계정은 권한 이력에 남긴다.
+        administratorAccountId.ifPresent(accountId -> teamAccessRepository.saveAudit(TeamAccessAudit.create(
+                teamId,
+                accountId,
+                handoff.getFromMemberId(),
+                ADMIN_CANCELLATION_AUDIT_ACTION,
+                null,
+                null,
+                cancelledAt
+        )));
         briefContinuitySignalRecorder.reconcileSeason(teamId, seasonId);
         return resultMapper.toRoleHandoffTransitionResult(savedRole, savedHandoff);
     }

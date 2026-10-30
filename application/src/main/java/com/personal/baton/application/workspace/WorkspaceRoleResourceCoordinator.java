@@ -2,6 +2,7 @@ package com.personal.baton.application.workspace;
 
 import org.springframework.stereotype.Component;
 import com.personal.baton.application.workspace.WorkspaceContentIdempotency.ContentCreationAttempt;
+import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateRoleResourceCommand;
 import com.personal.baton.application.workspace.port.in.WorkspaceContract.RoleResourceResult;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.UpdateRoleResourceCommand;
@@ -102,6 +103,9 @@ final class WorkspaceRoleResourceCoordinator {
                 resource.getRoleId(),
                 command.roleId()
         );
+        if (resource.isArchived()) {
+            throw WorkspaceNotFoundException.roleResource();
+        }
         String previousUrl = resource.getUrl();
         UUID previousRoleId = resource.getRoleId();
         resource.update(command.roleId(), command.title(), command.url(), command.description());

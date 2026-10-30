@@ -8,6 +8,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceSeasonReposito
 import com.personal.baton.domain.workspace.Season;
 import com.personal.baton.domain.workspace.Team;
 import com.personal.baton.domain.workspace.TeamPermission;
+import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -102,6 +103,9 @@ final class WorkspaceScopeAuthorizer {
 
     void requireMemberDeactivation(Team team, UUID memberId) { accountAccess.requireOtherAdministrator(team, memberId); }
     void requireConfirmedMember(Team team, UUID memberId) { accountAccess.requireConfirmedMember(team, memberId); }
+    Optional<UUID> requireHandoffCancelConfirmer(Team team, UUID memberId) {
+        return accountAccess.requireHandoffCancelConfirmer(team, memberId);
+    }
 
     private void verifyWrite(Team team, String accessKey) {
         if (team.isAccountAccessEnabled()) accountAccess.requireWrite(team);

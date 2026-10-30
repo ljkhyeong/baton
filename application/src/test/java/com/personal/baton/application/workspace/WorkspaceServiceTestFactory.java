@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import com.personal.baton.application.calendar.CalendarChangeRecorder;
 import com.personal.baton.application.calendar.port.out.CalendarSubscriptionStore;
 import com.personal.baton.application.watch.WatchMonitorChangeRecorder;
+import com.personal.baton.application.workspace.port.out.TeamAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
@@ -88,6 +89,7 @@ final class WorkspaceServiceTestFactory {
         WorkspaceRoleHandoffCoordinator roleHandoffCoordinator = new WorkspaceRoleHandoffCoordinator(
                 peopleRepository,
                 recordsRepository,
+                mock(TeamAccessRepository.class),
                 clock,
                 contentIdempotency,
                 memberResolver,

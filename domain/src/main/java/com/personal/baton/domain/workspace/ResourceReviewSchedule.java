@@ -27,7 +27,8 @@ public class ResourceReviewSchedule {
         if ((intervalDays == null) != (nextReviewOn == null) || (intervalDays != null && (intervalDays < 1 || intervalDays > 365))) {
             throw new DomainValidationException("재확인 주기는 1~365일과 다음 확인일을 함께 지정하거나 모두 해제해 주세요");
         }
-        this.intervalDays = intervalDays; this.nextReviewOn = nextReviewOn;
+        this.intervalDays = intervalDays;
+        this.nextReviewOn = nextReviewOn == null ? null : DomainAssertions.supportedDate(nextReviewOn, "다음 확인일");
     }
     public void confirmOn(LocalDate today) { if (intervalDays != null) nextReviewOn = today.plusDays(intervalDays); }
     public boolean isDueOn(LocalDate today) { return nextReviewOn != null && !today.isBefore(nextReviewOn); }

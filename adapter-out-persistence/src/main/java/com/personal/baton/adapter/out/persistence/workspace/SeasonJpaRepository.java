@@ -34,6 +34,7 @@ public interface SeasonJpaRepository extends JpaRepository<Season, UUID> {
             select season.teamId, season.id
             from Season season
             where season.endedAt is null and season.roundSchedule.enabled = true
+              and season.roundSchedule.nextOccurrenceDate <= season.endDate
             order by season.id
             """)
     List<ScheduledSeasonCandidate> findScheduledSeasonCandidates();
