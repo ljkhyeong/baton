@@ -109,7 +109,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 && !Objects.equals(role.getNextMemberId(), command.toMemberId())) {
             throw conflict("역할에 지정된 다음 담당자와 인수인계 대상이 다릅니다");
         }
-        memberResolver.requireActiveMembersForNewReferences(
+        memberResolver.requireActiveHandoffParticipants(
                 teamId,
                 fromMemberId,
                 command.toMemberId()
@@ -176,7 +176,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 "현재 담당자 명의로 전달을 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
-        memberResolver.requireActiveMembersForNewReferences(
+        memberResolver.requireActiveHandoffParticipants(
                 teamId,
                 handoff.getFromMemberId(),
                 handoff.getToMemberId()
@@ -240,7 +240,7 @@ final class WorkspaceRoleHandoffCoordinator {
                 "다음 담당자 명의로 수락을 확인해 주세요"
         );
         requireRoleMatchesHandoff(role, handoff);
-        memberResolver.requireActiveMembersForNewReferences(teamId, handoff.getToMemberId());
+        memberResolver.requireActiveHandoffParticipants(teamId, handoff.getToMemberId());
         rolePolicy.validateAssignmentDates(
                 season,
                 handoff.getIncomingAssignmentStartDate(),

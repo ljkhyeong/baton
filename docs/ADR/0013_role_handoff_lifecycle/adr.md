@@ -75,7 +75,7 @@ PREPARING ──전달──> TRANSFERRED ──수락──> ACCEPTED
 - 전달·수락·취소는 기존 이력의 상태 설정이므로 별도 생성 멱등 키를 요구하지 않는다.
 - 네 API는 역할 경로 아래에 두고 응답은 전환 뒤 전체 `role`과 `handoff`를 함께 반환한다.
 - 준비 성공은 `201 Created`와 역할 인수인계 URI `Location`, 나머지 전환은 `200 OK`를 사용한다.
-- 상태·참여자·역할 스냅샷 불일치는 `ROLE_HANDOFF_STATE_CONFLICT`, 준비도 경고 미확인은 `ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED`, 없는 이력은 `ROLE_HANDOFF_NOT_FOUND`로 구분한다.
+- 상태·참여자·역할 스냅샷 불일치와 참여자의 활동 종료는 `ROLE_HANDOFF_STATE_CONFLICT`, 준비도 경고 미확인은 `ROLE_HANDOFF_WARNING_CONFIRMATION_REQUIRED`, 없는 이력은 `ROLE_HANDOFF_NOT_FOUND`로 구분한다.
 
 ### 공유 키 신원 경계
 

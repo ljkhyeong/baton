@@ -782,6 +782,54 @@ class WorkspaceUseCaseTest {
                 exception -> assertThat(exception.getCode()).isEqualTo("ROLE_RESOURCE_NOT_FOUND"));
     }
 
+    @DisplayName("활동 종료한 참여자가 있는 인수인계의 준비·전달·수락은 상태 충돌로 거절한다")
+    @Test
+    void rejectsHandoffTransitionsWithDeactivatedParticipant() {
+        CreatedWorkspaceResult created = lifecycleUseCase.createWorkspace(
+                "workspace-handoff-inactive-member-01", CREATION_KEY,
+                new CreateWorkspaceCommand("인수인계 참여자 스터디", "파일럿 시즌",
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30), List.of("박민서", "김준호")));
+        WorkspaceResult workspace = lifecycleUseCase.getWorkspace(
+                created.teamId(), created.seasonId(), created.accessKey());
+        UUID minseo = memberNamed(workspace, "박민서").id();
+        UUID junho = memberNamed(workspace, "김준호").id();
+        RoleResult role = peopleUseCase.createRole(
+                created.teamId(), created.seasonId(), contentIdempotencyKey("inactive-handoff-role"), created.accessKey(),
+                new CreateRoleCommand("진행자", "모임을 진행합니다", minseo, null,
+                        LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), List.of(), null));
+        Runnable deactivateJunho = () -> peopleUseCase.updateMemberDeactivation(
+                created.teamId(), created.seasonId(), junho, created.accessKey(), true);
+        Runnable reactivateJunho = () -> peopleUseCase.updateMemberDeactivation(
+                created.teamId(), created.seasonId(), junho, created.accessKey(), false);
+        WorkspacePeopleCommands.PrepareRoleHandoffCommand prepare = new WorkspacePeopleCommands.PrepareRoleHandoffCommand(
+                junho, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 30));
+
+        deactivateJunho.run();
+        assertThatThrownBy(() -> peopleUseCase.prepareRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), contentIdempotencyKey("inactive-handoff-prepare-a"),
+                created.accessKey(), prepare)).isInstanceOf(RoleHandoffStateConflictException.class);
+        reactivateJunho.run();
+        UUID handoffId = peopleUseCase.prepareRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), contentIdempotencyKey("inactive-handoff-prepare-b"),
+                created.accessKey(), prepare).handoff().id();
+
+        deactivateJunho.run();
+        assertThatThrownBy(() -> peopleUseCase.transferRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), handoffId, created.accessKey(),
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo, true)))
+                .isInstanceOf(RoleHandoffStateConflictException.class);
+        reactivateJunho.run();
+        peopleUseCase.transferRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), handoffId, created.accessKey(),
+                new WorkspacePeopleCommands.TransferRoleHandoffCommand(minseo, true));
+
+        deactivateJunho.run();
+        assertThatThrownBy(() -> peopleUseCase.acceptRoleHandoff(
+                created.teamId(), created.seasonId(), role.id(), handoffId, created.accessKey(),
+                new WorkspacePeopleCommands.ConfirmRoleHandoffCommand(junho)))
+                .isInstanceOf(RoleHandoffStateConflictException.class);
+    }
+
     @DisplayName("역할 인수인계는 전달과 수락으로 담당 기간을 바꾸고 취소된 전달 재시도를 현재 상태로 재생한다")
     @Test
     void transfersAcceptsAndCancelsRoleHandoffs() {

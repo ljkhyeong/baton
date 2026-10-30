@@ -1,5 +1,6 @@
 package com.personal.baton.application.workspace;
 
+import com.personal.baton.application.workspace.error.RoleHandoffStateConflictException;
 import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
 import com.personal.baton.domain.workspace.DomainValidationException;
@@ -112,6 +113,26 @@ class WorkspaceMemberResolverTest {
         ))
                 .isInstanceOf(DomainValidationException.class)
                 .hasMessage("비활성 구성원은 새 담당자나 결정 작성자로 지정할 수 없습니다");
+    }
+
+    @DisplayName("활동 종료 구성원은 공유 잠금 뒤 인수인계 참여자 상태 충돌로 거절한다")
+    @Test
+    void rejectsDeactivatedHandoffParticipantAsStateConflict() {
+        WorkspacePeopleRepository repository = mock(WorkspacePeopleRepository.class);
+        Member active = member(FIRST_MEMBER_ID, TEAM_ID, "박민서");
+        Member deactivated = member(SECOND_MEMBER_ID, TEAM_ID, "김준호");
+        deactivated.updateDeactivation(true, Instant.parse("2026-07-31T12:00:00Z"));
+        when(repository.findMembersByTeamIdAndIdsWithSharedLock(
+                TEAM_ID,
+                List.of(FIRST_MEMBER_ID, SECOND_MEMBER_ID)
+        )).thenReturn(List.of(active, deactivated));
+        WorkspaceMemberResolver resolver = new WorkspaceMemberResolver(repository);
+
+        assertThatThrownBy(() -> resolver.requireActiveHandoffParticipants(
+                TEAM_ID,
+                SECOND_MEMBER_ID,
+                FIRST_MEMBER_ID
+        )).isInstanceOf(RoleHandoffStateConflictException.class);
     }
 
     @DisplayName("다른 팀 소속 구성원은 단일 조회에서도 찾을 수 없음으로 숨긴다")

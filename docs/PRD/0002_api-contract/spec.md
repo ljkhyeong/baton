@@ -590,7 +590,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 }
 ```
 
-같은 멱등 키와 같은 정규화 요청은 같은 인수인계의 현재 표현을 `201 Created`로 반환한다. 다른 열린 인수인계가 있거나 역할의 현재·다음 담당자 상태가 준비 조건과 맞지 않으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
+같은 멱등 키와 같은 정규화 요청은 같은 인수인계의 현재 표현을 `201 Created`로 반환한다. 다른 열린 인수인계가 있거나 역할의 현재·다음 담당자 상태가 준비 조건과 맞지 않으면 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 현재·다음 담당자가 활동을 종료한 경우도 같다.
 
 전달:
 
@@ -634,7 +634,7 @@ X-Baton-Access-Key: <워크스페이스 접근 키>
 
 현재 파일럿은 `PREPARING` 또는 `TRANSFERRED` 상태에서 준비 당시 이전 담당자 ID를 선언한 취소만 허용한다. 성공하면 인수인계를 `CANCELLED`로 만들고 역할의 `nextMemberId` 예약을 비우며 `200 OK`로 현재 역할과 인수인계를 반환한다. `ACCEPTED` 상태는 취소할 수 없다.
 
-세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환은 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 인수인계가나 경로의 팀·시즌·역할과 소속이 다른 인수인계는 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 공유 키 팀에서는 실제 사람을 인증한 감사 기록으로 해석하지 않는다. 계정 전환 팀은 `confirmedByMemberId`가 로그인 계정과 연결된 활성 구성원인지도 확인하며 불일치는 `403 WORKSPACE_ACCESS_DENIED`다. 취소에 한해 이전 담당자가 활동 종료, 계정 비활성, 연결된 계정 없음, 권한 없음 또는 `VIEWER`로 행동할 수 없으면 `ADMIN`이 이전 담당자 ID를 `confirmedByMemberId`로 선언해 취소할 수 있다. 이때 `cancelledByMemberId`는 이전 담당자이고 실제 수행 계정은 팀 권한 이력의 `ROLE_HANDOFF_ADMIN_CANCELLED`에 남는다. 이전 담당자가 행동할 수 있으면 `ADMIN`도 `403 WORKSPACE_ACCESS_DENIED`다.
+세 전환 요청은 별도 `Idempotency-Key`를 요구하지 않는다. 이미 같은 확인자 명의로 완료한 전달·수락·취소를 다시 요청하면 현재 표현을 반환하지만, 다른 확인자나 허용하지 않은 상태 전환, 전달할 때 이전·다음 담당자나 수락할 때 다음 담당자가 활동을 종료한 경우는 `409 ROLE_HANDOFF_STATE_CONFLICT`다. 없는 인수인계가나 경로의 팀·시즌·역할과 소속이 다른 인수인계는 `404 ROLE_HANDOFF_NOT_FOUND`다. 응답의 `transferredByMemberId`, `acceptedByMemberId`, `cancelledByMemberId`는 요청의 `confirmedByMemberId`를 상태별로 기록한 값이다. 공유 키를 가진 요청자가 해당 구성원 명의로 확인했다고 선언한 값이며, 공유 키 팀에서는 실제 사람을 인증한 감사 기록으로 해석하지 않는다. 계정 전환 팀은 `confirmedByMemberId`가 로그인 계정과 연결된 활성 구성원인지도 확인하며 불일치는 `403 WORKSPACE_ACCESS_DENIED`다. 취소에 한해 이전 담당자가 활동 종료, 계정 비활성, 연결된 계정 없음, 권한 없음 또는 `VIEWER`로 행동할 수 없으면 `ADMIN`이 이전 담당자 ID를 `confirmedByMemberId`로 선언해 취소할 수 있다. 이때 `cancelledByMemberId`는 이전 담당자이고 실제 수행 계정은 팀 권한 이력의 `ROLE_HANDOFF_ADMIN_CANCELLED`에 남는다. 이전 담당자가 행동할 수 있으면 `ADMIN`도 `403 WORKSPACE_ACCESS_DENIED`다.
 
 `PREPARING` 동안에는 담당자와 담당 기간만 고정되고 역할 내용, 인수인계 항목과 역할 자료는 계속 보완할 수 있다. `TRANSFERRED` 뒤에는 역할, 그 역할의 인수인계 항목과 자료를 수락 또는 취소 전까지 수정·완료·보관·복원하거나 다른 역할로 옮길 수 없다. 자료나 인수인계 항목을 다른 역할 사이에 옮길 때도 출발·도착 역할 중 하나가 `TRANSFERRED`이면 `409 ROLE_HANDOFF_STATE_CONFLICT`다.
 
