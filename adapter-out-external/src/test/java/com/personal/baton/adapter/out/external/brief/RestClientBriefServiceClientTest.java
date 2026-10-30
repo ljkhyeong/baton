@@ -70,7 +70,7 @@ class RestClientBriefServiceClientTest {
                 """;
         server.expect(request -> {
                     assertThat(request.getURI().getPath()).endsWith("/attention-items/resolutions");
-                    assertThat(request.getURI().getRawQuery()).isEqualTo("weekStart=2026-03-02&zoneId=America/New_York&limit=1"
+                    assertThat(request.getURI().getRawQuery()).isEqualTo("weekStart=2026-03-02&zoneId=America%2FNew_York&limit=1"
                             + "&afterEventType=ROLE_UNASSIGNED&afterSourceReference=role%3A%2B%26%20%ED%95%9C%EA%B8%80");
                 }).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
         server.expect(request -> {}).andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON)
@@ -83,6 +83,26 @@ class RestClientBriefServiceClientTest {
                 .isInstanceOf(BriefIntegrationConfigurationException.class);
         assertThatThrownBy(() -> client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), ZoneId.of("America/New_York"), null, 20))
                 .isInstanceOf(BriefIntegrationConfigurationException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("시간대 ID의 더하기 기호는 쿼리에서 공백으로 바뀌지 않게 인코딩한다")
+    void encodesPlusInZoneIdQuery() {
+        ZoneId zoneId = ZoneId.of("Etc/GMT+9");
+        String expectedQuery = "weekStart=2026-03-02&zoneId=Etc%2FGMT%2B9";
+        server.expect(request -> assertThat(request.getURI().getRawQuery()).isEqualTo(expectedQuery + "&limit=1"))
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"weekStart":"2026-03-02","zoneId":"Etc/GMT+9","windowStart":"2026-03-02T09:00:00Z",
+                         "windowEnd":"2026-03-09T09:00:00Z","evaluatedAt":"2026-03-03T00:00:00Z","resolvedCount":0,"items":[]}
+                        """));
+        server.expect(request -> assertThat(request.getURI().getRawQuery()).isEqualTo(expectedQuery))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(client.summarizeWeeklyResolutions(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), zoneId, null, 1)
+                .resolvedCount()).isZero();
+        assertThat(client.findLatestEditionForWeek(TEAM_ID, SEASON_ID, LocalDate.parse("2026-03-02"), zoneId).outcome())
+                .isEqualTo(Outcome.NOT_FOUND);
         server.verify();
     }
 
