@@ -65,6 +65,7 @@ export function SeasonSwitcherModal({
   )
   const hasSuccessor = seasons.some((season) =>
     season.previousSeasonId === currentSeason.id)
+  const reopenBlocked = Boolean(currentSeason.endedAt) && hasSuccessor
 
   return (
     <ModalShell
@@ -105,7 +106,7 @@ export function SeasonSwitcherModal({
           <strong>{currentSeason.name}</strong>
           <small>
             {currentSeason.endedAt
-              ? `${formatInstantDate(currentSeason.endedAt, currentSeason.timeZone)}에 종료`
+              ? `${formatInstantDate(currentSeason.endedAt, currentSeason.timeZone)}에 종료${reopenBlocked ? ' · 다음 시즌이 있어 다시 열 수 없습니다.' : ''}`
               : '시즌을 종료하면 기록을 수정할 수 없습니다.'}
           </small>
         </div>
@@ -121,7 +122,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className={currentSeason.endedAt ? 'secondary-button' : 'secondary-button danger-text'}
-            disabled={!canAdminister || endingPending}
+            disabled={!canAdminister || endingPending || reopenBlocked}
             onClick={onToggleEnding}
           >
             {endingPending
@@ -325,6 +326,9 @@ export function NextSeasonModal({
       return
     }
     setValidationError('')
+    if (!window.confirm(sourceSeason.endedAt
+      ? '다음 시즌을 만들면 종료한 현재 시즌을 다시 열 수 없습니다. 다음 시즌을 만들까요?'
+      : '현재 시즌은 바로 종료되고 다시 열 수 없습니다. 다음 시즌을 만들까요?')) return
     onSave(request)
   }
 
@@ -341,7 +345,7 @@ export function NextSeasonModal({
         <div className="season-copy-boundary">
           <Icon name="spark" size={17} />
           <p>
-            역할 설명과 반복 업무를 복사합니다. 담당자와 담당 기간은 새로 정해야 합니다. 이전 회차·결정·인수인계 기록은 복사하지 않습니다.
+            역할 설명과 반복 업무를 복사합니다. 담당자와 담당 기간은 새로 정해야 합니다. 이전 회차·결정·인수인계 기록은 복사하지 않습니다. 다음 시즌을 만들면 현재 시즌은 다시 열 수 없습니다.
           </p>
         </div>
         <div className="form-grid">
