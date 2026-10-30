@@ -280,6 +280,12 @@ export function HandoffView({
                 <>
                   <span className="handoff-state-label">수락 대기</span>
                   <strong>{nextName}님의 수락을 기다리고 있습니다</strong>
+                  <p>
+                    새 담당자의 담당 기간은 {formatDateRange(
+                      selectedHandoff.incomingAssignmentStartDate,
+                      selectedHandoff.incomingAssignmentEndDate,
+                    )}입니다.
+                  </p>
                   <p>전달한 인수인계 문서는 수락하거나 취소하기 전까지 역할·체크리스트·자료를 수정할 수 없습니다.</p>
                   <dl className="handoff-transfer-snapshot" aria-label="전달 시점 체크리스트와 자료 현황">
                     <div><dt>체크리스트 항목</dt><dd>{selectedHandoff.activeItemCount ?? 0}</dd></div>

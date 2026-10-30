@@ -1446,6 +1446,44 @@ test('@handoff 계정 팀의 관리자는 당사자가 아니어도 전달한 �
   await expect(page.getByText('김준호님의 계정으로 로그인해야 수락할 수 있습니다.')).toBeVisible()
 })
 
+test('@handoff 전달·수락 창과 수락 대기 화면은 다음 담당 기간을 보여 준다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '담당 기간 안내는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roleHandoffs = [openRoleHandoff('PREPARING')]
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await page.getByRole('button', { name: '내용 확인 후 전달' }).click()
+  const transferDialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
+  await expect(transferDialog).toContainText('다음 담당 기간 2026. 9. 18. — 미정')
+  await transferDialog.getByLabel('미완료 항목과 자료 누락을 확인했습니다').check()
+  await transferDialog.getByRole('button', { name: '인수인계 전달하기' }).click()
+  await expect(transferDialog).toHaveCount(0)
+
+  await expect(page.locator('.handoff-lifecycle-card')).toContainText('새 담당자의 담당 기간은 2026. 9. 18. — 미정입니다.')
+  await page.getByRole('button', { name: '인수인계 수락', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '역할 인수인계 수락' }))
+    .toContainText('다음 담당 기간 2026. 9. 18. — 미정')
+})
+
+test('@handoff 넘겨줄 활동 구성원이 없으면 인수인계 준비 창이 구성원 추가를 안내한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '구성원 안내는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roles[0] = { ...projection.roles[0]!, nextMemberId: null }
+  projection.members = projection.members.map((member) => member.id === MEMBER_ONE_ID
+    ? member
+    : { ...member, deactivatedAt: '2026-07-21T12:00:00Z' })
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
+  await expect(dialog).toContainText('넘겨줄 활동 구성원이 없습니다. 구성원 관리에서 구성원을 추가해 주세요.')
+  await expect(dialog.getByRole('button', { name: '인수인계 준비 시작' })).toBeDisabled()
+})
+
 test.describe('브라우저와 시즌의 시간대가 다를 때', () => {
   test.use({ timezoneId: 'America/New_York' })
 

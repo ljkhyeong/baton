@@ -13,6 +13,7 @@ import {
   useSubmissionLock,
 } from './WorkspaceModalPrimitives'
 import type { SaveResult } from './WorkspaceModalPrimitives'
+import { formatDateRange } from './WorkspaceViews'
 import { clampToSeason } from './seasonCalendar'
 import {
   categoryCopy,
@@ -193,6 +194,11 @@ export function RoleHandoffModal({
                 역할에 정한 다음 담당자입니다. 바꾸려면 역할 수정에서 다음 담당자를 변경해 주세요.
               </small>
             )}
+            {eligibleMembers.length === 0 && (
+              <small className="form-hint form-hint-warning">
+                넘겨줄 활동 구성원이 없습니다. 구성원 관리에서 구성원을 추가해 주세요.
+              </small>
+            )}
             <div className="date-grid">
               <label>
                 <span>다음 담당 시작일</span>
@@ -227,6 +233,14 @@ export function RoleHandoffModal({
               <Icon name="arrow" size={18} />
               <span><small>다음 담당자</small><strong>{toMember ? memberDisplayName(toMember) : '확인 필요'}</strong></span>
             </div>
+            {handoff && mode !== 'cancel' && (
+              <small className="form-hint">
+                다음 담당 기간 {formatDateRange(
+                  handoff.incomingAssignmentStartDate,
+                  handoff.incomingAssignmentEndDate,
+                )}
+              </small>
+            )}
             {mode === 'transfer' && (
               <>
                 <dl className="handoff-snapshot-grid" aria-label="전달 전 체크리스트와 자료 현황">
@@ -272,9 +286,9 @@ export function RoleHandoffModal({
         <FormActions
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
-          submitDisabled={mode === 'transfer'
-            && warnings.length > 0
-            && !warningAcknowledged}
+          submitDisabled={mode === 'prepare'
+            ? eligibleMembers.length === 0
+            : mode === 'transfer' && warnings.length > 0 && !warningAcknowledged}
           submitLabel={modalCopy.submit}
           pendingLabel={modalCopy.pending}
           onClose={onClose}
