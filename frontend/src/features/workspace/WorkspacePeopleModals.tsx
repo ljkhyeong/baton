@@ -273,9 +273,18 @@ export function RoleModal({
   )
   const [responsibilities, setResponsibilities] = useState(role?.responsibilities.join('\n') ?? '')
   const [risk, setRisk] = useState(role?.risk ?? '')
+  const [assignmentFilledFromSeason, setAssignmentFilledFromSeason] = useState(false)
   const [validationMessage, setValidationMessage] = useState('')
   const currentMemberOptions = memberSelectionOptions(members, role?.currentMemberId)
   const nextMemberOptions = memberSelectionOptions(members, role?.nextMemberId)
+  const selectCurrentMember = (memberId: string) => {
+    setCurrentMemberId(memberId)
+    if (!memberId || (assignmentStartDate && assignmentEndDate)) return
+    // 담당 기간이 비어 있으면 서버가 종료일 기준 공백 점검을 할 수 없다.
+    setAssignmentStartDate(assignmentStartDate || season.startDate)
+    setAssignmentEndDate(assignmentEndDate || season.endDate)
+    setAssignmentFilledFromSeason(true)
+  }
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current) return
@@ -345,7 +354,7 @@ export function RoleModal({
             <select
               value={currentMemberId}
               disabled={assignmentLocked}
-              onChange={(event) => setCurrentMemberId(event.target.value)}
+              onChange={(event) => selectCurrentMember(event.target.value)}
             >
               <option value="">담당자 미정</option>
               {currentMemberOptions.map(memberOption)}
@@ -390,6 +399,11 @@ export function RoleModal({
             />
           </label>
         </div>
+        {assignmentFilledFromSeason && (
+          <small className="form-hint">
+            담당 기간이 비어 있어 시즌 기간으로 채웠습니다. 필요하면 바꿔 주세요.
+          </small>
+        )}
         {assignmentLocked && (
           <small className="form-hint">
             인수인계를 준비하는 동안 담당자와 담당 기간은 바꿀 수 없습니다. 역할 설명과 담당 업무는 수정할 수 있습니다.

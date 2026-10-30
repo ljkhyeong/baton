@@ -1376,3 +1376,52 @@ test('@operations 공백만 입력하거나 서버 한도를 넘는 입력은 �
   await expect(handoffDialog.getByRole('alert')).toHaveText('남길 내용을 입력해 주세요.')
   expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/handoff-items`)).toHaveLength(0)
 })
+
+test('@operations 담당 기간이 빈 역할에 담당자를 고르면 시즌 기간으로 채우고 안내한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '담당 기간 기본값은 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roles[0] = {
+    ...projection.roles[0]!,
+    currentMemberId: null,
+    nextMemberId: null,
+    assignmentStartDate: null,
+    assignmentEndDate: null,
+  }
+  const api = await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 수정' })
+  await expect(dialog.getByLabel('담당 시작일')).toHaveValue('')
+  await dialog.getByLabel('현재 담당자').selectOption(MEMBER_ONE_ID)
+
+  await expect(dialog.getByLabel('담당 시작일')).toHaveValue('2026-07-02')
+  await expect(dialog.getByLabel('담당 종료일')).toHaveValue('2026-09-17')
+  await expect(dialog).toContainText('담당 기간이 비어 있어 시즌 기간으로 채웠습니다.')
+
+  await dialog.getByLabel('담당 종료일').fill('2026-08-31')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+  await expect(dialog).toHaveCount(0)
+  const update = await recordedCall(api, 'PUT', `${SCOPE_PATH}/roles/${ROLE_ID}`)
+  expect(update.body).toMatchObject({
+    currentMemberId: MEMBER_ONE_ID,
+    assignmentStartDate: '2026-07-02',
+    assignmentEndDate: '2026-08-31',
+  })
+})
+
+test('@operations 담당 기간이 있는 역할은 담당자를 바꿔도 기간을 유지한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '담당 기간 기본값은 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 수정' })
+  await dialog.getByLabel('담당 시작일').fill('2026-07-10')
+  await dialog.getByLabel('현재 담당자').selectOption(MEMBER_THREE_ID)
+
+  await expect(dialog.getByLabel('담당 시작일')).toHaveValue('2026-07-10')
+  await expect(dialog).not.toContainText('시즌 기간으로 채웠습니다.')
+})
