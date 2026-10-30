@@ -848,6 +848,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           <SeasonEndedBanner
             season={workspace.season}
             canAdminister={canAdminister}
+            changesDisabled={Boolean(conflictRecoveryStatus)}
             onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher}
             onCreateNext={seasonLifecycleFlow.actions.openSuccessor}
           />
@@ -1269,6 +1270,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           seasons={workspace.seasons}
           calendarDate={calendarDate}
           canAdminister={canAdminister}
+          changesDisabled={Boolean(conflictRecoveryStatus)}
           endingPending={seasonLifecycleFlow.switcher.endingPending}
           endingError={seasonLifecycleFlow.switcher.endingError}
           onClose={closeModal}

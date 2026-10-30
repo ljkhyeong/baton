@@ -455,6 +455,31 @@ test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 �
   expect(pageErrors).toEqual([])
 })
 
+test('@operations 충돌 뒤 최신 내용을 불러오지 못하면 시즌 관리 동작을 막는다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('button', { name: '시즌 정보 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '시즌 정보 수정' })
+  await editDialog.getByLabel('시즌 이름').fill('내가 고친 시즌')
+  api.conflictNextSeasonUpdate()
+  await page.route('**/api/v1/teams/**/workspace', (route) => route.fulfill({
+    status: 503,
+    json: { code: 'INTERNAL_ERROR', message: '일시적인 장애입니다.' },
+  }))
+  await editDialog.getByRole('button', { name: '시즌 정보 저장' }).click()
+  await expect(editDialog).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '최신 내용 다시 확인' })).toBeVisible()
+
+  await seasonSwitcher(page).click()
+  const seasons = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+  await expect(seasons).toContainText('최신 기록을 불러온 뒤 시즌을 변경할 수 있습니다.')
+  await expect(seasons.getByRole('button', { name: '시즌 정보 수정' })).toBeDisabled()
+  await expect(seasons.getByRole('button', { name: '시즌 종료' })).toBeDisabled()
+})
+
 test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 초점을 복원한다', async ({ page }) => {
   await attachSeasonApi(page)
   await openWorkspace(page)

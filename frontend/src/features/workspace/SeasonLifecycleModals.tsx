@@ -37,6 +37,7 @@ export function SeasonSwitcherModal({
   seasons,
   calendarDate,
   canAdminister,
+  changesDisabled,
   endingPending,
   endingError,
   onClose,
@@ -50,6 +51,7 @@ export function SeasonSwitcherModal({
   seasons: SeasonSummary[]
   calendarDate: string
   canAdminister: boolean
+  changesDisabled: boolean
   endingPending: boolean
   endingError: unknown
   onClose: () => void
@@ -115,7 +117,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className="secondary-button"
-            disabled={!canAdminister || Boolean(currentSeason.endedAt) || endingPending}
+            disabled={!canAdminister || changesDisabled || Boolean(currentSeason.endedAt) || endingPending}
             onClick={onEdit}
           >
             시즌 정보 수정
@@ -123,7 +125,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className={currentSeason.endedAt ? 'secondary-button' : 'secondary-button danger-text'}
-            disabled={!canAdminister || endingPending || reopenBlocked}
+            disabled={!canAdminister || changesDisabled || endingPending || reopenBlocked}
             onClick={onToggleEnding}
           >
             {endingPending
@@ -133,7 +135,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className="primary-button"
-            disabled={!canAdminister || hasSuccessor || endingPending}
+            disabled={!canAdminister || changesDisabled || hasSuccessor || endingPending}
             onClick={onCreateNext}
           >
             <Icon name="arrow" size={15} />
@@ -142,6 +144,9 @@ export function SeasonSwitcherModal({
         </div>
         {!canAdminister && (
           <small>시즌 설정·종료와 다음 시즌 생성은 관리자만 할 수 있습니다.</small>
+        )}
+        {changesDisabled && (
+          <small>최신 기록을 불러온 뒤 시즌을 변경할 수 있습니다.</small>
         )}
         <FormError error={endingError} />
       </section>
@@ -430,11 +435,13 @@ export function NextSeasonModal({
 export function SeasonEndedBanner({
   season,
   canAdminister,
+  changesDisabled,
   onSwitchSeason,
   onCreateNext,
 }: {
   season: SeasonSummary
   canAdminister: boolean
+  changesDisabled: boolean
   onSwitchSeason: () => void
   onCreateNext: () => void
 }) {
@@ -452,7 +459,7 @@ export function SeasonEndedBanner({
         <button type="button" className="secondary-button" onClick={onSwitchSeason}>
           다른 시즌 보기
         </button>
-        <button type="button" className="primary-button" disabled={!canAdminister} onClick={onCreateNext}>
+        <button type="button" className="primary-button" disabled={!canAdminister || changesDisabled} onClick={onCreateNext}>
           다음 시즌 시작
         </button>
       </div>
