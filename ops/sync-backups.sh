@@ -40,6 +40,18 @@ encryption_is_disabled() {
   esac
 }
 
+# 현재 원격을 가리키는 완료 표식은 업로드 때 재다운로드 비교를 마쳤다는 기록이다.
+remote_copy_was_verified() {
+  local verified_path="$1"
+  local verified_hash=""
+  local verified_remote=""
+
+  [[ -f "$verified_path" && -r "$verified_path" ]] || return 1
+  IFS= read -r verified_hash < "$verified_path" || true
+  verified_remote="$(sed -n '2p' "$verified_path")"
+  [[ "$verified_hash" =~ ^[0-9a-f]{64}$ && "$verified_remote" == "$remote" ]]
+}
+
 verify_remote_objects() {
   local backup_path="$1"
   local backup_name="$2"
@@ -162,10 +174,18 @@ latest_backup_epoch=-1
 latest_backup_name=""
 latest_backup_hash=""
 for backup_path in "${backups[@]}"; do
-  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
   backup_name="$(basename -- "$backup_path")"
   checksum_path="$backup_path.sha256"
   verified_path="$backup_path.uploaded"
+  if ! "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null; then
+    if ! remote_copy_was_verified "$verified_path"; then
+      exit 1
+    fi
+    # 원격 사본이 이미 검증됐으므로 로컬 사본 손상이 새 덤프 동기화를 막지 않게 한다.
+    printf 'Local copy failed verification but its off-site copy was verified; review it: %s\n' \
+      "$backup_name" >&2
+    continue
+  fi
   checksum_line=""
   IFS= read -r checksum_line < "$checksum_path"
   expected_backup_hash="${checksum_line%% *}"
