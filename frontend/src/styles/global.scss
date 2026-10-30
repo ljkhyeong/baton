@@ -2854,6 +2854,8 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .auth-form input, .onboarding-form input, .onboarding-form textarea, .onboarding-form select,
   .modal-form input, .modal-form textarea, .modal-form select, .season-modal .form-grid input { font-size: 16px; }
   .modal-form input:not([type="checkbox"]), .modal-form select, .season-modal .form-grid input { height: 44px; }
+  // 로그인·가입·비밀번호 찾기의 전환 링크는 글자만 있어도 44px 높이로 누를 수 있게 한다.
+  .auth-switch-copy a { display: inline-flex; min-height: 44px; align-items: center; }
   .record-search-scope select,
   .record-search-filters select,
   .record-search-filters input { min-height: 44px; }
