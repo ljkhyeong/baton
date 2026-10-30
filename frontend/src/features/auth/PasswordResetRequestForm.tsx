@@ -22,7 +22,7 @@ export default function PasswordResetRequestForm() {
     return (
       <div className="auth-result" role="status">
         <span className="auth-result-mark" aria-hidden="true">✓</span>
-        <h3>재설정 요청을 접수했습니다.</h3>
+        <h2>재설정 요청을 접수했습니다.</h2>
         <p>인증된 이메일 계정이라면 재설정 메일을 보내드립니다. 스팸함도 확인해 주세요.</p>
         <p>링크는 요청 후 30분 동안 한 번만 사용할 수 있습니다. 아직 유효한 링크가 있다면 기존 메일을 사용해 주세요.</p>
         <p>Google·Naver 계정은 해당 서비스에서 비밀번호를 변경해 주세요.</p>
@@ -37,7 +37,7 @@ export default function PasswordResetRequestForm() {
   if (capabilities.isError) {
     return (
       <div className="auth-result auth-result-warning" role="alert">
-        <h3>비밀번호 재설정 상태를 확인하지 못했습니다.</h3>
+        <h2>비밀번호 재설정 상태를 확인하지 못했습니다.</h2>
         <div className="auth-result-actions">
           <button
             className="primary-button"
@@ -55,7 +55,7 @@ export default function PasswordResetRequestForm() {
   if (!capabilities.data.passwordResetEnabled) {
     return (
       <div className="auth-result auth-result-warning" role="status">
-        <h3>현재 재설정 메일을 요청할 수 없습니다.</h3>
+        <h2>현재 재설정 메일을 요청할 수 없습니다.</h2>
         <p>이미 받은 유효한 링크는 계속 사용할 수 있습니다. 잠시 후 다시 확인해 주세요.</p>
         <Link className="primary-button auth-link-button" to="/login">로그인으로</Link>
       </div>

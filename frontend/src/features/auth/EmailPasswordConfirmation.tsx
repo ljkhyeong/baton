@@ -60,7 +60,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
     return (
       <div className="auth-result" role="status">
         <span className="auth-result-mark" aria-hidden="true">✓</span>
-        <h3>{passwordReset ? '비밀번호를 변경했습니다.' : '이메일 인증을 완료했습니다.'}</h3>
+        <h2>{passwordReset ? '비밀번호를 변경했습니다.' : '이메일 인증을 완료했습니다.'}</h2>
         <p>{passwordReset
           ? '모든 기기에서 로그아웃합니다. 새 비밀번호로 다시 로그인해 주세요.'
           : '이제 등록한 이메일과 방금 정한 비밀번호로 BATON에 로그인할 수 있습니다.'}</p>
@@ -73,7 +73,7 @@ function EmailPasswordForm({ token, purpose }: { token: string | null; purpose: 
     return (
       <div className="auth-result auth-result-warning" role="alert">
         <span className="auth-result-mark" aria-hidden="true">!</span>
-        <h3>{passwordReset ? '재설정 링크를 확인해 주세요.' : '인증 링크를 확인해 주세요.'}</h3>
+        <h2>{passwordReset ? '재설정 링크를 확인해 주세요.' : '인증 링크를 확인해 주세요.'}</h2>
         <p>
           링크가 올바르지 않거나 만료되었을 수 있습니다. 이미 인증에 사용한 링크도 다시 사용할 수 없습니다.
         </p>
