@@ -1403,8 +1403,8 @@ test('@handoff 인수인계 준비 창은 역할에 정한 다음 담당자를 �
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
 
-test('@handoff 역할의 다음 담당자가 활동을 끝냈으면 인수인계 준비 창에서 다른 구성원을 고를 수 있다', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name === 'mobile', '다음 담당자 고정 예외는 데스크톱에서 한 번 검증합니다.')
+test('@handoff 역할의 다음 담당자가 활동을 끝냈으면 역할 수정을 안내하고 준비를 막는다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 담당자 안내는 데스크톱에서 한 번 검증합니다.')
   const projection = makeProjection()
   projection.members[1] = { ...projection.members[1]!, deactivatedAt: '2026-07-21T12:00:00Z' }
   await installApi(page, projection)
@@ -1413,8 +1413,9 @@ test('@handoff 역할의 다음 담당자가 활동을 끝냈으면 인수인계
   await openHandoffView(page, testInfo.project.name)
   await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
   const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
-  await expect(dialog.getByLabel('다음 담당자')).toBeEnabled()
-  await expect(dialog).not.toContainText('역할에 정한 다음 담당자입니다.')
+  await expect(dialog).toContainText('역할에 정한 다음 담당자가 활동을 종료했습니다.')
+  await expect(dialog.getByLabel('다음 담당자')).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: '인수인계 준비 시작' })).toBeDisabled()
 })
 
 test('@handoff 역할 수정이 인수인계 규칙으로 거절되면 사유를 알리고 입력을 초안으로 남긴다', async ({ page }, testInfo) => {

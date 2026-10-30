@@ -88,6 +88,7 @@ export function RoleHandoffModal({
   const [selectedMemberId, setSelectedMemberId] = useState(eligibleMembers[0]?.id ?? '')
   // 서버는 역할에 정한 다음 담당자와 다른 대상을 거부한다.
   const toMemberId = retainedNextMember?.id ?? selectedMemberId
+  const nextMemberUnavailable = !handoff && Boolean(role.nextMemberId) && !retainedNextMember
   const suggestedStartDate = clampToSeason(
     role.assignmentEndDate
       ? addCalendarDays(role.assignmentEndDate, 1)
@@ -180,7 +181,7 @@ export function RoleHandoffModal({
               <span>다음 담당자</span>
               <select
                 required
-                disabled={Boolean(retainedNextMember)}
+                disabled={Boolean(retainedNextMember) || nextMemberUnavailable}
                 value={toMemberId}
                 onChange={(event) => setSelectedMemberId(event.target.value)}
               >
@@ -194,7 +195,12 @@ export function RoleHandoffModal({
                 역할에 정한 다음 담당자입니다. 바꾸려면 역할 수정에서 다음 담당자를 변경해 주세요.
               </small>
             )}
-            {eligibleMembers.length === 0 && (
+            {nextMemberUnavailable && (
+              <small className="form-hint form-hint-warning">
+                역할에 정한 다음 담당자가 활동을 종료했습니다. 역할 수정에서 다음 담당자를 바꾼 뒤 준비해 주세요.
+              </small>
+            )}
+            {eligibleMembers.length === 0 && !nextMemberUnavailable && (
               <small className="form-hint form-hint-warning">
                 넘겨줄 활동 구성원이 없습니다. 구성원 관리에서 구성원을 추가해 주세요.
               </small>
@@ -287,7 +293,7 @@ export function RoleHandoffModal({
           pending={submission.pending}
           closeGuardRef={submission.closeGuardRef}
           submitDisabled={mode === 'prepare'
-            ? eligibleMembers.length === 0
+            ? eligibleMembers.length === 0 || nextMemberUnavailable
             : mode === 'transfer' && warnings.length > 0 && !warningAcknowledged}
           submitLabel={modalCopy.submit}
           pendingLabel={modalCopy.pending}
