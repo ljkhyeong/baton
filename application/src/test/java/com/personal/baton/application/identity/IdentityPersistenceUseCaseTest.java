@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -339,6 +340,32 @@ class IdentityPersistenceUseCaseTest {
                 .isEqualTo(2);
         assertThat(recoveredClaim.getFirst().leaseToken())
                 .isNotEqualTo(firstClaim.getFirst().leaseToken());
+    }
+
+    @DisplayName("JVM 시간대가 DB 연결과 달라도 전달 만료 시각을 그대로 읽어 페이로드를 복호화한다")
+    @Test
+    void decryptsClaimedPayloadWhenJvmTimeZoneDiffers() {
+        registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
+                "zone@example.com",
+                "시간대 사용자"
+        ));
+        Instant claimedAt = Instant.now().plusSeconds(1);
+        TimeZone jvmTimeZone = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Apia"));
+        try {
+            var delivery = emailVerificationOutboxPort.claimPending(
+                    1,
+                    claimedAt,
+                    Duration.ofMinutes(1)
+            ).getFirst();
+
+            assertThat(outboxPayloadProtector.unprotect(
+                    delivery.protectionContext(),
+                    delivery.protectedPayload()
+            ).email()).isEqualTo("zone@example.com");
+        } finally {
+            TimeZone.setDefault(jvmTimeZone);
+        }
     }
 
     @DisplayName("서버 시각까지 만료된 아웃박스만 폐기하고 직후 페이로드는 보존한다")

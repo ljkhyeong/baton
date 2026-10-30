@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.out.persistence.identity;
 
+import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.instant;
 import static com.personal.baton.adapter.out.persistence.JdbcTimestamps.utc;
 
 import com.personal.baton.application.identity.EmailVerificationOutboxDelivery;
@@ -10,7 +11,6 @@ import com.personal.baton.application.identity.port.out.EmailVerificationOutboxP
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -164,8 +164,7 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                         resultSet.getString("challenge_token_hash"),
                         resultSet.getString("payload_ciphertext"),
                         resultSet.getString("payload_nonce"),
-                        resultSet.getTimestamp("expires_at").toLocalDateTime()
-                                .toInstant(ZoneOffset.UTC),
+                        instant(resultSet, "expires_at"),
                         resultSet.getInt("attempt_count"),
                         EmailChallengePurpose.valueOf(resultSet.getString("purpose"))
                 ),
