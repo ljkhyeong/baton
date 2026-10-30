@@ -79,7 +79,7 @@ function BriefAttentionResults({ scope, timeZone, readOnly, changesDisabled, onO
   if (accessError) return <p role="alert">{accessError.message}{' '}
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>권한 다시 확인</button></p>
   return <div className="brief-attention-body">
-    <p>BRIEF에 반영된 점검 항목입니다. 오늘 화면의 업무 위험 현황과 반영 시점이 다를 수 있습니다.</p>
+    <p className="brief-note">BRIEF에 반영된 점검 항목입니다. 오늘 화면의 업무 위험 현황과 반영 시점이 다를 수 있습니다.</p>
     <button type="button" onClick={refresh} disabled={summary.isFetching || page.isFetching}>목록 새로고침</button>
     {summary.isPending && <p role="status">미해결 항목 요약을 불러오고 있습니다.</p>}
     {summary.isError && <p role="alert">요약을 불러오지 못했습니다. {summary.error.message}</p>}

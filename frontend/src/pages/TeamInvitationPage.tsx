@@ -44,13 +44,13 @@ function InvitationContent({ accountId, token }: { accountId: string; token: str
     void navigate(generatePath(WORKSPACE_ROUTE, value), { replace: true })
   } })
   if (preview.isPending || preview.isIdle) return <p role="status">초대 내용을 확인하고 있습니다.</p>
-  if (preview.isError) return <div><p role="alert">{preview.error.message} <button className="secondary-button" type="button" onClick={() => preview.mutate()}>다시 확인</button></p>
+  if (preview.isError) return <div className="team-invitation-preview"><p role="alert">{preview.error.message} <button className="secondary-button" type="button" onClick={() => preview.mutate()}>다시 확인</button></p>
     <button type="button" className="secondary-button" onClick={() => {
       clearTeamInvitationToken()
       void navigate('/my-teams', { replace: true })
     }}>이 초대 지우기</button></div>
   const value = preview.data
-  return <div>
+  return <div className="team-invitation-preview">
     <h2>{value.teamName}</h2><p>{value.memberName} 구성원으로 참여합니다. 권한은 {permissionNames[value.permission]}입니다.</p>
     <p>다른 사람의 이름이거나 다른 계정으로 초대받았다면 수락하지 말고 팀 관리자에게 알려 주세요.</p>
     <button type="button" className="primary-button" disabled={accept.isPending} onClick={() => accept.mutate()}>

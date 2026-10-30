@@ -4,7 +4,8 @@
   line-height: 1.65;
   > :first-child { margin-top: 0; }
   > :last-child { margin-bottom: 0; }
-  h1, h2, h3, h4, h5, h6 { font-size: 14px; margin: 16px 0 8px; }
+  p:not(:last-child) { margin-bottom: 8px; }
+  h1, h2, h3, h4, h5, h6 { margin: 16px 0 8px; color: var(--ink); font-size: 14px; }
   ul, ol { padding-left: 22px; }
   li { display: list-item; }
   a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--baton); text-underline-offset: 3px; }

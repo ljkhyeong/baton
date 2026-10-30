@@ -606,7 +606,7 @@ a {
 .form-grid .full { grid-column: 1 / -1; }
 .onboarding-submit { width: 100%; margin-top: 4px; }
 .workspace-template-preview { border: 1px solid var(--rule); padding: 16px; overflow-wrap: anywhere; }
-.workspace-template-preview h3 { margin-top: 0; }
+.workspace-template-preview h3 { margin-top: 0; font-size: 16px; }
 
 .remote-state-page { display: grid; width: 100%; height: 100%; padding: 24px; place-items: center; overflow-y: auto; background: var(--canvas); }
 .remote-state { display: flex; width: min(100%, 460px); min-height: 300px; flex-direction: column; align-items: center; justify-content: center; padding: 42px; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--paper); text-align: center; }
@@ -615,6 +615,12 @@ a {
 .remote-state > h1 { margin: 15px 0 0; font-size: 20px; letter-spacing: -.025em; }
 .remote-state > p { max-width: 340px; margin: 10px 0 22px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 .remote-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+// 팀 초대 미리보기는 상태 카드의 제목·문단 서식을 따르고 아래 동작과 간격을 둔다.
+.team-invitation-preview { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 14px 0 22px; }
+.team-invitation-preview h2 { margin: 0; font-size: 18px; letter-spacing: -.025em; }
+.team-invitation-preview p { max-width: 340px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.team-invitation-preview [role="alert"] { color: var(--warning); }
+.team-invitation-preview > button { margin-top: 8px; }
 .remote-state a:not([class]) { color: var(--ink); text-underline-offset: 3px; }
 
 :is(a.primary-button, a.secondary-button, a.danger-button) { text-decoration: none; }
@@ -1505,8 +1511,11 @@ a {
   font-size: 12px;
 }
 
+// Markdown 목록·인용도 문단과 같은 크기·색으로 읽히게 한다.
 .decision-reason p,
-.decision-alternative p {
+.decision-alternative p,
+.decision-reason .decision-markdown,
+.decision-alternative .decision-markdown {
   margin: 0;
   color: var(--muted);
   font-size: 13px;

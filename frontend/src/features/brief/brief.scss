@@ -11,12 +11,13 @@
 .brief-summary, .brief-filters, .brief-pagination { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
 .brief-summary button { text-align: left; flex: 1 1 160px; }
 .brief-summary strong { display: block; margin-top: .35rem; font-size: 20px; }
-.brief-filters label { display: flex; flex: 1 1 150px; flex-direction: column; gap: .4rem; min-width: 0; }
+.brief-filters label { display: flex; flex: 1 1 150px; flex-direction: column; gap: .4rem; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
 .brief-note { color: var(--muted); font-size: 13px; }
 .brief-items { list-style: none; padding: 0; }
 .brief-items li { display: grid; gap: .5rem; padding: 1rem 0; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
 .brief-items li > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
 .brief-items small { color: var(--muted); }
+.brief-items li > button { justify-self: start; }
 .brief-history, .brief-edition { border-top: 1px solid var(--rule); margin-top: 1rem; padding-top: 1rem; overflow-wrap: anywhere; }
 .brief-history h3, .brief-edition h3 { font-size: 16px; }
 .brief-transitions { list-style: none; padding: 0 0 0 .75rem; border-left: 2px solid var(--rule-strong); }
@@ -36,7 +37,7 @@
 .brief-evidence { margin: .75rem 0; }
 .brief-evidence-list { display: grid; gap: 1rem; padding: 0; list-style: none; }
 .brief-evidence-list li { display: grid; gap: .4rem; font-size: 13px; overflow-wrap: anywhere; }
-.brief-filters select { width: 100%; }
+.brief-filters select { width: 100%; color: var(--ink); font-size: 13px; font-weight: 400; }
 @media (max-width: 600px) { .brief-change-columns { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) { .brief-attention button, .brief-attention select { min-height: 44px; } }
 
