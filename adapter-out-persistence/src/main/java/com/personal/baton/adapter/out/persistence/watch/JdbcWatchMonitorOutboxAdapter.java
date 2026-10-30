@@ -20,6 +20,7 @@ import java.util.UUID;
 import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -185,8 +186,9 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         return outbox.markFailed(sourceRevision, leaseToken, failedAt, errorCode);
     }
 
+    // 자료 잠금을 기다리는 동안 커밋된 새 스냅샷을 보려면 잠금 뒤 조회가 처음 조회의 스냅샷에 묶이면 안 된다.
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public boolean markInvalidTargetAndAppendInactive(
             long sourceRevision,
             UUID leaseToken,
