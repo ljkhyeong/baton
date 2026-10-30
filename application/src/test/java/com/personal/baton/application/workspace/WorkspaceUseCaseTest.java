@@ -5954,6 +5954,19 @@ class WorkspaceUseCaseTest {
                 created.accessKey(),
                 false
         )).isInstanceOf(SeasonSuccessorExistsException.class);
+        assertThatThrownBy(() -> lifecycleUseCase.createNextSeason(
+                created.teamId(),
+                created.seasonId(),
+                contentIdempotencyKey("next-season-second-attempt"),
+                created.accessKey(),
+                new WorkspaceLifecycleCommands.CreateNextSeasonCommand(
+                        "겨울 시즌",
+                        LocalDate.of(2026, 11, 1),
+                        LocalDate.of(2026, 12, 31),
+                        List.of(),
+                        List.of()
+                )
+        )).isInstanceOf(SeasonSuccessorExistsException.class);
         assertThatThrownBy(() -> operationsUseCase.createRoutine(
                 created.teamId(),
                 next.season().id(),
