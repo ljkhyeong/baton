@@ -2985,7 +2985,8 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   // 고정된 버튼 영역이 화면을 덜 차지하도록 한 줄에 두고 마지막 주 동작을 넓힌다.
   .form-actions > button:last-child { flex: 1; }
   .toast { right: 16px; bottom: 76px; left: 16px; justify-content: center; }
-  .summary-jump { min-height: 44px; margin: -12px 0; }
+  // 넓힌 누름 영역이 위쪽 회차 선택 상자와 겹치지 않을 만큼만 줄 높이를 줄인다.
+  .summary-jump { min-height: 44px; margin: -8px 0; }
   .mobile-topbar { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand team actions"; gap: 8px; padding: 8px 15px; }
   .mobile-topbar .brand { gap: 0; font-size: 0; }
   .mobile-team { min-height: 44px; gap: 6px; padding: 4px 10px; }
