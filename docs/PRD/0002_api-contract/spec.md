@@ -1034,8 +1034,8 @@ GET /actuator/health
 MySQL 행 잠금 시간이 제한을 넘으면 대상에 따라 다음 오류로 처리한다.
 
 - 워크스페이스·콘텐츠 생성 예약: `409 IDEMPOTENCY_KEY_CONFLICT`
-- 팀 접근 키: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
-- 공유 콘텐츠: `409 WORKSPACE_CONTENT_CONFLICT`
+- 팀 접근 키 변경 저장: `409 WORKSPACE_ACCESS_KEY_CONFLICT`
+- 공유 콘텐츠와 일반 변경·시즌 관리의 팀 잠금: `409 WORKSPACE_CONTENT_CONFLICT`
 
 계정 인증에서 별도로 `503`으로 분류한 경우가 아니라면 쿼리·트랜잭션 시간 초과와 DB 연결 실패는 `500 INTERNAL_ERROR`로 처리한다. 이를 사용자의 동시 수정으로 추측하지 않는다.
 
