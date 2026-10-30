@@ -26,8 +26,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import com.personal.baton.application.identity.port.out.CurrentAccountProvider;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase;
+import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.InvitationAcceptedResult;
+import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.application.workspace.port.in.WorkspaceRecordCommands.CreateDecisionCommand;
 import com.personal.baton.application.workspace.port.in.WorkspacePeopleCommands.CreateMemberCommand;
 import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
@@ -44,6 +49,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -75,6 +84,8 @@ class TeamAccessUseCaseTest {
     @Autowired WorkspaceSeasonRepository seasons;
     @Autowired ActiveAccountTeamMembershipVerifier activeMembership;
     @Autowired DeactivateAccountUseCase accountDeactivation;
+    @Autowired PlatformTransactionManager transactionManager;
+    @MockitoSpyBean WorkspaceAccessRepository teams;
     @MockitoBean CurrentAccountProvider current;
     @Autowired IdentityRepository identities;
     @Autowired Clock clock;
@@ -325,6 +336,64 @@ class TeamAccessUseCaseTest {
         lifecycle.updateSeasonEnding(fixture.id(), fixture.season(), null, true);
         when(current.currentAccountId()).thenReturn(Optional.of(account.getId()));
         assertThat(access.accept(account.getId(), invitation.token()).seasonId()).isEqualTo(ended.getId());
+    }
+    @Test
+    @DisplayName("같은 토큰의 동시 수락은 앞선 커밋을 잠금 뒤 다시 읽어 현재 권한을 반환한다")
+    void returnsCurrentPermissionForConcurrentAcceptOfSameToken() throws Exception {
+        var fixture = accountTeam("동시 수락 팀", "관리자", "신규 구성원");
+        UUID member = fixture.member("신규 구성원");
+        var token = access.invite(fixture.id(), fixture.adminAccount(), member, TeamPermission.MEMBER).token();
+        var account = identities.saveAccount(Account.create(UUID.randomUUID(), "신규 계정", clock.instant()));
+        when(current.currentAccountId()).thenReturn(Optional.of(account.getId()));
+
+        var waiting = acceptBehindCommittedAccept(fixture.id(), account.getId(), token, token);
+
+        assertThat(waiting.get(10, TimeUnit.SECONDS).permission()).isEqualTo(TeamPermission.MEMBER);
+        when(current.currentAccountId()).thenReturn(Optional.of(fixture.adminAccount()));
+        assertThat(access.getAccess(fixture.id(), fixture.adminAccount(), null).audit())
+                .filteredOn(value -> value.action().equals("INVITATION_ACCEPTED")).hasSize(1);
+    }
+    @Test
+    @DisplayName("한 계정이 다른 구성원 초대를 동시에 수락하면 늦은 요청은 멤버십 충돌로 끝난다")
+    void rejectsConcurrentAcceptOfAnotherMemberInvitation() throws Exception {
+        var fixture = accountTeam("동시 연결 팀", "관리자", "첫째 구성원", "둘째 구성원");
+        var first = access.invite(fixture.id(), fixture.adminAccount(), fixture.member("첫째 구성원"), TeamPermission.MEMBER);
+        var second = access.invite(fixture.id(), fixture.adminAccount(), fixture.member("둘째 구성원"), TeamPermission.MEMBER);
+        var account = identities.saveAccount(Account.create(UUID.randomUUID(), "신규 계정", clock.instant()));
+        when(current.currentAccountId()).thenReturn(Optional.of(account.getId()));
+
+        var waiting = acceptBehindCommittedAccept(fixture.id(), account.getId(), first.token(), second.token());
+
+        assertThatThrownBy(() -> waiting.get(10, TimeUnit.SECONDS))
+                .hasCauseInstanceOf(AccountMembershipConflictException.class);
+        assertThat(access.getMyTeams(account.getId()).teams()).singleElement()
+                .satisfies(value -> assertThat(value.memberId()).isEqualTo(fixture.member("첫째 구성원")));
+    }
+    // 뒤따르는 수락이 첫 조회를 마치고 팀 잠금을 기다리는 동안 앞선 수락을 커밋한다.
+    private Future<InvitationAcceptedResult> acceptBehindCommittedAccept(UUID teamId, UUID accountId, String committedToken,
+            String waitingToken) throws Exception {
+        var waitingForTeamLock = new CountDownLatch(1);
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            return new TransactionTemplate(transactionManager).execute(status -> {
+                teams.findTeamByIdForUpdate(teamId);
+                doAnswer(invocation -> {
+                    waitingForTeamLock.countDown();
+                    return invocation.callRealMethod();
+                }).when(teams).findTeamByIdForUpdate(teamId);
+                var waiting = executor.submit(() -> access.accept(accountId, waitingToken));
+                try {
+                    assertThat(waitingForTeamLock.await(10, TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(exception);
+                }
+                access.accept(accountId, committedToken);
+                return waiting;
+            });
+        } finally {
+            executor.shutdown();
+        }
     }
     private AccountTeam accountTeam(String name, String... memberNames) {
         NOW.set(Instant.parse("2026-09-05T03:00:00Z"));

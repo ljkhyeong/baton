@@ -1,6 +1,9 @@
 package com.personal.baton.adapter.out.persistence.workspace;
 
+import static com.personal.baton.adapter.out.persistence.PersistenceConstraintViolations.hasConstraint;
+
 import com.personal.baton.adapter.out.persistence.roundauth.AccountTeamMembershipJpaRepository;
+import com.personal.baton.application.roundauth.error.AccountMembershipConflictException;
 import com.personal.baton.application.workspace.port.out.TeamAccessRepository;
 import com.personal.baton.domain.roundauth.AccountTeamMembership;
 import com.personal.baton.domain.workspace.TeamInvitation;
@@ -10,6 +13,7 @@ import java.util.LinkedHashMap;
 import com.personal.baton.application.workspace.port.in.TeamAccessUseCase.MyTeamResult;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -37,7 +41,17 @@ public class TeamAccessPersistenceAdapter implements TeamAccessRepository {
     @Override public boolean existsOtherActiveAdministrator(UUID teamId, UUID memberId) {
         return memberships.existsOtherActiveAdministrator(teamId, memberId);
     }
-    @Override public AccountTeamMembership saveMembership(AccountTeamMembership value) { return memberships.save(value); }
+    @Override public AccountTeamMembership saveMembership(AccountTeamMembership value) {
+        try {
+            return memberships.saveAndFlush(value);
+        } catch (DataIntegrityViolationException exception) {
+            if (hasConstraint(exception, "uk_account_team_memberships_account_team")
+                    || hasConstraint(exception, "uk_account_team_memberships_member")) {
+                throw new AccountMembershipConflictException("이미 다른 계정 또는 구성원으로 연결되어 있습니다", exception);
+            }
+            throw exception;
+        }
+    }
     @Override public Optional<UUID> findInvitationTeamId(String tokenHash) { return invitations.findTeamIdByTokenHash(tokenHash); }
     @Override public Optional<TeamInvitation> lockInvitation(String tokenHash) { return invitations.lockByTokenHash(tokenHash); }
     @Override public Optional<TeamInvitation> findInvitationByTokenHash(String tokenHash) { return invitations.findByTokenHash(tokenHash); }
