@@ -279,6 +279,8 @@ openssl rand -hex 32
 | 재조립 없는 실행 | `start`, `restart`, `pause`, `unpause`, `watch`, `up --watch`, 대화형 메뉴를 거부한다. `COMPOSE_MENU=false`로 고정한다. |
 | 그 밖의 명령·옵션 | 운영에 필요한 명령만 허용한다. `run`, `attach`, 모델 변환, 이미지 게시, 확장, 데이터 볼륨 삭제, 파일·프로필·프로젝트 변경, 고아 컨테이너 제거·재생성 우회 옵션은 거부한다. |
 
+`web`은 UID `10002`의 비루트 Caddy로 실행하고 Linux capability를 모두 제거하며 `no-new-privileges`를 적용한다. 80·443 바인드는 이 컨테이너 네트워크 네임스페이스의 `net.ipv4.ip_unprivileged_port_start=0`으로 허용한다. root로 쓰던 기존 `baton_caddy_data`·`baton_caddy_config` 볼륨은 `web`을 시작하기 전에 일회성 `web-volume-owner`가 소유권을 맞추므로 기존 인증서를 그대로 쓴다. 헬스체크는 게시하지 않는 루프백 전용 `127.0.0.1:8081/healthz`를 호출한다.
+
 사전점검 뒤 환경 파일의 내용·권한·Git 추적 상태가 잘못 바뀌면 다음 Compose 명령이 실패한다. 다른 환경 파일은 `./ops/preflight-production.sh /absolute/path/to/env`로 검사한 뒤 모든 Compose 호출에 `BATON_PRODUCTION_ENV_FILE=/absolute/path/to/env`를 지정한다.
 
 `BATON_HOST`, DB 사용자·비밀번호, `BATON_WORKSPACE_CREATION_KEY`, `BATON_WORKSPACE_RECOVERY_KEY`는 필수다. 빠지면 Compose 설정 단계에서 실패한다. 두 운영 키는 직접 실행에서도 32~200자의 URL 안전 ASCII여야 한다. `production`에서는 두 값이 모두 있고 서로 달라야 애플리케이션이 시작된다.
@@ -694,6 +696,8 @@ systemd-analyze verify ops/systemd/baton-backup.service ops/systemd/baton-backup
 `production-runtime-smoke.sh`는 실제 프로덕션 `app`·`web` 이미지와 프로덕션 ROUND 오버레이를 조립한 뒤 고유 Compose 프로젝트와 폐기 가능한 MySQL·Caddy 볼륨을 사용한다. ROUND 이미지만 파일에 부여한 Linux 세분화 권한을 제거한 테스트 소유 Caddy 모의 서버로 바꾸고 프로덕션의 비루트 사용자, 읽기 전용 루트 파일 시스템, 정확한 세분화 권한 집합, 네트워크와 Spring 구성 트리 비밀 마운트를 그대로 검증한다.
 
 실제 ROUND 릴리스 이미지가 운영자가 고정한 다이제스트·리비전·레이블과 일치하는지는 사전점검과 래퍼의 잠금 내부 배포 경계가, 진입점 호환성은 공개 스테이징 기동이 별도로 확인한다.
+
+root로 쓰던 Caddy 볼륨을 재현해 비루트 `web` 이전, capability 제거와 로컬 헬스체크도 확인한다.
 
 먼저 DB 설정이 없는 `app` 이미지가 컨텍스트와 Flyway 구성 전에 전용 오류로 종료되는지 확인하고, Caddy 내부 CA HTTPS, 정적 프런트엔드와 SPA 대체 경로, 상태 검사·제품 API 역방향 프록시와 보안 헤더, 유효한 CI 전용 키를 사용한 프로덕션 프로필 기동, 실행 중인 Flyway·MySQL TLS 연결을 확인한다.
 

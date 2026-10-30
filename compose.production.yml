@@ -200,9 +200,18 @@ services:
     environment:
       BATON_HOST: ${BATON_HOST:?BATON_HOST is required}
       BATON_ROUND_RUNTIME_ENABLED: ${BATON_ROUND_RUNTIME_ENABLED:-false}
+    # 비루트 Caddy가 80·443을 바인드한다. 이 컨테이너의 네트워크 네임스페이스에만 적용된다.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       app:
         condition: service_healthy
+      web-volume-owner:
+        condition: service_completed_successfully
     ports:
       - "${BATON_HTTP_PUBLISH:-80:80}"
       - "${BATON_HTTPS_TCP_PUBLISH:-443:443}"
@@ -210,12 +219,41 @@ services:
     volumes:
       - baton_caddy_data:/data
       - baton_caddy_config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 2 -O /dev/null http://127.0.0.1:8081/healthz"]
+      interval: 15s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
     networks:
       edge:
       round_web:
       round_signaling:
         aliases:
           - ${BATON_HOST:?BATON_HOST is required}
+    logging: *default-logging
+
+  # root로 쓰던 기존 Caddy 볼륨의 인증서를 비루트 web이 계속 쓰도록 소유권만 맞추고 끝난다.
+  # 이미 내려받은 MySQL 이미지를 재사용하며 네트워크 없이 필요한 권한만 남긴다.
+  web-volume-owner:
+    image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+    user: "0:0"
+    entrypoint: ["chown", "-hR", "10002:10002", "/data", "/config"]
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_READ_SEARCH
+    cpus: "0.50"
+    mem_limit: 64m
+    pids_limit: 16
+    volumes:
+      - baton_caddy_data:/data
+      - baton_caddy_config:/config
     logging: *default-logging
 
 networks:

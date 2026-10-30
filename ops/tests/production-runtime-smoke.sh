@@ -525,6 +525,58 @@ assert_round_container_hardening() {
   fi
 }
 
+assert_web_container_hardening() {
+  local added_capabilities
+  local container_id
+  local dropped_capabilities
+  local health_status
+  local security_options
+
+  container_id="$("${COMPOSE[@]}" ps -q web)"
+  if [[ "$("${COMPOSE[@]}" exec -T web id -u | tr -d '\r\n')" != "10002" ]]; then
+    log "공개 Caddy 컨테이너가 비루트 UID로 실행되지 않습니다."
+    return 1
+  fi
+  dropped_capabilities="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{range .HostConfig.CapDrop}}{{.}} {{end}}' \
+      "$container_id"
+  )"
+  dropped_capabilities="${dropped_capabilities% }"
+  if [[ "${dropped_capabilities#CAP_}" != "ALL" ]]; then
+    log "공개 Caddy 컨테이너의 Linux capability 제거 집합이 정확히 ALL이 아닙니다."
+    return 1
+  fi
+  added_capabilities="$(
+    "$REAL_DOCKER" inspect \
+      --format '{{range .HostConfig.CapAdd}}{{.}} {{end}}' \
+      "$container_id"
+  )"
+  if [[ -n "$added_capabilities" ]]; then
+    log "공개 Caddy 컨테이너에 추가 Linux capability가 있습니다: $added_capabilities"
+    return 1
+  fi
+  security_options="$(
+    "$REAL_DOCKER" inspect --format '{{json .HostConfig.SecurityOpt}}' "$container_id"
+  )"
+  if [[ "$security_options" != *no-new-privileges* ]]; then
+    log "공개 Caddy 컨테이너에 no-new-privileges가 없습니다."
+    return 1
+  fi
+  health_status="$(
+    "$REAL_DOCKER" inspect --format '{{.State.Health.Status}}' "$container_id"
+  )"
+  if [[ "$health_status" != "healthy" ]]; then
+    log "공개 Caddy 컨테이너의 로컬 HTTP 헬스체크가 정상이 아닙니다: $health_status"
+    return 1
+  fi
+  if ! "${COMPOSE[@]}" exec -T web sh -ec \
+    'test -r /data/caddy/legacy/certificate && test -w /data/caddy && test -w /config/caddy'; then
+    log "root로 쓰던 기존 Caddy 볼륨을 비루트 web이 사용하지 못합니다."
+    return 1
+  fi
+}
+
 assert_round_turn_secret_mount() {
   local container_id
   local mount_contract
@@ -779,6 +831,13 @@ if [[ "$MISSING_DATASOURCE_OUTPUT" != *"DB_URL 설정이 필요합니다"* ]]; t
   exit 1
 fi
 
+log "root로 쓰던 이전 배포의 Caddy volume을 재현합니다."
+"${COMPOSE[@]}" run --rm --no-deps --entrypoint sh web-volume-owner -ec \
+  'mkdir -p /data/caddy/legacy /config/caddy
+  printf legacy > /data/caddy/legacy/certificate
+  chmod 700 /data/caddy/legacy
+  chown -R 0:0 /data /config'
+
 log "빌드한 이미지와 격리된 MySQL·Caddy volume을 기동합니다."
 "${COMPOSE[@]}" up --detach --no-build --wait --wait-timeout 300
 
@@ -802,6 +861,7 @@ assert_no_published_ports round-signaling
 assert_round_container_hardening round-web NET_BIND_SERVICE
 assert_round_container_hardening round-signaling ""
 assert_round_turn_secret_mount
+assert_web_container_hardening
 wait_for_public_health "$HTTPS_BASE_URL" "$HTTPS_PORT"
 
 # 공개 상태 검사기와 같은 판정으로 실제 Actuator 응답을 확인한다.

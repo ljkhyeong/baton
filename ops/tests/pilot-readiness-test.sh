@@ -1172,6 +1172,8 @@ grep -Fq 'header Cache-Control "public, max-age=31536000, immutable"' "$repo_roo
 grep -Fq 'header Cache-Control "no-cache"' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not revalidate the SPA entry document'
 
+grep -Fxq 'USER caddy' "$repo_root/frontend/Dockerfile" \
+  || fail 'production web image does not run as a non-root user'
 grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not import scalar secrets through configtree'
