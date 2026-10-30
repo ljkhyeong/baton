@@ -3,6 +3,9 @@ package com.personal.baton.adapter.in.web;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.personal.baton.application.workspace.error.ResourceCheckRequestException;
+import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
+import com.personal.baton.application.workspace.error.WorkspaceNotFoundException;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationHandler;
 import io.micrometer.observation.ObservationRegistry;
@@ -154,6 +157,45 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(""));
     }
 
+    @DisplayName("비JSON Accept여도 업무 오류는 본문 없는 500이 아니라 JSON 오류로 응답한다")
+    @Test
+    void writesApplicationErrorsAsJsonForNonJsonAccept() throws Exception {
+        mockMvc.perform(get("/api/v1/test/errors/access-denied").accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("WORKSPACE_ACCESS_DENIED"));
+        mockMvc.perform(get("/api/v1/test/errors/not-found").accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("TEAM_NOT_FOUND"));
+        mockMvc.perform(get("/api/v1/test/errors/resource-check").accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "17"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("WATCH_CHECK_RATE_LIMITED"));
+    }
+
+    @DisplayName("비JSON Accept여도 프레임워크 요청 오류와 내부 오류는 JSON으로 응답한다")
+    @Test
+    void writesFrameworkErrorsAsJsonForNonJsonAccept() throws Exception {
+        mockMvc.perform(get("/api/v1/test/errors").accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        mockMvc.perform(get("/api/v1/test/errors/failure").accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+    }
+
+    @DisplayName("성공 응답을 비JSON Accept로 쓸 수 없으면 본문 없는 406으로 응답한다")
+    @Test
+    void keepsEmptyNotAcceptableForSuccessBody() throws Exception {
+        mockMvc.perform(get("/api/v1/test/errors/payload").accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(content().string(""));
+    }
+
     @DisplayName("예상하지 못한 예외는 내부 정보를 숨기고 HTTP 관측에 기록한다")
     @Test
     void hidesUnexpectedFailureAndRecordsObservationError() throws Exception {
@@ -204,9 +246,29 @@ class GlobalExceptionHandlerTest {
             return new ErrorPayload("ok");
         }
 
+        @GetMapping("/api/v1/test/errors/payload")
+        ErrorPayload payload() {
+            return new ErrorPayload("ok");
+        }
+
         @GetMapping("/api/v1/test/errors/failure")
         String fail() {
             throw new IllegalStateException("jdbc:mysql://secret-host/internal");
+        }
+
+        @GetMapping("/api/v1/test/errors/access-denied")
+        String accessDenied() {
+            throw new WorkspaceAccessDeniedException();
+        }
+
+        @GetMapping("/api/v1/test/errors/not-found")
+        String notFound() {
+            throw WorkspaceNotFoundException.team();
+        }
+
+        @GetMapping("/api/v1/test/errors/resource-check")
+        String resourceCheck() {
+            throw new ResourceCheckRequestException(ResourceCheckRequestException.Reason.RATE_LIMITED, 17L);
         }
     }
 

@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -128,6 +129,7 @@ public class RoundAuthorizationExceptionHandler {
             boolean expireGrant
     ) {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
                 .cacheControl(CacheControl.noStore());
         if (expireGrant) {
             String roomId = RoundGrantAdmissionFilter.refreshRoomId(request);

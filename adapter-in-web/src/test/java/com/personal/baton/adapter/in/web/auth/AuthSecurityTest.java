@@ -277,6 +277,49 @@ class AuthSecurityTest {
                 .andExpect(jsonPath("$.code").value("AUTH_RATE_LIMITED"));
     }
 
+    @DisplayName("비JSON Accept여도 인증 오류는 JSON 본문으로 응답한다")
+    @Test
+    void writesAuthErrorsAsJsonForNonJsonAccept() throws Exception {
+        doThrow(new CurrentPasswordMismatchException())
+                .when(accountSecurityUseCase)
+                .changeLocalPassword(any());
+
+        mockMvc.perform(passwordChange(accountSession(UUID.randomUUID(), 0), "203.0.113.78")
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INVALID"));
+    }
+
+    @DisplayName("비JSON Accept여도 인증 요청률 제한은 JSON 본문과 재시도 시간으로 응답한다")
+    @Test
+    void writesRateLimitAsJsonForNonJsonAccept() throws Exception {
+        doThrow(new com.personal.baton.application.identity.error.HumanVerificationRejectedException())
+                .when(humanVerificationUseCase).verify(any());
+        org.springframework.test.web.servlet.request.RequestPostProcessor rateLimitedNetwork = request -> {
+            request.setRemoteAddr("203.0.113.79");
+            return request;
+        };
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            mockMvc.perform(sameOrigin(post(AuthController.PASSWORD_RESET_REQUESTS_PATH)).with(csrf())
+                            .with(rateLimitedNetwork)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"limited@example.com\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(sameOrigin(post(AuthController.PASSWORD_RESET_REQUESTS_PATH)).with(csrf())
+                        .with(rateLimitedNetwork)
+                        .accept(MediaType.TEXT_PLAIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"limited@example.com\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("AUTH_RATE_LIMITED"));
+    }
+
     @DisplayName("설정하지 않은 소셜 공급자 목록은 가입 가능 여부와 인증 정보가 없는 빈 배열만 반환한다")
     @Test
     void exposesEmptyProviderListWhenSocialLoginIsUnavailable() throws Exception {

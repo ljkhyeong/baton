@@ -1039,7 +1039,7 @@ MySQL 행 잠금 시간이 제한을 넘으면 대상에 따라 다음 오류로
 
 계정 인증에서 별도로 `503`으로 분류한 경우가 아니라면 쿼리·트랜잭션 시간 초과와 DB 연결 실패는 `500 INTERNAL_ERROR`로 처리한다. 이를 사용자의 동시 수정으로 추측하지 않는다.
 
-예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `406 Not Acceptable`은 오류 JSON을 협상할 수 없으므로 본문 없이 `X-Request-ID`만 반환한다.
+예상하지 못한 예외와 Spring MVC 요청 오류도 `ErrorResponse`로 반환한다. `ErrorResponse`는 요청의 `Accept`와 무관하게 `application/json`으로 내보낸다. 성공 응답 형식을 협상하지 못한 `406 Not Acceptable`만 본문 없이 `X-Request-ID`를 반환한다.
 
 내부 예외와 스택 추적은 서버 로그에만 남긴다. Spring과 필터 체인의 5xx는 MDC와 응답 헤더에 같은 요청 ID를 사용한다. Caddy가 만든 413·502·503도 응답과 접근 로그에 같은 엣지 요청 ID를 남긴다. 로그에서는 운영 키, 멱등 키와 외부 요청 ID를 제거한다. 브라우저는 운영자가 로그를 찾을 수 있도록 5xx 안내에 요청 ID를 표시한다.
 

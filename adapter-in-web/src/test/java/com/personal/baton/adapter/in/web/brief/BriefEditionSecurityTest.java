@@ -12,6 +12,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -40,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -102,6 +104,19 @@ class BriefEditionSecurityTest {
         mockMvc.perform(get(BriefWorkspaceContextController.READINESS_PATH, TEAM_ID, SEASON_ID)
                         .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("BRIEF_ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("비JSON Accept여도 BRIEF 업무 오류는 JSON 본문으로 응답한다")
+    void writesBriefErrorsAsJsonForNonJsonAccept() throws Exception {
+        when(contextUseCase.findGenerationReadiness(org.mockito.ArgumentMatchers.any())).thenThrow(new BriefAccessDeniedException());
+        mockMvc.perform(get(BriefWorkspaceContextController.READINESS_PATH, TEAM_ID, SEASON_ID)
+                        .with(authentication(accountAuthentication())).header("X-Baton-Access-Key", ACCESS_KEY)
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("BRIEF_ACCESS_DENIED"));
     }
 
     @Test

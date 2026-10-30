@@ -37,6 +37,7 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -105,7 +106,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ErrorMapping mapping = ERROR_MAPPINGS.get(type);
             if (mapping != null) {
                 HttpObservationErrors.mark(servletRequest(request), exception);
-                return ResponseEntity.status(mapping.status())
+                return jsonError(mapping.status())
                         .body(new ErrorResponse(mapping.code(), exception.getMessage()));
             }
         }
@@ -118,7 +119,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         HttpObservationErrors.mark(request, exception);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        return jsonError(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
     }
 
@@ -130,7 +131,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
         };
-        var response = ResponseEntity.status(status).header(HttpHeaders.CACHE_CONTROL, "no-store");
+        var response = jsonError(status).header(HttpHeaders.CACHE_CONTROL, "no-store");
         if (exception.retryAfterSeconds() != null) {
             response.header(HttpHeaders.RETRY_AFTER, exception.retryAfterSeconds().toString());
         }
@@ -210,7 +211,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             return super.createResponseEntity(null, headers, status, request);
         }
         Object normalizedBody = body instanceof ErrorResponse ? body : frameworkError(status);
-        return super.createResponseEntity(normalizedBody, headers, status, request);
+        return jsonError(status).headers(headers).body(normalizedBody);
     }
 
     @Override
@@ -234,6 +235,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 request
         );
+    }
+
+    // Accept와 협상하면 비JSON 요청에서 쓰기에 실패해 본문 없는 500으로 번지므로 형식을 고정한다.
+    private ResponseEntity.BodyBuilder jsonError(HttpStatusCode status) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON);
     }
 
     private ErrorResponse frameworkError(HttpStatusCode status) {
