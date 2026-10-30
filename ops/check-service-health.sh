@@ -92,9 +92,7 @@ if [[ "$http_status" != "200" ]]; then
   fail "expected HTTP 200 without redirects, received $http_status"
 fi
 
-health_body="$(< "$body_file")"
-aggregate_up_pattern='^[[:space:]]*\{"status":"UP"(,"groups":\[("[A-Za-z0-9._-]+"(,"[A-Za-z0-9._-]+")*)?\])?\}[[:space:]]*$'
-if [[ ! "$health_body" =~ $aggregate_up_pattern ]]; then
+if ! production_validation_is_aggregate_up_document "$(< "$body_file")"; then
   fail "health response was not the aggregate UP document"
 fi
 

@@ -75,7 +75,8 @@ if ! awk \
   -v refreshed="$last_refresh" \
   -v maximum="$max_staleness_seconds" \
   'BEGIN {
-    age = now - refreshed
+    # 지표 시각은 소수 초, now는 정수 초라 같은 초의 갱신이 미래로 보이지 않게 내림해 비교한다.
+    age = now - int(refreshed)
     exit !(refreshed > 0 && age >= 0 && age <= maximum)
   }'; then
   printf 'BATON 연동 지표의 마지막 정상 갱신 시각이 유효하지 않거나 오래됐습니다: last_refresh=%s now=%s max_staleness_seconds=%s\n' \

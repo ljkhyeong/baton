@@ -328,7 +328,7 @@ kubectl -n portfolio create secret tls rag-tls \
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-import secrets, uuid
+import base64, secrets, uuid
 p = Path('secrets')
 if any(p.iterdir()):
     raise SystemExit('기존 secrets 폴더가 있으므로 새 키를 만들지 않습니다.')
@@ -337,6 +337,7 @@ for name in ('DB_PASSWORD','MYSQL_ROOT_PASSWORD','DATABASE_PASSWORD',
              'BATON_CAL_INTERNAL_TOKEN','TURN_COTURN_SECRET','KNOWLEDGE_SYNC_KEY'):
     (p/name).write_text(secrets.token_urlsafe(48))
 (p/'BATON_CAL_SUBSCRIPTION_GENERATION').write_text(str(uuid.uuid4()))
+(p/'BATON_EMAIL_VERIFICATION_OUTBOX_ENCRYPTION_KEY').write_text(base64.b64encode(secrets.token_bytes(32)).decode())
 PY
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out secrets/current-private.pem
 openssl pkey -in secrets/current-private.pem -pubout -out secrets/current-public.pem
@@ -344,7 +345,8 @@ kubectl -n baton create secret generic baton-secret \
   --from-file=DB_PASSWORD=secrets/DB_PASSWORD \
   --from-file=BATON_WORKSPACE_CREATION_KEY=secrets/BATON_WORKSPACE_CREATION_KEY \
   --from-file=BATON_WORKSPACE_RECOVERY_KEY=secrets/BATON_WORKSPACE_RECOVERY_KEY \
-  --from-file=BATON_CAL_BEARER_TOKEN=secrets/BATON_CAL_INTERNAL_TOKEN
+  --from-file=BATON_CAL_BEARER_TOKEN=secrets/BATON_CAL_INTERNAL_TOKEN \
+  --from-file=BATON_EMAIL_VERIFICATION_OUTBOX_ENCRYPTION_KEY=secrets/BATON_EMAIL_VERIFICATION_OUTBOX_ENCRYPTION_KEY
 kubectl -n baton create secret generic mysql-secret \
   --from-file=MYSQL_PASSWORD=secrets/DB_PASSWORD \
   --from-file=MYSQL_ROOT_PASSWORD=secrets/MYSQL_ROOT_PASSWORD
@@ -358,17 +360,22 @@ kubectl -n baton create secret generic round-secret --from-file=TURN_COTURN_SECR
 kubectl -n portfolio create secret generic knowledge-secret --from-file=KNOWLEDGE_SYNC_KEY=secrets/KNOWLEDGE_SYNC_KEY
 ```
 
+`BATON_EMAIL_VERIFICATION_OUTBOX_ENCRYPTION_KEY`는 메일을 보내지 않아도 `production` 프로필의 기동 필수값이다. 없으면 BATON이 시작 단계에서 실패한다. 32바이트 키의 Base64 값이며 아웃박스 토큰 복호화에 쓰므로 재배포 때 바꾸지 않는다.
+
 ### BATON 로그인 준비
 
 배포만 해도 로그인 공급자가 자동으로 등록되는 것은 아니다. Google OAuth는 사용자가 Google에서 로그인한 뒤 BATON으로 돌아오는 흐름이다. 리디렉션 URI는 그 돌아올 주소이며 Google 설정과 BATON 주소가 정확히 일치해야 한다. 다른 주소라면 로그인 화면은 열려도 마지막 콜백에서 실패할 수 있다. 테스트 상태의 동의 화면은 등록한 테스트 사용자만 로그인할 수 있으므로 첫 운영 계정부터 등록한다.
 
 본 절차는 SMTP를 추가하지 않고 Google OAuth로 로그인한다. Google Cloud에서 웹 애플리케이션 OAuth 클라이언트를 준비한다. 승인된 리디렉션 URI는 `https://b4ton.com/login/oauth2/code/google`이다. 동의 화면이 테스트 상태면 로그인할 계정을 테스트 사용자로 등록한다.
 
+`production` 프로필만으로는 소셜 로그인이 켜지지 않는다. `oauth2` 프로필을 더하면 Google과 Naver를 함께 등록하는데, Naver 값이 없어도 기동은 되지만 치환되지 않은 값으로 등록돼 로그인 화면에 동작하지 않는 Naver 버튼이 나타난다. 그래서 이 절차는 프로필을 추가하지 않고 Spring 표준 설정으로 Google 공급자만 등록한 뒤 `BATON_AUTH_OAUTH2_ENABLED=true`로 켠다. Naver까지 쓰려면 `SPRING_PROFILES_ACTIVE=production,oauth2`로 바꾸고 `BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID`·`BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET`·`BATON_AUTH_OAUTH2_NAVER_CLIENT_ID`·`BATON_AUTH_OAUTH2_NAVER_CLIENT_SECRET`를 모두 넣는다.
+
 `secrets/google.env`를 편집기로 작성한다. 값은 따옴표 없이 기록하고 셸에서 `source`하지 않는다.
 
 ```dotenv
-BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID=실제_클라이언트_ID
-BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET=실제_클라이언트_비밀값
+BATON_AUTH_OAUTH2_ENABLED=true
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=실제_클라이언트_ID
+SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=실제_클라이언트_비밀값
 ```
 
 ```bash
@@ -493,13 +500,13 @@ for name,sources,ports in [
     policies.append(allow('baton',name,sources,ports))
 for name,sources,ports in [('rag-web',[traefik],[8080]),('knowledge-api',[from_app('portfolio',['rag-web'])],[8080]),('elasticsearch',[from_app('portfolio',['knowledge-api'])],[9200])]:
     policies.append(allow('portfolio',name,sources,ports))
-for ns,name,port in [('baton','app',8080),('baton','cal',8081),('baton','round-signaling',8787),('portfolio','knowledge-api',9091)]:
+for ns,name,port in [('baton','cal',8081),('baton','round-signaling',8787),('portfolio','knowledge-api',9091)]:
     policy=allow(ns,name,[monitor],[port]); policy['metadata']['name']+='-monitor'; policies.append(policy)
 save('00-network',policies)
 
 mysql=workload('baton','mysql','mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb',3306,'512Mi','1536Mi',
  {'MYSQL_DATABASE':'baton','MYSQL_USER':'baton','TZ':'UTC'},['mysql-secret'],storage=('20Gi','/var/lib/mysql'))
-mysql[1]['spec']['template']['spec']['containers'][0]['args']=['--character-set-server=utf8mb4','--collation-server=utf8mb4_unicode_ci','--default-time-zone=+00:00','--innodb-buffer-pool-size=512M','--max-connections=50']
+mysql[1]['spec']['template']['spec']['containers'][0]['args']=['--character-set-server=utf8mb4','--collation-server=utf8mb4_unicode_ci','--default-time-zone=+00:00','--innodb-buffer-pool-size=512M','--max-connections=50','--slow-query-log=ON','--long-query-time=1','--slow-query-log-file=/var/lib/mysql/slow-query.log']
 postgres=workload('baton','postgres','postgres:18.6-alpine',5432,'256Mi','512Mi',{'POSTGRES_DB':'baton_cal','POSTGRES_USER':'baton_cal'},['postgres-secret'],storage=('10Gi','/var/lib/postgresql'))
 postgres[1]['spec']['template']['spec']['containers'][0]['args']=['-c','shared_buffers=128MB','-c','max_connections=30']
 save('10-databases',mysql+postgres)
@@ -517,8 +524,8 @@ assert src.count('{$BATON_HOST} {')==1
 src=src.replace('{$BATON_HOST} {',':8080 {',1)
 src=src.replace('request_header -X-Forwarded-*','request_header -X-Forwarded-Host\n\trequest_header -X-Forwarded-Proto\n\trequest_header -X-Forwarded-Port')
 src=src.replace('{http.request.remote.host}','{http.request.client_ip}').replace('key {remote_host}','key {client_ip}')
-# 공개 Actuator 경로를 닫고 상태는 내부에서 확인한다.
-src=src.replace('\n:8080 {','\n:8080 {\n\thandle /actuator/* {\n\t\trespond 404\n\t}\n',1)
+# 외부 감시가 쓰는 상태 경로만 남기고 나머지 Actuator 경로는 닫는다.
+src=src.replace('\n:8080 {','\n:8080 {\n\t@privateActuator {\n\t\tpath /actuator /actuator/*\n\t\tnot path /actuator/health /actuator/health/*\n\t}\n\thandle @privateActuator {\n\t\trespond 404\n\t}\n',1)
 head='{\n auto_https off\n admin off\n servers {\n  trusted_proxies static '+pod_cidr+'\n  trusted_proxies_strict\n  client_ip_headers X-Forwarded-For\n }\n}\n'
 save('21-web',[cm('baton','web-config',{'Caddyfile':head+src})]+workload('baton','web','baton-web:'+rev,8080,'64Mi','128Mi',{'BATON_HOST':'b4ton.com','BATON_ROUND_RUNTIME_ENABLED':'true'},health='/',mounts=[('web-config','/etc/caddy',False)]))
 
@@ -624,7 +631,7 @@ done
 하나라도 실패하면 이후 배포를 진행하지 않는다. `dry-run` 성공은 이미지 기동·TLS·통화 성공을 뜻하지 않는다. 특히 다음을 읽고 확인한다.
 
 - 내부 TLS 주소의 hostAliases가 6절의 ClusterIP와 같다.
-- Google OAuth, RSA 키, CAL 토큰·구독 세대가 비어 있지 않다.
+- Google OAuth, RSA 키, CAL 토큰·구독 세대와 이메일 아웃박스 키가 비어 있지 않다.
 - Pod CIDR과 Traefik 라벨이 실제 서버와 같다. 프록시 신뢰 설정은 해당 NetworkPolicy와 함께 적용한다.
 - Traefik 3.3 이상에서 접근 로그 비활성 annotation을 지원한다. 지원하지 않으면 해당 라우트의 민감 경로 로그 제외를 설정한 뒤 공개한다. 기존 happyGallery의 로그 설정을 통째로 덮어쓰지 않는다.
 - Cloudflare 프록시를 나중에 켜면 원본 IP 신뢰 설정을 다시 검토한다. 현재 설정은 DNS only와 기존 Traefik을 전제로 한다.
@@ -808,9 +815,10 @@ curl -I https://b4ton.com
 curl -I "https://$RAG_HOST/api/v1/knowledge/search"
 curl -I https://cal.b4ton.com/internal/api/v1/subscriptions
 curl -I https://b4ton.com/actuator/prometheus
+curl --fail --silent --show-error https://b4ton.com/actuator/health
 ```
 
-BATON은 정상 페이지, 검색 API의 HEAD는 구현에 따라 `405`일 수 있다. CAL 내부 API와 BATON Actuator는 공개 주소에서 `404`여야 한다. TLS 검사에 `-k`를 쓰지 않는다. 인증서 이름 불일치·만료·체인 누락은 먼저 고친다.
+BATON은 정상 페이지, 검색 API의 HEAD는 구현에 따라 `405`일 수 있다. CAL 내부 API와 BATON `/actuator/prometheus`는 공개 주소에서 `404`여야 한다. 외부 감시가 쓰는 `/actuator/health`만 공개하며 `"status":"UP"`이 포함된 응답을 반환해야 한다. TLS 검사에 `-k`를 쓰지 않는다. 인증서 이름 불일치·만료·체인 누락은 먼저 고친다.
 
 ```bash
 curl --fail-with-body "https://$RAG_HOST/api/v1/knowledge/search" \
@@ -839,7 +847,7 @@ curl --fail-with-body "https://$RAG_HOST/api/v1/knowledge/search" \
 ### CAL
 
 1. 테스트 모임의 날짜를 바꾸고 캘린더 전달 로그·지표를 확인한다.
-2. `baton_integration_delivery_items{integration="calendar"}`의 pending·processing이 처리 후 0으로 줄고 failed가 0인지 확인한다. 실패가 남으면 토큰·TLS·CAL 계약부터 확인한다.
+2. 14절의 BATON 지표 확인 명령으로 `baton_integration_delivery_items{integration="calendar"}`의 pending·processing이 처리 후 0으로 줄고 failed가 0인지 확인한다. 실패가 남으면 토큰·TLS·CAL 계약부터 확인한다.
 3. 전달 확인 후 9절의 구독 활성화를 완료한다.
 4. 오늘 화면에서 `내 캘린더에 추가`로 주소를 발급한다. 실제 Apple·Google·Outlook 중 하나에 URL 구독으로 등록한다.
 5. 일정 변경 반영과 구독 해지 후 기존 URL 접근 거절을 확인한다. 외부 캘린더 앱의 갱신 주기는 즉시가 아닐 수 있다.
@@ -974,7 +982,7 @@ VITE_KNOWLEDGE_TURNSTILE_SITE_KEY=실제_공개_사이트_키
 
 | 대상 | 주소 |
 | --- | --- |
-| BATON | `app.baton.svc.cluster.local:8080/actuator/prometheus` |
+| BATON | 다른 Pod에서 수집 불가 — 아래 설명 참고 |
 | CAL | `cal-metrics.baton.svc.cluster.local:8081/actuator/prometheus` |
 | ROUND | `round-signaling.baton.svc.cluster.local:8787/actuator/prometheus` |
 | RAG | Pod 9091의 `/actuator/prometheus` — 아래 관리 Service 추가 |
@@ -985,6 +993,13 @@ kubectl -n baton expose deployment cal --name=cal-metrics --port=8081 --target-p
 ```
 
 CAL 관리 수집 주소는 실제로 `cal-metrics.baton.svc.cluster.local:8081`, RAG는 `knowledge-metrics.portfolio.svc.cluster.local:9091`을 사용한다. 기존 `cal` Service는 업무 포트만 열고 있다. `MONITOR_NAMESPACE`와 기존 Prometheus egress 정책도 확인한다.
+
+BATON은 `/actuator/prometheus`를 `127.0.0.1`에서만 허용하므로 기존 Prometheus가 `app:8080`을 조회하면 `403`을 받는다. 이 제한을 풀지 않는다. 지속 수집에는 [같은 Pod의 수집기](free-integrations.md#연결-설정)가 필요하며 이 문서의 매니페스트에는 포함하지 않았다. 그때까지는 BATON용 수집 대상과 NetworkPolicy를 추가하지 않고 다음 명령으로 지표를 확인한다.
+
+```bash
+kubectl -n baton exec deployment/app -- wget -q -O - http://127.0.0.1:8080/actuator/prometheus \
+  | grep '^baton_integration_'
+```
 
 관찰 대상은 메모리·OOMKilled·재시작·디스크 여유·HTTP 5xx·CAL 적체·TURN 할당 실패·RAG 검색/답변 실패·OpenAI 실제 사용료다. 애플리케이션 메트릭만으로 공급자의 최종 청구액을 계산하지 않는다.
 
@@ -1127,7 +1142,7 @@ EndpointSlice는 Service가 연결할 Pod 주소와 준비 상태를 보여 준�
 
 초보자 설명 보완 시 기존 배포 명령·생성기 코드가 그대로임을 비교했고, 추가 조회 명령의 Bash 문법과 문서 링크를 확인했다. 기존과 같은 설정에 대한 이미지·프록시 검사는 반복하지 않았다.
 
-실제 k3s 적용, DB 초기화·복원, 공개 인증서 체인, 외부 망 TURN 통화, OAuth·OpenAI·Turnstile 공급자 연동과 부하 검증은 실행하지 않았다. 위 단계별 확인과 배포 완료 기준을 운영 환경에서 통과해야 배포 완료다.
+실제 k3s 적용, DB 초기화·복원, 공개 인증서 체인, 외부 망 TURN 통화, OAuth·OpenAI·Turnstile 공급자 연동과 부하 검증은 실행하지 않았다. 아웃박스 키 Secret, Google 전용 로그인 설정, 상태 경로 공개와 BATON 지표 확인 명령도 코드와 설정을 대조해 고친 내용이며 실제 k3s에서 실행 검증하지 않았다. 위 단계별 확인과 배포 완료 기준을 운영 환경에서 통과해야 배포 완료다.
 
 ## 참고
 

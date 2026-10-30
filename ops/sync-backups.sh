@@ -16,6 +16,9 @@ if [[ $# -eq 1 ]]; then
   defer_cycle_finalization=true
 fi
 
+# 스냅샷 성공을 기록한 뒤의 보존 정리 실패다. systemd 유닛이 이 코드로는 재시작하지 않아 덤프가 쌓이지 않는다.
+prune_failure_exit_status=79
+
 temporary_path=""
 cleanup() {
   if [[ -n "$temporary_path" ]]; then
@@ -37,11 +40,23 @@ encryption_is_disabled() {
   esac
 }
 
+# 현재 원격을 가리키는 완료 표식은 업로드 때 재다운로드 비교를 마쳤다는 기록이다.
+remote_copy_was_verified() {
+  local verified_path="$1"
+  local verified_hash=""
+  local verified_remote=""
+
+  [[ -f "$verified_path" && -r "$verified_path" ]] || return 1
+  IFS= read -r verified_hash < "$verified_path" || true
+  verified_remote="$(sed -n '2p' "$verified_path")"
+  [[ "$verified_hash" =~ ^[0-9a-f]{64}$ && "$verified_remote" == "$remote" ]]
+}
+
 verify_remote_objects() {
   local backup_path="$1"
   local backup_name="$2"
 
-  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
+  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null || return 1
   printf '%s\n' "$backup_name" "$backup_name.sha256" | \
     rclone check "$backup_dir" "$remote" --download --one-way --files-from-raw - \
       --retries 5 --retries-sleep 30s
@@ -159,10 +174,18 @@ latest_backup_epoch=-1
 latest_backup_name=""
 latest_backup_hash=""
 for backup_path in "${backups[@]}"; do
-  "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null
   backup_name="$(basename -- "$backup_path")"
   checksum_path="$backup_path.sha256"
   verified_path="$backup_path.uploaded"
+  if ! "$script_dir/verify-backup.sh" --require-checksum "$backup_path" >/dev/null; then
+    if ! remote_copy_was_verified "$verified_path"; then
+      exit 1
+    fi
+    # 원격 사본이 이미 검증됐으므로 로컬 사본 손상이 새 덤프 동기화를 막지 않게 한다.
+    printf 'Local copy failed verification but its off-site copy was verified; review it: %s\n' \
+      "$backup_name" >&2
+    continue
+  fi
   checksum_line=""
   IFS= read -r checksum_line < "$checksum_path"
   expected_backup_hash="${checksum_line%% *}"
@@ -202,8 +225,22 @@ for backup_path in "${backups[@]}"; do
   fi
 done
 
+if [[ $uploaded -gt 0 && "$defer_cycle_finalization" == false ]]; then
+  mkdir -p -- "$state_dir"
+  temporary_path="$(mktemp "$state_dir/.last-success.XXXXXX")"
+  printf '%s\n%s\n%s\n%s\n%s\n' \
+    "$latest_backup_epoch" \
+    "$latest_backup_name" \
+    "$latest_backup_hash" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    "$remote" > "$temporary_path"
+  mv -- "$temporary_path" "$state_dir/last-success"
+  temporary_path=""
+fi
+
 minimum_local_backups=3
 pruned=0
+prune_failed=0
 if [[ "$defer_cycle_finalization" == false ]]; then
   recent_start=0
   if [[ ${#backups[@]} -gt $minimum_local_backups ]]; then
@@ -223,26 +260,20 @@ if [[ "$defer_cycle_finalization" == false ]]; then
       continue
     fi
     expired_name="$(basename -- "$expired_backup")"
-    verify_remote_objects "$expired_backup" "$expired_name"
+    if ! verify_remote_objects "$expired_backup" "$expired_name"; then
+      printf 'Retention audit failed; keeping the local snapshot: %s\n' "$expired_name" >&2
+      prune_failed=$((prune_failed + 1))
+      continue
+    fi
     rm -f -- "$expired_backup" "$expired_backup.sha256" "$expired_backup.uploaded"
     pruned=$((pruned + 1))
   done < <(find "$backup_dir" -maxdepth 1 -type f -name 'baton-*.sql.gz' -mtime "+$retention_days" -print0)
 fi
 
-if [[ $uploaded -gt 0 && "$defer_cycle_finalization" == false ]]; then
-  mkdir -p -- "$state_dir"
-  temporary_path="$(mktemp "$state_dir/.last-success.XXXXXX")"
-  printf '%s\n%s\n%s\n%s\n%s\n' \
-    "$latest_backup_epoch" \
-    "$latest_backup_name" \
-    "$latest_backup_hash" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-    "$remote" > "$temporary_path"
-  mv -- "$temporary_path" "$state_dir/last-success"
-  temporary_path=""
-fi
-
-printf 'Off-site backup synchronization completed: uploaded=%d, already_verified=%d, local_pruned=%d, remote=%s\n' \
-  "$uploaded" "$already_verified" "$pruned" "$remote"
+printf 'Off-site backup synchronization completed: uploaded=%d, already_verified=%d, local_pruned=%d, prune_failed=%d, remote=%s\n' \
+  "$uploaded" "$already_verified" "$pruned" "$prune_failed" "$remote"
 
 trap - EXIT INT TERM
+if [[ $prune_failed -gt 0 ]]; then
+  exit "$prune_failure_exit_status"
+fi

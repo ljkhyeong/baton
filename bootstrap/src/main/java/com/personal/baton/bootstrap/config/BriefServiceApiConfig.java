@@ -12,6 +12,7 @@ import com.personal.baton.application.workspace.port.out.WorkspaceOperationsRepo
 import com.personal.baton.application.brief.port.out.BriefContinuitySignalStorePort;
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,7 +23,8 @@ public class BriefServiceApiConfig {
     @Bean
     BriefServiceClient briefEditionServiceClient(
             BriefServiceApiProperties properties,
-            BriefRestClientFactory clientFactory
+            BriefRestClientFactory clientFactory,
+            SslBundles sslBundles
     ) {
         if (!properties.enabled()) {
             return DisabledBriefServiceClient.INSTANCE;
@@ -33,7 +35,8 @@ public class BriefServiceApiConfig {
                 properties.requiredBaseUri(),
                 properties.requiredBearerToken(),
                 properties.connectTimeout(),
-                properties.readTimeout()
+                properties.readTimeout(),
+                properties.configuredSslBundle(sslBundles)
         );
     }
 

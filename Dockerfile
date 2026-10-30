@@ -36,4 +36,5 @@ COPY --from=build --chown=baton:baton /workspace/baton.jar ./baton.jar
 USER baton
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/baton.jar"]
+# Compose 1GiB 제한에서 k3s의 -Xmx512m과 같은 힙을 쓰고 나머지는 비힙 영역에 남긴다.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=50.0", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/baton.jar"]

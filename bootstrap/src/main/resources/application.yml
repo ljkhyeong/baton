@@ -116,6 +116,7 @@ baton:
       enabled: ${BATON_BRIEF_SERVICE_API_ENABLED:false}
       base-url: ${BATON_BRIEF_SERVICE_API_BASE_URL:}
       bearer-token: ${BATON_BRIEF_SERVICE_API_BEARER_TOKEN:}
+      ssl-bundle: ${BATON_BRIEF_SERVICE_API_SSL_BUNDLE:}
       connect-timeout: ${BATON_BRIEF_SERVICE_API_CONNECT_TIMEOUT:PT2S}
       read-timeout: ${BATON_BRIEF_SERVICE_API_READ_TIMEOUT:PT5S}
   watch:
