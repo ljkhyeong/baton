@@ -401,8 +401,24 @@ crash_published_body_count="$(find "$crash_publish_root/backups" -maxdepth 1 -ty
 crash_published_sidecar_count="$(find "$crash_publish_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz.sha256' | wc -l | tr -d ' ')"
 assert_count 0 "$crash_published_body_count" 'crash-safe body publication'
 assert_count 1 "$crash_published_sidecar_count" 'crash-safe orphan sidecar'
+crash_leftover_dump="$(
+  find "$crash_publish_root/backups" -maxdepth 1 -type f -name '.baton-*' -print
+)"
+assert_file "$crash_leftover_dump"
 run_cycle "$crash_publish_root" >/dev/null
 assert_file "$crash_publish_root/state/last-success"
+# 최근 임시 파일은 다른 실행이 쓰는 중일 수 있어 남기고, 오래된 잔존물만 잠금 안에서 지운다.
+assert_file "$crash_leftover_dump"
+touch -t 202001010000 "$crash_leftover_dump"
+printf 'keep me\n' > "$crash_publish_root/backups/.unrelated-temporary"
+touch -t 202001010000 "$crash_publish_root/backups/.unrelated-temporary"
+if FAKE_FLOCK_EXIT=1 run_cycle "$crash_publish_root" >/dev/null 2>&1; then
+  fail 'contended cycle for temporary cleanup unexpectedly succeeded'
+fi
+assert_file "$crash_leftover_dump"
+run_cycle "$crash_publish_root" >/dev/null
+assert_no_file "$crash_leftover_dump"
+assert_file "$crash_publish_root/backups/.unrelated-temporary"
 
 direct_backup_root="$test_root/direct-backup"
 mkdir -p -- "$direct_backup_root/backups"

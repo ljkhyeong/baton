@@ -53,6 +53,12 @@ if ! flock -n 9; then
   exit 75
 fi
 
+# 강제 종료가 남긴 임시 파일은 평문 덤프일 수 있으므로 잠금을 잡은 뒤 지운다. 쓰는 중인 파일은
+# 수정 시각이 갱신되고 주기는 systemd 제한인 2시간 안에 끝나므로 3시간이 지난 파일만 잔존물로 본다.
+if [[ -d "$backup_dir" ]]; then
+  find "$backup_dir" -maxdepth 1 -type f -name '.baton-*' -mmin +180 -print -delete
+fi
+
 retry_pending=false
 for pending_backup in "$backup_dir"/baton-*.sql.gz; do
   if [[ ! -f "$pending_backup" ]]; then
