@@ -121,6 +121,27 @@ class IntegrationDeliveryMetricsTest {
         assertThat(registry.get("baton.email.delivery.receipts").tag("event", "hard_bounce").gauge().value()).isZero();
     }
 
+    @DisplayName("활성 항목이 없어도 마지막 전달 성공 시각과 0건 지표를 그대로 노출한다")
+    @Test
+    void exposesLastSuccessWithoutActiveItems() {
+        insertWatch("DELIVERED", NOW.minusSeconds(45));
+        insertEmail("SUPERSEDED", NOW.minusSeconds(40), null);
+        insertEmail("DELIVERED", NOW.minusSeconds(30), null);
+
+        metrics.refresh();
+
+        assertThat(gauge("baton.integration.delivery.last.success.time", "watch"))
+                .isEqualTo(NOW.minusSeconds(45).getEpochSecond());
+        assertThat(gauge("baton.integration.delivery.last.success.time", "email"))
+                .isEqualTo(NOW.minusSeconds(30).getEpochSecond());
+        assertThat(gauge("baton.integration.delivery.last.success.time", "brief")).isZero();
+        assertThat(deliveryItems("watch", "pending")).isZero();
+        assertThat(deliveryItems("email", "failed")).isZero();
+        assertThat(gauge("baton.integration.delivery.oldest.pending.age", "watch")).isZero();
+        assertThat(gauge("baton.integration.delivery.expired.processing.items", "watch")).isZero();
+        assertThat(registry.get("baton.integration.metrics.refresh.success").gauge().value()).isEqualTo(1);
+    }
+
     @DisplayName("시즌 이름의 영구 실패는 일정 지표와 구분해 운영 점검에 노출한다")
     @Test
     void exposesSeasonMetadataFailure() {
