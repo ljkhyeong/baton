@@ -137,6 +137,41 @@ class WatchMonitorOutboxPersistenceTest {
         assertThat(payloads.get(1).eventId()).isEqualTo(changed.eventId());
     }
 
+    @DisplayName("자료의 첫 스냅샷 기록은 인덱스 틈을 공유하는 다른 자료의 트랜잭션을 기다리지 않는다")
+    @Test
+    void appendsFirstSnapshotWithoutWaitingForOtherResource() throws Exception {
+        CountDownLatch firstAppended = new CountDownLatch(1);
+        CountDownLatch allowFirstCommit = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<?> firstTransaction = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> {
+                        outboxPort.appendIfChanged(activeChange(
+                                UUID.randomUUID(),
+                                FIRST_RESOURCE_ID,
+                                "https://example.com/first"
+                        ));
+                        firstAppended.countDown();
+                        await(allowFirstCommit);
+                    }));
+            assertThat(firstAppended.await(5, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(executor.submit(() -> outboxPort.appendIfChanged(activeChange(
+                    UUID.randomUUID(),
+                    SECOND_RESOURCE_ID,
+                    "https://example.org/second"
+            ))).get(3, TimeUnit.SECONDS)).isTrue();
+
+            allowFirstCommit.countDown();
+            firstTransaction.get(5, TimeUnit.SECONDS);
+            assertThat(outboxCount()).isEqualTo(2L);
+        } finally {
+            allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     @DisplayName("원본 네임스페이스는 대소문자만 달라도 다른 환경으로 판정한다")
     @Test
     void comparesSourceNamespaceCaseSensitively() {

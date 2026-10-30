@@ -316,6 +316,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     }
 
     private Optional<Snapshot> findLatestSnapshot(UUID resourceId) {
+        // 첫 스냅샷까지 잠금 읽기를 하면 빈 범위의 gap 잠금이 인덱스 틈을 공유하는 다른 자료의 첫 INSERT를 막는다.
+        // 트랜잭션 스냅샷이 오래돼 첫 행을 놓쳐도 같은 목표를 한 번 더 기록할 뿐 변경을 잃지 않는다.
+        if (!hasSnapshot(resourceId)) {
+            return Optional.empty();
+        }
         return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
@@ -337,6 +342,14 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         resultSet.getString("target_url"),
                         resultSet.getString("rejected_target_url")
                 ),
+                resourceId.toString()
+        ));
+    }
+
+    private boolean hasSnapshot(UUID resourceId) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM watch_monitor_outbox WHERE resource_id = UUID_TO_BIN(?))",
+                Boolean.class,
                 resourceId.toString()
         ));
     }

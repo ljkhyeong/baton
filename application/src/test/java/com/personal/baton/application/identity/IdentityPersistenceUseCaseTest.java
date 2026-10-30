@@ -342,6 +342,46 @@ class IdentityPersistenceUseCaseTest {
                 .isNotEqualTo(firstClaim.getFirst().leaseToken());
     }
 
+    @DisplayName("첫 전달 요청은 인덱스 틈을 공유하는 다른 신원의 가입 트랜잭션을 기다리지 않는다")
+    @Test
+    void enqueuesFirstDeliveryWithoutWaitingForOtherIdentity() throws Exception {
+        CountDownLatch firstEnqueued = new CountDownLatch(1);
+        CountDownLatch allowFirstCommit = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> firstTransaction = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> {
+                        registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
+                                "first-gap@example.com",
+                                "첫 가입자"
+                        ));
+                        firstEnqueued.countDown();
+                        try {
+                            assertThat(allowFirstCommit.await(10, TimeUnit.SECONDS)).isTrue();
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(exception);
+                        }
+                    }));
+            assertThat(firstEnqueued.await(5, TimeUnit.SECONDS)).isTrue();
+
+            executor.submit(() -> registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
+                    "second-gap@example.com",
+                    "둘째 가입자"
+            ))).get(5, TimeUnit.SECONDS);
+
+            allowFirstCommit.countDown();
+            firstTransaction.get(5, TimeUnit.SECONDS);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM email_verification_delivery_outbox WHERE delivery_status = 'PENDING'",
+                    Integer.class
+            )).isEqualTo(2);
+        } finally {
+            allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     @DisplayName("JVM 시간대가 DB 연결과 달라도 전달 만료 시각을 그대로 읽어 페이로드를 복호화한다")
     @Test
     void decryptsClaimedPayloadWhenJvmTimeZoneDiffers() {

@@ -13,6 +13,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -391,6 +394,80 @@ class CalendarOutboxPersistenceTest {
                 "SELECT COUNT(*) FROM calendar_snapshot_outbox",
                 Long.class
         )).isZero();
+    }
+
+    @DisplayName("시즌의 첫 이름 기록은 인덱스 틈을 공유하는 다른 시즌의 트랜잭션을 기다리지 않는다")
+    @Test
+    void appendsFirstSeasonMetadataWithoutWaitingForOtherSeason() throws Exception {
+        String adjacentSeasonPrefix = UUID.randomUUID().toString().substring(0, 34);
+
+        assertSecondAppendDoesNotWait(
+                () -> outboxPort.appendSeasonMetadataIfChanged(
+                        UUID.fromString(adjacentSeasonPrefix + "01"), "첫 시즌", OCCURRED_AT
+                ),
+                () -> outboxPort.appendSeasonMetadataIfChanged(
+                        UUID.fromString(adjacentSeasonPrefix + "02"), "둘째 시즌", OCCURRED_AT
+                )
+        );
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM calendar_season_metadata_outbox",
+                Long.class
+        )).isEqualTo(2);
+    }
+
+    @DisplayName("원본의 첫 스냅샷 기록은 인덱스 틈을 공유하는 다른 원본의 트랜잭션을 기다리지 않는다")
+    @Test
+    void appendsFirstSnapshotWithoutWaitingForOtherSource() throws Exception {
+        String adjacentSourcePrefix = UUID.randomUUID().toString().substring(0, 34);
+        CalendarSnapshot.Time time = new CalendarSnapshot.AllDay(
+                LocalDate.of(2026, 8, 28),
+                LocalDate.of(2026, 8, 29)
+        );
+
+        assertSecondAppendDoesNotWait(
+                () -> outboxPort.appendIfChanged(
+                        snapshot(UUID.fromString(adjacentSourcePrefix + "01"), time)
+                ),
+                () -> outboxPort.appendIfChanged(
+                        snapshot(UUID.fromString(adjacentSourcePrefix + "02"), time)
+                )
+        );
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM calendar_snapshot_outbox",
+                Long.class
+        )).isEqualTo(2);
+    }
+
+    private void assertSecondAppendDoesNotWait(Runnable first, Runnable second) throws Exception {
+        CountDownLatch firstAppended = new CountDownLatch(1);
+        CountDownLatch allowFirstCommit = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var firstTransaction = executor.submit(() -> new TransactionTemplate(transactionManager)
+                    .executeWithoutResult(status -> {
+                        first.run();
+                        firstAppended.countDown();
+                        try {
+                            assertThat(allowFirstCommit.await(10, TimeUnit.SECONDS)).isTrue();
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(exception);
+                        }
+                    }));
+            assertThat(firstAppended.await(5, TimeUnit.SECONDS)).isTrue();
+
+            executor.submit(() -> new TransactionTemplate(transactionManager)
+                            .executeWithoutResult(status -> second.run()))
+                    .get(3, TimeUnit.SECONDS);
+
+            allowFirstCommit.countDown();
+            firstTransaction.get(5, TimeUnit.SECONDS);
+        } finally {
+            allowFirstCommit.countDown();
+            executor.shutdownNow();
+        }
     }
 
     private void captureCurrentRound() {

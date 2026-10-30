@@ -55,7 +55,10 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
                         );
                     }
 
-                    supersedePendingAfterIdentityLock(context.identityId(), enqueuedAt);
+                    // 대체할 전달이 없는 첫 요청까지 UPDATE하면 빈 범위의 gap 잠금이 다른 신원의 INSERT를 막는다.
+                    if (hasUnfinishedDelivery(context.identityId())) {
+                        supersedePendingAfterIdentityLock(context.identityId(), enqueuedAt);
+                    }
                     jdbcTemplate.update(
                             """
                             INSERT INTO email_verification_delivery_outbox (
@@ -329,6 +332,21 @@ public class JdbcEmailVerificationOutboxAdapter implements EmailVerificationOutb
             throw new IllegalArgumentException("이메일 인증 identity를 찾을 수 없습니다");
         }
         return accountId;
+    }
+
+    private boolean hasUnfinishedDelivery(UUID identityId) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM email_verification_delivery_outbox
+                    WHERE identity_id = UUID_TO_BIN(?)
+                      AND delivery_status IN ('PENDING', 'PROCESSING')
+                )
+                """,
+                Boolean.class,
+                identityId.toString()
+        ));
     }
 
     private void supersedePendingAfterIdentityLock(UUID identityId, Instant supersededAt) {
