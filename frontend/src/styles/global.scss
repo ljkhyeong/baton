@@ -652,9 +652,11 @@ a {
 
 .workspace-switcher {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   min-width: 0;
+  // 긴 팀·시즌 이름이 주 메뉴를 다음 줄로 밀지 않도록 폭을 제한하고 말줄임한다.
+  max-width: min(42vw, 520px);
   min-height: 44px;
   padding: 0 8px;
   border: 0;
@@ -666,8 +668,10 @@ a {
 }
 
 .workspace-switcher:hover { background: var(--nav); }
-.workspace-switcher strong { font-size: 15px; font-weight: 650; white-space: nowrap; }
-.workspace-switcher small { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.workspace-switcher strong,
+.workspace-switcher small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-switcher strong { font-size: 16px; font-weight: 650; }
+.workspace-switcher small { flex-shrink: 3; color: var(--muted); font-size: 14px; }
 .workspace-switcher > svg { flex: 0 0 auto; align-self: center; color: var(--muted); transform: rotate(90deg); }
 
 .workspace-symbol {
@@ -690,7 +694,7 @@ a {
   border-radius: var(--radius);
   color: var(--muted);
   background: transparent;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -2768,8 +2772,9 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
     cursor: pointer;
   }
   .mobile-team-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
-  .mobile-team strong { font-size: 14px; }
-  .mobile-team small { color: var(--muted); font-size: 12px; }
+  // 긴 팀 이름은 두 줄, 시즌 이름은 한 줄까지 보여 주고 전체 이름은 버튼 이름으로 전달한다.
+  .mobile-team strong { display: -webkit-box; overflow: hidden; font-size: 14px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .mobile-team small { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-team > svg { flex-shrink: 0; }
   .mobile-workspace-actions { grid-area: actions; display: flex; justify-content: flex-end; gap: 2px; }
   .mobile-share,
