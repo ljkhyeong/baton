@@ -40,8 +40,14 @@ export function NotificationInbox({ scope, workspace, onOpenRound, onOpenHandoff
   useEffect(() => {
     void client.invalidateQueries({ queryKey: ['teams', scope.teamId, 'seasons', scope.seasonId, 'notifications', scope.accountId] })
   }, [client, scope.teamId, scope.seasonId, scope.accountId, workspace])
+  // 읽음 요청 전이나 진행 중에 시작한 조회의 늦은 응답이 읽음 결과를 덮지 않게 한다.
+  const cancelInboxRead = () => client.cancelQueries({ queryKey: key, exact: true })
   const read = useMutation({ mutationFn: (id: string) => readNotification(scope, id),
-    onSuccess: data => client.setQueryData(key, data),
+    onMutate: cancelInboxRead,
+    onSuccess: async data => {
+      await cancelInboxRead()
+      client.setQueryData(key, data)
+    },
     onError: () => { void client.invalidateQueries({ queryKey: key, exact: true }) } })
   const notifications = inbox.data?.notifications ?? []
   const unread = notifications.filter(item => !item.read).length

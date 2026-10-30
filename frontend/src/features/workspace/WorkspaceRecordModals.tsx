@@ -241,6 +241,18 @@ function LockedRoleSelect({ roles, lockedRoleIds, value, onChange, lockedMessage
   )
 }
 
+function isLinkableUrl(value: string) {
+  try {
+    const parsed = new URL(value)
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:')
+      && Boolean(parsed.hostname)
+      && !parsed.username
+      && !parsed.password
+  } catch {
+    return false
+  }
+}
+
 export function RoleResourceModal({
   draftScope,
   roles,
@@ -285,12 +297,7 @@ export function RoleResourceModal({
       return
     }
     const normalizedUrl = url.trim()
-    const parsed = URL.parse(normalizedUrl)
-    if (!parsed
-      || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-      || !parsed.hostname
-      || parsed.username
-      || parsed.password) {
+    if (!isLinkableUrl(normalizedUrl)) {
       setUrlValidationMessage('http:// 또는 https://로 시작하는 주소를 입력하세요. 아이디와 비밀번호가 포함된 주소는 사용할 수 없습니다.')
       return
     }

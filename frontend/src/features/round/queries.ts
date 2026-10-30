@@ -24,7 +24,6 @@ export function useCurrentRoundRoomMappings(
     queryFn: ({ signal }) => getCurrentRoundRoomMappings(scope, signal),
     enabled: enabled && Boolean(
       accountId
-      && scope.accessKey
       && scope.seasonId
       && scope.teamId,
     ),

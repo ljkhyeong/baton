@@ -2,6 +2,7 @@ import {
   clearAllRoundRoomEntryContexts,
   forgetRoundRoomEntryContextsForTeam,
 } from '@/features/round/storage'
+import { clearAllPendingAccessKeyRotations } from '@/features/workspace/pendingAccessKeyChange'
 import {
   clearAllWorkspaceCapabilitiesAndRecents,
   forgetWorkspaceCapabilityAndRecents,
@@ -24,5 +25,6 @@ export function forgetWorkspaceDeviceState(
 export function clearAllWorkspaceDeviceState() {
   const capabilitiesRemoved = clearAllWorkspaceCapabilitiesAndRecents()
   const roundContextsRemoved = clearAllRoundRoomEntryContexts()
-  return capabilitiesRemoved && roundContextsRemoved
+  const pendingRotationsRemoved = clearAllPendingAccessKeyRotations()
+  return capabilitiesRemoved && roundContextsRemoved && pendingRotationsRemoved
 }

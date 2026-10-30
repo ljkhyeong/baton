@@ -23,10 +23,13 @@ export function safeAuthReturnTo(
     || candidate.startsWith('//')
     || candidate.includes('\\')) return null
 
-  const parsed = URL.parse(candidate, 'https://baton.invalid')
-  if (!parsed
-    || parsed.origin !== 'https://baton.invalid'
-    || parsed.hash) return null
+  let parsed: URL
+  try {
+    parsed = new URL(candidate, 'https://baton.invalid')
+  } catch {
+    return null
+  }
+  if (parsed.origin !== 'https://baton.invalid' || parsed.hash) return null
   if (['/account', '/join', '/my-teams'].includes(parsed.pathname)) return parsed.search ? null : parsed.pathname as AuthReturnTo
   if (ROUND_ROOM_ROUTE_PATTERN.test(parsed.pathname)) return parsed.search ? null : parsed.pathname as AuthReturnTo
   if (!WORKSPACE_ROUTE_PATTERN.test(parsed.pathname)) return null

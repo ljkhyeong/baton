@@ -606,7 +606,7 @@ a {
 .remote-state > strong,
 .remote-state > h1 { margin: 15px 0 0; font-size: 20px; letter-spacing: -.025em; }
 .remote-state > p { max-width: 340px; margin: 10px 0 22px; color: var(--muted); font-size: 13px; line-height: 1.7; }
-.remote-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.remote-state-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
 .remote-state a:not([class]) { color: var(--ink); text-underline-offset: 3px; }
 
 :is(a.primary-button, a.secondary-button, a.danger-button) { text-decoration: none; }

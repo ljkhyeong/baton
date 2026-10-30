@@ -1198,6 +1198,39 @@ test('@memory @records @responsive 결정 Markdown은 명시적으로 전환하�
 })
 
 
+test('@memory URL.parse가 없는 브라우저에서도 Markdown 링크와 자료 주소를 검증한다', async ({ page }, testInfo) => {
+  await page.addInitScript(() => Reflect.deleteProperty(URL, 'parse'))
+  const projection = makeProjection()
+  projection.decisions[0]!.textFormat = 'MARKDOWN'
+  projection.decisions[0]!.reason = '[공식 근거](https://example.com/guide)\n\n[실행 링크](javascript:alert%281%29)\n\n[상대 경로](/relative)'
+  const api = await installApi(page, projection)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '기록' }).click()
+  const entry = page.locator(`[data-decision-id="${DECISION_ID}"]`)
+  await expect(entry.getByRole('link', { name: '공식 근거' })).toHaveAttribute('href', 'https://example.com/guide')
+  await expect(entry.getByText('실행 링크', { exact: true })).toBeVisible()
+  await expect(entry.getByRole('link', { name: '실행 링크' })).toHaveCount(0)
+  await expect(entry.getByRole('link', { name: '상대 경로' })).toHaveCount(0)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
+  await page.getByLabel('선택한 역할 상세').getByRole('button', { name: '자료 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '참고 자료 추가' })
+  await dialog.getByLabel('역할').selectOption(ROLE_ID)
+  await dialog.getByLabel('자료 이름').fill('문제 선정 기준 문서')
+  await dialog.getByLabel('링크').fill('주소가 아닌 값')
+  await dialog.getByRole('button', { name: '자료 추가' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('http:// 또는 https://로 시작하는 주소를 입력하세요.')
+  await dialog.getByLabel('링크').fill('https://user:secret@example.com/guide')
+  await dialog.getByRole('button', { name: '자료 추가' }).click()
+  await expect(dialog.getByRole('alert')).toContainText('아이디와 비밀번호가 포함된 주소는 사용할 수 없습니다.')
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`)).toHaveLength(0)
+  await dialog.getByLabel('링크').fill('https://docs.example.com/problem-selection')
+  await dialog.getByRole('button', { name: '자료 추가' }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(recordedCalls(api, 'POST', `${SCOPE_PATH}/role-resources`)).toHaveLength(1)
+})
+
 test('@memory @responsive 자료 확인은 로그인한 구성원의 기록과 변경 후 재확인을 표시한다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.resources.push({ id: CREATED_ROLE_RESOURCE_ID, roleId: ROLE_ID, title: '운영 안내',
