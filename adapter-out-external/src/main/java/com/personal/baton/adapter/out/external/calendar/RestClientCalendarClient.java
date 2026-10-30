@@ -257,7 +257,8 @@ public final class RestClientCalendarClient implements
         } catch (ResourceAccessException exception) {
             return DeliveryResult.retryable("CAL_NETWORK_FAILURE");
         } catch (RestClientException exception) {
-            return DeliveryResult.retryable("CAL_CLIENT_FAILURE");
+            return DeliveryResult.retryable(exception.getMostSpecificCause() instanceof IOException
+                    ? "CAL_NETWORK_FAILURE" : "CAL_CLIENT_FAILURE");
         }
     }
 
@@ -300,6 +301,11 @@ public final class RestClientCalendarClient implements
             CalendarErrorResponse body = response.bodyTo(CalendarErrorResponse.class);
             if (body != null && body.code() != null && !body.code().isBlank()) {
                 return body.code();
+            }
+        } catch (RestClientException exception) {
+            // 본문을 끝까지 받지 못하면 코드를 판단할 수 없으므로 호출부가 연결 실패로 분류한다.
+            if (exception.getMostSpecificCause() instanceof IOException) {
+                throw exception;
             }
         } catch (RuntimeException ignored) {
             // 안정적인 오류 코드가 없으면 HTTP 상태만 보존한다.

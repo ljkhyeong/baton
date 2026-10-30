@@ -16,7 +16,11 @@ import com.personal.baton.application.watch.WatchMonitorDelivery;
 import com.personal.baton.application.watch.WatchMonitoringState;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient.Outcome;
 import com.personal.baton.application.watch.port.out.WatchMonitorClient.SynchronizationResult;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -30,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -254,6 +259,47 @@ class RestClientWatchMonitorClientTest {
 
         assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
         assertThat(result.code()).isEqualTo("WATCH_NETWORK_FAILURE");
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @EnumSource(names = {"CONFLICT", "UNPROCESSABLE_CONTENT"})
+    @DisplayName("오류 코드를 정하는 본문을 받다가 끊기면 영구 실패로 굳히지 않고 재시도한다")
+    void retryWhenProblemBodyIsInterrupted(HttpStatus status) {
+        server.expect(requestTo(BASE_URL + "/api/v1/resource-monitors/" + ENCODED_RESOURCE_REFERENCE))
+                .andRespond(request -> {
+                    InputStream body = new SequenceInputStream(
+                            new ByteArrayInputStream("{\"code\":".getBytes(StandardCharsets.UTF_8)),
+                            new InputStream() {
+                                @Override
+                                public int read() throws IOException {
+                                    throw new SocketTimeoutException("응답 본문 수신 시간 초과");
+                                }
+                            }
+                    );
+                    MockClientHttpResponse response = new MockClientHttpResponse(body, status);
+                    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+                    return response;
+                });
+
+        SynchronizationResult result = client.synchronize(activeDelivery());
+
+        assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+        assertThat(result.code()).isEqualTo("WATCH_NETWORK_FAILURE");
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @EnumSource(names = {"CONFLICT", "UNPROCESSABLE_CONTENT"})
+    @DisplayName("끝까지 받은 오류 본문을 해석할 수 없으면 HTTP 상태만 남긴 영구 실패로 분류한다")
+    void keepPermanentFailureForMalformedProblemBody(HttpStatus status) {
+        server.expect(requestTo(BASE_URL + "/api/v1/resource-monitors/" + ENCODED_RESOURCE_REFERENCE))
+                .andRespond(withStatus(status).contentType(MediaType.APPLICATION_JSON).body("{"));
+
+        SynchronizationResult result = client.synchronize(activeDelivery());
+
+        assertThat(result.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(result.code()).isEqualTo("HTTP_" + status.value());
         server.verify();
     }
 

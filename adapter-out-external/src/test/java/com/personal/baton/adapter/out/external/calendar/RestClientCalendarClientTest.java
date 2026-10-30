@@ -14,9 +14,12 @@ import com.personal.baton.application.calendar.CalendarSeasonMetadata;
 import com.personal.baton.application.calendar.CalendarSnapshot;
 import com.personal.baton.application.calendar.CalendarRecoveryManifest;
 import com.personal.baton.application.delivery.DeliveryResult.Outcome;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -237,6 +241,46 @@ class RestClientCalendarClientTest {
 
         assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
         assertThat(result.code()).isEqualTo("CAL_NETWORK_FAILURE");
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @EnumSource(names = {"CONFLICT", "UNPROCESSABLE_CONTENT"})
+    @DisplayName("CAL 오류 본문을 읽는 중 끊기면 영구 실패로 굳히지 않고 같은 스냅샷을 재시도한다")
+    void retriesWhenErrorResponseBodyIsInterrupted(HttpStatus status) {
+        server.expect(requestTo(SNAPSHOT_URL)).andRespond(request -> {
+            InputStream body = new SequenceInputStream(
+                    new ByteArrayInputStream("{\"code\":".getBytes(StandardCharsets.UTF_8)),
+                    new InputStream() {
+                        @Override
+                        public int read() throws IOException {
+                            throw new SocketTimeoutException("응답 본문 수신 시간 초과");
+                        }
+                    }
+            );
+            var response = new MockClientHttpResponse(body, status);
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            return response;
+        });
+
+        var result = client.deliver(snapshot());
+
+        assertThat(result.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+        assertThat(result.code()).isEqualTo("CAL_NETWORK_FAILURE");
+        server.verify();
+    }
+
+    @ParameterizedTest
+    @EnumSource(names = {"CONFLICT", "UNPROCESSABLE_CONTENT"})
+    @DisplayName("끝까지 받은 CAL 오류 본문을 해석할 수 없으면 HTTP 상태만 남긴 영구 실패로 분류한다")
+    void keepsPermanentFailureForMalformedErrorBody(HttpStatus status) {
+        server.expect(requestTo(SNAPSHOT_URL))
+                .andRespond(withStatus(status).contentType(MediaType.APPLICATION_JSON).body("{"));
+
+        var result = client.deliver(snapshot());
+
+        assertThat(result.outcome()).isEqualTo(Outcome.PERMANENT_FAILURE);
+        assertThat(result.code()).isEqualTo("HTTP_" + status.value());
         server.verify();
     }
 
