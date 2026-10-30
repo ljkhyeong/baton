@@ -503,6 +503,7 @@ a {
 .account-security-card header h3 { margin: 6px 0 7px; font-size: 16px; }
 .account-security-card header p,
 .account-security-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; word-break: keep-all; }
+.account-security-note a { color: var(--ink); font-weight: 700; }
 .account-session-card { border-color: var(--warning-border); }
 .account-session-card .danger-button { align-self: flex-start; }
 
@@ -1403,6 +1404,7 @@ a {
 .routine-owner small { color: var(--muted); font-size: 12px; }
 .routine-copy time { color: var(--muted); font-size: 12px; }
 .routine-schedule { flex-shrink: 0; }
+.phase-content .routine-schedule { width: 156px; }
 .routine-row.overdue .routine-copy time { color: var(--warning); font-weight: 700; }
 .routine-row.completed .routine-copy strong { color: var(--muted); text-decoration: line-through; }
 
@@ -1721,6 +1723,7 @@ a {
 }
 
 dialog.inspector {
+  max-width: none;
   margin: 0 0 0 auto;
   border: 0;
   color: inherit;
@@ -1814,11 +1817,15 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 @keyframes backdrop-in { from { opacity: 0; } }
 
 .modal {
+  --modal-pad-y: 34px;
+  --modal-pad-x: 34px;
   position: relative;
   overflow-y: auto;
   width: min(100%, 520px);
   max-height: min(86vh, 760px);
-  padding: 34px;
+  padding: var(--modal-pad-y) var(--modal-pad-x);
+  // 하단에 고정한 버튼 영역이 초점 이동한 입력칸을 가리지 않게 한다.
+  scroll-padding-bottom: 96px;
   border-radius: var(--radius-lg);
   background: var(--paper);
   box-shadow: 0 24px 80px rgba(11, 17, 14, .22);
@@ -2101,6 +2108,18 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 .form-error { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); color: var(--warning); background: var(--warning-soft); font-size: 12px; line-height: 1.55; }
 .form-retry-notice { margin: 0; padding: 10px 12px; border-left: 3px solid var(--success); color: var(--ink); background: var(--success-soft); font-size: 12px; line-height: 1.55; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 5px; }
+// 입력이 길어 대화상자가 스크롤돼도 저장·취소 버튼을 아래에 고정한다.
+.modal .form-actions {
+  position: sticky;
+  z-index: 1;
+  bottom: calc(var(--modal-pad-y) * -1);
+  // 초안 안내(order: 99)보다 뒤에 두어 항상 마지막 줄에 놓는다.
+  order: 100;
+  margin: 0 calc(var(--modal-pad-x) * -1) calc(var(--modal-pad-y) * -1);
+  padding: 16px var(--modal-pad-x) 24px;
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+}
 .record-draft { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; order: 99; color: var(--faint); }
 .record-draft.has-draft { order: 0; padding: 12px 14px; border-radius: var(--radius); color: var(--ink); background: var(--info-soft); }
 .record-draft small, .record-draft p { width: 100%; margin: 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -2169,8 +2188,8 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 }
 
 .account-membership-warning { color: var(--warning) !important; }
-.account-membership-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.account-membership-error p { margin: 0; color: var(--warning); font-size: 12px; line-height: 1.55; }
+.account-membership-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.account-membership-error p { flex: 1 1 220px; margin: 0; color: var(--warning); font-size: 12px; line-height: 1.55; }
 .account-membership-error button { flex: 0 0 auto; }
 
 .member-management {
@@ -2380,11 +2399,11 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
 .toast-error { background: var(--warning); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 
+// 위쪽 경계는 기록 탭의 밑줄이 맡는다.
 .record-search-panel {
   display: grid;
   gap: 16px;
   border: 0;
-  border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
   background: var(--paper);
 }
@@ -2813,7 +2832,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .page-header h1 { line-height: 1.35; }
   .page-action { width: 100%; }
   .page-action .primary-button { width: 100%; }
-  .record-search-panel { padding: 16px 0; }
+  .record-search-panel { padding-bottom: 16px; }
   .record-search-filters { grid-template-columns: 1fr 1fr; }
   .record-search-footer,
   .record-search-summary { align-items: flex-start; flex-direction: column; }
@@ -2860,6 +2879,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .routine-row { grid-template-columns: 44px minmax(0, 1fr) auto; align-items: start; gap: 6px; min-height: 84px; }
   .routine-owner { display: none; }
   .routine-copy { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .phase-content .routine-schedule { width: auto; }
   .check-button { position: relative; width: 44px; min-height: 44px; border: 0; background: transparent; }
   .check-button::before { position: absolute; inset: 11px; border: 1px solid var(--rule-strong); border-radius: var(--radius); content: ""; }
   .check-button > svg { position: relative; z-index: 1; }
@@ -2888,7 +2908,7 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   .inspector { top: auto; left: 0; width: 100%; border-top: 1px solid var(--rule); border-left: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: 0 -18px 60px rgba(17, 23, 20, .18); transform: translateY(105%); }
   dialog.inspector { height: auto; max-height: 84vh; margin: auto 0 0; }
   .inspector.is-open { transform: translateY(0); }
-  .modal { max-height: 92vh; padding: 28px 22px; }
+  .modal { --modal-pad-y: 28px; --modal-pad-x: 22px; max-height: 92vh; }
   .role-handoff-form .date-grid { grid-template-columns: 1fr; }
   .season-modal { align-self: end; width: calc(100% + 40px); max-height: 90vh; margin: 0 -20px -20px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
   .season-ended-banner { align-items: stretch; flex-direction: column; }
@@ -2912,8 +2932,8 @@ a.round-room-text-action { display: inline-flex; align-items: center; text-align
   }
   .member-management-actions button { min-height: 44px; }
   .form-grid { grid-template-columns: 1fr; }
-  .form-actions { flex-direction: column-reverse; }
-  .form-actions button { width: 100%; }
+  // 고정된 버튼 영역이 화면을 덜 차지하도록 한 줄에 두고 마지막 주 동작을 넓힌다.
+  .form-actions > button:last-child { flex: 1; }
   .toast { right: 16px; bottom: 76px; left: 16px; justify-content: center; }
   .summary-jump { min-height: 44px; margin: -12px 0; }
   .mobile-topbar { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand team actions"; gap: 8px; padding: 8px 15px; }
