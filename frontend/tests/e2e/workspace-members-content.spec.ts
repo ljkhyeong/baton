@@ -1240,3 +1240,24 @@ test('@operations 생성 요청이 충돌해도 창과 입력을 유지하고 �
   expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
 })
+
+test('@operations 오프라인에서 제출해도 멈추지 않고 네트워크 오류를 보여 준 뒤 창을 닫을 수 있다', async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '오프라인 제출 경로는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await openSharedWorkspace(page)
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await dialog.getByLabel('역할 이름').fill('오프라인에서 제출한 역할')
+  await dialog.getByLabel('역할 목적').fill('연결이 끊겨도 대화상자가 멈추지 않습니다.')
+
+  await context.setOffline(true)
+  // 가로챈 요청은 오프라인에서도 응답을 받으므로 실제 연결 실패를 직접 만든다.
+  await page.route('**/api/v1/**', (route) => route.abort('internetdisconnected'))
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+
+  await expect(dialog.getByRole('alert')).toContainText('서버에 연결하지 못해 요청 결과를 확인할 수 없습니다.')
+  await expect(dialog.getByRole('alert')).toContainText('중복으로 만들지 않고 저장 여부를 확인합니다.')
+  await dialog.getByRole('button', { name: '취소' }).click()
+  await expect(dialog).toHaveCount(0)
+})
