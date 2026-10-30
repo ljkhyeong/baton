@@ -937,6 +937,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               onConfigureRoundSchedule={seasonLifecycleFlow.actions.openRoundSchedule}
               busyRoundIds={busyRoundIds}
               busyRoutineIds={busyRoutineIds}
+              canAdminister={canAdminister}
               changesDisabled={contentChangesDisabled}
             />
           )}

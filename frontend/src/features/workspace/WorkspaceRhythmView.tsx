@@ -43,6 +43,7 @@ export function RhythmView({
   onConfigureRoundSchedule,
   busyRoundIds,
   busyRoutineIds,
+  canAdminister,
   changesDisabled,
 }: {
   season: Season
@@ -67,6 +68,7 @@ export function RhythmView({
   onConfigureRoundSchedule: () => void
   busyRoundIds: ReadonlySet<string>
   busyRoutineIds: ReadonlySet<string>
+  canAdminister: boolean
   changesDisabled: boolean
 }) {
   const phases: RoutinePhase[] = ['BEFORE', 'DURING', 'AFTER']
@@ -108,11 +110,12 @@ export function RhythmView({
                 : ` · 다음 예정일 ${formatLocalDate(season.roundSchedule.nextOccurrenceDate)}`
               : ''}
           </p>
+          {!canAdminister && <p>설정은 관리자만 바꿀 수 있습니다.</p>}
         </div>
         <button
           type="button"
           className="secondary-button"
-          disabled={changesDisabled}
+          disabled={changesDisabled || !canAdminister}
           onClick={onConfigureRoundSchedule}
         >
           {season.roundSchedule ? '회차 자동 생성 설정' : '설정하기'}

@@ -258,7 +258,7 @@ test('@operations 관리자의 인수인계 취소는 권한 변경 없이 이�
   await expect(dialog).not.toContainText('접근 없음 →')
 })
 
-test('@operations 관리자가 아닌 구성원은 시즌 목록을 보고 전환하지만 시즌 관리 동작은 비활성으로 본다', async ({ page }) => {
+test('@operations 관리자가 아닌 구성원은 시즌 목록을 보고 전환하지만 시즌 관리 동작은 비활성으로 본다', async ({ page }, testInfo) => {
   const projection = makeProjection()
   projection.team = { ...projection.team, accountAccessEnabled: true, permission: 'MEMBER' }
   await installApi(page, projection)
@@ -271,4 +271,9 @@ test('@operations 관리자가 아닌 구성원은 시즌 목록을 보고 전�
   await expect(dialog.getByRole('button', { name: '시즌 종료' })).toBeDisabled()
   await expect(dialog.getByRole('button', { name: '다음 시즌 시작' })).toBeDisabled()
   await expect(dialog).toContainText('관리자만 할 수 있습니다.')
+  await dialog.getByRole('button', { name: '닫기' }).click()
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '일정' }).click()
+  await expect(page.locator('.round-schedule-card')).toContainText('설정은 관리자만 바꿀 수 있습니다.')
+  await expect(page.getByRole('button', { name: '설정하기' })).toBeDisabled()
 })
