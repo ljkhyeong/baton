@@ -211,10 +211,13 @@ BATON_API_PROXY_TARGET=http://127.0.0.1:18080 npm run dev
 모든 구성원이 키를 잃었다면 운영자가 아래 API로 기존 키를 폐기하고 새 키를 발급한다. 응답을 받지 못했을 때도 같은 `Idempotency-Key`로 재시도한다. 상세 조건은 [API 계약](docs/PRD/0002_api-contract/spec.md)을 따른다.
 
 ```bash
-curl -X POST \
-  "https://baton.example.com/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover" \
-  -H "Idempotency-Key: <32~200자의 고엔트로피 값>" \
-  -H "X-Baton-Recovery-Key: <프로덕션 복구 키>"
+# 복구 키가 프로세스 인자와 셸 기록에 남지 않도록 입력받아 curl 설정(표준 입력)으로 넘긴다.
+IFS= read -r -s -p '프로덕션 복구 키: ' recovery_key; printf '\n'
+printf 'header = "X-Baton-Recovery-Key: %s"\n' "$recovery_key" | curl -q --config - \
+  --request POST \
+  --header "Idempotency-Key: <32~200자의 고엔트로피 값>" \
+  "https://baton.example.com/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover"
+unset recovery_key
 ```
 
 ## 첫 파일럿 운영 배포
@@ -383,10 +386,13 @@ cat /absolute/path/to/baton-backup-state/last-restore-recovery-targets.tsv
 # 각 줄의 팀 ID와 시즌 ID에 새 멱등 키를 사용해 운영자 복구 API를 호출한다.
 # 응답을 확인할 때까지 같은 restore_idempotency_key를 보관하고, 다음 팀에는 새 값을 만든다.
 restore_idempotency_key="$(openssl rand -hex 32)"
-curl -X POST \
-  "https://<BATON_HOST>/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover" \
-  -H "Idempotency-Key: $restore_idempotency_key" \
-  -H "X-Baton-Recovery-Key: <프로덕션 복구 키>"
+# 복구 키가 프로세스 인자와 셸 기록에 남지 않도록 입력받아 curl 설정(표준 입력)으로 넘긴다.
+IFS= read -r -s -p '프로덕션 복구 키: ' recovery_key; printf '\n'
+printf 'header = "X-Baton-Recovery-Key: %s"\n' "$recovery_key" | curl -q --config - \
+  --request POST \
+  --header "Idempotency-Key: $restore_idempotency_key" \
+  "https://<BATON_HOST>/api/v1/teams/<team-id>/seasons/<season-id>/access-key/recover"
+unset recovery_key
 # 응답의 accessKey로 다음 형식의 새 링크를 만들고 구성원에게 다시 전달한다.
 # https://<BATON_HOST>/teams/<team-id>/seasons/<season-id>#accessKey=<new-access-key>
 # 기존 링크의 403과 새 링크의 조회·변경을 확인한 뒤 새 보안 상태를 백업한다.
