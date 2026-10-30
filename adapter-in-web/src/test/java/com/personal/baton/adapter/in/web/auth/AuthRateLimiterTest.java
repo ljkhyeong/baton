@@ -1,5 +1,6 @@
 package com.personal.baton.adapter.in.web.auth;
 
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,29 @@ class AuthRateLimiterTest {
                 .satisfies(exception -> assertThat(
                         ((AuthRateLimitExceededException) exception).retryAfterSeconds()
                 ).isBetween(1L, 60L));
+    }
+
+    @DisplayName("인증 필터가 잘라 내는 앞뒤 제어 문자는 같은 계정 축으로 묶는다")
+    @Test
+    void limitsLoginByEmailTrimmedLikeAuthenticationFilter() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+        List<String> variants = List.of(
+                "\u0001member@example.com",
+                "member@example.com\u001f",
+                "\u0001\u2003Member@Example.COM\u2003\u0001"
+        );
+
+        for (int attempt = 0; attempt < 20; attempt += 1) {
+            limiter.checkLogin(
+                    "198.51.100." + (attempt + 1),
+                    variants.get(attempt % variants.size())
+            );
+        }
+
+        assertThatThrownBy(() -> limiter.checkLogin(
+                "203.0.113.1",
+                "member@example.com"
+        )).isInstanceOf(AuthRateLimitExceededException.class);
     }
 
     @DisplayName("성공한 로그인은 유한한 계정 실패 예산을 즉시 복구한다")

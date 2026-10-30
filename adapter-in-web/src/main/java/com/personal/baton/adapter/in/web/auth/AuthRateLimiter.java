@@ -104,8 +104,10 @@ public final class AuthRateLimiter {
         }
     }
 
+    // UsernamePasswordAuthenticationFilter의 trim()과 도메인 정규화의 strip()·소문자 변환 순서를 따른다.
     private String normalizeEmail(String email) {
         return Objects.requireNonNullElse(email, "")
+                .trim()
                 .strip()
                 .toLowerCase(Locale.ROOT);
     }
