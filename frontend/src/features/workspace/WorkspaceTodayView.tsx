@@ -145,22 +145,26 @@ export function TodayView({
           })}
           {mine.unfinished.length ? (
             <div className="today-task-list" role="list">
-              {mine.unfinished.map(({ round, execution }) => (
-                <div key={execution.id} role="listitem">
-                  <RoutineRow
-                    routine={routines.find((item) => item.id === execution.routineId)}
-                    execution={execution}
-                    role={roles.find((item) => item.id === execution.ownerRoleId)}
-                    members={members}
-                    timeZone={season.timeZone}
-                    onToggle={onToggleRoutine}
-                    onSelectRole={onSelectRole}
-                    onEdit={onEditRoutine}
-                    pending={changesDisabled || isRoundBusy(round.id)}
-                    operationPending={isRoundBusy(round.id)}
-                  />
-                </div>
-              ))}
+              {mine.unfinished.map(({ round, execution }) => {
+                const role = roles.find((item) => item.id === execution.ownerRoleId)
+                return (
+                  <div key={execution.id} role="listitem">
+                    <RoutineRow
+                      routine={routines.find((item) => item.id === execution.routineId)}
+                      execution={execution}
+                      role={role}
+                      context={role ? `${round.name} · ${role.name}` : round.name}
+                      members={members}
+                      timeZone={season.timeZone}
+                      onToggle={onToggleRoutine}
+                      onSelectRole={onSelectRole}
+                      onEdit={onEditRoutine}
+                      pending={changesDisabled || isRoundBusy(round.id)}
+                      operationPending={isRoundBusy(round.id)}
+                    />
+                  </div>
+                )
+              })}
             </div>
           ) : <p className="my-work-empty">남은 담당 업무가 없습니다.</p>}
         </section>

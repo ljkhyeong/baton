@@ -1082,6 +1082,10 @@ a {
 .today-list-columns { display: grid; grid-template-columns: minmax(0, 1fr) 220px 140px; gap: 10px; padding: 10px 12px 10px 50px; border-bottom: 1px solid var(--rule); background: var(--nav); color: var(--muted); font-size: 12px; }
 .today-page .routine-owner strong { display: none; }
 .today-page .routine-owner small { color: var(--ink); font-size: 13px; }
+.routine-context { color: var(--muted); font-size: 12px; }
+// 내 할 일은 모두 내 업무이므로 담당자 열 대신 업무명 아래에 회차와 역할을 표시한다.
+.today-page .my-work .routine-owner { display: none; }
+.today-page .my-work .routine-copy { grid-column: 2 / -1; }
 
 .plain-section {
   min-width: 0;
