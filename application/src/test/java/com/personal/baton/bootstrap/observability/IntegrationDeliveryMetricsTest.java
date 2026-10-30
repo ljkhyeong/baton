@@ -142,6 +142,24 @@ class IntegrationDeliveryMetricsTest {
         assertThat(registry.get("baton.integration.metrics.refresh.success").gauge().value()).isEqualTo(1);
     }
 
+    @DisplayName("보상까지 기록한 WATCH 대상 거절은 원시 실패 수에만 남기고 조치 대상에서 제외한다")
+    @Test
+    void excludesCompensatedWatchTargetRejectionFromActionableFailures() {
+        insertWatch("FAILED", NOW.minusSeconds(60));
+        jdbcTemplate.update("UPDATE watch_monitor_outbox SET last_error_code = 'INVALID_TARGET_URL'");
+
+        metrics.refresh();
+
+        assertThat(deliveryItems("watch", "failed")).isEqualTo(1);
+        assertThat(actionableFailedItems("watch")).isZero();
+
+        insertWatch("FAILED", NOW.minusSeconds(30));
+        metrics.refresh();
+
+        assertThat(deliveryItems("watch", "failed")).isEqualTo(2);
+        assertThat(actionableFailedItems("watch")).isEqualTo(1);
+    }
+
     @DisplayName("시즌 이름의 영구 실패는 일정 지표와 구분해 운영 점검에 노출한다")
     @Test
     void exposesSeasonMetadataFailure() {
