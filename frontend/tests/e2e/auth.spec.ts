@@ -1283,6 +1283,17 @@ for (const { title, endSession } of [
   })
 }
 
+test('@smoke URL.parse가 없는 브라우저에서도 로그인 복귀 경로를 검증한다', async ({ page }) => {
+  await page.addInitScript(() => Reflect.deleteProperty(URL, 'parse'))
+  await installAuthApi(page)
+  await page.goto(`/login?returnTo=${encodeURIComponent(`${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`)}`)
+  await loginWithEmail(page)
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}?brief=8e448211-66ae-44ab-9888-c4960648c221`)
+
+  await page.goto(`/login?returnTo=${encodeURIComponent('//evil.example/steal')}`)
+  await expect(page.getByRole('link', { name: '스터디로 이동' })).toHaveAttribute('href', '/')
+})
+
 // 계정 전환 팀은 로그인 전까지 저장된 공유 키도 거부한다.
 async function installAccountOnlyWorkspace(page: Page, sessionState: { authenticated: boolean }) {
   const projection = makeProjection()
