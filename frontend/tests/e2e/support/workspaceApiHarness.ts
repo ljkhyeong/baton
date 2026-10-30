@@ -199,6 +199,8 @@ export type ApiHarness = {
   releaseContentCreation: () => void
   makeWorkspaceGetsUnavailable: () => void
   restoreWorkspaceGets: () => void
+  endSeasonFromAnotherDevice: () => void
+  changeTeamPermissionFromAnotherDevice: (permission: WorkspaceProjection['team']['permission']) => void
   holdNextRoleUpdate: () => void
   releaseRoleUpdate: () => void
   conflictNextRoleUpdate: (role: Role) => void
@@ -584,6 +586,13 @@ export async function installApi(page: Page, initialProjection = makeProjection(
       : null
     if (contentOperation && !contentIdempotencyKey) {
       return error(400, 'INVALID_INPUT', 'Idempotency-Key가 필요합니다.')
+    }
+    // 서버처럼 권한과 시즌 상태를 확인한 뒤에 같은 키의 결과를 돌려준다.
+    if (contentOperation && projection.team.permission === 'VIEWER') {
+      return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
+    }
+    if (contentOperation && projection.season.endedAt) {
+      return error(409, 'SEASON_ENDED', '종료된 시즌의 기록은 변경할 수 없습니다.')
     }
     if (contentResultKey && contentCreationResults.has(contentResultKey)) {
       return json(201, structuredClone(contentCreationResults.get(contentResultKey)))
@@ -1212,6 +1221,15 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     },
     makeWorkspaceGetsUnavailable: () => { workspaceGetsUnavailable = true },
     restoreWorkspaceGets: () => { workspaceGetsUnavailable = false },
+    endSeasonFromAnotherDevice: () => {
+      const endedSeason = { ...projection.season, endedAt: '2026-07-30T03:00:00Z' }
+      projection.season = endedSeason
+      projection.seasons = projection.seasons.map((season) =>
+        season.id === endedSeason.id ? endedSeason : season)
+    },
+    changeTeamPermissionFromAnotherDevice: (permission) => {
+      projection.team = { ...projection.team, permission }
+    },
     holdNextRoleUpdate: () => {
       const gate = Promise.withResolvers<void>()
       roleUpdateGate = gate.promise

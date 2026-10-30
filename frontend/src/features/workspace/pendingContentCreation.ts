@@ -58,11 +58,13 @@ type PendingContentCreation = {
   idempotencyKey: string
   createdAt: number
   cleanupRequired?: true
+  // 시즌 종료나 권한 상실로 같은 요청을 다시 보낼 수 없어 결과를 확인하지 못한 기록이다.
+  cleanupReason?: 'unconfirmable'
 }
 
 export type PendingContentCreationCleanupRetry = Pick<
   PendingContentCreation,
-  'teamId' | 'seasonId' | 'operation' | 'normalizedPayload' | 'idempotencyKey'
+  'teamId' | 'seasonId' | 'operation' | 'normalizedPayload' | 'idempotencyKey' | 'cleanupReason'
 >
 
 type WorkspaceIdentity = Pick<WorkspaceScope, 'teamId' | 'seasonId'>
@@ -229,6 +231,7 @@ function isPendingContentCreation(value: unknown): value is PendingContentCreati
     && Number.isFinite(candidate.createdAt)
     && candidate.createdAt >= 0
     && (candidate.cleanupRequired === undefined || candidate.cleanupRequired === true)
+    && (candidate.cleanupReason === undefined || candidate.cleanupReason === 'unconfirmable')
 }
 
 function isCleanupMarker(value: unknown): value is PendingContentCreation {
@@ -254,6 +257,7 @@ function cleanupRetry(pending: PendingContentCreation): PendingContentCreationCl
     operation: pending.operation,
     normalizedPayload: pending.normalizedPayload,
     idempotencyKey: pending.idempotencyKey,
+    cleanupReason: pending.cleanupReason,
   }
 }
 
@@ -275,23 +279,8 @@ export function pendingContentCreationCleanupRetry(): PendingContentCreationClea
   return durableRetry ? cleanupRetry(durableRetry.value) : volatileCleanupRetry
 }
 
-export function markPendingContentCreationCleanupRequired<
-  Operation extends ContentCreationOperation,
->(
-  scope: WorkspaceIdentity,
-  operation: Operation,
-  request: ContentCreationRequestByOperation[Operation],
-  idempotencyKey: string,
-): PendingContentCreationCleanupRetry {
-  const key = storageKey(idempotencyKey)
-  const normalizedPayload = normalizePayload(operation, request)
-  const retry: PendingContentCreationCleanupRetry = {
-    teamId: scope.teamId,
-    seasonId: scope.seasonId,
-    operation,
-    normalizedPayload,
-    idempotencyKey,
-  }
+function markCleanupRequired(retry: PendingContentCreationCleanupRetry) {
+  const key = storageKey(retry.idempotencyKey)
   volatileCleanupRetry = retry
 
   const pending = readValidatedJson(key, isPendingContentCreation)
@@ -301,15 +290,47 @@ export function markPendingContentCreationCleanupRequired<
     createdAt: matchingPending?.createdAt ?? Date.now(),
     cleanupRequired: true,
   }
-  const pendingMarked = Boolean(matchingPending
-    && writeJson(key, { ...matchingPending, cleanupRequired: true }))
+  const pendingMarked = Boolean(matchingPending && writeJson(key, {
+    ...matchingPending,
+    cleanupRequired: true,
+    cleanupReason: retry.cleanupReason,
+  }))
   const durableMarked = pendingMarked
     || writeJson(CLEANUP_MARKER_STORAGE_KEY, markedPending)
   if (durableMarked) {
     volatileCleanupRetry = null
   }
   notifyCleanupChange()
+}
+
+export function markPendingContentCreationCleanupRequired<
+  Operation extends ContentCreationOperation,
+>(
+  scope: WorkspaceIdentity,
+  operation: Operation,
+  request: ContentCreationRequestByOperation[Operation],
+  idempotencyKey: string,
+): PendingContentCreationCleanupRetry {
+  const retry: PendingContentCreationCleanupRetry = {
+    teamId: scope.teamId,
+    seasonId: scope.seasonId,
+    operation,
+    normalizedPayload: normalizePayload(operation, request),
+    idempotencyKey,
+  }
+  markCleanupRequired(retry)
   return retry
+}
+
+// 다시 제출할 수 없는 범위의 기록은 지우지 않고 사용자가 직접 삭제하도록 표시한다.
+export function markUnconfirmablePendingContentCreations(scope: WorkspaceIdentity) {
+  readPendingContentCreations()
+    ?.filter(({ value }) => value.cleanupRequired !== true
+      && value.teamId === scope.teamId
+      && value.seasonId === scope.seasonId)
+    .forEach(({ value }) => {
+      markCleanupRequired({ ...cleanupRetry(value), cleanupReason: 'unconfirmable' })
+    })
 }
 
 export function clearPendingContentCreationCleanup(

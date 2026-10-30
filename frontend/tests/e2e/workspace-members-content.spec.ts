@@ -35,6 +35,8 @@ import {
   expectScopedCall,
   expectPendingCreationDialogLocked,
   openHandoffView,
+  makeProjection,
+  installAccountSession,
 } from './support/workspaceApiHarness'
 import type { ApiHarness } from './support/workspaceApiHarness'
 
@@ -1084,4 +1086,115 @@ test('@operations 반복 업무 응답 유실 뒤 마감 변경을 새 요청으
     (routine) => routine.title === '마감 journal 경계 확인',
   )).toHaveLength(2)
   await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+async function submitNewRole(page: Page, projectName: string, name: string) {
+  await navigation(page, projectName).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '역할 추가' }).click()
+  const dialog = page.getByRole('dialog', { name: '새 역할 만들기' })
+  await dialog.getByLabel('역할 이름').fill(name)
+  await dialog.getByLabel('역할 목적').fill('생성 요청의 결과 확인 경계를 검증합니다.')
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+  return dialog
+}
+
+test('@operations 시즌 종료로 거절된 생성 요청은 임시 기록을 지워 새 생성을 막지 않는다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'journal 종결 판단은 데스크톱에서 한 번 검증합니다.')
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  api.commitNextContentCreationThenTimeout('role')
+  const dialog = await submitNewRole(page, testInfo.project.name, '시즌 종료 전 응답 유실 역할')
+  await expect(dialog.getByRole('alert')).toContainText('중복으로 만들지 않고 저장 여부를 확인합니다.')
+  expect(await pendingContentCreationEntries(page)).toHaveLength(1)
+
+  api.endSeasonFromAnotherDevice()
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+  await expect(page.getByRole('alert', { name: '임시 기록 삭제 필요' })).toHaveCount(0)
+})
+
+test('@operations 응답을 잃은 뒤 시즌이 끝나 다시 제출할 수 없으면 임시 기록을 직접 삭제한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'journal 삭제 경로는 데스크톱에서 한 번 검증합니다.')
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+  api.commitNextContentCreationThenTimeout('role')
+  const dialog = await submitNewRole(page, testInfo.project.name, '다시 확인할 수 없는 역할')
+  await expect(dialog.getByRole('alert')).toContainText('중복으로 만들지 않고 저장 여부를 확인합니다.')
+  await dialog.getByRole('button', { name: '닫기' }).click()
+
+  api.endSeasonFromAnotherDevice()
+  await expect(page.getByText('이 시즌은 읽기 전용입니다.')).toBeVisible()
+  const cleanupBanner = page.getByRole('alert', { name: '임시 기록 삭제 필요' })
+  await expect(cleanupBanner).toContainText('이전 요청의 저장 결과를 더 이상 확인할 수 없습니다.')
+  expect(await pendingContentCreationEntries(page)).toEqual([
+    expect.objectContaining({ cleanupRequired: true, cleanupReason: 'unconfirmable' }),
+  ])
+
+  await page.reload()
+  await expect(cleanupBanner).toContainText('이전 요청의 저장 결과를 더 이상 확인할 수 없습니다.')
+  await cleanupBanner.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
+  await expect(cleanupBanner).toHaveCount(0)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@operations 열람자로 바뀌어 거절된 생성 기록은 재시도를 안내하지 않고 삭제 경로를 준다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'journal 삭제 경로는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.team = { ...projection.team, accountAccessEnabled: true, permission: 'MEMBER' }
+  const api = await installApi(page, projection)
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  await openSharedWorkspace(page)
+
+  api.changeTeamPermissionFromAnotherDevice('VIEWER')
+  const dialog = await submitNewRole(page, testInfo.project.name, '권한을 잃은 뒤 제출한 역할')
+
+  await expect(dialog.getByRole('alert')).toContainText('워크스페이스 접근 권한이 없습니다.')
+  await expect(dialog.getByRole('alert')).not.toContainText('같은 내용으로 다시 제출')
+  await dialog.getByRole('button', { name: '닫기' }).click()
+  const cleanupBanner = page.getByRole('alert', { name: '임시 기록 삭제 필요' })
+  await cleanupBanner.getByRole('button', { name: '임시 기록 삭제', exact: true }).click()
+  await expect(cleanupBanner).toHaveCount(0)
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+async function seedPendingMemberCreation(page: Page) {
+  await page.addInitScript(({ prefix, entry }) => {
+    localStorage.setItem(`${prefix}${entry.idempotencyKey}`, JSON.stringify(entry))
+  }, {
+    prefix: PENDING_CONTENT_CREATION_STORAGE_PREFIX,
+    entry: {
+      teamId: TEAM_ID,
+      seasonId: SEASON_ID,
+      operation: 'member',
+      normalizedPayload: JSON.stringify({ name: '권한을 잃기 전 추가한 구성원' }),
+      idempotencyKey: '00000000-0000-4000-8000-000000000201',
+      createdAt: 1,
+    },
+  })
+}
+
+test('@operations 로그인한 계정이 팀 접근을 잃으면 남은 생성 기록을 삭제 대상으로 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'journal 삭제 경로는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await installAccountSession(page)
+  await seedPendingMemberCreation(page)
+  await page.goto(`${WORKSPACE_PATH}#accessKey=stale-access-key`)
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
+
+  await expect.poll(async () => (await pendingContentCreationEntries(page))[0]?.cleanupReason)
+    .toBe('unconfirmable')
+})
+
+test('@operations 로그인하지 않은 접근 거부는 다시 제출할 수 있도록 생성 기록을 그대로 둔다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'journal 삭제 경로는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await page.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: false } }))
+  await seedPendingMemberCreation(page)
+  await page.goto(`${WORKSPACE_PATH}#accessKey=stale-access-key`)
+  await expect(page.getByRole('heading', { name: '작업 공간을 불러오지 못했습니다' })).toBeVisible()
+
+  expect((await pendingContentCreationEntries(page))[0]?.cleanupRequired).toBeUndefined()
 })
