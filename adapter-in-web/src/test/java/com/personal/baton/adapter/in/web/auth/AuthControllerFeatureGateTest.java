@@ -5,6 +5,7 @@ import com.personal.baton.adapter.in.web.auth.AuthRequests.LocalRegistrationRequ
 import com.personal.baton.adapter.in.web.config.AuthFeatureProperties;
 import com.personal.baton.adapter.in.web.config.SocialLoginProviderCatalog;
 import com.personal.baton.application.identity.error.EmailVerificationDeliveryUnavailableException;
+import com.personal.baton.application.identity.error.HumanVerificationRejectedException;
 import com.personal.baton.application.identity.port.in.RegisterLocalAccountUseCase;
 import com.personal.baton.application.identity.port.in.HumanVerificationUseCase;
 import com.personal.baton.application.identity.port.in.HumanVerificationUseCase.Action;
@@ -18,7 +19,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -125,6 +129,72 @@ class AuthControllerFeatureGateTest {
         ));
     }
 
+    @DisplayName("자동 요청 방지를 통과하지 못한 요청은 피해자 이메일의 요청 한도를 소비하지 않는다")
+    @Test
+    void keepsEmailBudgetWhenHumanVerificationFails() {
+        var enabledController = enabledController();
+        var attacker = new MockHttpServletRequest();
+        attacker.setRemoteAddr("198.51.100.1");
+        doThrow(new HumanVerificationRejectedException())
+                .when(humanVerificationUseCase).verify(any());
+
+        for (int attempt = 0; attempt < 4; attempt += 1) {
+            assertThatThrownBy(() -> enabledController.requestPasswordReset(
+                    new AuthRequests.PasswordResetRequest("victim@example.com", "invalid-token"),
+                    attacker
+            )).isInstanceOf(HumanVerificationRejectedException.class);
+        }
+        doNothing().when(humanVerificationUseCase).verify(any());
+        var victim = new MockHttpServletRequest();
+        victim.setRemoteAddr("203.0.113.1");
+
+        enabledController.requestPasswordReset(
+                new AuthRequests.PasswordResetRequest("victim@example.com", "valid-token"),
+                victim
+        );
+
+        verify(resetUseCase).requestPasswordReset("victim@example.com");
+    }
+
+    @DisplayName("같은 이메일은 자동 요청 방지를 통과한 요청만 세어 세 번 뒤 제한한다")
+    @Test
+    void limitsEmailAfterHumanVerification() {
+        var enabledController = enabledController();
+
+        for (int attempt = 0; attempt < 3; attempt += 1) {
+            enabledController.requestPasswordReset(
+                    new AuthRequests.PasswordResetRequest("member@example.com", "valid-token"),
+                    requestFrom("192.0.2." + (attempt + 1))
+            );
+        }
+
+        assertThatThrownBy(() -> enabledController.requestPasswordReset(
+                new AuthRequests.PasswordResetRequest("member@example.com", "valid-token"),
+                requestFrom("192.0.2.100")
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        verify(humanVerificationUseCase, times(4)).verify(any());
+        verify(resetUseCase, times(3)).requestPasswordReset("member@example.com");
+    }
+
+    @DisplayName("IP 제한을 넘긴 메일 요청은 외부 자동 요청 방지 검증을 호출하지 않는다")
+    @Test
+    void limitsNetworkBeforeHumanVerification() {
+        var enabledController = enabledController();
+
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            enabledController.requestPasswordReset(
+                    new AuthRequests.PasswordResetRequest("member-" + attempt + "@example.com", "valid-token"),
+                    requestFrom("192.0.2.1")
+            );
+        }
+
+        assertThatThrownBy(() -> enabledController.requestPasswordReset(
+                new AuthRequests.PasswordResetRequest("another@example.com", "valid-token"),
+                requestFrom("192.0.2.1")
+        )).isInstanceOf(AuthRateLimitExceededException.class);
+        verify(humanVerificationUseCase, times(12)).verify(any());
+    }
+
     private AuthController enabledController() {
         return new AuthController(
                 registerUseCase,
@@ -135,6 +205,12 @@ class AuthControllerFeatureGateTest {
                 new AuthFeatureProperties(true, true),
                 humanVerificationUseCase
         );
+    }
+
+    private MockHttpServletRequest requestFrom(String remoteAddress) {
+        var request = new MockHttpServletRequest();
+        request.setRemoteAddr(remoteAddress);
+        return request;
     }
 
     @SuppressWarnings("unchecked")

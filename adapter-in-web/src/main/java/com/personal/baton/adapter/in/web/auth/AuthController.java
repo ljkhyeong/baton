@@ -134,15 +134,12 @@ public class AuthController {
                     "자체 이메일 계정 등록이 비활성화됐습니다"
             );
         }
-        authRateLimiter.checkRegistration(
-                servletRequest.getRemoteAddr(),
-                request.email()
-        );
-        humanVerificationUseCase.verify(new HumanVerificationCommand(
+        admitEmailRequest(
+                request.email(),
                 request.turnstileToken(),
-                AuthRateLimiter.withoutIpv6Brackets(servletRequest.getRemoteAddr()),
+                servletRequest,
                 Action.LOCAL_REGISTRATION
-        ));
+        );
         try {
             registerLocalAccountUseCase.registerLocalAccount(new RegisterLocalAccountCommand(
                     request.email(),
@@ -182,12 +179,12 @@ public class AuthController {
         if (!authFeatureProperties.passwordResetEnabled()) {
             throw new EmailVerificationDeliveryUnavailableException("비밀번호 재설정 요청이 비활성화됐습니다");
         }
-        authRateLimiter.checkRegistration(servletRequest.getRemoteAddr(), request.email());
-        humanVerificationUseCase.verify(new HumanVerificationCommand(
+        admitEmailRequest(
+                request.email(),
                 request.turnstileToken(),
-                AuthRateLimiter.withoutIpv6Brackets(servletRequest.getRemoteAddr()),
+                servletRequest,
                 Action.PASSWORD_RESET_REQUEST
-        ));
+        );
         passwordResetUseCase.requestPasswordReset(request.email());
         return ResponseEntity.accepted().cacheControl(CacheControl.noStore())
                 .body(new PasswordResetRequestResponse(true));
@@ -200,6 +197,23 @@ public class AuthController {
         authRateLimiter.checkVerification(servletRequest.getRemoteAddr(), request.token());
         passwordResetUseCase.resetPassword(new ResetPasswordCommand(request.token(), request.password()));
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    // IP 제한은 외부 검증 호출 앞에서 소비하고, 이메일 제한은 잘못된 token으로 피해자의
+    // 메일 요청을 막지 못하도록 검증을 통과한 뒤에 소비한다.
+    private void admitEmailRequest(
+            String email,
+            String turnstileToken,
+            HttpServletRequest servletRequest,
+            Action action
+    ) {
+        authRateLimiter.checkRegistrationNetwork(servletRequest.getRemoteAddr());
+        humanVerificationUseCase.verify(new HumanVerificationCommand(
+                turnstileToken,
+                AuthRateLimiter.withoutIpv6Brackets(servletRequest.getRemoteAddr()),
+                action
+        ));
+        authRateLimiter.checkRegistrationEmail(email);
     }
 
 }

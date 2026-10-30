@@ -36,11 +36,14 @@ public final class AuthRateLimiter {
             .expireAfterAccess(Duration.ofHours(1))
             .build();
 
-    public void checkRegistration(String remoteAddress, String email) {
+    public void checkRegistrationNetwork(String remoteAddress) {
         consume(
                 "registration:ip:" + digest(normalizeClientNetwork(remoteAddress)),
                 REGISTRATION_IP
         );
+    }
+
+    public void checkRegistrationEmail(String email) {
         consume("registration:email:" + digest(normalizeEmail(email)), REGISTRATION_EMAIL);
     }
 

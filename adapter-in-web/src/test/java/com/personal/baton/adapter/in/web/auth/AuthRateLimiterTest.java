@@ -15,14 +15,26 @@ class AuthRateLimiterTest {
     void limitsRegistrationByNormalizedEmail() {
         AuthRateLimiter limiter = new AuthRateLimiter();
 
-        limiter.checkRegistration("192.0.2.1", " Study.User@Example.COM ");
-        limiter.checkRegistration("192.0.2.2", "study.user@example.com");
-        limiter.checkRegistration("192.0.2.3", "STUDY.USER@example.com");
+        limiter.checkRegistrationEmail(" Study.User@Example.COM ");
+        limiter.checkRegistrationEmail("study.user@example.com");
+        limiter.checkRegistrationEmail("STUDY.USER@example.com");
 
-        assertThatThrownBy(() -> limiter.checkRegistration(
-                "192.0.2.4",
-                "study.user@example.com"
-        )).isInstanceOf(AuthRateLimitExceededException.class);
+        assertThatThrownBy(() -> limiter.checkRegistrationEmail("study.user@example.com"))
+                .isInstanceOf(AuthRateLimitExceededException.class);
+    }
+
+    @DisplayName("같은 네트워크의 가입 요청은 시간 창 안에서 열두 번까지만 허용한다")
+    @Test
+    void limitsRegistrationByNetwork() {
+        AuthRateLimiter limiter = new AuthRateLimiter();
+
+        for (int attempt = 0; attempt < 12; attempt += 1) {
+            limiter.checkRegistrationNetwork("192.0.2.1");
+        }
+
+        assertThatThrownBy(() -> limiter.checkRegistrationNetwork("192.0.2.1"))
+                .isInstanceOf(AuthRateLimitExceededException.class);
+        limiter.checkRegistrationNetwork("192.0.2.2");
     }
 
     @DisplayName("같은 IP와 이메일 조합의 로그인 무차별 대입은 열 번 뒤 제한한다")
