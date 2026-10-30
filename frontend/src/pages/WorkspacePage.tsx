@@ -111,6 +111,27 @@ export default function WorkspacePage() {
     )
   }, [navigate, teamId])
 
+  if (!accessKey && session.isError && session.data === undefined) {
+    return (
+      <>
+        <title>{workspaceTitle}</title>
+        <main className="remote-state-page">
+          <section className="remote-state" role="alert">
+            <span className="section-kicker">로그인 상태 확인 필요</span>
+            <h1>로그인 상태를 확인하지 못했습니다.</h1>
+            <p>{session.error.message}</p>
+            <div className="remote-state-actions">
+              <button type="button" className="primary-button" disabled={session.isFetching} onClick={() => void session.refetch()}>
+                {session.isFetching ? '다시 확인 중' : '다시 확인'}
+              </button>
+              <Link to="/" className="secondary-button">새 작업 공간 만들기</Link>
+            </div>
+          </section>
+        </main>
+      </>
+    )
+  }
+
   if (!accessKey && !session.data?.authenticated) {
     return (
       <>

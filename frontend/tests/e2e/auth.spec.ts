@@ -1342,6 +1342,22 @@ test('@smoke 로그인한 계정이 작업 공간 접근을 거부당하면 로�
   await expect(page.getByRole('link', { name: '로그인', exact: true })).toHaveCount(0)
 })
 
+test('@smoke 작업 공간은 세션 조회 실패를 미인증으로 추측하지 않고 다시 확인한다', async ({ page }) => {
+  const projection = makeProjection()
+  projection.team.accountAccessEnabled = true
+  projection.team.permission = 'MEMBER'
+  await installApi(page, projection)
+  await installAuthApi(page, { authenticated: true, sessionFailuresBeforeSuccess: 1 })
+  await page.goto(WORKSPACE_PATH)
+
+  await expect(page.getByRole('alert')).toContainText('로그인 상태를 확인하지 못했습니다.')
+  await expect(page.getByText('로그인 또는 공유 링크 필요')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '다시 확인', exact: true }).click()
+
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+})
+
 test('@smoke 접근 키를 저장하지 못하면 새 탭에서 로그인하고 원래 작업 공간을 유지한다', async ({ page, context }, testInfo) => {
   await blockAccessKeyStorage(context)
   const sessionState = { authenticated: false }
