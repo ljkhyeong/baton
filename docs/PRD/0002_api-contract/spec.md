@@ -1381,7 +1381,8 @@ nullable `previousPermission`, nullable `permission`, `changedAt`이며 최근 5
 
 초대 수락의 계정 연결과 권한 변경은 원자적이다. 같은 토큰의 같은 계정 재수락은 현재 권한을 반환한다.
 권한이 취소된 계정은 재수락으로 권한을 되살릴 수 없다. 다른 계정·구성원의 기존 연결과 충돌하면
-`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다.
+`409 ACCOUNT_MEMBERSHIP_CONFLICT`, 마지막 관리자 제거는 `400 INVALID_INPUT`이다. 계정 권한 전환의 복구 키가
+미설정·누락·불일치이면 `403 WORKSPACE_RECOVERY_DENIED`다.
 
 워크스페이스 응답의 `team`은 기존 `id`, `name`에 `accountAccessEnabled`와 nullable `permission`을
 추가한다. 공유 키 팀에서는 각각 `false`, `null`이며 계정 팀에서는 `true`와 현재 접근 권한이다.
