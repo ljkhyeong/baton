@@ -1218,3 +1218,25 @@ test('@operations 마감을 정하지 않은 반복 업무는 수정해도 마�
   expect(update.body).not.toHaveProperty('deadlineDayOffset')
   expect(update.body).not.toHaveProperty('deadlineTime')
 })
+
+test('@operations 생성 요청이 충돌해도 창과 입력을 유지하고 같은 요청으로 다시 제출한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '생성 충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  api.conflictNextContentCreation('role')
+  const dialog = await submitNewRole(page, testInfo.project.name, '충돌 뒤 다시 제출할 역할')
+
+  await expect(dialog.getByRole('alert')).toContainText('최신 내용을 확인한 뒤 다시 시도해 주세요.')
+  await expect(dialog.getByRole('alert')).toContainText('중복으로 만들지 않고 저장 여부를 확인합니다.')
+  await expect(dialog.getByLabel('역할 이름')).toHaveValue('충돌 뒤 다시 제출할 역할')
+  expect(await pendingContentCreationEntries(page)).toHaveLength(1)
+  await expect(page.getByRole('button', { name: '역할 추가' })).toBeEnabled()
+
+  await dialog.getByRole('button', { name: '역할 만들기' }).click()
+  await expect(dialog).toHaveCount(0)
+  const attempts = recordedCalls(api, 'POST', `${SCOPE_PATH}/roles`)
+  expect(attempts).toHaveLength(2)
+  expect(attempts[1]?.headers['idempotency-key']).toBe(attempts[0]?.headers['idempotency-key'])
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})

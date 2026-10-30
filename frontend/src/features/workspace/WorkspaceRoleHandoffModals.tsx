@@ -84,9 +84,9 @@ export function RoleHandoffModal({
     isActiveMember(member) && member.id !== role.currentMemberId)
   const retainedNextMember = eligibleMembers.find((member) =>
     member.id === (handoff?.toMemberId ?? role.nextMemberId))
-  const [toMemberId, setToMemberId] = useState(
-    retainedNextMember?.id ?? eligibleMembers[0]?.id ?? '',
-  )
+  const [selectedMemberId, setSelectedMemberId] = useState(eligibleMembers[0]?.id ?? '')
+  // 서버는 역할에 정한 다음 담당자와 다른 대상을 거부한다.
+  const toMemberId = retainedNextMember?.id ?? selectedMemberId
   const suggestedStartDate = clampToSeason(
     role.assignmentEndDate
       ? addCalendarDays(role.assignmentEndDate, 1)
@@ -179,14 +179,20 @@ export function RoleHandoffModal({
               <span>다음 담당자</span>
               <select
                 required
+                disabled={Boolean(retainedNextMember)}
                 value={toMemberId}
-                onChange={(event) => setToMemberId(event.target.value)}
+                onChange={(event) => setSelectedMemberId(event.target.value)}
               >
                 {eligibleMembers.map((member) => (
                   <option key={member.id} value={member.id}>{memberDisplayName(member)}</option>
                 ))}
               </select>
             </label>
+            {retainedNextMember && (
+              <small className="form-hint">
+                역할에 정한 다음 담당자입니다. 바꾸려면 역할 수정에서 다음 담당자를 변경해 주세요.
+              </small>
+            )}
             <div className="date-grid">
               <label>
                 <span>다음 담당 시작일</span>

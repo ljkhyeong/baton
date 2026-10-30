@@ -337,9 +337,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
   useWorkspaceMutationRecovery({
     teamId,
     seasonId,
-    onRoleHandoffConflict: () => beginContentConflictRecovery(
-      '다른 사람이 수정한 인수인계 내용을 불러왔습니다.',
-    ),
+    onRoleHandoffConflict: beginContentConflictRecovery,
     onWorkspaceContentConflict: () => beginContentConflictRecovery(
       '다른 사람이 수정한 내용을 불러왔습니다.',
     ),

@@ -6,7 +6,7 @@ import { workspaceMutationKey } from './queries'
 type WorkspaceMutationRecoveryOptions = {
   teamId: string
   seasonId: string
-  onRoleHandoffConflict: () => void
+  onRoleHandoffConflict: (message: string) => void
   onWorkspaceContentConflict: () => void
   onSeasonEnded: () => void
 }
@@ -19,17 +19,18 @@ export function useWorkspaceMutationRecovery({
   onSeasonEnded,
 }: WorkspaceMutationRecoveryOptions) {
   const queryClient = useQueryClient()
-  const recoverMutation = useEffectEvent((error: ApiError) => {
+  const recoverMutation = useEffectEvent((error: ApiError, conflictShownInForm: boolean) => {
+    if (error.code === 'SEASON_ENDED') {
+      onSeasonEnded()
+      return
+    }
+    if (conflictShownInForm) return
     if (error.code === 'ROLE_HANDOFF_STATE_CONFLICT') {
-      onRoleHandoffConflict()
+      onRoleHandoffConflict(error.message)
       return
     }
     if (error.code === 'WORKSPACE_CONTENT_CONFLICT') {
       onWorkspaceContentConflict()
-      return
-    }
-    if (error.code === 'SEASON_ENDED') {
-      onSeasonEnded()
     }
   })
 
@@ -40,7 +41,7 @@ export function useWorkspaceMutationRecovery({
 
       const error = event.action.error
       if (!(error instanceof ApiError)) return
-      recoverMutation(error)
+      recoverMutation(error, event.mutation.meta?.showConflictInForm === true)
     })
   }, [queryClient, seasonId, teamId])
 }

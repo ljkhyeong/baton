@@ -195,6 +195,8 @@ export type ApiHarness = {
   returnMalformedNextContentCreationResponse: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   rejectNextMemberAsConflict: () => void
+  conflictNextContentCreation: (operation: ContentCreationOperation) => void
+  rejectNextRoleHandoffChange: (message: string) => void
   holdNextContentCreation: (operation: ContentCreationOperation) => void
   releaseContentCreation: () => void
   makeWorkspaceGetsUnavailable: () => void
@@ -467,6 +469,8 @@ export async function installApi(page: Page, initialProjection = makeProjection(
   let contentCreationToReturnMalformed: ContentCreationOperation | null = null
   let contentCreationToRejectAsReused: ContentCreationOperation | null = null
   let rejectMemberAsConflict = false
+  let contentCreationToConflict: ContentCreationOperation | null = null
+  let roleHandoffChangeRejection: string | null = null
   let contentCreationGate: {
     operation: ContentCreationOperation
     pending: Promise<void>
@@ -600,6 +604,17 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     if (contentOperation && contentCreationToRejectAsReused === contentOperation) {
       contentCreationToRejectAsReused = null
       return error(409, 'IDEMPOTENCY_KEY_REUSED', '같은 멱등 키를 다른 요청에 사용할 수 없습니다.')
+    }
+    if (contentOperation && contentCreationToConflict === contentOperation) {
+      contentCreationToConflict = null
+      return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 요청이 먼저 처리되고 있습니다.')
+    }
+    const isRoleHandoffChange = method === 'PATCH'
+      && new RegExp(`^${SCOPE_PATH}/roles/[^/]+/handoffs/[^/]+/(transfer|acceptance|cancellation)$`).test(path)
+    if (roleHandoffChangeRejection && (isRoleHandoffChange || contentOperation === 'roleHandoff')) {
+      const message = roleHandoffChangeRejection
+      roleHandoffChangeRejection = null
+      return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', message)
     }
     if (contentOperation && contentCreationGate?.operation === contentOperation) {
       const gate = contentCreationGate.pending
@@ -1207,6 +1222,8 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     rejectNextMemberAsConflict: () => { rejectMemberAsConflict = true },
+    conflictNextContentCreation: (operation) => { contentCreationToConflict = operation },
+    rejectNextRoleHandoffChange: (message) => { roleHandoffChangeRejection = message },
     holdNextContentCreation: (operation) => {
       const gate = Promise.withResolvers<void>()
       contentCreationGate = {

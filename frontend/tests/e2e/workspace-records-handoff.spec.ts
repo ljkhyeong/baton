@@ -1259,3 +1259,101 @@ test('@handoff 할 일 화면의 바통 알림은 인계가 가장 가까운 역
     .toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { level: 2, name: '김준호님에게 넘길 인수인계' })).toBeVisible()
 })
+
+test('@handoff 인수인계 전환이 규칙으로 거절되면 서버가 알려 준 사유를 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '거절 사유 안내는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.roleHandoffs = [{
+    id: ROLE_HANDOFF_ID,
+    roleId: ROLE_ID,
+    fromMemberId: MEMBER_ONE_ID,
+    toMemberId: MEMBER_TWO_ID,
+    outgoingAssignmentStartDate: '2026-07-02',
+    outgoingAssignmentEndDate: '2026-09-17',
+    incomingAssignmentStartDate: '2026-09-18',
+    incomingAssignmentEndDate: null,
+    status: 'PREPARING',
+    preparedAt: '2026-07-22T09:00:00Z',
+    transferredAt: null,
+    acceptedAt: null,
+    cancelledAt: null,
+    transferredByMemberId: null,
+    acceptedByMemberId: null,
+    cancelledByMemberId: null,
+    activeItemCount: null,
+    incompleteItemCount: null,
+    resourceCount: null,
+    warningAcknowledged: false,
+  }]
+  const api = await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await openHandoffView(page, testInfo.project.name)
+  await page.getByRole('button', { name: '내용 확인 후 전달' }).click()
+  const dialog = page.getByRole('dialog', { name: '인수인계 전달 전 확인' })
+  await dialog.getByLabel('미완료 항목과 자료 누락을 확인했습니다').check()
+  api.rejectNextRoleHandoffChange('현재 담당자 명의로 전달을 확인해 주세요')
+  await dialog.getByRole('button', { name: '인수인계 전달하기' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('.toast[role="status"]')).toHaveText('현재 담당자 명의로 전달을 확인해 주세요')
+})
+
+test('@handoff 인수인계 준비 창은 역할에 정한 다음 담당자를 고정하고 충돌 사유를 창에 표시한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 담당자 고정은 데스크톱에서 한 번 검증합니다.')
+  const api = await installApi(page)
+  await openSharedWorkspace(page)
+
+  await openHandoffView(page, testInfo.project.name)
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
+  const nextMember = dialog.getByLabel('다음 담당자')
+  await expect(nextMember).toHaveValue(MEMBER_TWO_ID)
+  await expect(nextMember).toBeDisabled()
+  await expect(dialog).toContainText('역할에 정한 다음 담당자입니다.')
+
+  api.rejectNextRoleHandoffChange('이 역할에는 이미 진행 중인 인수인계가 있습니다')
+  await dialog.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  await expect(dialog.getByRole('alert')).toHaveText('이 역할에는 이미 진행 중인 인수인계가 있습니다')
+  await expect.poll(async () => (await pendingContentCreationEntries(page)).length).toBe(0)
+})
+
+test('@handoff 역할의 다음 담당자가 활동을 끝냈으면 인수인계 준비 창에서 다른 구성원을 고를 수 있다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 담당자 고정 예외는 데스크톱에서 한 번 검증합니다.')
+  const projection = makeProjection()
+  projection.members[1] = { ...projection.members[1]!, deactivatedAt: '2026-07-21T12:00:00Z' }
+  await installApi(page, projection)
+  await openSharedWorkspace(page)
+
+  await openHandoffView(page, testInfo.project.name)
+  await page.getByRole('button', { name: '인수인계 준비 시작' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 인수인계 준비 시작' })
+  await expect(dialog.getByLabel('다음 담당자')).toBeEnabled()
+  await expect(dialog).not.toContainText('역할에 정한 다음 담당자입니다.')
+})
+
+test('@handoff 역할 수정이 인수인계 규칙으로 거절되면 사유를 알리고 입력을 초안으로 남긴다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '거절 사유 안내는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await page.route(`**${SCOPE_PATH}/roles/${ROLE_ID}`, (route) => route.fulfill({
+    status: 409,
+    json: {
+      code: 'ROLE_HANDOFF_STATE_CONFLICT',
+      message: '진행 중인 인수인계의 담당자와 담당 기간은 수락 또는 취소 전까지 바꿀 수 없습니다',
+    },
+  }))
+  await openSharedWorkspace(page)
+
+  await navigation(page, testInfo.project.name).getByRole('button', { name: '역할' }).click()
+  await page.getByRole('button', { name: '문제 큐레이터 역할 수정' }).click()
+  const dialog = page.getByRole('dialog', { name: '역할 수정' })
+  await dialog.getByLabel('역할 목적').fill('저장하지 못한 역할 목적입니다.')
+  await dialog.getByRole('button', { name: '변경 저장' }).click()
+
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('.toast[role="status"]')).toHaveText(
+    '진행 중인 인수인계의 담당자와 담당 기간은 수락 또는 취소 전까지 바꿀 수 없습니다',
+  )
+  await expect(page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)'))
+    .toHaveValue(/저장하지 못한 역할 목적입니다\./)
+})
