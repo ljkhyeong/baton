@@ -367,10 +367,14 @@ export function SeasonRoundModal({
   const [meetingDate, setMeetingDate] = useState(
     round?.meetingDate ?? clampToSeason(pilotCalendarDate(new Date(), season.timeZone), season),
   )
+  const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (submission.closeGuardRef.current || !name.trim() || !meetingDate) return
-    submission.start(onSave({ name: name.trim(), meetingDate }))
+    if (submission.closeGuardRef.current || !meetingDate) return
+    const normalizedName = name.trim()
+    setValidationMessage(normalizedName ? '' : '회차 이름을 입력해 주세요.')
+    if (!normalizedName) return
+    submission.start(onSave({ name: normalizedName, meetingDate }))
   }
   return (
     <ModalShell
@@ -414,6 +418,7 @@ export function SeasonRoundModal({
             {formatLocalDate(season.startDate)}부터 {formatLocalDate(season.endDate)} 사이에서 선택해 주세요.
           </small>
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (

@@ -850,6 +850,10 @@ test('@operations 반복 업무와 회차를 안전하게 생성하고 선택한
   await expect(roundDialog.getByLabel('모임 날짜')).toHaveAttribute('min', '2026-07-02')
   await expect(roundDialog.getByLabel('모임 날짜')).toHaveAttribute('max', '2026-09-17')
   await roundDialog.getByLabel('모임 날짜').fill('2026-07-24')
+  await roundDialog.getByLabel('회차 이름').fill('   ')
+  await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
+  await expect(roundDialog.getByRole('alert')).toHaveText('회차 이름을 입력해 주세요.')
+  await roundDialog.getByLabel('회차 이름').fill('3회차')
   await roundDialog.getByRole('button', { name: '회차 만들기' }).click()
 
   await expect(roundDialog.getByRole('alert')).toContainText('같은 내용으로 다시 제출하면 중복으로 만들지 않고 저장 여부를 확인합니다.')
