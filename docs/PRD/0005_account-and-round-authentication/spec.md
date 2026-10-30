@@ -325,8 +325,10 @@ BATON은 각 정규 ROUND `roomId`를 정확히 하나의 활성
 `(teamId, seasonId, resourceId)`에 연결한다. 하나의 리소스도 활성 방 하나만 가진다.
 매핑 종료 뒤 방 ID 삭제 표식은 영구 보존하고 재사용하지 않는다.
 
-관리 API는 `Account` 세션과 `X-Baton-Access-Key`를 모두 요구한다. 변경 요청은 CSRF와 정확한
-동일 출처도 요구하지만 현재 연결과 활성 방 매핑 조회 GET은 CSRF 없이 사용할 수 있다.
+관리 API는 `Account` 세션을 요구하고, 공유 키 방식의 팀은 `X-Baton-Access-Key`도 요구한다.
+[계정 권한을 사용하는 팀](../0009_team-account-access/spec.md)은 공유 키 없이 팀 권한으로 확인한다.
+변경 요청은 CSRF와 정확한 동일 출처도 요구하지만 현재 연결과 활성 방 매핑 조회 GET은 CSRF 없이
+사용할 수 있다.
 
 - `GET /api/v1/account-memberships/current?teamId={teamId}`: 미연결이면 정확히
   `200 {claimed:false}`, 연결됐으면

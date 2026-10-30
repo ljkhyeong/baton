@@ -233,6 +233,14 @@ function projectionWithMultipleRoundResources() {
   return projection
 }
 
+// 공유 키 없이 초대받은 계정으로 여는 계정 전환 팀
+function accountTeamProjection(permission: 'MEMBER' | 'VIEWER') {
+  const projection = projectionWithRoundResource()
+  projection.team.accountAccessEnabled = true
+  projection.team.permission = permission
+  return projection
+}
+
 async function openRoundResource(page: Page, projectName: string) {
   await navigation(page, projectName).getByRole('button', { name: '역할' }).click()
   await page.locator('.role-row-open').filter({ hasText: '문제 큐레이터' }).click()
@@ -523,6 +531,22 @@ test('종료 시즌에서는 서버가 거부할 ROUND 종료 동작을 노출�
     '종료된 시즌에서는 ROUND 방에 입장하거나 종료할 수 없습니다.',
   )
   expect(roundApi.calls.some((call) => call.method === 'DELETE')).toBe(false)
+})
+
+test('@webkit 공유 키 없는 계정 팀 구성원도 ROUND 방 목록을 확인하고 방을 시작한다', async ({ page }, testInfo) => {
+  await installApi(page, accountTeamProjection('MEMBER'))
+  const roundApi = await installRoundProductApi(page)
+  await page.goto(WORKSPACE_PATH)
+  const inspector = await openRoundResource(page, testInfo.project.name)
+
+  await inspector.getByRole('button', { name: 'ROUND 시작' }).click()
+
+  await expect(page).toHaveURL(new RegExp(`/room/${ROOM_ID}$`))
+  const mappingRead = roundApi.calls.find((call) => (
+    call.method === 'GET' && call.path === '/api/v1/round-room-mappings'
+  ))
+  expect(mappingRead?.query).toEqual({ seasonId: SEASON_ID, teamId: TEAM_ID })
+  expect(mappingRead?.headers['x-baton-access-key'] ?? '').toBe('')
 })
 
 test('익명 사용자는 접근 키 없는 로그인 복귀 링크를 받는다', async ({ page }, testInfo) => {
