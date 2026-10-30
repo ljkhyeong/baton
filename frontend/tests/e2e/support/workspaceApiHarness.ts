@@ -1521,6 +1521,7 @@ type PendingContentCreationEntry = {
   idempotencyKey: string
   createdAt: number
   cleanupRequired?: true
+  cleanupReason?: 'unconfirmable'
 }
 
 export function pendingWorkspaceCreationEntry(

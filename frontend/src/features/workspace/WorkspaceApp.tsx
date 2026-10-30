@@ -835,6 +835,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           {accountAccessEnabled && <p className="workspace-permission-note">계정 권한: {workspace.team.permission === 'ADMIN' ? '관리자' : workspace.team.permission === 'MEMBER' ? '구성원' : '열람자 · 기록 조회만 가능'}</p>}
           <SeasonEndedBanner
             season={workspace.season}
+            canAdminister={canAdminister}
             onSwitchSeason={seasonLifecycleFlow.actions.openSwitcher}
             onCreateNext={seasonLifecycleFlow.actions.openSuccessor}
           />
@@ -958,6 +959,9 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
               roles={roles}
               roleHandoffs={roleHandoffs}
               members={members}
+              currentMember={me}
+              accountAccessEnabled={accountAccessEnabled}
+              canAdminister={canAdminister}
               season={workspace.season}
               calendarDate={calendarDate}
               selectedRoleId={effectiveSelectedRoleId}
@@ -1247,6 +1251,7 @@ export default function WorkspaceApp({ teamId, seasonId, accessKey, accessDenied
           currentSeason={workspace.season}
           seasons={workspace.seasons}
           calendarDate={calendarDate}
+          canAdminister={canAdminister}
           endingPending={seasonLifecycleFlow.switcher.endingPending}
           endingError={seasonLifecycleFlow.switcher.endingError}
           onClose={closeModal}

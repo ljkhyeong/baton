@@ -35,6 +35,42 @@ import {
   openRecordSearch,
   openHandoffView,
 } from './support/workspaceApiHarness'
+import type { RoleHandoff } from '../../src/features/workspace/types'
+
+function openRoleHandoff(status: 'PREPARING' | 'TRANSFERRED'): RoleHandoff {
+  return {
+    id: ROLE_HANDOFF_ID,
+    roleId: ROLE_ID,
+    fromMemberId: MEMBER_ONE_ID,
+    toMemberId: MEMBER_TWO_ID,
+    outgoingAssignmentStartDate: '2026-07-02',
+    outgoingAssignmentEndDate: '2026-09-17',
+    incomingAssignmentStartDate: '2026-09-18',
+    incomingAssignmentEndDate: null,
+    status,
+    preparedAt: '2026-07-22T09:00:00Z',
+    transferredAt: status === 'TRANSFERRED' ? '2026-07-22T09:10:00Z' : null,
+    acceptedAt: null,
+    cancelledAt: null,
+    transferredByMemberId: status === 'TRANSFERRED' ? MEMBER_ONE_ID : null,
+    acceptedByMemberId: null,
+    cancelledByMemberId: null,
+    activeItemCount: status === 'TRANSFERRED' ? 2 : null,
+    incompleteItemCount: status === 'TRANSFERRED' ? 1 : null,
+    resourceCount: status === 'TRANSFERRED' ? 0 : null,
+    warningAcknowledged: status === 'TRANSFERRED',
+  }
+}
+
+function accountProjection(
+  handoff: RoleHandoff,
+  permission: 'ADMIN' | 'MEMBER',
+) {
+  const projection = makeProjection()
+  projection.team = { ...projection.team, accountAccessEnabled: true, permission }
+  projection.roleHandoffs = [handoff]
+  return projection
+}
 
 const PROBLEM_SELECTION_RESOURCE = {
   id: CREATED_ROLE_RESOURCE_ID,
@@ -1298,28 +1334,7 @@ test('@handoff 할 일 화면의 바통 알림은 인계가 가장 가까운 역
 test('@handoff 인수인계 전환이 규칙으로 거절되면 서버가 알려 준 사유를 표시한다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '거절 사유 안내는 데스크톱에서 한 번 검증합니다.')
   const projection = makeProjection()
-  projection.roleHandoffs = [{
-    id: ROLE_HANDOFF_ID,
-    roleId: ROLE_ID,
-    fromMemberId: MEMBER_ONE_ID,
-    toMemberId: MEMBER_TWO_ID,
-    outgoingAssignmentStartDate: '2026-07-02',
-    outgoingAssignmentEndDate: '2026-09-17',
-    incomingAssignmentStartDate: '2026-09-18',
-    incomingAssignmentEndDate: null,
-    status: 'PREPARING',
-    preparedAt: '2026-07-22T09:00:00Z',
-    transferredAt: null,
-    acceptedAt: null,
-    cancelledAt: null,
-    transferredByMemberId: null,
-    acceptedByMemberId: null,
-    cancelledByMemberId: null,
-    activeItemCount: null,
-    incompleteItemCount: null,
-    resourceCount: null,
-    warningAcknowledged: false,
-  }]
+  projection.roleHandoffs = [openRoleHandoff('PREPARING')]
   const api = await installApi(page, projection)
   await openSharedWorkspace(page)
 
@@ -1391,4 +1406,40 @@ test('@handoff 역할 수정이 인수인계 규칙으로 거절되면 사유를
   )
   await expect(page.getByLabel('저장하지 못한 입력 내용 (읽기 전용)'))
     .toHaveValue(/저장하지 못한 역할 목적입니다\./)
+})
+
+test('@handoff 계정 팀은 인수인계 당사자만 전달·수락을 활성화하고 취소는 관리자에게도 연다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '권한별 버튼 상태는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page, accountProjection(openRoleHandoff('PREPARING'), 'MEMBER'))
+  await installAccountSession(page, { claimedMemberId: MEMBER_THREE_ID })
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await expect(page.getByRole('button', { name: '내용 확인 후 전달' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '준비 취소' })).toBeDisabled()
+  await expect(page.getByText('박민서님의 계정으로 로그인해야 전달할 수 있습니다.')).toBeVisible()
+})
+
+test('@handoff 계정 팀의 이전 담당자는 준비한 인수인계를 전달하고 취소할 수 있다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '권한별 버튼 상태는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page, accountProjection(openRoleHandoff('PREPARING'), 'MEMBER'))
+  await installAccountSession(page, { claimedMemberId: MEMBER_ONE_ID })
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await expect(page.getByRole('button', { name: '내용 확인 후 전달' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '준비 취소' })).toBeEnabled()
+  await expect(page.getByText('계정으로 로그인해야')).toHaveCount(0)
+})
+
+test('@handoff 계정 팀의 관리자는 당사자가 아니어도 전달한 인수인계를 취소할 수 있지만 수락할 수 없다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '권한별 버튼 상태는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page, accountProjection(openRoleHandoff('TRANSFERRED'), 'ADMIN'))
+  await installAccountSession(page, { claimedMemberId: MEMBER_THREE_ID })
+  await openSharedWorkspace(page)
+  await openHandoffView(page, testInfo.project.name)
+
+  await expect(page.getByRole('button', { name: '인수인계 수락', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '전달 취소' })).toBeEnabled()
+  await expect(page.getByText('김준호님의 계정으로 로그인해야 수락할 수 있습니다.')).toBeVisible()
 })

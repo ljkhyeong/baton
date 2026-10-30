@@ -35,6 +35,7 @@ export function SeasonSwitcherModal({
   currentSeason,
   seasons,
   calendarDate,
+  canAdminister,
   endingPending,
   endingError,
   onClose,
@@ -47,6 +48,7 @@ export function SeasonSwitcherModal({
   currentSeason: SeasonSummary
   seasons: SeasonSummary[]
   calendarDate: string
+  canAdminister: boolean
   endingPending: boolean
   endingError: unknown
   onClose: () => void
@@ -111,7 +113,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className="secondary-button"
-            disabled={Boolean(currentSeason.endedAt) || endingPending}
+            disabled={!canAdminister || Boolean(currentSeason.endedAt) || endingPending}
             onClick={onEdit}
           >
             시즌 정보 수정
@@ -119,7 +121,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className={currentSeason.endedAt ? 'secondary-button' : 'secondary-button danger-text'}
-            disabled={endingPending}
+            disabled={!canAdminister || endingPending}
             onClick={onToggleEnding}
           >
             {endingPending
@@ -129,13 +131,16 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className="primary-button"
-            disabled={hasSuccessor || endingPending}
+            disabled={!canAdminister || hasSuccessor || endingPending}
             onClick={onCreateNext}
           >
             <Icon name="arrow" size={15} />
             {hasSuccessor ? '다음 시즌이 이미 있습니다' : '다음 시즌 시작'}
           </button>
         </div>
+        {!canAdminister && (
+          <small>시즌 설정·종료와 다음 시즌 생성은 관리자만 할 수 있습니다.</small>
+        )}
         <FormError error={endingError} />
       </section>
     </ModalShell>
@@ -416,10 +421,12 @@ export function NextSeasonModal({
 
 export function SeasonEndedBanner({
   season,
+  canAdminister,
   onSwitchSeason,
   onCreateNext,
 }: {
   season: SeasonSummary
+  canAdminister: boolean
   onSwitchSeason: () => void
   onCreateNext: () => void
 }) {
@@ -437,7 +444,7 @@ export function SeasonEndedBanner({
         <button type="button" className="secondary-button" onClick={onSwitchSeason}>
           다른 시즌 보기
         </button>
-        <button type="button" className="primary-button" onClick={onCreateNext}>
+        <button type="button" className="primary-button" disabled={!canAdminister} onClick={onCreateNext}>
           다음 시즌 시작
         </button>
       </div>

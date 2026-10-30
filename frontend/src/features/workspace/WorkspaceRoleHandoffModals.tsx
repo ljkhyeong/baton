@@ -36,7 +36,7 @@ import type {
   TransferRoleHandoffRequest,
 } from './types'
 
-function roleHandoffIdentityCopy(member: Member | undefined, action: string, accountAccessEnabled: boolean) {
+export function roleHandoffIdentityCopy(member: Member | undefined, action: string, accountAccessEnabled: boolean) {
   const memberName = member ? memberDisplayName(member) : '지정된 구성원'
   if (accountAccessEnabled) return `${memberName}님의 계정으로 로그인해야 ${action}할 수 있습니다.`
   return `공유 링크로 접속하면 본인 확인 없이 ${memberName}님이 ${action}한 것으로 기록됩니다.`
@@ -256,6 +256,7 @@ export function RoleHandoffModal({
                 mode === 'accept' ? '수락' : mode === 'transfer' ? '전달' : '취소',
                 accountAccessEnabled,
               )}
+              {accountAccessEnabled && mode === 'cancel' && ' 이전 담당자가 행동할 수 없으면 관리자가 취소할 수 있습니다.'}
             </p>
           </>
         )}
