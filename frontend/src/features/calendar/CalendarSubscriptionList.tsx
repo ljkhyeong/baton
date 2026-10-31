@@ -40,7 +40,7 @@ export default function CalendarSubscriptionList({ accountId }: { accountId: str
   }
   return <section className="account-security-card calendar-subscription-list" aria-labelledby="my-calendar-title">
     <header>
-      <h3 id="my-calendar-title">내 캘린더 구독</h3>
+      <h2 id="my-calendar-title">내 캘린더 구독</h2>
       <p>내 캘린더 구독을 확인하거나 해제하세요. 팀을 떠난 뒤에도 해제할 수 있습니다.</p>
     </header>
     <form className="calendar-search" role="search" aria-label="내 캘린더 구독 검색" onSubmit={event => {

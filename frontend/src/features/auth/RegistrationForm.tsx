@@ -21,7 +21,7 @@ export default function RegistrationForm({ turnstileSiteKey }: { turnstileSiteKe
     return (
       <div className="auth-result" role="status">
         <span className="auth-result-mark" aria-hidden="true">✓</span>
-        <h3>인증 메일을 확인해 주세요.</h3>
+        <h2>인증 메일을 확인해 주세요.</h2>
         <p>
           가입할 수 있는 이메일이면 인증 메일을 보내드립니다. 메일의 링크에서 비밀번호를 설정하세요.
         </p>

@@ -10,6 +10,7 @@
 .content-history dd > span { color: var(--muted); font-size: 12px; }
 .content-history pre { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0; }
 @media (max-width: 600px) { .content-history dl > div { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .content-history summary { display: flex; min-height: 44px; align-items: center; } }
 
 .archive-record-body { flex: 1; min-width: 0; }
 .archive-record-body > strong, .archive-record-body > small { display: block; }

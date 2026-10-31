@@ -72,7 +72,8 @@
 
 @media (max-width: 720px) {
   .account-topbar { padding: 0 16px; }
-  .account-topbar nav a { min-height: 44px; }
+  .account-topbar nav a,
+  .account-topbar .brand { min-height: 44px; }
   .my-teams-content { padding: 28px 16px 56px; }
   .my-teams-intro h1 { font-size: 24px; }
   .pending-invitation-notice { align-items: stretch; flex-direction: column; }

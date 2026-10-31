@@ -17,7 +17,7 @@ export default function RegistrationGate() {
     return (
       <div className="auth-result auth-result-warning" role="alert">
         <span className="auth-result-mark" aria-hidden="true">!</span>
-        <h3>지금 가입할 수 있는지 확인하지 못했습니다.</h3>
+        <h2>지금 가입할 수 있는지 확인하지 못했습니다.</h2>
         <p>잠시 후 다시 확인해 주세요. 기존 계정으로는 로그인할 수 있습니다.</p>
         <div className="auth-result-actions">
           <button
@@ -38,7 +38,7 @@ export default function RegistrationGate() {
     return (
       <div className="auth-result auth-result-warning" role="status">
         <span className="auth-result-mark" aria-hidden="true">!</span>
-        <h3>현재는 이메일로 가입할 수 없습니다.</h3>
+        <h2>현재는 이메일로 가입할 수 없습니다.</h2>
         <p>기존 이메일 계정이나 사용 가능한 소셜 계정으로 로그인하세요.</p>
         <Link className="primary-button auth-link-button" to="/login">로그인 화면으로</Link>
       </div>

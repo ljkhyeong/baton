@@ -19,7 +19,7 @@ export function ResourceReviewSchedulePanel({ scope, resourceId, accountId, edit
   }), onSuccess: result => { client.setQueryData(reviewScheduleKey(scope, resourceId), result); setDraft(null); void client.invalidateQueries({ queryKey: dueReviewsKey(scope) }) },
   onError: () => { void query.refetch() } })
   return <section className="resource-review-schedule" aria-label="자료 재확인 주기">
-    <h4>재확인 주기</h4>
+    <h3>재확인 주기</h3>
     {query.isPending ? <p role="status">재확인 일정을 불러오고 있습니다.</p>
       : query.isError ? <p role="alert">{query.error.message} <button className="secondary-button" type="button" onClick={() => void query.refetch()}>다시 불러오기</button></p>
         : <p>{query.data.nextReviewOn ? `${query.data.intervalDays}일마다 확인 · 다음 확인일 ${formatLocalDate(query.data.nextReviewOn)}${query.data.reviewDue ? ' · 재확인할 때입니다.' : ''}` : '정기 확인이 꺼져 있습니다.'}</p>}

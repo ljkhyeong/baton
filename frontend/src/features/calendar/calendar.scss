@@ -33,6 +33,7 @@
 .calendar-polling-note { color: var(--muted); font-size: 12px; }
 
 .calendar-search-fields { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.calendar-search-fields > label[for] { font-size: 12px; font-weight: 700; }
 .calendar-search-fields > button,
 .calendar-selection-actions > button,
 .calendar-bulk > button { justify-self: start; }
@@ -55,3 +56,5 @@
 .holiday-list li { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
 .holiday-list time { color: var(--muted); }
 .holiday-notice { font-weight: 600; }
+
+@media (max-width: 720px) { .calendar-filter, .holiday-month input { min-height: 44px; } }

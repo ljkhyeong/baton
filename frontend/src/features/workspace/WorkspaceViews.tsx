@@ -174,7 +174,7 @@ export function RoundControl({
   )
 }
 
-export function RoutineRow({ routine, execution, role, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, operationPending, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; operationPending: boolean; archivePending?: boolean }) {
+export function RoutineRow({ routine, execution, role, context, members, timeZone, onToggle, onSelectRole, onEdit, onArchive, pending, operationPending, archivePending = false }: { routine?: Routine; execution?: RoutineExecution; role?: Role; context?: string; members: Member[]; timeZone: string; onToggle: (execution: RoutineExecution) => void; onSelectRole: (id: string) => void; onEdit: (routine: Routine) => void; onArchive?: (routine: Routine, archived: boolean) => void; pending: boolean; operationPending: boolean; archivePending?: boolean }) {
   const displayRoutine = execution ?? routine
   if (!displayRoutine) return null
   const member = getMember(members, role?.currentMemberId)
@@ -191,7 +191,7 @@ export function RoutineRow({ routine, execution, role, members, timeZone, onTogg
         </button>
       ) : <span className="check-button check-button-unavailable" aria-hidden="true" />}
       <button type="button" className="routine-copy" onClick={() => role && onSelectRole(role.id)}>
-        <span className="routine-text"><strong>{displayRoutine.title}</strong><small>{displayRoutine.detail}</small></span>
+        <span className="routine-text"><strong>{displayRoutine.title}</strong>{context && <span className="routine-context">{context}</span>}<small>{displayRoutine.detail}</small></span>
         <span className="routine-schedule">
           {execution ? <>
             <span className={`timing-label ${execution.timingStatus.toLowerCase()}`}>{routineTimingStatusCopy[execution.timingStatus]}</span>

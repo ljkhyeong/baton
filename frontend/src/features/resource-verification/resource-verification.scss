@@ -14,7 +14,7 @@
 .resource-links > li:has(.resource-verification) { flex-wrap: wrap; }
 
 .resource-review-schedule { margin: 16px 0; border-block: 1px solid var(--rule); padding: 12px 0; }
-.resource-review-schedule h4 { margin: 0; }
+.resource-review-schedule h3 { margin: 0; font-size: 13px; }
 .resource-review-schedule fieldset { margin: 0; padding: 0; border: 0; display: grid; gap: 10px; min-width: 0; }
 .resource-review-schedule input:not([type="checkbox"]) { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--rule); }
 .resource-review-schedule .review-toggle { display: flex; align-items: center; gap: 8px; }
@@ -27,4 +27,7 @@
 .due-resource-reviews p { color: var(--muted); overflow-wrap: anywhere; }
 
 .due-reviews-heading > button { padding: 4px 0; border: 0; color: var(--muted); background: transparent; font-size: 12px; cursor: pointer; }
-@media (max-width: 720px) { .due-reviews-heading > button { min-height: 44px; } }
+@media (max-width: 720px) {
+  .due-reviews-heading > button { min-height: 44px; }
+  .resource-verification summary { display: flex; min-height: 44px; align-items: center; }
+}
