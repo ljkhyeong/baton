@@ -107,6 +107,7 @@ baton_cal_backfill_enabled="false"
 baton_cal_recovery_preparation_enabled="false"
 baton_cal_recovery_run_id=""
 baton_cal_delivery_enabled="false"
+baton_cal_subscriptions_enabled="false"
 baton_cal_season_metadata_enabled="false"
 baton_cal_season_metadata_maintenance="OFF"
 baton_cal_base_url=""
@@ -139,7 +140,7 @@ seen_baton_brief_bearer_token_file=false
 seen_baton_brief_service_host=false
 seen_baton_brief_private_network=false
 seen_baton_brief_service_api_bearer_token_file=false
-seen_baton_brief_service_truststore_file=false
+seen_baton_brief_service_trusted_certificate_file=false
 if ! production_validation_parse_literal_env "$env_file"; then
   fail "$PRODUCTION_VALIDATION_ERROR"
 fi
@@ -190,6 +191,9 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
       ;;
     BATON_CAL_DELIVERY_ENABLED)
       baton_cal_delivery_enabled="$value"
+      ;;
+    BATON_CAL_SUBSCRIPTIONS_ENABLED)
+      baton_cal_subscriptions_enabled="$value"
       ;;
     BATON_CAL_SEASON_METADATA_ENABLED)
       baton_cal_season_metadata_enabled="$value"
@@ -255,8 +259,8 @@ for ((env_index = 0; env_index < ${#PRODUCTION_VALIDATION_ENV_KEYS[@]}; env_inde
     BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE)
       seen_baton_brief_service_api_bearer_token_file=true
       ;;
-    BATON_BRIEF_SERVICE_TRUSTSTORE_FILE)
-      seen_baton_brief_service_truststore_file=true
+    BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE)
+      seen_baton_brief_service_trusted_certificate_file=true
       ;;
     BATON_STATUS_PAGE_ENABLED|BATON_SENTRY_SOURCEMAPS_UPLOAD)
       production_validation_validate_boolean fail "$key" "$value"
@@ -382,6 +386,8 @@ production_validation_validate_boolean \
 production_validation_validate_boolean \
   fail BATON_CAL_DELIVERY_ENABLED "$baton_cal_delivery_enabled"
 production_validation_validate_boolean \
+  fail BATON_CAL_SUBSCRIPTIONS_ENABLED "$baton_cal_subscriptions_enabled"
+production_validation_validate_boolean \
   fail BATON_CAL_SEASON_METADATA_ENABLED "$baton_cal_season_metadata_enabled"
 if [[ -n "$baton_cal_recovery_run_id" \
   && ! "$baton_cal_recovery_run_id" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
@@ -400,6 +406,10 @@ if [[ -n "$baton_cal_recovery_run_id" && "$baton_cal_delivery_enabled" == "true"
   [[ "$baton_cal_capture_enabled" == "true" \
     && "$baton_cal_season_metadata_enabled" == "true" ]] \
     || fail "CAL 복구 완료 확인에는 캡처와 시즌 이름 연동이 필요합니다"
+fi
+if [[ "$baton_cal_subscriptions_enabled" == "true" ]]; then
+  [[ "$baton_cal_capture_enabled" == "true" && "$baton_cal_delivery_enabled" == "true" ]] \
+    || fail "BATON_CAL_SUBSCRIPTIONS_ENABLED=true 설정에는 CAL 캡처와 전달 활성화가 필요합니다"
 fi
 if [[ "$baton_cal_delivery_enabled" == "true" ]]; then
   [[ -n "$baton_cal_base_url" ]] \
@@ -466,8 +476,8 @@ if [[ "$baton_brief_service_api_enabled" == "true" ]]; then
     || fail "BATON_BRIEF_PRIVATE_NETWORK is required when BRIEF service API is enabled"
   [[ "$seen_baton_brief_service_api_bearer_token_file" == true ]] \
     || fail "BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE is required when BRIEF service API is enabled"
-  [[ "$seen_baton_brief_service_truststore_file" == true ]] \
-    || fail "BATON_BRIEF_SERVICE_TRUSTSTORE_FILE is required when BRIEF service API is enabled"
+  [[ "$seen_baton_brief_service_trusted_certificate_file" == true ]] \
+    || fail "BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE is required when BRIEF service API is enabled"
 fi
 if [[ -n "$baton_brief_service_host" \
   && ( ${#baton_brief_service_host} -gt 63 \

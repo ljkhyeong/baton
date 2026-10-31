@@ -23,6 +23,8 @@ public final class AuthRateLimiter {
     private static final Limit LOGIN_IP = new Limit(60, Duration.ofMinutes(10));
     private static final Limit LOGIN_IP_EMAIL = new Limit(10, Duration.ofMinutes(10));
     private static final Limit LOGIN_ACCOUNT_FAILURE = new Limit(20, Duration.ofMinutes(10));
+    private static final Limit PASSWORD_CHANGE_IP = new Limit(60, Duration.ofMinutes(10));
+    private static final Limit PASSWORD_CHANGE_ACCOUNT = new Limit(10, Duration.ofMinutes(10));
     private static final Limit VERIFICATION_IP = new Limit(30, Duration.ofMinutes(10));
     private static final Limit VERIFICATION_TOKEN = new Limit(5, Duration.ofMinutes(10));
     private static final Limit ROUND_ACCOUNT_ROOM = new Limit(12, Duration.ofMinutes(1));
@@ -34,11 +36,14 @@ public final class AuthRateLimiter {
             .expireAfterAccess(Duration.ofHours(1))
             .build();
 
-    public void checkRegistration(String remoteAddress, String email) {
+    public void checkRegistrationNetwork(String remoteAddress) {
         consume(
                 "registration:ip:" + digest(normalizeClientNetwork(remoteAddress)),
                 REGISTRATION_IP
         );
+    }
+
+    public void checkRegistrationEmail(String email) {
         consume("registration:email:" + digest(normalizeEmail(email)), REGISTRATION_EMAIL);
     }
 
@@ -67,6 +72,17 @@ public final class AuthRateLimiter {
         }
     }
 
+    public void checkPasswordChange(String remoteAddress, UUID accountId) {
+        consume(
+                "password-change:ip:" + digest(normalizeClientNetwork(remoteAddress)),
+                PASSWORD_CHANGE_IP
+        );
+        consume(
+                "password-change:account:" + digest(Objects.requireNonNull(accountId).toString()),
+                PASSWORD_CHANGE_ACCOUNT
+        );
+    }
+
     public void checkVerification(String remoteAddress, String verificationToken) {
         consume(
                 "verification:ip:" + digest(normalizeClientNetwork(remoteAddress)),
@@ -87,6 +103,14 @@ public final class AuthRateLimiter {
         );
     }
 
+    // ForwardedHeaderFilter는 전달받은 IPv6 주소를 대괄호로 감싸 getRemoteAddr()에 돌려준다.
+    static String withoutIpv6Brackets(String remoteAddress) {
+        if (remoteAddress != null && remoteAddress.startsWith("[") && remoteAddress.endsWith("]")) {
+            return remoteAddress.substring(1, remoteAddress.length() - 1);
+        }
+        return remoteAddress;
+    }
+
     private void consume(String key, Limit limit) {
         Bucket bucket = buckets.get(key, ignored -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
@@ -104,8 +128,10 @@ public final class AuthRateLimiter {
         }
     }
 
+    // UsernamePasswordAuthenticationFilter의 trim()과 도메인 정규화의 strip()·소문자 변환 순서를 따른다.
     private String normalizeEmail(String email) {
         return Objects.requireNonNullElse(email, "")
+                .trim()
                 .strip()
                 .toLowerCase(Locale.ROOT);
     }
@@ -115,7 +141,7 @@ public final class AuthRateLimiter {
     }
 
     private String normalizeClientNetwork(String remoteAddress) {
-        String candidate = Objects.requireNonNullElse(remoteAddress, "").strip();
+        String candidate = withoutIpv6Brackets(Objects.requireNonNullElse(remoteAddress, "").strip());
         int zoneDelimiter = candidate.indexOf('%');
         if (zoneDelimiter >= 0) {
             candidate = candidate.substring(0, zoneDelimiter);

@@ -3,6 +3,7 @@ package com.personal.baton.application.workspace;
 import com.personal.baton.application.workspace.error.SeasonEndedException;
 import com.personal.baton.application.workspace.error.WorkspaceAccessDeniedException;
 import com.personal.baton.application.roundauth.port.out.RoundAuthorizationRepository;
+import com.personal.baton.application.roundauth.ActiveAccountTeamMembershipVerifier;
 import com.personal.baton.application.workspace.port.out.TeamAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspaceAccessRepository;
 import com.personal.baton.application.workspace.port.out.WorkspacePeopleRepository;
@@ -143,7 +144,8 @@ class WorkspaceScopeAuthorizerTest {
         when(fixture.seasonRepository.findSeasonByTeamIdAndIdForUpdate(TEAM_ID, SEASON_ID))
                 .thenReturn(Optional.of(fixture.season));
         var policy = new TeamAccountAccessPolicy(
-                () -> Optional.of(accountId), memberships, people, mock(TeamAccessRepository.class)
+                () -> Optional.of(accountId), memberships, people, mock(TeamAccessRepository.class),
+                mock(ActiveAccountTeamMembershipVerifier.class)
         );
         var authorizer = new WorkspaceScopeAuthorizer(
                 fixture.accessRepository, fixture.seasonRepository,

@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 import tools.jackson.databind.ObjectMapper;
 
 class LocalLoginRateLimitFilterTest {
@@ -35,6 +36,47 @@ class LocalLoginRateLimitFilterTest {
                 "{\"code\":\"AUTH_RATE_LIMITED\","
                         + "\"message\":\"인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요\"}"
         );
+    }
+
+    @DisplayName("프록시가 전달한 IPv6 클라이언트는 ForwardedHeaderFilter를 거쳐도 /64별로 제한한다")
+    @Test
+    void separatesForwardedIpv6Networks() throws Exception {
+        LocalLoginRateLimitFilter filter = new LocalLoginRateLimitFilter(
+                new AuthRateLimiter(),
+                new SecurityErrorResponseWriter(new ObjectMapper())
+        );
+        ForwardedHeaderFilter forwardedHeaderFilter = new ForwardedHeaderFilter();
+
+        for (int attempt = 0; attempt < 60; attempt += 1) {
+            forwarded(filter, forwardedHeaderFilter, "2001:db8:abcd:42::1", "member-" + attempt + "@example.com");
+        }
+
+        assertThat(forwarded(filter, forwardedHeaderFilter, "2001:db8:abcd:42::2", "another@example.com").getStatus())
+                .isEqualTo(429);
+        assertThat(forwarded(filter, forwardedHeaderFilter, "2001:db8:abcd:43::1", "another@example.com").getStatus())
+                .isEqualTo(200);
+    }
+
+    private MockHttpServletResponse forwarded(
+            LocalLoginRateLimitFilter filter,
+            ForwardedHeaderFilter forwardedHeaderFilter,
+            String clientAddress,
+            String email
+    ) throws Exception {
+        MockHttpServletRequest request = request();
+        request.setParameter("email", email);
+        request.addHeader("X-Forwarded-For", clientAddress);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        forwardedHeaderFilter.doFilter(
+                request,
+                response,
+                (forwardedRequest, forwardedResponse) -> filter.doFilter(
+                        forwardedRequest,
+                        forwardedResponse,
+                        new MockFilterChain()
+                )
+        );
+        return response;
     }
 
     private MockHttpServletRequest request() {

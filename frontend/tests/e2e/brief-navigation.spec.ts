@@ -472,6 +472,33 @@ test('잘못된 주간 요약 링크와 조회 거부 시 최신 주간 요약�
   }
 })
 
+test('잘못된 주간 요약 링크를 지워도 저장해 지운 접근 키를 주소에 되살리지 않는다 @smoke', async ({ page }) => {
+  await installSharedEdition(page)
+  await page.goto(`${WORKSPACE_PATH}?brief=잘못된값#accessKey=${ACCESS_KEY}`)
+  const panel = page.locator('.brief-attention')
+  await expect(panel.getByRole('alert')).toContainText('주간 요약 링크가 올바르지 않습니다.')
+  await expect.poll(() => new URL(page.url()).hash).toBe('')
+
+  await panel.getByRole('button', { name: '링크 선택 지우기' }).click()
+
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(page).toHaveURL(WORKSPACE_PATH)
+})
+
+test('저장하지 못한 접근 키는 주간 요약 링크를 지워도 주소에 남겨 작업 공간을 유지한다 @smoke', async ({ page }) => {
+  await blockAccessKeyStorage(page)
+  await installSharedEdition(page)
+  await page.goto(`${WORKSPACE_PATH}?brief=잘못된값#accessKey=${ACCESS_KEY}`)
+  const panel = page.locator('.brief-attention')
+  await expect(panel.getByRole('alert')).toContainText('주간 요약 링크가 올바르지 않습니다.')
+
+  await panel.getByRole('button', { name: '링크 선택 지우기' }).click()
+
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(page).toHaveURL(`${WORKSPACE_PATH}#accessKey=${ACCESS_KEY}`)
+  await expect(page.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
+})
+
 test('인쇄에는 선택한 불변 주간 요약과 현재 업무명 구분만 담는다 @smoke', async ({ page, browserName }, testInfo) => {
   await blockAccessKeyStorage(page)
   await installSharedEdition(page, { printItems: true })

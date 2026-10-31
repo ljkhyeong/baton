@@ -8,6 +8,7 @@ import {
   ACCESS_KEY,
   WORKSPACE_PATH,
   SCOPE_PATH,
+  PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY,
   PENDING_CREATION_STORAGE_PREFIX,
   RECENT_WORKSPACE,
   makeProjection,
@@ -193,6 +194,28 @@ test('온보딩 자격 증명 응답이 손상되면 생성 임시 기록과 현
     }),
   ])
   expect(await storedAccessKey(page)).toBeNull()
+})
+
+test('오프라인에서 온보딩을 제출해도 멈추지 않고 네트워크 오류와 재시도 기록을 남긴다', async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '오프라인 제출 경로는 데스크톱에서 한 번 검증합니다.')
+  await installApi(page)
+  await page.goto('/start')
+  await fillOnboardingForm(page, {
+    teamName: '오프라인 스터디',
+    seasonName: '2026 여름 시즌',
+    startDate: '2026-07-02',
+    endDate: '2026-09-17',
+    memberNames: ['박민서', '김준호'],
+  })
+
+  await context.setOffline(true)
+  // 가로챈 요청은 오프라인에서도 응답을 받으므로 실제 연결 실패를 직접 만든다.
+  await page.route('**/api/v1/**', (route) => route.abort('internetdisconnected'))
+  await page.getByRole('button', { name: '작업 공간 만들기' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('서버에 연결하지 못해 요청 결과를 확인할 수 없습니다.')
+  await expect(page.getByRole('button', { name: '작업 공간 만들기' })).toBeEnabled()
+  expect(await pendingCreationEntries(page)).toHaveLength(1)
 })
 
 test('같은 구성원 이름은 구분해서 입력하도록 안내하고 API를 호출하지 않는다', async ({ page }) => {
@@ -1093,8 +1116,14 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
       roomId,
     )
   }, { roomId: 'bcdf-ghjk-mnpq', teamId: TEAM_ID, seasonId: SEASON_ID })
+  const otherTeamRotationKey = 'baton-pending-access-key-change:v1:00000000-0000-4000-8000-000000000099'
+  await page.evaluate((storageKeys) => {
+    const rotation = JSON.stringify({ operation: 'rotate', idempotencyKey: crypto.randomUUID() })
+    storageKeys.forEach((storageKey) => localStorage.setItem(storageKey, rotation))
+  }, [PENDING_ACCESS_KEY_ROTATION_STORAGE_KEY, otherTeamRotationKey])
   const peer = await context.newPage()
   await api.attachPage(peer)
+  await peer.route('**/api/v1/auth/session', (route) => route.fulfill({ json: { authenticated: false } }))
   await peer.goto(WORKSPACE_PATH)
   await expect(peer.getByRole('heading', { level: 1, name: /남은 업무 \d+개/ })).toBeVisible()
   const workspaceGetCount = () => recordedCalls(api, 'GET', `${SCOPE_PATH}/workspace`).length
@@ -1121,6 +1150,9 @@ test('@smoke 이 기기에서 삭제는 접근 키와 최근 목록과 ROUND 기
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => (
     key.startsWith('baton-round-entry:') || key.startsWith('baton-round-resource:')
   )))).toEqual([])
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => (
+    key.startsWith('baton-pending-access-key-change:')
+  )))).toEqual([otherTeamRotationKey])
   await peer.close()
 })
 

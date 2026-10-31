@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TeamInvitationJpaRepository extends JpaRepository<TeamInvitation, UUID> {
-    List<TeamInvitation> findAllByTeamIdOrderByCreatedAtDesc(UUID teamId);
+    List<TeamInvitation> findTop50ByTeamIdOrderByCreatedAtDescIdDesc(UUID teamId);
     List<TeamInvitation> findAllByTeamIdAndMemberIdAndAcceptedAtIsNullAndRevokedAtIsNull(UUID teamId, UUID memberId);
     Optional<TeamInvitation> findByTokenHash(String tokenHash);
     @Query("select i.teamId from TeamInvitation i where i.tokenHash = :tokenHash")

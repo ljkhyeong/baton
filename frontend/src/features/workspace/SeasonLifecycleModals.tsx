@@ -4,7 +4,8 @@ import { addCalendarDays } from '@/shared/lib/calendarDate'
 import { formatInstantDate } from '@/shared/lib/dateTimeFormat'
 import { Icon } from '@/shared/ui/Icon'
 import { daysUntil } from './seasonCalendar'
-import { FormActions, FormError, ModalShell } from './WorkspaceModalPrimitives'
+import { FormActions, FormError, ModalShell, useSubmissionLock } from './WorkspaceModalPrimitives'
+import type { SaveResult } from './WorkspaceModalPrimitives'
 import { formatLocalDate } from './workspacePresentation'
 import type {
   CreateNextSeasonRequest,
@@ -35,6 +36,8 @@ export function SeasonSwitcherModal({
   currentSeason,
   seasons,
   calendarDate,
+  canAdminister,
+  changesDisabled,
   endingPending,
   endingError,
   onClose,
@@ -47,6 +50,8 @@ export function SeasonSwitcherModal({
   currentSeason: SeasonSummary
   seasons: SeasonSummary[]
   calendarDate: string
+  canAdminister: boolean
+  changesDisabled: boolean
   endingPending: boolean
   endingError: unknown
   onClose: () => void
@@ -63,6 +68,7 @@ export function SeasonSwitcherModal({
   )
   const hasSuccessor = seasons.some((season) =>
     season.previousSeasonId === currentSeason.id)
+  const reopenBlocked = Boolean(currentSeason.endedAt) && hasSuccessor
 
   return (
     <ModalShell
@@ -103,7 +109,7 @@ export function SeasonSwitcherModal({
           <strong>{currentSeason.name}</strong>
           <small>
             {currentSeason.endedAt
-              ? `${formatInstantDate(currentSeason.endedAt)}에 종료`
+              ? `${formatInstantDate(currentSeason.endedAt, currentSeason.timeZone)}에 종료${reopenBlocked ? ' · 다음 시즌이 있어 다시 열 수 없습니다.' : ''}`
               : '시즌을 종료하면 기록을 수정할 수 없습니다.'}
           </small>
         </div>
@@ -111,7 +117,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className="secondary-button"
-            disabled={Boolean(currentSeason.endedAt) || endingPending}
+            disabled={!canAdminister || changesDisabled || Boolean(currentSeason.endedAt) || endingPending}
             onClick={onEdit}
           >
             시즌 정보 수정
@@ -119,7 +125,7 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className={currentSeason.endedAt ? 'secondary-button' : 'secondary-button danger-text'}
-            disabled={endingPending}
+            disabled={!canAdminister || changesDisabled || endingPending || reopenBlocked}
             onClick={onToggleEnding}
           >
             {endingPending
@@ -129,13 +135,19 @@ export function SeasonSwitcherModal({
           <button
             type="button"
             className="primary-button"
-            disabled={hasSuccessor || endingPending}
+            disabled={!canAdminister || changesDisabled || hasSuccessor || endingPending}
             onClick={onCreateNext}
           >
             <Icon name="arrow" size={15} />
             {hasSuccessor ? '다음 시즌이 이미 있습니다' : '다음 시즌 시작'}
           </button>
         </div>
+        {!canAdminister && (
+          <small>시즌 설정·종료와 다음 시즌 생성은 관리자만 할 수 있습니다.</small>
+        )}
+        {changesDisabled && (
+          <small>최신 기록을 불러온 뒤 시즌을 변경할 수 있습니다.</small>
+        )}
         <FormError error={endingError} />
       </section>
     </ModalShell>
@@ -153,8 +165,9 @@ export function SeasonEditModal({
   pending: boolean
   error: unknown
   onClose: () => void
-  onSave: (request: UpdateSeasonRequest) => void
+  onSave: (request: UpdateSeasonRequest) => SaveResult
 }) {
+  const submission = useSubmissionLock(pending)
   const [name, setName] = useState(season.name)
   const [startDate, setStartDate] = useState(season.startDate)
   const [endDate, setEndDate] = useState(season.endDate)
@@ -162,13 +175,14 @@ export function SeasonEditModal({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (submission.closeGuardRef.current) return
     const normalizedName = name.trim()
     if (!normalizedName) {
       setValidationError('시즌 이름을 입력해 주세요.')
       return
     }
     setValidationError('')
-    onSave({ name: normalizedName, startDate, endDate })
+    submission.start(onSave({ name: normalizedName, startDate, endDate }))
   }
 
   return (
@@ -177,7 +191,8 @@ export function SeasonEditModal({
       kicker="시즌"
       title="시즌 정보 수정"
       description="시즌 이름과 기간을 바꿉니다. 기존 모임 날짜와 담당 기간은 새 기간 안에 있어야 합니다."
-      closeDisabled={pending}
+      closeDisabled={submission.pending}
+      closeGuardRef={submission.closeGuardRef}
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -216,7 +231,7 @@ export function SeasonEditModal({
         </div>
         {validationError && <p className="form-error" role="alert">{validationError}</p>}
         <FormError error={error} />
-        <FormActions pending={pending} submitLabel="시즌 정보 저장" pendingLabel="저장하는 중…" onClose={onClose} />
+        <FormActions pending={submission.pending} closeGuardRef={submission.closeGuardRef} submitLabel="시즌 정보 저장" pendingLabel="저장하는 중…" onClose={onClose} />
       </form>
     </ModalShell>
   )
@@ -320,6 +335,9 @@ export function NextSeasonModal({
       return
     }
     setValidationError('')
+    if (!window.confirm(sourceSeason.endedAt
+      ? '다음 시즌을 만들면 종료한 현재 시즌을 다시 열 수 없습니다. 다음 시즌을 만들까요?'
+      : '현재 시즌은 바로 종료되고 다시 열 수 없습니다. 다음 시즌을 만들까요?')) return
     onSave(request)
   }
 
@@ -336,7 +354,7 @@ export function NextSeasonModal({
         <div className="season-copy-boundary">
           <Icon name="spark" size={17} />
           <p>
-            역할 설명과 반복 업무를 복사합니다. 담당자와 담당 기간은 새로 정해야 합니다. 이전 회차·결정·인수인계 기록은 복사하지 않습니다.
+            역할 설명과 반복 업무를 복사합니다. 담당자와 담당 기간은 새로 정해야 합니다. 이전 회차·결정·인수인계 기록은 복사하지 않습니다. 다음 시즌을 만들면 현재 시즌은 다시 열 수 없습니다.
           </p>
         </div>
         <div className="form-grid">
@@ -416,10 +434,14 @@ export function NextSeasonModal({
 
 export function SeasonEndedBanner({
   season,
+  canAdminister,
+  changesDisabled,
   onSwitchSeason,
   onCreateNext,
 }: {
   season: SeasonSummary
+  canAdminister: boolean
+  changesDisabled: boolean
   onSwitchSeason: () => void
   onCreateNext: () => void
 }) {
@@ -430,14 +452,14 @@ export function SeasonEndedBanner({
         <Icon name="check" size={18} />
         <span>
           <strong>이 시즌은 읽기 전용입니다.</strong>
-          <small>{formatInstantDate(season.endedAt)}에 종료되어 기록을 바꿀 수 없습니다.</small>
+          <small>{formatInstantDate(season.endedAt, season.timeZone)}에 종료되어 기록을 바꿀 수 없습니다.</small>
         </span>
       </div>
       <div>
         <button type="button" className="secondary-button" onClick={onSwitchSeason}>
           다른 시즌 보기
         </button>
-        <button type="button" className="primary-button" onClick={onCreateNext}>
+        <button type="button" className="primary-button" disabled={!canAdminister || changesDisabled} onClick={onCreateNext}>
           다음 시즌 시작
         </button>
       </div>

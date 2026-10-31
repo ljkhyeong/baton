@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page, Route } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type {
   CreateNextSeasonRequest,
   CreateRoleResourceRequest,
@@ -34,6 +34,10 @@ const WORKSPACE_URL = `/teams/${TEAM_ID}/seasons/${SOURCE_SEASON_ID}`
 const ENDED_AT = '2026-07-30T03:00:00Z'
 const PENDING_SEASON_SUCCESSOR_STORAGE_KEY =
   `baton-pending-season-successor:v1:${TEAM_ID}`
+const OPEN_HANDOFF_ENDING_MESSAGE =
+  '준비 중이거나 수락을 기다리는 인수인계를 수락 또는 취소한 뒤 시즌을 종료해 주세요'
+const OPEN_HANDOFF_SUCCESSOR_MESSAGE =
+  '준비 중이거나 수락을 기다리는 인수인계를 수락 또는 취소한 뒤 다음 시즌을 시작해 주세요'
 
 const sourceSeason = (endedAt: string | null = null): SeasonSummary => ({
   id: SOURCE_SEASON_ID,
@@ -185,6 +189,10 @@ type SeasonApiHarness = {
   waitForHeldRoleUpdate: () => Promise<void>
   releaseHeldRoleUpdate: () => void
   rejectNextSuccessorAsInvalidInput: () => void
+  rejectNextSuccessorForOpenHandoff: () => void
+  conflictNextSuccessor: () => void
+  blockSeasonEndingForOpenHandoff: () => void
+  allowSeasonEnding: () => void
 }
 
 async function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -204,6 +212,9 @@ async function attachSeasonApi(
   let heldRoleUpdateStarted = Promise.resolve()
   let markHeldRoleUpdateStarted = () => {}
   let rejectNextSuccessorAsInvalidInput = false
+  let rejectNextSuccessorForOpenHandoff = false
+  let conflictNextSuccessor = false
+  let seasonEndingBlockedByHandoff = false
   let rejectNextSeasonUpdateAsConflict = false
   const harness: SeasonApiHarness = {
     successorAttempts: [],
@@ -226,6 +237,18 @@ async function attachSeasonApi(
     releaseHeldRoleUpdate: () => releaseHeldRoleUpdate(),
     rejectNextSuccessorAsInvalidInput: () => {
       rejectNextSuccessorAsInvalidInput = true
+    },
+    rejectNextSuccessorForOpenHandoff: () => {
+      rejectNextSuccessorForOpenHandoff = true
+    },
+    conflictNextSuccessor: () => {
+      conflictNextSuccessor = true
+    },
+    blockSeasonEndingForOpenHandoff: () => {
+      seasonEndingBlockedByHandoff = true
+    },
+    allowSeasonEnding: () => {
+      seasonEndingBlockedByHandoff = false
     },
   }
 
@@ -283,6 +306,22 @@ async function attachSeasonApi(
         }, 400)
         return
       }
+      if (rejectNextSuccessorForOpenHandoff) {
+        rejectNextSuccessorForOpenHandoff = false
+        await fulfillJson(route, {
+          code: 'ROLE_HANDOFF_STATE_CONFLICT',
+          message: OPEN_HANDOFF_SUCCESSOR_MESSAGE,
+        }, 409)
+        return
+      }
+      if (conflictNextSuccessor) {
+        conflictNextSuccessor = false
+        await fulfillJson(route, {
+          code: 'WORKSPACE_CONTENT_CONFLICT',
+          message: '다른 요청이 먼저 처리되고 있습니다.',
+        }, 409)
+        return
+      }
       source = { ...source, endedAt: source.endedAt ?? ENDED_AT }
       target = {
         id: NEXT_SEASON_ID,
@@ -303,6 +342,20 @@ async function attachSeasonApi(
           routineId: COPIED_ROUTINE_ID,
         }],
       }, 201)
+      return
+    }
+
+    if (method === 'PATCH' && path === `${SOURCE_SCOPE}/ending`) {
+      if (seasonEndingBlockedByHandoff) {
+        await fulfillJson(route, {
+          code: 'ROLE_HANDOFF_STATE_CONFLICT',
+          message: OPEN_HANDOFF_ENDING_MESSAGE,
+        }, 409)
+        return
+      }
+      const { ended } = request.postDataJSON() as { ended: boolean }
+      source = { ...source, endedAt: ended ? ENDED_AT : null }
+      await fulfillJson(route, source)
       return
     }
 
@@ -373,8 +426,15 @@ async function openNextSeasonDialog(page: Page) {
   return page.getByRole('dialog', { name: '다음 시즌 시작' })
 }
 
+async function submitNextSeason(dialog: Locator) {
+  dialog.page().once('dialog', (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
+}
+
 test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 최신 데이터를 불러온다', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', '중앙 충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const pageErrors: Error[] = []
+  page.on('pageerror', (error) => pageErrors.push(error))
   const api = await attachSeasonApi(page)
   await openWorkspace(page)
 
@@ -392,6 +452,32 @@ test('@operations 시즌 정보 충돌도 중앙 복구가 편집기를 닫고 �
   await seasonSwitcher(page).click()
   await expect(page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' }))
     .toContainText('다른 구성원이 고친 시즌')
+  expect(pageErrors).toEqual([])
+})
+
+test('@operations 충돌 뒤 최신 내용을 불러오지 못하면 시즌 관리 동작을 막는다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  await page.getByRole('button', { name: '시즌 정보 수정' }).click()
+  const editDialog = page.getByRole('dialog', { name: '시즌 정보 수정' })
+  await editDialog.getByLabel('시즌 이름').fill('내가 고친 시즌')
+  api.conflictNextSeasonUpdate()
+  await page.route('**/api/v1/teams/**/workspace', (route) => route.fulfill({
+    status: 503,
+    json: { code: 'INTERNAL_ERROR', message: '일시적인 장애입니다.' },
+  }))
+  await editDialog.getByRole('button', { name: '시즌 정보 저장' }).click()
+  await expect(editDialog).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '최신 내용 다시 확인' })).toBeVisible()
+
+  await seasonSwitcher(page).click()
+  const seasons = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+  await expect(seasons).toContainText('최신 기록을 불러온 뒤 시즌을 변경할 수 있습니다.')
+  await expect(seasons.getByRole('button', { name: '시즌 정보 수정' })).toBeDisabled()
+  await expect(seasons.getByRole('button', { name: '시즌 종료' })).toBeDisabled()
 })
 
 test('@smoke @responsive 시즌 전환은 URL과 화면 상태를 함께 바꾸고 초점을 복원한다', async ({ page }) => {
@@ -467,7 +553,7 @@ test("@handoff 다음 시즌 시작 화면을 떠난 뒤 늦은 성공 응답이
   await openWorkspace(page)
   const dialog = await openNextSeasonDialog(page)
   await dialog.getByLabel("다음 시즌 이름").fill("2026 가을 시즌")
-  await dialog.getByRole("button", { name: "현재 시즌 종료하고 만들기" }).click()
+  await submitNextSeason(dialog)
   await requestStarted.promise
 
   await page.evaluate(() => {
@@ -508,7 +594,7 @@ test('@handoff 다음 시즌 선택은 담당 역할 의존성을 지키고 멱�
   await expect(secondRoutine).not.toBeChecked()
 
   await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
-  await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
+  await submitNextSeason(dialog)
 
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
   await expect(page.getByRole('heading', { name: '남은 업무 0개' })).toBeVisible()
@@ -537,7 +623,7 @@ test('@handoff 다음 시즌 성공 기록을 삭제하지 못하면 새 시즌 
 
   const dialog = await openNextSeasonDialog(page)
   await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
-  await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
+  await submitNextSeason(dialog)
 
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
   await expect(page.evaluate((storageKey) =>
@@ -581,7 +667,7 @@ test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못�
 
   const dialog = await openNextSeasonDialog(page)
   await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
-  await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
+  await submitNextSeason(dialog)
 
   await expect(dialog.getByText(
     '다음 시즌 생성에 사용한 임시 기록을 삭제하지 못했습니다. 사이트 데이터 저장을 허용한 뒤 다시 시도해 주세요.',
@@ -613,7 +699,7 @@ test('@handoff 다음 시즌 종료 요청의 임시 기록을 삭제하지 못�
   await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
   await dialog.getByLabel('시작일').fill('2026-10-01')
   await dialog.getByLabel('종료일').fill('2026-12-31')
-  await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
+  await submitNextSeason(dialog)
 
   await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
   expect(api.successorAttempts).toHaveLength(2)
@@ -683,6 +769,110 @@ test('@operations 서버가 시즌 종료를 알리면 열려 있던 편집기�
   await expect(page.getByText('다른 구성원이 시즌을 종료했습니다.')).toBeVisible()
 })
 
+
+test('@handoff 열린 인수인계로 시즌을 종료할 수 없으면 창을 유지하고 서버 사유를 보여 준다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '시즌 종료 거절 안내는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page)
+  api.blockSeasonEndingForOpenHandoff()
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  const dialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+  page.once('dialog', (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '시즌 종료' }).click()
+
+  await expect(dialog.getByRole('alert')).toHaveText(OPEN_HANDOFF_ENDING_MESSAGE)
+  await expect(dialog).toBeVisible()
+  await expect(page.getByText('다른 사람이 수정한')).toHaveCount(0)
+
+  api.allowSeasonEnding()
+  page.once('dialog', (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '시즌 종료' }).click()
+  await expect(page.locator('.toast[role="status"]')).toContainText('시즌을 종료했습니다.')
+})
+
+test('@handoff 열린 인수인계로 다음 시즌을 시작할 수 없으면 입력을 유지하고 임시 기록을 지운다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 시즌 거절 안내는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page, null, false)
+  api.rejectNextSuccessorForOpenHandoff()
+  await openWorkspace(page)
+
+  const dialog = await openNextSeasonDialog(page)
+  await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
+  await submitNextSeason(dialog)
+
+  await expect(dialog.getByRole('alert')).toHaveText(OPEN_HANDOFF_SUCCESSOR_MESSAGE)
+  await expect(dialog.getByLabel('다음 시즌 이름')).toHaveValue('2026 가을 시즌')
+  await expect(page.evaluate((storageKey) =>
+    window.localStorage.getItem(storageKey), PENDING_SEASON_SUCCESSOR_STORAGE_KEY))
+    .resolves.toBeNull()
+
+  await dialog.getByLabel('다음 시즌 이름').fill('이름을 바꾼 가을 시즌')
+  await submitNextSeason(dialog)
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  expect(api.successorAttempts).toHaveLength(2)
+  expect(api.successorAttempts[1]!.idempotencyKey).not.toBe(api.successorAttempts[0]!.idempotencyKey)
+})
+
+test('@handoff 다음 시즌 생성이 충돌해도 창과 입력을 유지하고 같은 요청으로 다시 제출한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '다음 시즌 충돌 복구는 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page, null, false)
+  api.conflictNextSuccessor()
+  await openWorkspace(page)
+
+  const dialog = await openNextSeasonDialog(page)
+  await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
+  await submitNextSeason(dialog)
+
+  await expect(dialog.getByRole('alert')).toContainText('최신 내용을 확인한 뒤 다시 시도해 주세요.')
+  await expect(dialog.getByLabel('다음 시즌 이름')).toHaveValue('2026 가을 시즌')
+
+  await submitNextSeason(dialog)
+  await expect(page).toHaveURL(`/teams/${TEAM_ID}/seasons/${NEXT_SEASON_ID}`)
+  expect(api.successorAttempts[1]!.idempotencyKey).toBe(api.successorAttempts[0]!.idempotencyKey)
+})
+
+test('@handoff 다음 시즌 시작을 확인하지 않으면 요청을 보내지 않고 현재 시즌을 유지한다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '되돌릴 수 없는 전환 확인은 데스크톱에서 한 번 검증합니다.')
+  const api = await attachSeasonApi(page, null, false)
+  await openWorkspace(page)
+
+  const dialog = await openNextSeasonDialog(page)
+  await dialog.getByLabel('다음 시즌 이름').fill('2026 가을 시즌')
+  let confirmation = ''
+  page.once('dialog', async (prompt) => {
+    confirmation = prompt.message()
+    await prompt.dismiss()
+  })
+  await dialog.getByRole('button', { name: '현재 시즌 종료하고 만들기' }).click()
+
+  await expect.poll(() => confirmation).toContain('현재 시즌은 바로 종료되고 다시 열 수 없습니다')
+  await expect(dialog).toBeVisible()
+  expect(api.successorAttempts).toHaveLength(0)
+})
+
+test('@handoff 종료한 시즌에 다음 시즌이 있으면 시즌 다시 열기를 비활성화하고 이유를 알린다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '시즌 다시 열기 제한은 데스크톱에서 한 번 검증합니다.')
+  await attachSeasonApi(page, ENDED_AT)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  const dialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+  await expect(dialog.getByRole('button', { name: '시즌 다시 열기' })).toBeDisabled()
+  await expect(dialog).toContainText('다음 시즌이 있어 다시 열 수 없습니다.')
+})
+
+test('@operations 다음 시즌이 없는 종료 시즌은 다시 열 수 있다', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', '시즌 다시 열기는 데스크톱에서 한 번 검증합니다.')
+  await attachSeasonApi(page, ENDED_AT, false)
+  await openWorkspace(page)
+
+  await seasonSwitcher(page).click()
+  const dialog = page.getByRole('dialog', { name: '알고리즘 한 바퀴 시즌' })
+  page.once('dialog', (confirmation) => confirmation.accept())
+  await dialog.getByRole('button', { name: '시즌 다시 열기' }).click()
+  await expect(page.locator('.toast[role="status"]')).toContainText('시즌을 다시 열었습니다.')
+})
 
 test('@handoff @responsive 이전 시즌 기록을 필요할 때 조회하고 선택한 자료만 현재 역할에 연결한다', async ({ page }, testInfo) => {
   await attachSeasonApi(page, ENDED_AT)

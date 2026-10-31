@@ -45,7 +45,8 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
         } catch (ResourceAccessException exception) {
             return SynchronizationResult.retryable("WATCH_NETWORK_FAILURE");
         } catch (RestClientException exception) {
-            return SynchronizationResult.retryable("WATCH_CLIENT_FAILURE");
+            return SynchronizationResult.retryable(exception.getMostSpecificCause() instanceof IOException
+                    ? "WATCH_NETWORK_FAILURE" : "WATCH_CLIENT_FAILURE");
         }
     }
 
@@ -85,6 +86,10 @@ public final class RestClientWatchMonitorClient implements WatchMonitorClient {
             WatchProblemResponse problem = response.bodyTo(WatchProblemResponse.class);
             return problem == null ? null : problem.code();
         } catch (RestClientException exception) {
+            // 본문을 끝까지 받지 못하면 코드를 판단할 수 없으므로 영구 실패로 분류하지 않는다.
+            if (exception.getMostSpecificCause() instanceof IOException) {
+                throw exception;
+            }
             return null;
         }
     }

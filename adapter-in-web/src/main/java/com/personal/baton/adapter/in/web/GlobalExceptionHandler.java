@@ -34,9 +34,11 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -55,6 +57,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "INTERNAL_ERROR",
             "서버에서 요청을 처리하지 못했습니다"
     );
+    private static final String INVALID_VALUE_MESSAGE = "요청 값 형식이 올바르지 않습니다";
 
     private record ErrorMapping(HttpStatus status, String code) {
     }
@@ -105,7 +108,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             ErrorMapping mapping = ERROR_MAPPINGS.get(type);
             if (mapping != null) {
                 HttpObservationErrors.mark(servletRequest(request), exception);
-                return ResponseEntity.status(mapping.status())
+                return jsonError(mapping.status())
                         .body(new ErrorResponse(mapping.code(), exception.getMessage()));
             }
         }
@@ -118,8 +121,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             HttpServletRequest request
     ) {
         HttpObservationErrors.mark(request, exception);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        return jsonError(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
+    }
+
+    // 어댑터가 애그리게이트별 충돌로 바꾸지 못한 교착·잠금 실패다. 원래 메시지의 SQL을 숨기고,
+    // 정상적인 수정 충돌과 구분해 원인을 찾을 수 있도록 서버 로그를 남긴다.
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<Object> handleConcurrencyFailure(
+            ConcurrencyFailureException exception,
+            WebRequest request
+    ) {
+        LOG.warn("Unconverted lock failure: {}", request.getDescription(false), exception);
+        return handleApplicationException(new WorkspaceContentConflictException(exception), request);
     }
 
     @ExceptionHandler(ResourceCheckRequestException.class)
@@ -130,7 +144,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
             case UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
         };
-        var response = ResponseEntity.status(status).header(HttpHeaders.CACHE_CONTROL, "no-store");
+        var response = jsonError(status).header(HttpHeaders.CACHE_CONTROL, "no-store");
         if (exception.retryAfterSeconds() != null) {
             response.header(HttpHeaders.RETRY_AFTER, exception.retryAfterSeconds().toString());
         }
@@ -162,7 +176,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .sorted(Comparator.comparing(error -> error.getField()))
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .map(error -> error.getField() + ": "
+                        + (error.isBindingFailure() ? INVALID_VALUE_MESSAGE : error.getDefaultMessage()))
                 .collect(Collectors.joining(", "));
         return handleExceptionInternal(exception, new ErrorResponse("INVALID_INPUT", message), headers, status, request);
     }
@@ -176,7 +191,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ) {
         return handleExceptionInternal(
                 exception,
-                new ErrorResponse("INVALID_INPUT", "요청 값 형식이 올바르지 않습니다"),
+                new ErrorResponse("INVALID_INPUT", INVALID_VALUE_MESSAGE),
                 headers,
                 status,
                 request
@@ -210,7 +225,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             return super.createResponseEntity(null, headers, status, request);
         }
         Object normalizedBody = body instanceof ErrorResponse ? body : frameworkError(status);
-        return super.createResponseEntity(normalizedBody, headers, status, request);
+        return jsonError(status).headers(headers).body(normalizedBody);
     }
 
     @Override
@@ -234,6 +249,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 request
         );
+    }
+
+    // Accept와 협상하면 비JSON 요청에서 쓰기에 실패해 본문 없는 500으로 번지므로 형식을 고정한다.
+    private ResponseEntity.BodyBuilder jsonError(HttpStatusCode status) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON);
     }
 
     private ErrorResponse frameworkError(HttpStatusCode status) {

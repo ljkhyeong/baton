@@ -3,6 +3,10 @@ import {
   forgetRoundRoomEntryContextsForTeam,
 } from '@/features/round/storage'
 import {
+  clearAllPendingAccessKeyRotations,
+  forgetPendingAccessKeyRotation,
+} from '@/features/workspace/pendingAccessKeyChange'
+import {
   clearAllWorkspaceCapabilitiesAndRecents,
   forgetWorkspaceCapabilityAndRecents,
 } from '@/features/workspace/storage'
@@ -17,6 +21,7 @@ export function forgetWorkspaceDeviceState(
 ): ForgetWorkspaceDeviceStateResult {
   const capabilityResult = forgetWorkspaceCapabilityAndRecents(teamId)
   const roundContextRemoved = forgetRoundRoomEntryContextsForTeam(teamId)
+  forgetPendingAccessKeyRotation(teamId)
   if (capabilityResult !== 'removed') return capabilityResult
   return roundContextRemoved ? 'removed' : 'round-context-cleanup-failed'
 }
@@ -24,5 +29,6 @@ export function forgetWorkspaceDeviceState(
 export function clearAllWorkspaceDeviceState() {
   const capabilitiesRemoved = clearAllWorkspaceCapabilitiesAndRecents()
   const roundContextsRemoved = clearAllRoundRoomEntryContexts()
-  return capabilitiesRemoved && roundContextsRemoved
+  const pendingRotationsRemoved = clearAllPendingAccessKeyRotations()
+  return capabilitiesRemoved && roundContextsRemoved && pendingRotationsRemoved
 }

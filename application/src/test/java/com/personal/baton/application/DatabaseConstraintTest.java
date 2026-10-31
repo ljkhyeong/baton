@@ -53,6 +53,39 @@ class DatabaseConstraintTest {
         ));
     }
 
+    @DisplayName("연동 지표와 팀 멤버십 조회는 선두 열이 맞는 인덱스를 갖는다")
+    @Test
+    void providesLookupIndexes() {
+        assertThat(indexColumns("brief_continuity_outbox", "idx_brief_continuity_outbox_last_success"))
+                .containsExactly("delivery_status", "completed_at");
+        assertThat(indexColumns("calendar_snapshot_outbox", "idx_calendar_snapshot_outbox_last_success"))
+                .containsExactly("delivery_status", "completed_at");
+        assertThat(indexColumns("calendar_season_metadata_outbox", "idx_calendar_season_metadata_last_success"))
+                .containsExactly("delivery_status", "completed_at");
+        assertThat(indexColumns("watch_monitor_outbox", "idx_watch_monitor_outbox_last_success"))
+                .containsExactly("delivery_status", "completed_at");
+        assertThat(indexColumns("email_verification_delivery_outbox", "idx_email_verification_outbox_last_success"))
+                .containsExactly("delivery_status", "completed_at");
+        assertThat(indexColumns("watch_health_event_inbox", "idx_watch_health_event_inbox_accepted_at"))
+                .containsExactly("accepted_at");
+        assertThat(indexColumns("account_team_memberships", "idx_account_team_memberships_team"))
+                .containsExactly("team_id", "member_id");
+    }
+
+    private static List<String> indexColumns(String table, String index) {
+        return jdbc.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+                ORDER BY seq_in_index
+                """,
+                String.class,
+                table,
+                index
+        );
+    }
+
     @DisplayName("구성원 이름은 팀 안에서 대소문자를 구분해 유일하고 다른 팀과는 겹칠 수 있다")
     @Test
     void memberNameIsUniqueWithinTeam() {

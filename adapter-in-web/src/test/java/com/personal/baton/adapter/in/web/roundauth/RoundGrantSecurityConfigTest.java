@@ -10,6 +10,7 @@ import com.personal.baton.adapter.in.web.auth.AccountSessionPrincipal;
 import com.personal.baton.adapter.in.web.config.SecurityConfig;
 import com.personal.baton.application.identity.port.in.ValidateAccountSessionUseCase;
 import com.personal.baton.adapter.in.web.config.WebFilterConfig;
+import com.personal.baton.application.roundauth.error.RoundParticipationDeniedException;
 import com.personal.baton.application.roundauth.port.in.RoundAdministrationUseCase;
 import com.personal.baton.application.roundauth.port.in.RoundParticipationUseCase;
 import jakarta.servlet.http.Cookie;
@@ -146,6 +147,41 @@ class RoundGrantSecurityConfigTest {
                           "mappings": []
                         }
                         """, true));
+    }
+
+    @DisplayName("ROUND 조회의 잘못된 UUID는 변환 예외 원문 없이 고정 문구로 응답한다")
+    @Test
+    void hidesInvalidUuidConversionMessage() throws Exception {
+        var result = mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .with(authentication(accountAuthentication(
+                                UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b")
+                        )))
+                        .queryParam("teamId", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.message").value("요청 값 형식이 올바르지 않습니다"))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("Invalid UUID", "abc");
+    }
+
+    @DisplayName("비JSON Accept여도 ROUND 업무 오류는 JSON 본문과 no-store를 유지한다")
+    @Test
+    void writesRoundErrorsAsJsonForNonJsonAccept() throws Exception {
+        UUID accountId = UUID.fromString("8e448211-66ae-44ab-9888-c4960648c22b");
+        UUID teamId = UUID.fromString("11111111-1111-4111-8111-111111111111");
+        when(roundAdministrationUseCase.findCurrentMembership(any()))
+                .thenThrow(new RoundParticipationDeniedException());
+
+        mockMvc.perform(get(RoundAdministrationController.CURRENT_MEMBERSHIP_PATH)
+                        .with(authentication(accountAuthentication(accountId)))
+                        .queryParam("teamId", teamId.toString())
+                        .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("ROUND_PARTICIPATION_DENIED"));
     }
 
     @DisplayName("ROUND 갱신 요청이 CSRF로 거부되면 토큰 쿠키를 유지하고 항상 403을 반환한다")

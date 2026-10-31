@@ -76,6 +76,17 @@ write_valid_backup() {
   "$repo_root/ops/verify-backup.sh" --write-checksum --require-checksum "$target" >/dev/null
 }
 
+# 지정한 시간 전 UTC 시각을 백업 파일 이름 형식으로 출력한다.
+snapshot_stamp_hours_ago() {
+  local epoch=$(($(date -u '+%s') - $1 * 60 * 60))
+
+  if date --version >/dev/null 2>&1; then
+    date -u -d "@$epoch" '+%Y%m%dT%H%M%SZ'
+  else
+    date -u -r "$epoch" '+%Y%m%dT%H%M%SZ'
+  fi
+}
+
 fake_bin="$test_root/fakebin"
 mkdir -p -- "$fake_bin"
 
@@ -242,6 +253,9 @@ case "$command_name" in
     if [[ "${FAKE_RCLONE_FAIL_AT:-0}" == "$count" ]]; then
       exit 42
     fi
+    if [[ -n "${FAKE_RCLONE_FAIL_FROM:-}" && "$count" -ge "$FAKE_RCLONE_FAIL_FROM" ]]; then
+      exit 42
+    fi
 
     source_path="$2"
     destination="$3"
@@ -387,8 +401,24 @@ crash_published_body_count="$(find "$crash_publish_root/backups" -maxdepth 1 -ty
 crash_published_sidecar_count="$(find "$crash_publish_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz.sha256' | wc -l | tr -d ' ')"
 assert_count 0 "$crash_published_body_count" 'crash-safe body publication'
 assert_count 1 "$crash_published_sidecar_count" 'crash-safe orphan sidecar'
+crash_leftover_dump="$(
+  find "$crash_publish_root/backups" -maxdepth 1 -type f -name '.baton-*' -print
+)"
+assert_file "$crash_leftover_dump"
 run_cycle "$crash_publish_root" >/dev/null
 assert_file "$crash_publish_root/state/last-success"
+# 최근 임시 파일은 다른 실행이 쓰는 중일 수 있어 남기고, 오래된 잔존물만 잠금 안에서 지운다.
+assert_file "$crash_leftover_dump"
+touch -t 202001010000 "$crash_leftover_dump"
+printf 'keep me\n' > "$crash_publish_root/backups/.unrelated-temporary"
+touch -t 202001010000 "$crash_publish_root/backups/.unrelated-temporary"
+if FAKE_FLOCK_EXIT=1 run_cycle "$crash_publish_root" >/dev/null 2>&1; then
+  fail 'contended cycle for temporary cleanup unexpectedly succeeded'
+fi
+assert_file "$crash_leftover_dump"
+run_cycle "$crash_publish_root" >/dev/null
+assert_no_file "$crash_leftover_dump"
+assert_file "$crash_publish_root/backups/.unrelated-temporary"
 
 direct_backup_root="$test_root/direct-backup"
 mkdir -p -- "$direct_backup_root/backups"
@@ -609,12 +639,34 @@ for day in 01 02 03 04; do
   write_valid_backup "$prune_audit_backup"
   touch -t "202001${day}0000" "$prune_audit_backup"
 done
-if FAKE_RCLONE_CORRUPT_CHECK_AT=11 run_cycle "$prune_audit_root" >/dev/null 2>&1; then
-  fail 'remote prune audit mismatch unexpectedly succeeded'
-fi
+# 보존 정리 실패는 끝난 백업을 취소하지 않는다. 실패한 파일만 남기고 나머지를 정리한 뒤
+# 재시작하지 않는 종료 코드로 알려 systemd 재시작마다 덤프가 늘지 않게 한다.
+set +e
+FAKE_RCLONE_CORRUPT_CHECK_AT=11 run_cycle "$prune_audit_root" >/dev/null 2>&1
+prune_audit_status=$?
+set -e
+assert_count 79 "$prune_audit_status" 'failed remote prune audit exit status'
+grep -Fxq "RestartPreventExitStatus=$prune_audit_status" \
+  "$repo_root/ops/systemd/baton-backup.service" \
+  || fail 'backup unit restarts after a retention-only failure'
 prune_audit_backup_count="$(find "$prune_audit_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
-assert_count 5 "$prune_audit_backup_count" 'failed remote prune audit local snapshots'
-assert_no_file "$prune_audit_root/state/last-success"
+assert_count 4 "$prune_audit_backup_count" 'failed remote prune audit local snapshots'
+prune_audit_expired_count="$(
+  find "$prune_audit_root/backups" -maxdepth 1 -type f \
+    \( -name '*-pending01.sql.gz' -o -name '*-pending02.sql.gz' \) | wc -l | tr -d ' '
+)"
+assert_count 1 "$prune_audit_expired_count" 'expired snapshot kept by the failed audit'
+assert_file "$prune_audit_root/state/last-success"
+prune_audit_newest="$(
+  find "$prune_audit_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' ! -name '*-pending*' -print
+)"
+[[ "$(sed -n '2p' "$prune_audit_root/state/last-success")" == "$(basename -- "$prune_audit_newest")" ]] \
+  || fail 'retention failure did not record the newest verified snapshot'
+PATH="$fake_bin:$PATH" \
+BATON_BACKUP_STATE_DIR="$prune_audit_root/state" \
+BATON_BACKUP_MAX_AGE_HOURS=36 \
+"$repo_root/ops/check-backup-freshness.sh" >/dev/null \
+  || fail 'retention failure hid the verified snapshot from the freshness check'
 
 failure_root="$test_root/upload-failure"
 mkdir -p -- "$failure_root/backups" "$failure_root/remote"
@@ -625,8 +677,9 @@ for day in 01 02 03 04; do
   touch -t "202001${day}0000" "$failure_backup"
 done
 failure_backup="$failure_root/backups/baton-20200101T000000Z-pending01.sql.gz"
-if FAKE_RCLONE_FAIL_AT=2 run_cycle "$failure_root" >/dev/null 2>&1; then
-  fail 'checksum upload failure unexpectedly succeeded'
+# 원격 장애가 이어져도 새 로컬 덤프는 남기고, 보존 정리 없이 주기를 실패로 끝낸다.
+if FAKE_RCLONE_FAIL_FROM=2 run_cycle "$failure_root" >/dev/null 2>&1; then
+  fail 'persistent remote failure unexpectedly succeeded'
 fi
 assert_file "$failure_backup"
 assert_file "$failure_backup.sha256"
@@ -635,7 +688,103 @@ assert_file "$failure_root/remote/daily/$(basename -- "$failure_backup")"
 assert_no_file "$failure_root/remote/daily/$(basename -- "$failure_backup").sha256"
 assert_no_file "$failure_root/state/last-success"
 failure_backup_count="$(find "$failure_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
-assert_count 4 "$failure_backup_count" 'failed upload must not run local retention'
+assert_count 5 "$failure_backup_count" 'remote outage keeps a new dump without local retention'
+# 같은 장애의 재시작은 20시간 안의 덤프를 재사용해 덤프를 늘리지 않는다.
+if FAKE_RCLONE_FAIL_FROM=2 run_cycle "$failure_root" >/dev/null 2>&1; then
+  fail 'restart during a remote outage unexpectedly succeeded'
+fi
+failure_restart_count="$(find "$failure_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
+assert_count 5 "$failure_restart_count" 'restart during a remote outage must reuse the recent dump'
+
+# 재시도 실패 주기의 새 덤프 판단은 파일 이름의 스냅샷 시각 기준 20시간 경계를 따른다.
+for recent_window_case in 19:1 21:2; do
+  recent_window_hours="${recent_window_case%%:*}"
+  recent_window_expected="${recent_window_case##*:}"
+  recent_window_root="$test_root/recent-window-$recent_window_hours"
+  mkdir -p -- "$recent_window_root/backups" "$recent_window_root/remote"
+  write_valid_production_env "$recent_window_root/production.env"
+  write_valid_backup \
+    "$recent_window_root/backups/baton-$(snapshot_stamp_hours_ago "$recent_window_hours")-pending.sql.gz"
+  if FAKE_RCLONE_FAIL_FROM=1 run_cycle "$recent_window_root" >/dev/null 2>&1; then
+    fail "remote outage unexpectedly succeeded with a $recent_window_hours hour old dump"
+  fi
+  recent_window_count="$(find "$recent_window_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
+  assert_count "$recent_window_expected" "$recent_window_count" \
+    "dump count after a retry failure with a $recent_window_hours hour old dump"
+done
+
+damaged_recent_root="$test_root/damaged-recent-dump"
+mkdir -p -- "$damaged_recent_root/backups" "$damaged_recent_root/remote"
+write_valid_production_env "$damaged_recent_root/production.env"
+damaged_recent_backup="$damaged_recent_root/backups/baton-$(snapshot_stamp_hours_ago 1)-damaged.sql.gz"
+write_valid_backup "$damaged_recent_backup"
+printf '%s\n' 'corrupted dump' > "$damaged_recent_backup"
+# 검증에 실패하는 최근 덤프는 새 덤프를 대신하지 못한다.
+if run_cycle "$damaged_recent_root" >/dev/null 2>&1; then
+  fail 'damaged pending dump unexpectedly synchronized'
+fi
+damaged_recent_count="$(find "$damaged_recent_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' | wc -l | tr -d ' ')"
+assert_count 2 "$damaged_recent_count" 'damaged recent dump must not suppress a new dump'
+assert_count 0 "$(find "$damaged_recent_root/remote" -type f | wc -l | tr -d ' ')" \
+  'damaged recent dump remote files'
+
+transient_failure_root="$test_root/transient-upload-failure"
+mkdir -p -- "$transient_failure_root/backups" "$transient_failure_root/remote"
+write_valid_production_env "$transient_failure_root/production.env"
+for day in 01 02 03 04; do
+  transient_failure_backup="$transient_failure_root/backups/baton-202001${day}T000000Z-pending${day}.sql.gz"
+  write_valid_backup "$transient_failure_backup"
+  touch -t "202001${day}0000" "$transient_failure_backup"
+done
+# 재시도 실패는 뒤이은 동기화가 성공해도 주기 실패로 남긴다.
+if FAKE_RCLONE_FAIL_AT=2 run_cycle "$transient_failure_root" >/dev/null 2>&1; then
+  fail 'failed retry unexpectedly ended the cycle as success'
+fi
+assert_file "$transient_failure_root/state/last-success"
+transient_failure_verified_count="$(find "$transient_failure_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz.uploaded' | wc -l | tr -d ' ')"
+assert_count 3 "$transient_failure_verified_count" 'transient retry failure verified local snapshots'
+
+damaged_verified_root="$test_root/damaged-verified-copy"
+mkdir -p -- "$damaged_verified_root/backups" "$damaged_verified_root/remote"
+write_valid_production_env "$damaged_verified_root/production.env"
+for day in 01 02 03; do
+  damaged_verified_backup="$damaged_verified_root/backups/baton-202001${day}T000000Z-verified${day}.sql.gz"
+  write_valid_backup "$damaged_verified_backup"
+  touch -t "202001${day}0000" "$damaged_verified_backup"
+done
+run_cycle "$damaged_verified_root" >/dev/null
+damaged_verified_backup="$damaged_verified_root/backups/baton-20200102T000000Z-verified02.sql.gz"
+assert_file "$damaged_verified_backup.uploaded"
+printf '%s\n' 'corrupted after off-site verification' > "$damaged_verified_backup"
+touch -t 202001020000 "$damaged_verified_backup"
+# 이미 원격 검증된 로컬 사본의 손상은 새 덤프의 업로드와 최신성 기록을 막지 않는다.
+set +e
+run_cycle "$damaged_verified_root" >/dev/null 2>"$damaged_verified_root/stderr"
+damaged_verified_status=$?
+set -e
+grep -Fq "$(basename -- "$damaged_verified_backup")" "$damaged_verified_root/stderr" \
+  || fail 'damaged verified local copy was not reported'
+for damaged_verified_new_dump in \
+  "$damaged_verified_root"/backups/baton-*.sql.gz; do
+  [[ "$damaged_verified_new_dump" == *-verified* ]] && continue
+  assert_file "$damaged_verified_new_dump.uploaded"
+done
+[[ "$(sed -n '2p' "$damaged_verified_root/state/last-success")" != *-verified* ]] \
+  || fail 'damaged verified local copy blocked the newest snapshot state'
+# 만료 전 손상은 경고로 끝나고, 만료 뒤에는 재검증할 수 없어 파일을 남기고 정리 실패로 알린다.
+assert_count 79 "$damaged_verified_status" 'expired damaged local copy retention status'
+assert_file "$damaged_verified_backup"
+
+damaged_unexpired_root="$test_root/damaged-unexpired-copy"
+mkdir -p -- "$damaged_unexpired_root/backups" "$damaged_unexpired_root/remote"
+write_valid_production_env "$damaged_unexpired_root/production.env"
+run_cycle "$damaged_unexpired_root" >/dev/null
+damaged_unexpired_backup="$(
+  find "$damaged_unexpired_root/backups" -maxdepth 1 -type f -name 'baton-*.sql.gz' -print
+)"
+printf '%s\n' 'corrupted after off-site verification' > "$damaged_unexpired_backup"
+run_cycle "$damaged_unexpired_root" >/dev/null 2>&1 \
+  || fail 'damaged verified local copy stopped the backup cycle'
 
 new_upload_failure_root="$test_root/new-upload-failure"
 mkdir -p -- "$new_upload_failure_root/backups" "$new_upload_failure_root/remote"
@@ -768,6 +917,22 @@ if BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
   run_cycle "$new_upload_failure_root" >/dev/null 2>&1; then
   fail 'backup failure with heartbeat unexpectedly succeeded'
 fi
+assert_no_file "$heartbeat_root/request"
+# 보존 정리 실패도 주기 실패이므로 완료 신호를 보내지 않는다.
+heartbeat_prune_root="$test_root/heartbeat-prune-failure"
+mkdir -p -- "$heartbeat_prune_root/backups" "$heartbeat_prune_root/remote"
+write_valid_production_env "$heartbeat_prune_root/production.env"
+for day in 01 02 03 04; do
+  heartbeat_prune_backup="$heartbeat_prune_root/backups/baton-202001${day}T000000Z-pending${day}.sql.gz"
+  write_valid_backup "$heartbeat_prune_backup"
+  touch -t "202001${day}0000" "$heartbeat_prune_backup"
+done
+if BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \
+  FAKE_HEARTBEAT_ROOT="$heartbeat_root" FAKE_RCLONE_CORRUPT_CHECK_AT=11 \
+  run_cycle "$heartbeat_prune_root" >/dev/null 2>&1; then
+  fail 'retention failure with heartbeat unexpectedly succeeded'
+fi
+assert_file "$heartbeat_prune_root/state/last-success"
 assert_no_file "$heartbeat_root/request"
 printf '%s' 'http://uptime.betterstack.com/api/v1/heartbeat/test-secret-token' > "$heartbeat_root/url"
 BATON_BACKUP_HEARTBEAT_URL_FILE="$heartbeat_root/url" \

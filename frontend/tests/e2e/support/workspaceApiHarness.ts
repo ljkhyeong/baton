@@ -195,10 +195,14 @@ export type ApiHarness = {
   returnMalformedNextContentCreationResponse: (operation: ContentCreationOperation) => void
   rejectNextContentCreationAsReused: (operation: ContentCreationOperation) => void
   rejectNextMemberAsConflict: () => void
+  conflictNextContentCreation: (operation: ContentCreationOperation) => void
+  rejectNextRoleHandoffChange: (message: string) => void
   holdNextContentCreation: (operation: ContentCreationOperation) => void
   releaseContentCreation: () => void
   makeWorkspaceGetsUnavailable: () => void
   restoreWorkspaceGets: () => void
+  endSeasonFromAnotherDevice: () => void
+  changeTeamPermissionFromAnotherDevice: (permission: WorkspaceProjection['team']['permission']) => void
   holdNextRoleUpdate: () => void
   releaseRoleUpdate: () => void
   conflictNextRoleUpdate: (role: Role) => void
@@ -465,6 +469,8 @@ export async function installApi(page: Page, initialProjection = makeProjection(
   let contentCreationToReturnMalformed: ContentCreationOperation | null = null
   let contentCreationToRejectAsReused: ContentCreationOperation | null = null
   let rejectMemberAsConflict = false
+  let contentCreationToConflict: ContentCreationOperation | null = null
+  let roleHandoffChangeRejection: string | null = null
   let contentCreationGate: {
     operation: ContentCreationOperation
     pending: Promise<void>
@@ -585,12 +591,30 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     if (contentOperation && !contentIdempotencyKey) {
       return error(400, 'INVALID_INPUT', 'Idempotency-Key가 필요합니다.')
     }
+    // 서버처럼 권한과 시즌 상태를 확인한 뒤에 같은 키의 결과를 돌려준다.
+    if (contentOperation && projection.team.permission === 'VIEWER') {
+      return error(403, 'WORKSPACE_ACCESS_DENIED', '워크스페이스 접근 권한이 없습니다.')
+    }
+    if (contentOperation && projection.season.endedAt) {
+      return error(409, 'SEASON_ENDED', '종료된 시즌의 기록은 변경할 수 없습니다.')
+    }
     if (contentResultKey && contentCreationResults.has(contentResultKey)) {
       return json(201, structuredClone(contentCreationResults.get(contentResultKey)))
     }
     if (contentOperation && contentCreationToRejectAsReused === contentOperation) {
       contentCreationToRejectAsReused = null
       return error(409, 'IDEMPOTENCY_KEY_REUSED', '같은 멱등 키를 다른 요청에 사용할 수 없습니다.')
+    }
+    if (contentOperation && contentCreationToConflict === contentOperation) {
+      contentCreationToConflict = null
+      return error(409, 'WORKSPACE_CONTENT_CONFLICT', '다른 요청이 먼저 처리되고 있습니다.')
+    }
+    const isRoleHandoffChange = method === 'PATCH'
+      && new RegExp(`^${SCOPE_PATH}/roles/[^/]+/handoffs/[^/]+/(transfer|acceptance|cancellation)$`).test(path)
+    if (roleHandoffChangeRejection && (isRoleHandoffChange || contentOperation === 'roleHandoff')) {
+      const message = roleHandoffChangeRejection
+      roleHandoffChangeRejection = null
+      return error(409, 'ROLE_HANDOFF_STATE_CONFLICT', message)
     }
     if (contentOperation && contentCreationGate?.operation === contentOperation) {
       const gate = contentCreationGate.pending
@@ -1198,6 +1222,8 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     },
     rejectNextContentCreationAsReused: (operation) => { contentCreationToRejectAsReused = operation },
     rejectNextMemberAsConflict: () => { rejectMemberAsConflict = true },
+    conflictNextContentCreation: (operation) => { contentCreationToConflict = operation },
+    rejectNextRoleHandoffChange: (message) => { roleHandoffChangeRejection = message },
     holdNextContentCreation: (operation) => {
       const gate = Promise.withResolvers<void>()
       contentCreationGate = {
@@ -1212,6 +1238,15 @@ export async function installApi(page: Page, initialProjection = makeProjection(
     },
     makeWorkspaceGetsUnavailable: () => { workspaceGetsUnavailable = true },
     restoreWorkspaceGets: () => { workspaceGetsUnavailable = false },
+    endSeasonFromAnotherDevice: () => {
+      const endedSeason = { ...projection.season, endedAt: '2026-07-30T03:00:00Z' }
+      projection.season = endedSeason
+      projection.seasons = projection.seasons.map((season) =>
+        season.id === endedSeason.id ? endedSeason : season)
+    },
+    changeTeamPermissionFromAnotherDevice: (permission) => {
+      projection.team = { ...projection.team, permission }
+    },
     holdNextRoleUpdate: () => {
       const gate = Promise.withResolvers<void>()
       roleUpdateGate = gate.promise
@@ -1486,6 +1521,7 @@ type PendingContentCreationEntry = {
   idempotencyKey: string
   createdAt: number
   cleanupRequired?: true
+  cleanupReason?: 'unconfirmable'
 }
 
 export function pendingWorkspaceCreationEntry(

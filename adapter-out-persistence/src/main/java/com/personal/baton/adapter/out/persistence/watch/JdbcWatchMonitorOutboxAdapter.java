@@ -20,6 +20,7 @@ import java.util.UUID;
 import org.springframework.dao.support.DataAccessUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -185,8 +186,9 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
         return outbox.markFailed(sourceRevision, leaseToken, failedAt, errorCode);
     }
 
+    // 자료 잠금을 기다리는 동안 커밋된 새 스냅샷을 보려면 잠금 뒤 조회가 처음 조회의 스냅샷에 묶이면 안 된다.
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, isolation = Isolation.READ_COMMITTED)
     public boolean markInvalidTargetAndAppendInactive(
             long sourceRevision,
             UUID leaseToken,
@@ -314,6 +316,11 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
     }
 
     private Optional<Snapshot> findLatestSnapshot(UUID resourceId) {
+        // 첫 스냅샷까지 잠금 읽기를 하면 빈 범위의 gap 잠금이 인덱스 틈을 공유하는 다른 자료의 첫 INSERT를 막는다.
+        // 트랜잭션 스냅샷이 오래돼 첫 행을 놓쳐도 같은 목표를 한 번 더 기록할 뿐 변경을 잃지 않는다.
+        if (!hasSnapshot(resourceId)) {
+            return Optional.empty();
+        }
         return DataAccessUtils.optionalResult(jdbcTemplate.query(
                 """
                 SELECT
@@ -335,6 +342,14 @@ public class JdbcWatchMonitorOutboxAdapter implements WatchMonitorOutboxPort {
                         resultSet.getString("target_url"),
                         resultSet.getString("rejected_target_url")
                 ),
+                resourceId.toString()
+        ));
+    }
+
+    private boolean hasSnapshot(UUID resourceId) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM watch_monitor_outbox WHERE resource_id = UUID_TO_BIN(?))",
+                Boolean.class,
                 resourceId.toString()
         ));
     }

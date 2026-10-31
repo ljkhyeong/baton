@@ -32,3 +32,21 @@ test('@memory @responsive 수정 이력은 결정 변경 뒤 갱신되고 보관
   await page.locator('.archive-row').getByText('수정 이력', { exact: true }).click()
   await expect(page.locator('.archive-row .content-history').getByText(original, { exact: true })).toBeVisible()
 })
+
+test.describe('브라우저와 시즌의 시간대가 다를 때', () => {
+  test.use({ timezoneId: 'America/New_York' })
+
+  test('@memory 수정 이력 시각을 시즌 시간대로 표시한다', async ({ page }, testInfo) => {
+    await installApi(page, makeProjection())
+    await page.route(`**${SCOPE_PATH}/decisions/${DECISION_ID}/changes`, route => route.fulfill({ json: {
+      teamId: TEAM_ID, seasonId: SEASON_ID, recordKind: 'DECISION', recordId: DECISION_ID,
+      changes: [{ id: '00000000-0000-4000-8000-000000000099', actorAccountId: null, actorName: '공유 키 사용자',
+        changedAt: '2026-07-03T16:30:00Z', fields: [{ fieldName: '이유', beforeValue: '이전', afterValue: '이후' }] }],
+    } }))
+    await openSharedWorkspace(page)
+    await navigation(page, testInfo.project.name).getByRole('button', { name: '기록', exact: true }).click()
+    const entry = page.locator(`[data-decision-id="${DECISION_ID}"]`)
+    await entry.getByText('수정 이력', { exact: true }).click()
+    await expect(entry.locator('.content-history')).toContainText('공유 키 사용자 · 2026. 7. 4. 오전 1:30')
+  })
+})

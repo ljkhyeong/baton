@@ -464,6 +464,12 @@ paths:
                     "currentPassword" : "wrong current password",
                     "newPassword" : "new correct horse battery staple"
                   }
+              changeLocalPasswordRateLimited:
+                value: |-
+                  {
+                    "currentPassword" : "wrong current password",
+                    "newPassword" : "new correct horse battery staple"
+                  }
               changeLocalPasswordUnavailable:
                 value: |-
                   {
@@ -527,6 +533,32 @@ paths:
           headers:
             Cache-Control:
               description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            X-Request-ID:
+              description: 서버가 생성한 요청 추적 ID
+              schema:
+                type: string
+        '429':
+          description: '429'
+          content:
+            application/json:
+              examples:
+                changeLocalPasswordRateLimited:
+                  value: |-
+                    {
+                      "code" : "AUTH_RATE_LIMITED",
+                      "message" : "인증 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요"
+                    }
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          headers:
+            Cache-Control:
+              description: 민감 응답 캐시 금지
+              schema:
+                type: string
+            Retry-After:
+              description: 다음 요청까지 기다릴 초
               schema:
                 type: string
             X-Request-ID:
@@ -1819,7 +1851,7 @@ paths:
                   value: >-
                     {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
               schema:
-                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+                $ref: '#/components/schemas/Schema_8ed83bbb191bd047'
           headers:
             Cache-Control:
               description: 비공개 응답 캐시 금지
@@ -1885,7 +1917,7 @@ paths:
                   value: >-
                     {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
               schema:
-                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+                $ref: '#/components/schemas/Schema_8ed83bbb191bd047'
           headers:
             Cache-Control:
               description: 비공개 응답 캐시 금지
@@ -2009,7 +2041,7 @@ paths:
                   value: >-
                     {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
               schema:
-                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+                $ref: '#/components/schemas/Schema_8ed83bbb191bd047'
           headers:
             Cache-Control:
               description: 비공개 응답 캐시 금지
@@ -2076,7 +2108,7 @@ paths:
                   value: >-
                     {"teamId":"00000000-0000-4000-8000-000000000001","accountId":"00000000-0000-4000-8000-000000000004","accountAccessEnabled":true,"memberId":"00000000-0000-4000-8000-000000000003","permission":"ADMIN","members":[{"memberId":"00000000-0000-4000-8000-000000000003","memberName":"박민서","active":true,"accountId":"00000000-0000-4000-8000-000000000004","permission":"ADMIN"}],"invitations":[{"id":"00000000-0000-4000-8000-000000000003","memberId":"00000000-0000-4000-8000-000000000003","permission":"VIEWER","createdAt":"2026-09-05T03:00:00Z","expiresAt":"2026-09-12T03:00:00Z","acceptedAt":null,"revokedAt":null}],"audit":[{"id":"00000000-0000-4000-8000-000000000003","actorAccountId":"00000000-0000-4000-8000-000000000004","memberId":"00000000-0000-4000-8000-000000000003","action":"ADMIN_RECOVERY","previousPermission":null,"permission":"ADMIN","changedAt":"2026-09-05T03:00:00Z"}]}
               schema:
-                $ref: '#/components/schemas/Schema_59121c6eafa63b3f'
+                $ref: '#/components/schemas/Schema_8ed83bbb191bd047'
           headers:
             Cache-Control:
               description: 비공개 응답 캐시 금지
@@ -11440,173 +11472,6 @@ components:
         - acceptedAt
         - eventId
       type: object
-    Schema_59121c6eafa63b3f:
-      properties:
-        accountAccessEnabled:
-          description: 계정 권한 전환 여부
-          type: boolean
-        accountId:
-          description: 현재 계정
-          format: uuid
-          type: string
-        audit:
-          description: 최근 접근 변경 50건, 관리자에게만 제공
-          items:
-            properties:
-              action:
-                description: 변경 종류
-                type: string
-              actorAccountId:
-                description: 변경 계정
-                format: uuid
-                type: string
-              changedAt:
-                description: 변경 시각
-                format: date-time
-                type: string
-              id:
-                description: 변경 이력 식별자
-                format: uuid
-                type: string
-              memberId:
-                description: 대상 구성원
-                format: uuid
-                type: string
-              permission:
-                description: 변경 뒤 권한
-                enum:
-                  - ADMIN
-                  - MEMBER
-                  - VIEWER
-                nullable: true
-                type: string
-              previousPermission:
-                description: 이전 권한
-                enum:
-                  - ADMIN
-                  - MEMBER
-                  - VIEWER
-                nullable: true
-                type: string
-            required:
-              - action
-              - actorAccountId
-              - changedAt
-              - id
-              - memberId
-              - permission
-              - previousPermission
-            type: object
-          type: array
-        invitations:
-          description: 초대 목록, 관리자에게만 제공
-          items:
-            properties:
-              acceptedAt:
-                description: 수락 시각
-                format: date-time
-                nullable: true
-                type: string
-              createdAt:
-                description: 생성 시각
-                format: date-time
-                type: string
-              expiresAt:
-                description: 만료 시각
-                format: date-time
-                type: string
-              id:
-                description: 초대 식별자
-                format: uuid
-                type: string
-              memberId:
-                description: 초대 구성원
-                format: uuid
-                type: string
-              permission:
-                description: 초대 권한
-                enum:
-                  - ADMIN
-                  - MEMBER
-                  - VIEWER
-                type: string
-              revokedAt:
-                description: 취소 시각
-                format: date-time
-                nullable: true
-                type: string
-            required:
-              - acceptedAt
-              - createdAt
-              - expiresAt
-              - id
-              - memberId
-              - permission
-              - revokedAt
-            type: object
-          type: array
-        memberId:
-          description: 내 연결 구성원
-          format: uuid
-          nullable: true
-          type: string
-        members:
-          description: 관리 가능한 구성원
-          items:
-            properties:
-              accountId:
-                description: 연결 계정
-                format: uuid
-                nullable: true
-                type: string
-              active:
-                description: 활동 여부
-                type: boolean
-              memberId:
-                description: 구성원 식별자
-                format: uuid
-                type: string
-              memberName:
-                description: 구성원 이름
-                type: string
-              permission:
-                description: 승인된 권한
-                enum:
-                  - ADMIN
-                  - MEMBER
-                  - VIEWER
-                nullable: true
-                type: string
-            required:
-              - accountId
-              - active
-              - memberId
-              - memberName
-              - permission
-            type: object
-          type: array
-        permission:
-          description: 내 권한
-          enum:
-            - ADMIN
-            - MEMBER
-            - VIEWER
-          nullable: true
-          type: string
-        teamId:
-          description: 팀 식별자
-          format: uuid
-          type: string
-      required:
-        - accountAccessEnabled
-        - accountId
-        - audit
-        - invitations
-        - memberId
-        - members
-        - permission
-        - teamId
-      type: object
     Schema_5a45c106831f37af:
       properties:
         archivedAt:
@@ -12583,6 +12448,173 @@ components:
       required:
         - csrfHeaderName
         - csrfToken
+      type: object
+    Schema_8ed83bbb191bd047:
+      properties:
+        accountAccessEnabled:
+          description: 계정 권한 전환 여부
+          type: boolean
+        accountId:
+          description: 현재 계정
+          format: uuid
+          type: string
+        audit:
+          description: 최근 접근 변경 50건, 관리자에게만 제공
+          items:
+            properties:
+              action:
+                description: 변경 종류
+                type: string
+              actorAccountId:
+                description: 변경 계정
+                format: uuid
+                type: string
+              changedAt:
+                description: 변경 시각
+                format: date-time
+                type: string
+              id:
+                description: 변경 이력 식별자
+                format: uuid
+                type: string
+              memberId:
+                description: 대상 구성원
+                format: uuid
+                type: string
+              permission:
+                description: 변경 뒤 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                nullable: true
+                type: string
+              previousPermission:
+                description: 이전 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                nullable: true
+                type: string
+            required:
+              - action
+              - actorAccountId
+              - changedAt
+              - id
+              - memberId
+              - permission
+              - previousPermission
+            type: object
+          type: array
+        invitations:
+          description: 최근 초대 50건, 관리자에게만 제공
+          items:
+            properties:
+              acceptedAt:
+                description: 수락 시각
+                format: date-time
+                nullable: true
+                type: string
+              createdAt:
+                description: 생성 시각
+                format: date-time
+                type: string
+              expiresAt:
+                description: 만료 시각
+                format: date-time
+                type: string
+              id:
+                description: 초대 식별자
+                format: uuid
+                type: string
+              memberId:
+                description: 초대 구성원
+                format: uuid
+                type: string
+              permission:
+                description: 초대 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                type: string
+              revokedAt:
+                description: 취소 시각
+                format: date-time
+                nullable: true
+                type: string
+            required:
+              - acceptedAt
+              - createdAt
+              - expiresAt
+              - id
+              - memberId
+              - permission
+              - revokedAt
+            type: object
+          type: array
+        memberId:
+          description: 내 연결 구성원
+          format: uuid
+          nullable: true
+          type: string
+        members:
+          description: 관리 가능한 구성원
+          items:
+            properties:
+              accountId:
+                description: 연결 계정
+                format: uuid
+                nullable: true
+                type: string
+              active:
+                description: 활동 여부
+                type: boolean
+              memberId:
+                description: 구성원 식별자
+                format: uuid
+                type: string
+              memberName:
+                description: 구성원 이름
+                type: string
+              permission:
+                description: 승인된 권한
+                enum:
+                  - ADMIN
+                  - MEMBER
+                  - VIEWER
+                nullable: true
+                type: string
+            required:
+              - accountId
+              - active
+              - memberId
+              - memberName
+              - permission
+            type: object
+          type: array
+        permission:
+          description: 내 권한
+          enum:
+            - ADMIN
+            - MEMBER
+            - VIEWER
+          nullable: true
+          type: string
+        teamId:
+          description: 팀 식별자
+          format: uuid
+          type: string
+      required:
+        - accountAccessEnabled
+        - accountId
+        - audit
+        - invitations
+        - memberId
+        - members
+        - permission
+        - teamId
       type: object
     Schema_8ff7ee21dc10031e:
       properties:

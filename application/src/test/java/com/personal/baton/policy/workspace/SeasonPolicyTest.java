@@ -1,5 +1,6 @@
 package com.personal.baton.policy.workspace;
 
+import com.personal.baton.domain.workspace.DomainValidationException;
 import com.personal.baton.domain.workspace.Season;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -7,9 +8,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Tag("policy")
 class SeasonPolicyTest {
@@ -23,6 +27,29 @@ class SeasonPolicyTest {
 
         assertThat(season.getStartDate()).isEqualTo(date);
         assertThat(season.getEndDate()).isEqualTo(date);
+    }
+
+    @DisplayName("시즌 날짜는 1001년부터 9998년까지 허용한다")
+    @Test
+    void acceptsSupportedYearBoundaries() {
+        Season season = Season.create(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "긴 시즌",
+                LocalDate.of(1001, 1, 1),
+                LocalDate.of(9998, 12, 31)
+        );
+
+        assertThat(season.getStartDate()).isEqualTo(LocalDate.of(1001, 1, 1));
+        assertThat(season.getEndDate()).isEqualTo(LocalDate.of(9998, 12, 31));
+    }
+
+    @DisplayName("지원 연도를 벗어난 시즌 시작일과 종료일은 입력 오류다")
+    @ParameterizedTest
+    @CsvSource({"1000-12-31,2026-07-20", "2026-07-20,9999-01-01", "2026-07-20,+10000-01-01"})
+    void rejectsYearsOutsideSupportedRange(LocalDate startDate, LocalDate endDate) {
+        assertThatThrownBy(() -> Season.validatePeriod(startDate, endDate))
+                .isInstanceOf(DomainValidationException.class);
     }
 
     @DisplayName("시즌 시작일이 종료일보다 늦으면 시즌을 만들 수 없다")

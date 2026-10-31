@@ -49,6 +49,14 @@ class WatchMonitorScheduler {
     void reconcile() {
         ReconcileWatchMonitorsUseCase.ReconciliationResult result =
                 reconcileWatchMonitors.reconcile();
+        if (result.hasFailures()) {
+            throw new IllegalStateException(
+                    "WATCH 상태 조정에 실패한 자료가 있습니다. failed="
+                            + result.failedResourceIds().size()
+                            + ", candidates=" + result.candidateCount()
+                            + ", appended=" + result.appendedCount()
+            );
+        }
         if (result.appendedCount() > 0) {
             log.info("WATCH reconciliation이 누락된 snapshot을 복구했습니다. candidates="
                     + result.candidateCount() + ", appended=" + result.appendedCount());

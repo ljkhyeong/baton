@@ -130,6 +130,10 @@ export function isWorkspaceContentConflict(error: unknown) {
   return error instanceof ApiError && error.code === 'WORKSPACE_CONTENT_CONFLICT'
 }
 
+export function isRoleHandoffStateConflict(error: unknown) {
+  return error instanceof ApiError && error.code === 'ROLE_HANDOFF_STATE_CONFLICT'
+}
+
 export type WorkspaceScope = {
   teamId: string
   seasonId: string

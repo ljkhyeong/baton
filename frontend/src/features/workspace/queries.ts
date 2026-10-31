@@ -167,17 +167,20 @@ type WorkspaceCommandOptions = {
   teamWide?: boolean
   // 수정 충돌이면 충돌 복구 흐름이 최신 내용을 보여 줄 때까지 다시 불러오지 않는다.
   keepOnContentConflict?: boolean
+  // 충돌을 입력 창에 표시한다. 창을 닫지 않고 최신 내용만 다시 불러와 같은 입력을 다시 제출할 수 있다.
+  showConflictInForm?: boolean
 }
 
 function useWorkspaceCommand<TVariables, TData>(
   scope: WorkspaceScope,
   mutationFn: (variables: TVariables) => Promise<TData>,
-  { teamWide = false, keepOnContentConflict = false }: WorkspaceCommandOptions = {},
+  { teamWide = false, keepOnContentConflict = false, showConflictInForm = false }: WorkspaceCommandOptions = {},
 ) {
   const { invalidate, invalidateTeam } = useInvalidateWorkspace(scope)
   const refresh = teamWide ? invalidateTeam : invalidate
   return useWorkspaceMutation<TData, Error, TVariables>(scope, {
     mutationFn,
+    meta: { showConflictInForm },
     onSettled: keepOnContentConflict ? invalidateUnlessContentConflict(refresh) : refresh,
   })
 }
@@ -219,7 +222,7 @@ export function useUpdateSeasonEndingMutation(scope: WorkspaceScope) {
   return useWorkspaceCommand(
     scope,
     (request: UpdateSeasonEndingRequest) => updateSeasonEnding(scope, request),
-    { teamWide: true, keepOnContentConflict: true },
+    { teamWide: true, showConflictInForm: true },
   )
 }
 
@@ -228,7 +231,7 @@ export function useCreateNextSeasonMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateNextSeasonRequest>) =>
       createNextSeason(scope, request, idempotencyKey),
-    { teamWide: true },
+    { teamWide: true, showConflictInForm: true },
   )
 }
 
@@ -237,6 +240,7 @@ export function useCreateRoleMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleRequest>) =>
       createRole(scope, request, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 
@@ -245,7 +249,7 @@ export function useCreateMemberMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateMemberRequest>) =>
       createMember(scope, request, idempotencyKey),
-    { teamWide: true },
+    { teamWide: true, showConflictInForm: true },
   )
 }
 
@@ -282,6 +286,7 @@ export function usePrepareRoleHandoffMutation(scope: WorkspaceScope) {
       idempotencyKey,
     }: IdempotentCreateCommand<PrepareRoleHandoffCommandRequest>) =>
       prepareRoleHandoff(scope, roleId, body, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 
@@ -314,6 +319,7 @@ export function useCreateRoutineMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoutineRequest>) =>
       createRoutine(scope, request, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 
@@ -338,6 +344,7 @@ export function useCreateSeasonRoundMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateSeasonRoundRequest>) =>
       createSeasonRound(scope, request, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 
@@ -394,6 +401,7 @@ export function useCreateDecisionMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateDecisionRequest>) =>
       createDecision(scope, request, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 
@@ -418,6 +426,7 @@ export function useCreateHandoffItemMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateHandoffItemRequest>) =>
       createHandoffItem(scope, request, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 
@@ -476,6 +485,7 @@ export function useCreateRoleResourceMutation(scope: WorkspaceScope) {
     scope,
     ({ request, idempotencyKey }: IdempotentCreateCommand<CreateRoleResourceRequest>) =>
       createRoleResource(scope, request, idempotencyKey),
+    { showConflictInForm: true },
   )
 }
 

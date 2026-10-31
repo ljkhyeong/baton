@@ -248,6 +248,7 @@ for forbidden_name in \
   BATON_CAL_RECOVERY_PREPARATION_ENABLED \
   BATON_CAL_RECOVERY_RUN_ID \
   BATON_CAL_DELIVERY_ENABLED \
+  BATON_CAL_SUBSCRIPTIONS_ENABLED \
   BATON_CAL_SEASON_METADATA_ENABLED \
   BATON_CAL_SEASON_METADATA_MAINTENANCE \
   BATON_CAL_BASE_URL \
@@ -268,7 +269,7 @@ for forbidden_name in \
 	  BATON_BRIEF_SERVICE_HOST \
 	  BATON_BRIEF_PRIVATE_NETWORK \
 	  BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE \
-	  BATON_BRIEF_SERVICE_TRUSTSTORE_FILE \
+	  BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE \
 	  BATON_AUTH_OAUTH2_ENABLED \
 	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_ID \
 	  BATON_AUTH_OAUTH2_GOOGLE_CLIENT_SECRET_FILE \
@@ -349,6 +350,8 @@ for required_secret_name in \
   BATON_SECRET_SMTP_PASSWORD \
   BATON_SECRET_EMAIL_OUTBOX_ENCRYPTION_KEY \
   BATON_SECRET_BRIEF_BEARER_TOKEN \
+  BATON_SECRET_BRIEF_SERVICE_API_BEARER_TOKEN \
+  BATON_SECRET_BRIEF_SERVICE_TRUSTED_CERTIFICATE \
   BATON_SECRET_ROUND_CURRENT_PRIVATE_KEY \
   BATON_SECRET_ROUND_CURRENT_PUBLIC_KEY \
   BATON_SECRET_ROUND_PREVIOUS_PUBLIC_KEY \
@@ -377,6 +380,17 @@ fi
 if [[ -n "${FAKE_EXPECTED_BRIEF_BEARER_TOKEN:-}" \
   && "$BATON_SECRET_BRIEF_BEARER_TOKEN" != "$FAKE_EXPECTED_BRIEF_BEARER_TOKEN" ]]; then
   printf 'Production wrapper passed the wrong BRIEF Bearer token.\n' >&2
+  exit 89
+fi
+if [[ -n "${FAKE_EXPECTED_BRIEF_SERVICE_BEARER_TOKEN:-}" \
+  && "$BATON_SECRET_BRIEF_SERVICE_API_BEARER_TOKEN" != "$FAKE_EXPECTED_BRIEF_SERVICE_BEARER_TOKEN" ]]; then
+  printf 'Production wrapper passed the wrong BRIEF service Bearer token.\n' >&2
+  exit 89
+fi
+if [[ -n "${FAKE_EXPECTED_BRIEF_SERVICE_CERTIFICATE_FILE:-}" \
+  && "$BATON_SECRET_BRIEF_SERVICE_TRUSTED_CERTIFICATE" \
+    != "$(< "$FAKE_EXPECTED_BRIEF_SERVICE_CERTIFICATE_FILE")" ]]; then
+  printf 'Production wrapper passed the wrong BRIEF service certificate.\n' >&2
   exit 89
 fi
 if [[ -n "${FAKE_EXPECTED_SPRING_PROFILES_ACTIVE:-}" \
@@ -438,11 +452,29 @@ done
 [[ -n "$body_file" && -n "$url" ]] || exit 81
 case "${FAKE_CURL_MODE:-healthy}" in
   healthy)
+    # Spring Boot 4의 Jackson 3가 정렬한 실제 응답 순서다.
+    printf '{"groups":["liveness","readiness"],"status":"UP"}\n' > "$body_file"
+    printf '200'
+    ;;
+  status-first)
     printf '{"status":"UP","groups":["liveness","readiness"]}\n' > "$body_file"
+    printf '200'
+    ;;
+  status-only)
+    printf '{"status":"UP"}\n' > "$body_file"
     printf '200'
     ;;
   down)
     printf '{"status":"DOWN"}\n' > "$body_file"
+    printf '200'
+    ;;
+  groups-down)
+    printf '{"groups":["liveness","readiness"],"status":"DOWN"}\n' > "$body_file"
+    printf '200'
+    ;;
+  nested-up)
+    printf '{"components":{"db":{"status":"UP"}},"groups":["liveness"],"status":"DOWN"}\n' \
+      > "$body_file"
     printf '200'
     ;;
   redirect)
@@ -537,7 +569,6 @@ brief_bearer_token_file="$auth_secret_dir/brief-bearer-token"
 brief_service_bearer_token_file="$auth_secret_dir/brief-service-bearer-token"
 brief_service_private_key_file="$auth_secret_dir/brief-service-private.pem"
 brief_service_certificate_file="$auth_secret_dir/brief-service-certificate.pem"
-brief_service_truststore_file="$auth_secret_dir/brief-service-truststore.p12"
 round_turn_shared_secret_file="$auth_secret_dir/round-turn-shared-secret"
 round_private_key_file="$auth_secret_dir/round-private.pem"
 round_public_key_file="$auth_secret_dir/round-public.pem"
@@ -555,9 +586,6 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
   -addext 'subjectAltName=DNS:brief-service' \
   -keyout "$brief_service_private_key_file" \
   -out "$brief_service_certificate_file" >/dev/null 2>&1
-keytool -importcert -noprompt -storetype PKCS12 -storepass changeit \
-  -alias brief-service -file "$brief_service_certificate_file" \
-  -keystore "$brief_service_truststore_file" >/dev/null 2>&1
 printf '%s' "$round_turn_shared_secret" > "$round_turn_shared_secret_file"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
   -out "$round_private_key_file" >/dev/null 2>&1
@@ -577,7 +605,6 @@ chmod 600 \
   "$brief_service_bearer_token_file" \
   "$brief_service_private_key_file" \
   "$brief_service_certificate_file" \
-  "$brief_service_truststore_file" \
   "$round_turn_shared_secret_file" \
   "$round_private_key_file" \
   "$round_public_key_file" \
@@ -677,6 +704,7 @@ preflight_output="$(PATH="$fake_bin:$PATH" \
   BATON_CAL_RECOVERY_PREPARATION_ENABLED=true \
   BATON_CAL_RECOVERY_RUN_ID=90000000-0000-0000-0000-000000000001 \
   BATON_CAL_DELIVERY_ENABLED=true \
+  BATON_CAL_SUBSCRIPTIONS_ENABLED=true \
   BATON_CAL_SEASON_METADATA_ENABLED=true \
   BATON_CAL_SEASON_METADATA_MAINTENANCE=REPLAY \
   BATON_CAL_BASE_URL=https://ambient-calendar.invalid \
@@ -859,10 +887,15 @@ printf '%s\n' \
   'BATON_BRIEF_SERVICE_HOST=brief-service' \
   'BATON_BRIEF_PRIVATE_NETWORK=baton-brief-private' \
   "BATON_BRIEF_SERVICE_API_BEARER_TOKEN_FILE=$brief_service_bearer_token_file" \
-  "BATON_BRIEF_SERVICE_TRUSTSTORE_FILE=$brief_service_truststore_file" \
+  "BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=$brief_service_certificate_file" \
   >> "$brief_service_enabled_env"
 brief_service_preflight_output="$(PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/brief-service-docker.log" \
+  FAKE_ENV_ARGUMENT_LOG="$test_root/brief-service-env.log" \
+  FAKE_EXPECTED_BRIEF_SERVICE_BEARER_TOKEN="$brief_service_bearer_token" \
+  FAKE_EXPECTED_BRIEF_SERVICE_CERTIFICATE_FILE="$brief_service_certificate_file" \
+  BATON_SECRET_BRIEF_SERVICE_API_BEARER_TOKEN=ambient-brief-service-token \
+  BATON_SECRET_BRIEF_SERVICE_TRUSTED_CERTIFICATE=ambient-brief-service-certificate \
   "$preflight_script" "$brief_service_enabled_env" 2>&1)" \
   || fail 'enabled BRIEF service API production preflight failed'
 assert_contains 'Production preflight passed' "$brief_service_preflight_output" \
@@ -872,6 +905,69 @@ assert_contains 'compose.brief-service.production.yml' \
   'enabled BRIEF service API Compose overlay'
 assert_not_contains "$brief_service_bearer_token" "$brief_service_preflight_output" \
   'enabled BRIEF service API preflight token output'
+assert_not_contains "$brief_service_bearer_token" "$(cat "$test_root/brief-service-docker.log")" \
+  'enabled BRIEF service API Docker arguments'
+assert_not_contains "$brief_service_bearer_token" "$(cat "$test_root/brief-service-env.log")" \
+  'enabled BRIEF service API env arguments'
+
+brief_service_private_key_env="$test_root/brief-service-private-key.env"
+brief_service_certificate_with_key_file="$auth_secret_dir/brief-service-certificate-with-key.pem"
+cat "$brief_service_certificate_file" "$brief_service_private_key_file" \
+  > "$brief_service_certificate_with_key_file"
+chmod 600 "$brief_service_certificate_with_key_file"
+sed "s|^BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=.*|BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=$brief_service_certificate_with_key_file|" \
+  "$brief_service_enabled_env" > "$brief_service_private_key_env"
+chmod 600 "$brief_service_private_key_env"
+expect_preflight_failure \
+  'BRIEF service certificate with private key' \
+  "$brief_service_private_key_env" \
+  'must not contain a private key'
+
+brief_service_not_certificate_env="$test_root/brief-service-not-certificate.env"
+brief_service_not_certificate_file="$auth_secret_dir/brief-service-not-certificate.pem"
+head -c 512 /dev/zero | tr '\0' 'a' > "$brief_service_not_certificate_file"
+chmod 600 "$brief_service_not_certificate_file"
+sed "s|^BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=.*|BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=$brief_service_not_certificate_file|" \
+  "$brief_service_enabled_env" > "$brief_service_not_certificate_env"
+chmod 600 "$brief_service_not_certificate_env"
+expect_preflight_failure \
+  'BRIEF service invalid certificate' \
+  "$brief_service_not_certificate_env" \
+  'must contain a PEM certificate'
+
+brief_service_expired_env="$test_root/brief-service-expired.env"
+brief_service_expired_certificate_file="$auth_secret_dir/brief-service-expired.pem"
+# OpenSSL 3.0의 req는 과거 만료일을 만들 수 없어 2020-01-02에 만료된 공개 인증서를 고정한다.
+cat > "$brief_service_expired_certificate_file" <<'CERTIFICATE'
+-----BEGIN CERTIFICATE-----
+MIIBlTCCATugAwIBAgIUNlc7GwQmj2HB6D+az41UfDmeVW8wCgYIKoZIzj0EAwIw
+IDEeMBwGA1UEAwwVYnJpZWYtc2VydmljZS1leHBpcmVkMB4XDTIwMDEwMTAwMDAw
+MFoXDTIwMDEwMjAwMDAwMFowIDEeMBwGA1UEAwwVYnJpZWYtc2VydmljZS1leHBp
+cmVkMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECYdWlSVi8Xlpao+XdqbuYdLE
+1kZJ73p27yCOiTWJNl+neL6NO1vle4Q2WAP4jWGpRRcuNveNJua2xTPuboEJSaNT
+MFEwHQYDVR0OBBYEFH7FXwR7dIDF9OHmhCrwAZ509VccMB8GA1UdIwQYMBaAFH7F
+XwR7dIDF9OHmhCrwAZ509VccMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwID
+SAAwRQIhALZPKO5OlVkmLSqBV/w/CE++Q0scS3NNO/8obX+F/n43AiBEQ6EyT1CD
+U7btE4BhUza1CVRrvwuGooBG4y4afMhTQg==
+-----END CERTIFICATE-----
+CERTIFICATE
+chmod 600 "$brief_service_expired_certificate_file"
+sed "s|^BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=.*|BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=$brief_service_expired_certificate_file|" \
+  "$brief_service_enabled_env" > "$brief_service_expired_env"
+chmod 600 "$brief_service_expired_env"
+expect_preflight_failure \
+  'BRIEF service expired certificate' \
+  "$brief_service_expired_env" \
+  'contains an expired certificate'
+
+brief_service_legacy_env="$test_root/brief-service-legacy-truststore.env"
+sed 's|^BATON_BRIEF_SERVICE_TRUSTED_CERTIFICATE_FILE=|BATON_BRIEF_SERVICE_TRUSTSTORE_FILE=|' \
+  "$brief_service_enabled_env" > "$brief_service_legacy_env"
+chmod 600 "$brief_service_legacy_env"
+expect_preflight_failure \
+  'BRIEF service legacy truststore key' \
+  "$brief_service_legacy_env" \
+  'unknown or unsafe production environment key: BATON_BRIEF_SERVICE_TRUSTSTORE_FILE'
 
 if PATH="$fake_bin:$PATH" \
   FAKE_DOCKER_LOG="$test_root/brief-service-noninternal-docker.log" \
@@ -964,6 +1060,23 @@ assert_contains 'Production preflight passed' "$cal_preflight_output" \
   'enabled CAL production preflight'
 assert_not_contains "$cal_token" "$cal_preflight_output" \
   'enabled CAL preflight secret leak'
+
+cal_subscriptions_env="$test_root/cal-subscriptions.env"
+cp "$cal_enabled_env" "$cal_subscriptions_env"
+printf '%s\n' 'BATON_CAL_SUBSCRIPTIONS_ENABLED=true' >> "$cal_subscriptions_env"
+chmod 600 "$cal_subscriptions_env"
+"$production_env_validator_script" "$cal_subscriptions_env" >/dev/null \
+  || fail 'CAL 구독 활성 설정을 거부했습니다'
+for cal_subscription_dependency in BATON_CAL_CAPTURE_ENABLED BATON_CAL_DELIVERY_ENABLED; do
+  cal_subscription_dependency_env="$test_root/cal-subscriptions-without-$cal_subscription_dependency.env"
+  sed "s/^$cal_subscription_dependency=true$/$cal_subscription_dependency=false/" \
+    "$cal_subscriptions_env" > "$cal_subscription_dependency_env"
+  chmod 600 "$cal_subscription_dependency_env"
+  expect_preflight_failure \
+    "$cal_subscription_dependency 없는 CAL 구독" \
+    "$cal_subscription_dependency_env" \
+    'BATON_CAL_SUBSCRIPTIONS_ENABLED=true 설정에는 CAL 캡처와 전달 활성화가 필요합니다'
+done
 
 watch_enabled_env="$test_root/watch-enabled.env"
 write_valid_env "$watch_enabled_env"
@@ -1059,6 +1172,23 @@ grep -Fq 'header Cache-Control "public, max-age=31536000, immutable"' "$repo_roo
 grep -Fq 'header Cache-Control "no-cache"' "$repo_root/ops/Caddyfile" \
   || fail 'Caddy does not revalidate the SPA entry document'
 
+# 값은 홈서버 k3s 런북의 자원 제한과 맞춘다.
+for production_limit in \
+  'mem_limit: 1536m' \
+  'mem_limit: 1g' \
+  'mem_limit: 128m' \
+  'pids_limit: 256' \
+  'pids_limit: 512' \
+  'pids_limit: 128' \
+  '- --slow-query-log=ON' \
+  '- --long-query-time=1'; do
+  grep -Fq -- "$production_limit" "$repo_root/compose.production.yml" \
+    || fail "production Compose is missing: $production_limit"
+done
+grep -Fq -- '-XX:+ExitOnOutOfMemoryError' "$repo_root/Dockerfile" \
+  || fail 'production app does not exit on OutOfMemoryError'
+grep -Fxq 'USER caddy' "$repo_root/frontend/Dockerfile" \
+  || fail 'production web image does not run as a non-root user'
 grep -Fq 'SPRING_CONFIG_IMPORT: configtree:/run/baton-config/' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not import scalar secrets through configtree'
@@ -1074,9 +1204,21 @@ grep -Fq 'BATON_BRIEF_RECONCILIATION_INTERVAL: ${BATON_BRIEF_RECONCILIATION_INTE
 grep -Fq 'target: /run/baton-config/baton.brief.service-api.bearer-token' \
   "$repo_root/compose.brief-service.production.yml" \
   || fail 'BRIEF service Compose does not mount the separate Bearer through configtree'
-grep -Fq 'target: /run/baton-keys/brief-service-truststore.p12' \
+grep -Fq 'target: /run/baton-config/spring.ssl.bundle.pem.brief-service.truststore.certificate' \
   "$repo_root/compose.brief-service.production.yml" \
-  || fail 'BRIEF service Compose does not mount the TLS truststore'
+  || fail 'BRIEF service Compose does not mount the trusted certificate through configtree'
+grep -Fq 'BATON_BRIEF_SERVICE_API_SSL_BUNDLE: brief-service' \
+  "$repo_root/compose.brief-service.production.yml" \
+  || fail 'BRIEF service Compose does not select its dedicated SSL bundle'
+grep -Fq 'environment: BATON_SECRET_BRIEF_SERVICE_API_BEARER_TOKEN' \
+  "$repo_root/compose.brief-service.production.yml" \
+  || fail 'BRIEF service Bearer must use an environment secret readable by UID 10001'
+grep -Fq 'environment: BATON_SECRET_BRIEF_SERVICE_TRUSTED_CERTIFICATE' \
+  "$repo_root/compose.brief-service.production.yml" \
+  || fail 'BRIEF service certificate must use an environment secret readable by UID 10001'
+if grep -Fq 'javax.net.ssl.trustStore' "$repo_root/compose.brief-service.production.yml"; then
+  fail 'BRIEF service Compose replaces the JVM-wide truststore'
+fi
 grep -Fq 'target: /run/baton-keys/current-private.pem' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not mount the ROUND private key at a fixed path'
@@ -1104,6 +1246,9 @@ grep -Fq 'BATON_CAL_RECOVERY_RUN_ID: ${BATON_CAL_RECOVERY_RUN_ID:-}' \
 grep -Fq 'BATON_CAL_DELIVERY_ENABLED: ${BATON_CAL_DELIVERY_ENABLED:-false}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose does not forward the CAL delivery gate'
+grep -Fq 'BATON_CAL_SUBSCRIPTIONS_ENABLED: ${BATON_CAL_SUBSCRIPTIONS_ENABLED:-false}' \
+  "$repo_root/compose.production.yml" \
+  || fail 'production Compose가 CAL 구독 발급 설정을 전달하지 않습니다'
 grep -Fq 'BATON_CAL_SEASON_METADATA_MAINTENANCE: ${BATON_CAL_SEASON_METADATA_MAINTENANCE:-OFF}' \
   "$repo_root/compose.production.yml" \
   || fail 'production Compose가 CAL 시즌 이름 보정 모드를 전달하지 않습니다'
@@ -2142,6 +2287,12 @@ printf '%s\n' 'BATON_CAL_SEASON_METADATA_ENABLED=maybe' >> "$invalid_cal_metadat
 expect_preflight_failure \
   'CAL 시즌 이름 설정 오류' "$invalid_cal_metadata_env" 'BATON_CAL_SEASON_METADATA_ENABLED'
 
+invalid_cal_subscriptions_env="$test_root/invalid-cal-subscriptions.env"
+write_valid_env "$invalid_cal_subscriptions_env"
+printf '%s\n' 'BATON_CAL_SUBSCRIPTIONS_ENABLED=maybe' >> "$invalid_cal_subscriptions_env"
+expect_preflight_failure \
+  'CAL 구독 설정 오류' "$invalid_cal_subscriptions_env" 'BATON_CAL_SUBSCRIPTIONS_ENABLED'
+
 invalid_cal_recovery_id_env="$test_root/invalid-cal-recovery-id.env"
 write_valid_env "$invalid_cal_recovery_id_env"
 printf '%s\n' 'BATON_CAL_RECOVERY_RUN_ID=not-a-uuid' >> "$invalid_cal_recovery_id_env"
@@ -2401,8 +2552,18 @@ assert_not_contains '--insecure' "$curl_arguments" 'certificate verification'
 assert_not_contains ' -k ' " $curl_arguments " 'certificate verification'
 assert_not_contains '--location' "$curl_arguments" 'redirect behavior'
 
+FAKE_CURL_MODE=status-first run_health >/dev/null \
+  || fail 'status-first health response order failed'
+FAKE_CURL_MODE=status-only run_health >/dev/null \
+  || fail 'health response without probe groups failed'
 if FAKE_CURL_MODE=down run_health >/dev/null 2>&1; then
   fail 'DOWN service health unexpectedly passed'
+fi
+if FAKE_CURL_MODE=groups-down run_health >/dev/null 2>&1; then
+  fail 'DOWN service health with probe groups unexpectedly passed'
+fi
+if FAKE_CURL_MODE=nested-up run_health >/dev/null 2>&1; then
+  fail 'nested component UP unexpectedly replaced the aggregate status'
 fi
 if FAKE_CURL_MODE=redirect run_health >/dev/null 2>&1; then
   fail 'redirected service health unexpectedly passed'

@@ -21,6 +21,7 @@ const seasonSuccessorJournalPolicy = {
     'INVALID_INPUT',
     'SEASON_NAME_CONFLICT',
     'SEASON_SUCCESSOR_EXISTS',
+    'ROLE_HANDOFF_STATE_CONFLICT',
     'SEASON_NOT_FOUND',
     'ROLE_NOT_FOUND',
     'ROUTINE_NOT_FOUND',

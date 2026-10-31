@@ -376,6 +376,59 @@ class RoundAutomationApplicationTest {
     }
 
     @Test
+    @DisplayName("커서가 시즌 종료일을 넘어도 일정은 켜 둔 채 멈추고 시즌을 늘리면 같은 커서부터 회차를 만든다")
+    void keepsScheduleEnabledPastSeasonEndAndResumesAfterExtension() {
+        UUID teamId = UUID.randomUUID();
+        UUID seasonId = UUID.randomUUID();
+        Team team = team(teamId);
+        Season season = Season.create(
+                seasonId,
+                teamId,
+                "2026 하반기",
+                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 8, 7)
+        );
+        season.configureRoundSchedule(
+                LocalDate.of(2026, 8, 1),
+                LocalTime.of(20, 0),
+                RoundRecurrence.WEEKLY,
+                7,
+                true
+        );
+        season.advanceRoundSchedule();
+        when(accessRepository.findTeamByIdWithSharedLock(teamId)).thenReturn(Optional.of(team));
+        when(seasonRepository.findSeasonByTeamIdAndIdForUpdate(teamId, seasonId))
+                .thenReturn(Optional.of(season));
+        when(operationsRepository.findActiveRoutinesBySeasonId(seasonId))
+                .thenReturn(List.of(routine(seasonId, -1, LocalTime.of(23, 0))));
+        when(operationsRepository.saveSeasonRound(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(operationsRepository.saveRoutineExecutions(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        ScheduledRoundGenerationWorker worker = new ScheduledRoundGenerationWorker(
+                accessRepository,
+                seasonRepository,
+                operationsRepository,
+                briefRecorder,
+                mock(CalendarChangeRecorder.class)
+        );
+        ScheduledSeasonCandidate candidate = new ScheduledSeasonCandidate(teamId, seasonId);
+        Instant dueAt = Instant.parse("2026-08-07T00:00:00Z");
+
+        assertThat(worker.generateNextOccurrence(candidate, dueAt)).isFalse();
+
+        assertThat(season.getRoundSchedule().isEnabled()).isTrue();
+        assertThat(season.getRoundSchedule().getNextOccurrenceDate()).isEqualTo(LocalDate.of(2026, 8, 8));
+        verify(seasonRepository, never()).saveSeason(any());
+
+        season.update(season.getName(), season.getStartDate(), LocalDate.of(2026, 8, 31));
+
+        assertThat(worker.generateNextOccurrence(candidate, dueAt)).isTrue();
+        verify(operationsRepository).saveSeasonRound(any());
+        assertThat(season.getRoundSchedule().getNextOccurrenceDate()).isEqualTo(LocalDate.of(2026, 8, 15));
+    }
+
+    @Test
     @DisplayName("이미 생성된 예정일은 회차를 중복 저장하지 않고 커서만 전진한다")
     void skipsExistingAutomaticRoundOccurrence() {
         UUID teamId = UUID.randomUUID();

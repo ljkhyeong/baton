@@ -55,7 +55,7 @@ export function RoutineModal({
   const [phase, setPhase] = useState<RoutinePhase>(routine?.phase ?? 'BEFORE')
   const [dueLabel, setDueLabel] = useState(routine?.dueLabel ?? '')
   const [deadlineDayOffset, setDeadlineDayOffset] = useState(
-    routine?.deadlineDayOffset == null ? '-1' : String(routine.deadlineDayOffset),
+    routine ? String(routine.deadlineDayOffset ?? '') : '-1',
   )
   const [deadlineTime, setDeadlineTime] = useState(
     routine?.deadlineTime?.slice(0, 5) ?? '22:00',
@@ -64,9 +64,16 @@ export function RoutineModal({
     (routine?.ownerRoleId ?? selectedRoleId) || roles[0]?.id || '',
   )
   const [detail, setDetail] = useState(routine?.detail ?? '')
+  const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (submission.closeGuardRef.current || !ownerRoleId) return
+    const invalidMessage = !title.trim() ? '반복 업무 이름을 입력해 주세요.'
+      : !dueLabel.trim() ? '기한 설명을 입력해 주세요.'
+        : !detail.trim() ? '세부 설명을 입력해 주세요.'
+          : ''
+    setValidationMessage(invalidMessage)
+    if (invalidMessage) return
     submission.start(onSave({
       title: title.trim(),
       phase,
@@ -85,7 +92,7 @@ export function RoutineModal({
     <ModalShell
       title={editing ? '반복 업무 수정' : '반복 업무 만들기'}
       description={editing
-        ? '업무 시점, 담당 역할과 기한을 수정하세요.'
+        ? '업무 시점, 담당 역할과 기한을 수정하세요. 이미 만든 회차에는 반영되지 않습니다.'
         : '반복할 업무와 담당 역할, 마감을 정합니다.'}
       closeDisabled={submission.pending}
       closeGuardRef={submission.closeGuardRef}
@@ -96,6 +103,7 @@ export function RoutineModal({
           <span>반복 업무 이름</span>
           <input
             required
+            maxLength={200}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="예: 문제 5개 선정"
@@ -128,6 +136,7 @@ export function RoutineModal({
           <span>기한 설명</span>
           <input
             required
+            maxLength={100}
             value={dueLabel}
             onChange={(event) => setDueLabel(event.target.value)}
             placeholder="예: 수요일 18:00"
@@ -170,12 +179,14 @@ export function RoutineModal({
           <span>세부 설명</span>
           <textarea
             required
+            maxLength={1000}
             value={detail}
             onChange={(event) => setDetail(event.target.value)}
             placeholder="완료 기준이나 다음 담당자가 알아야 할 내용을 적어주세요"
             rows={3}
           />
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (
@@ -356,10 +367,14 @@ export function SeasonRoundModal({
   const [meetingDate, setMeetingDate] = useState(
     round?.meetingDate ?? clampToSeason(pilotCalendarDate(new Date(), season.timeZone), season),
   )
+  const [validationMessage, setValidationMessage] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (submission.closeGuardRef.current || !name.trim() || !meetingDate) return
-    submission.start(onSave({ name: name.trim(), meetingDate }))
+    if (submission.closeGuardRef.current || !meetingDate) return
+    const normalizedName = name.trim()
+    setValidationMessage(normalizedName ? '' : '회차 이름을 입력해 주세요.')
+    if (!normalizedName) return
+    submission.start(onSave({ name: normalizedName, meetingDate }))
   }
   return (
     <ModalShell
@@ -403,6 +418,7 @@ export function SeasonRoundModal({
             {formatLocalDate(season.startDate)}부터 {formatLocalDate(season.endDate)} 사이에서 선택해 주세요.
           </small>
         </label>
+        {validationMessage && <p className="form-error" role="alert">{validationMessage}</p>}
         {editing
           ? <FormError error={error} />
           : (

@@ -9,7 +9,7 @@ const accountSecurityKeys = {
 export function useAccountSecurity(accountId: string) {
   return useQuery({
     queryKey: accountSecurityKeys.current(accountId),
-    queryFn: getAccountSecurity,
+    queryFn: () => getAccountSecurity(accountId),
     retry: false,
     staleTime: 0,
   })
