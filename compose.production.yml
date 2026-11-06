@@ -8,7 +8,7 @@ x-logging: &default-logging
 
 services:
   mysql:
-    image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${BATON_DB_NAME:-baton}
@@ -248,7 +248,7 @@ services:
   # root로 쓰던 기존 Caddy 볼륨의 인증서를 비루트 web이 계속 쓰도록 소유권만 맞추고 끝난다.
   # 이미 내려받은 MySQL 이미지를 재사용하며 네트워크 없이 필요한 권한만 남긴다.
   web-volume-owner:
-    image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+    image: mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
     user: "0:0"
     entrypoint: ["chown", "-hR", "10002:10002", "/data", "/config"]
     network_mode: none
